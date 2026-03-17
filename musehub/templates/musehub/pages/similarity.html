@@ -1,0 +1,122 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}Similarity {{ base_ref }}...{{ head_ref }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="{{ base_url }}">{{ repo_slug }}</a> /
+  similarity /
+  <span class="text-mono">{{ base_ref }}...{{ head_ref }}</span>
+{% endblock %}
+
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{% block page_data %}
+const repoId = {{ repo_id | tojson }};
+const base   = {{ base_url | tojson }};
+{% endblock %}
+
+{% block content %}
+<!-- ── Page header ──────────────────────────────────────────────────────── -->
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+  <div>
+    <h1 style="margin:0;font-size:18px;color:#e6edf3">
+      Similarity:
+      <code style="font-size:14px">{{ base_ref }}</code>
+      &hellip;
+      <code style="font-size:14px">{{ head_ref }}</code>
+    </h1>
+    <div style="font-size:12px;color:#8b949e;margin-top:4px">{{ interpretation }}</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a href="{{ diff_url }}" class="btn btn-secondary" style="font-size:13px">
+      &#128200; Open Full Diff
+    </a>
+    <a href="{{ create_pr_url }}" class="btn btn-primary" style="font-size:13px">
+      &#10133; Create Pull Request
+    </a>
+  </div>
+</div>
+
+<!-- ── Overall badge + radar ────────────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start;margin-bottom:24px">
+  <div>
+    <!-- Large similarity badge -->
+    <div class="card" style="background:{{ badge.bg }};border-color:{{ badge.color }};text-align:center;padding:var(--space-5) var(--space-4);margin-bottom:16px">
+      <div style="font-size:56px;font-weight:800;color:{{ badge.color }};line-height:1">{{ overall_pct }}%</div>
+      <div style="font-size:15px;font-weight:700;color:{{ badge.color }};margin-top:6px">{{ badge.label }}</div>
+      <div style="font-size:12px;color:#8b949e;margin-top:4px">overall musical similarity</div>
+    </div>
+
+    <!-- Colour scale legend -->
+    <div class="card" style="padding:var(--space-3) var(--space-4)">
+      <div style="font-size:12px;color:#8b949e;margin-bottom:6px;font-weight:600">Colour scale</div>
+      {% for entry in [
+        {"min": 90, "label": "≥ 90% — Nearly Identical",    "color": "#3fb950"},
+        {"min": 75, "label": "≥ 75% — Very Similar",         "color": "#58a6ff"},
+        {"min": 60, "label": "≥ 60% — Moderately Similar",   "color": "#f0883e"},
+        {"min": 45, "label": "≥ 45% — Somewhat Different",   "color": "#ffa657"},
+        {"min":  0, "label": "< 45% — Very Different",       "color": "#f85149"},
+      ] %}
+      <div style="display:flex;align-items:center;gap:8px;padding:3px 0">
+        <span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:{{ entry.color }}"></span>
+        <span style="font-size:12px;color:#8b949e">{{ entry.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Server-rendered radar SVG -->
+  <div style="flex-shrink:0">
+    <div style="width:300px">
+      {{ radar_svg | safe }}
+    </div>
+    <div style="font-size:11px;color:#8b949e;text-align:center;margin-top:6px">
+      <span style="display:inline-block;width:20px;height:2px;background:#58a6ff;vertical-align:middle;margin-right:4px"></span>similarity score
+      <span style="display:inline-block;width:20px;border-top:2px dashed #f0883e;vertical-align:middle;margin-left:12px;margin-right:4px"></span>perfect (1.0)
+    </div>
+  </div>
+</div>
+
+<!-- ── 10-dimension breakdown table ────────────────────────────────────── -->
+<div class="card" style="margin-bottom:24px;overflow-x:auto">
+  <h2 style="margin:0 0 12px;font-size:16px;color:#e6edf3">Dimension Breakdown</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="border-bottom:2px solid #30363d">
+        <th style="padding:8px 12px;text-align:left;color:#8b949e;font-weight:600">Dimension</th>
+        <th style="padding:8px 12px;text-align:right;color:#58a6ff;font-weight:600">Score</th>
+        <th style="padding:8px 12px;color:#8b949e;font-weight:600">Similarity</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in dim_rows %}
+      <tr style="border-bottom:1px solid #21262d">
+        <td style="padding:8px 12px;font-size:13px;color:#e6edf3;white-space:nowrap">{{ row.label }}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:13px;color:#8b949e">{{ row.pct }}%</td>
+        <td style="padding:8px 12px;min-width:120px">
+          <div style="background:#21262d;border-radius:3px;height:6px;overflow:hidden">
+            <div style="height:100%;width:{{ row.pct }}%;background:{{ row.bar_color }};border-radius:3px"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Action CTA ────────────────────────────────────────────────────────── -->
+<div class="card" style="text-align:center;padding:var(--space-5)">
+  <div style="font-size:14px;color:#e6edf3;margin-bottom:12px">
+    Explore the full musical diff between
+    <code>{{ base_ref }}</code> and <code>{{ head_ref }}</code>
+  </div>
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+    <a href="{{ diff_url }}" class="btn btn-secondary" style="font-size:14px;padding:10px 20px">
+      &#128200; Open Full Diff
+    </a>
+    <a href="{{ create_pr_url }}" class="btn btn-primary" style="font-size:14px;padding:10px 20px">
+      &#10133; Create Pull Request
+    </a>
+  </div>
+</div>
+{% endblock %}

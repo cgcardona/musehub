@@ -1,0 +1,126 @@
+{% extends "musehub/base.html" %}
+{% from "musehub/macros/empty_state.html" import empty_state %}
+
+{% block title %}Pull Requests — {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / pulls
+{% endblock %}
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{% block page_data %}
+const repoId = {{ repo_id | tojson }};
+const base   = {{ base_url | tojson }};
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── PR list layout ─────────────────────────────────────────────────────── */
+.pr-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.pr-row:last-child { border-bottom: none; }
+
+.branch-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: monospace;
+  background: var(--color-surface-2, #161b22);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg, #e6edf3);
+}
+
+.pr-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8b949e;
+}
+
+/* ── Sort bar ────────────────────────────────────────────────────────────── */
+.sort-btn { font-size: 12px; padding: 3px 10px; }
+.sort-active {
+  background: var(--color-accent, #1f6feb) !important;
+  color: #fff !important;
+  border-color: var(--color-accent, #1f6feb) !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap">
+    <h1 style="margin:0">Pull Requests</h1>
+  </div>
+
+  {# ── State tabs — HTMX-powered ── #}
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--color-border);margin-bottom:var(--space-3)">
+    <a href="{{ base_url }}/pulls?state=open"
+       class="tab-btn{% if state == 'open' or not state %} tab-active{% endif %}"
+       hx-get="{{ base_url }}/pulls?state=open"
+       hx-target="#pr-rows"
+       hx-push-url="true">
+      ○ Open <span class="tab-count">{{ open_count }}</span>
+    </a>
+    <a href="{{ base_url }}/pulls?state=merged"
+       class="tab-btn{% if state == 'merged' %} tab-active{% endif %}"
+       hx-get="{{ base_url }}/pulls?state=merged"
+       hx-target="#pr-rows"
+       hx-push-url="true">
+      ✓ Merged <span class="tab-count">{{ merged_count }}</span>
+    </a>
+    <a href="{{ base_url }}/pulls?state=closed"
+       class="tab-btn{% if state == 'closed' %} tab-active{% endif %}"
+       hx-get="{{ base_url }}/pulls?state=closed"
+       hx-target="#pr-rows"
+       hx-push-url="true">
+      ✗ Closed <span class="tab-count">{{ closed_count }}</span>
+    </a>
+    <a href="{{ base_url }}/pulls?state=all"
+       class="tab-btn{% if state == 'all' %} tab-active{% endif %}"
+       hx-get="{{ base_url }}/pulls?state=all"
+       hx-target="#pr-rows"
+       hx-push-url="true">
+      All <span class="tab-count">{{ open_count + merged_count + closed_count }}</span>
+    </a>
+  </div>
+
+  {# ── Sort bar ── #}
+  <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+    <span style="font-size:13px;color:#8b949e">Sort:</span>
+    <a href="{{ base_url }}/pulls?state={{ state }}&sort=newest"
+       class="btn btn-ghost btn-sm sort-btn{% if active_sort == 'newest' %} sort-active{% endif %}"
+       hx-get="{{ base_url }}/pulls?state={{ state }}&sort=newest"
+       hx-target="#pr-rows"
+       hx-push-url="true">Newest</a>
+    <a href="{{ base_url }}/pulls?state={{ state }}&sort=oldest"
+       class="btn btn-ghost btn-sm sort-btn{% if active_sort == 'oldest' %} sort-active{% endif %}"
+       hx-get="{{ base_url }}/pulls?state={{ state }}&sort=oldest"
+       hx-target="#pr-rows"
+       hx-push-url="true">Oldest</a>
+  </div>
+
+  {# ── PR rows — HTMX swap target ── #}
+  <div id="pr-rows">
+    {% include "musehub/fragments/pr_rows.html" %}
+  </div>
+</div>
+{% endblock %}
+
+{% block page_script %}
+<script>
+// Minimal JS: repo nav initialisation only. All data is server-rendered.
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof initRepoNav === 'function') initRepoNav({{ repo_id | tojson }});
+});
+</script>
+{% endblock %}

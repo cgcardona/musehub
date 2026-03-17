@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/musehub/static/tokens.css">
+  <link rel="stylesheet" href="/musehub/static/components.css">
+  <link rel="stylesheet" href="/musehub/static/layout.css">
+  <link rel="stylesheet" href="/musehub/static/icons.css">
+  <link rel="stylesheet" href="/musehub/static/music.css">
+  <title>{% block title %}Muse Hub{% endblock %} — Muse Hub</title>
+  <link rel="alternate" type="application/json" href="{{ request.url }}">
+  {# oEmbed discovery — lets CMS/blog platforms auto-embed MuseHub pages.
+     Emits a <link> tag pointing to the oEmbed endpoint for the current URL.
+     Individual pages may override this block to supply a more specific ref. #}
+  {% block oembed_link %}<link rel="alternate" type="application/json+oembed"
+       href="https://musehub.stori.app/musehub/oembed?url={{ request.url | urlencode }}"
+       title="MuseHub oEmbed">{% endblock %}
+  {% block extra_css %}{% endblock %}
+  {% block jsonld %}{% endblock %}
+  <script src="/musehub/static/alpinejs.min.js" defer></script>
+  <script src="/musehub/static/htmx.min.js"></script>
+  <style>
+    .nav-notif-bell {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      font-size: 16px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      color: inherit;
+      transition: background 0.15s;
+    }
+    .nav-notif-bell:hover { background: rgba(255,255,255,0.08); }
+    .nav-notif-badge {
+      position: absolute;
+      top: -6px;
+      right: -8px;
+      background: #e53e3e;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 16px;
+      height: 16px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0 3px;
+      line-height: 1;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  {# HTMX top-of-page loading bar — shown via .htmx-request CSS class #}
+  <div id="htmx-loading" class="htmx-indicator" aria-hidden="true" style="position:fixed;top:0;left:0;right:0;height:2px;background:var(--color-accent,#1f6feb);z-index:9999;display:none"></div>
+  {# Global navigation bar — logo, search, user menu #}
+  {% include "musehub/partials/navbar.html" %}
+
+  {# Contextual breadcrumb row — populated by each page via {% block breadcrumb %} #}
+  <div class="breadcrumb-bar">
+    <span class="breadcrumb">{% block breadcrumb %}{% endblock %}</span>
+    {% include "musehub/partials/breadcrumbs.html" %}
+  </div>
+
+  {# Repo-scoped pages fill this with the repo identity card + tab strip #}
+  {% block repo_nav %}{% endblock %}
+
+  <div class="container{% block container_extra_class %}{% endblock %}" hx-boost="true"{% block container_attrs %}{% endblock %}>
+    {% block token_form %}
+    <div class="token-form" id="token-form" style="display:none">
+      <p id="token-msg">Enter your Maestro JWT to browse this repo.</p>
+      <input type="password" id="token-input" placeholder="eyJ..." />
+      <button class="btn btn-primary" onclick="saveToken()">Save &amp; Load</button>
+      &nbsp;
+      <button class="btn btn-secondary" onclick="clearToken();location.reload()">Clear</button>
+    </div>
+    {% endblock %}
+    <div id="content">{% block content %}<p class="loading">Loading&#8230;</p>{% endblock %}</div>
+  </div>
+
+  {% block body_extra %}{% endblock %}
+
+  {# Persistent floating audio player — hidden until audio is queued #}
+  <div class="audio-player" id="audio-player" style="display:none">
+    <button class="player-btn" id="player-toggle" onclick="togglePlay()">&#9654;</button>
+    <div class="player-info">
+      <span class="player-title" id="player-title">Now Playing</span>
+      <span class="player-repo" id="player-repo"></span>
+    </div>
+    <div class="player-progress">
+      <span class="player-time" id="player-current">0:00</span>
+      <input type="range" class="player-seek" id="player-seek" value="0" min="0" max="100" step="0.1"
+             oninput="seekAudio(this.value)" />
+      <span class="player-time" id="player-duration">0:00</span>
+    </div>
+    <audio id="player-audio" onended="onAudioEnded()" ontimeupdate="onTimeUpdate()"
+           onloadedmetadata="onMetadata()"></audio>
+    <button class="player-btn" onclick="closePlayer()" title="Close">&#10005;</button>
+  </div>
+
+  <script src="/musehub/static/musehub.js"></script>
+  <script>
+    async function loadNotifBadge() {
+      if (!getToken()) return;
+      try {
+        const data = await apiFetch('/notifications');
+        const unread = Array.isArray(data) ? data.filter(n => !n.is_read).length : 0;
+        const badge = document.getElementById('nav-notif-badge');
+        if (badge) {
+          badge.textContent = unread > 99 ? '99+' : String(unread);
+          badge.style.display = unread > 0 ? 'flex' : 'none';
+        }
+      } catch (e) { /* silent fail */ }
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+      // Show Sign out only when a token is stored.
+      if (getToken()) {
+        var btn = document.getElementById('signout-btn');
+        if (btn) btn.style.display = '';
+      }
+      loadNotifBadge();
+      {% block page_data %}{% endblock %}
+      {% block page_script %}{% endblock %}
+    });
+  </script>
+</body>
+</html>

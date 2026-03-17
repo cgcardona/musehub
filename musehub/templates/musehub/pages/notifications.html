@@ -1,0 +1,55 @@
+{% extends "musehub/base.html" %}
+{% from "musehub/macros/pagination.html" import pagination %}
+{% from "musehub/macros/empty_state.html" import empty_state %}
+
+{% block title %}Notifications{% endblock %}
+{% block breadcrumb %}Notifications{% endblock %}
+
+{% block content %}
+{% if not authenticated %}
+  {{ empty_state("🔔", "Sign in to see notifications", "Your notifications appear here when you're signed in.") }}
+{% else %}
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3)">
+    <h1 style="margin:0">
+      Notifications
+      {% if unread_count > 0 %}
+        <span class="badge badge-accent" style="margin-left:var(--space-2)">{{ unread_count }} unread</span>
+      {% endif %}
+    </h1>
+  </div>
+
+  {# Filter bar — HTMX form swaps #notification-rows on change #}
+  <form method="get" action="/musehub/ui/notifications"
+        hx-get="/musehub/ui/notifications"
+        hx-target="#notification-rows"
+        hx-push-url="true"
+        style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)">
+    <label class="sort-radio-label" style="display:flex;align-items:center;gap:var(--space-2);font-size:13px;cursor:pointer">
+      <input type="checkbox" name="unread_only" value="true"
+             {% if unread_only %}checked{% endif %}
+             onchange="this.form.requestSubmit()"/>
+      Unread only
+    </label>
+    <select name="type_filter" class="filter-select"
+            style="font-size:13px;padding:4px 8px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary)"
+            onchange="this.form.requestSubmit()">
+      <option value="">All types</option>
+      {% for et in event_types %}
+        <option value="{{ et }}" {% if et == type_filter %}selected{% endif %}>{{ et | title }}</option>
+      {% endfor %}
+    </select>
+    {% if type_filter or unread_only %}
+      <a href="/musehub/ui/notifications" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+
+  <div id="notification-rows">
+    {% include "musehub/fragments/notification_rows.html" %}
+  </div>
+
+  {{ pagination(page, total_pages, '/musehub/ui/notifications',
+               extra_params={'type_filter': type_filter or '', 'unread_only': 'true' if unread_only else ''}) }}
+</div>
+{% endif %}
+{% endblock %}

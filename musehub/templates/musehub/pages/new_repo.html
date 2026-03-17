@@ -1,0 +1,391 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}Create a new repository{% endblock %}
+
+{% block breadcrumb %}<a href="/musehub/ui/explore">Explore</a> / New repository{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-layout {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-5) 0;
+}
+.wizard-header {
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-4);
+}
+.wizard-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2) 0;
+}
+.wizard-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.form-group {
+  margin-bottom: var(--space-4);
+}
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+  color: var(--text-primary);
+}
+.form-label .required {
+  color: #f85149;
+  margin-left: 2px;
+}
+.form-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  background: var(--bg-surface, #0d1117);
+  border: 1px solid var(--border-default, #30363d);
+  border-radius: var(--radius-md, 6px);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+.owner-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.owner-sep {
+  font-size: 20px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.owner-input { flex: 0 0 220px; }
+.name-input  { flex: 1; }
+.name-check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+#name-check {
+  font-size: 12px;
+  min-height: 16px;
+}
+.htmx-indicator {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}
+.visibility-row {
+  display: flex;
+  gap: var(--space-3);
+}
+.visibility-card {
+  flex: 1;
+  padding: var(--space-3);
+  border: 2px solid var(--border-default, #30363d);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  background: var(--bg-surface);
+  transition: border-color 0.15s;
+}
+.visibility-card.selected,
+.visibility-card[aria-checked="true"] {
+  border-color: var(--color-accent, #58a6ff);
+}
+.visibility-card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.visibility-card-desc  { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.visibility-icon { font-size: 18px; margin-bottom: 4px; }
+.form-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-surface, #0d1117);
+  border: 1px solid var(--border-subtle, #21262d);
+  border-radius: var(--radius-md, 6px);
+  margin-bottom: var(--space-2);
+}
+.form-checkbox-row input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
+.form-checkbox-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.form-checkbox-desc  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.branch-row { margin-top: var(--space-3); }
+.tag-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-surface, #0d1117);
+  border: 1px solid var(--border-default, #30363d);
+  border-radius: var(--radius-md, 6px);
+  min-height: 38px;
+  cursor: text;
+}
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.tag-pill-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}
+.tag-pill-remove:hover { color: #f85149; }
+.tag-text-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 100px;
+  flex: 1;
+}
+.wizard-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: var(--space-5) 0;
+}
+.wizard-actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-5);
+}
+.submit-error {
+  color: #f85149;
+  font-size: 13px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-layout" x-data="{
+  visibility: 'private',
+  topics: [],
+  topicInput: '',
+  showBranch: true,
+  addTopic(val) {
+    val = val.trim().replace(/,/g, '');
+    if (val && !this.topics.includes(val)) this.topics.push(val);
+    this.topicInput = '';
+  },
+  removeTopic(i) { this.topics.splice(i, 1); },
+  onTopicKey(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      this.addTopic(e.target.value);
+    } else if (e.key === 'Backspace' && e.target.value === '' && this.topics.length > 0) {
+      this.topics.pop();
+    }
+  }
+}">
+
+  <div class="wizard-header">
+    <h1 class="wizard-title">🗂️ Create a new repository</h1>
+    <p class="wizard-subtitle">A repository contains all your project's files, commit history, and collaboration records.</p>
+  </div>
+
+  <form id="wizard-form" onsubmit="submitWizard(event)">
+
+    {# Owner / repo name row with HTMX availability check #}
+    <div class="form-group">
+      <label class="form-label">Owner &amp; repository name <span class="required">*</span></label>
+      <div class="form-description">Choose your username as the owner. The name determines the URL.</div>
+      <div class="owner-name-row">
+        <input class="form-input owner-input" id="f-owner" name="owner" type="text"
+               placeholder="your-username"
+               pattern="^[a-z0-9]([a-z0-9\-]{0,62}[a-z0-9])?$"
+               required maxlength="64"
+               title="Lowercase letters, numbers, and hyphens only; no leading/trailing hyphens"/>
+        <span class="owner-sep">/</span>
+        <input class="form-input name-input" id="f-name" name="name" type="text"
+               placeholder="my-composition"
+               required maxlength="255"
+               hx-get="/musehub/ui/new/check"
+               hx-trigger="input changed delay:300ms"
+               hx-target="#name-check"
+               hx-indicator="#name-check-indicator"
+               hx-include="#f-owner, #f-name"
+               hx-vals='js:{"owner": document.getElementById("f-owner").value, "slug": event.target.value}'/>
+        <span id="name-check-indicator" class="htmx-indicator" aria-label="Checking…">⏳</span>
+        <span id="name-check"></span>
+      </div>
+    </div>
+
+    {# Description #}
+    <div class="form-group">
+      <label class="form-label" for="f-description">Description</label>
+      <div class="form-description">A short summary shown on the explore page and your profile.</div>
+      <textarea class="form-input" id="f-description" name="description" rows="2" maxlength="350"
+                placeholder="A jazz trio arrangement in D minor…" style="resize:vertical"></textarea>
+    </div>
+
+    <hr class="wizard-divider"/>
+
+    {# Visibility — Alpine.js radio toggle (minimal stateful UI) #}
+    <div class="form-group">
+      <label class="form-label">Visibility <span class="required">*</span></label>
+      <div class="visibility-row">
+        <label class="visibility-card"
+               :class="{ selected: visibility === 'public' }">
+          <input type="radio" name="visibility" value="public" x-model="visibility"
+                 style="display:none"/>
+          <div class="visibility-icon">🌍</div>
+          <div class="visibility-card-title">Public</div>
+          <div class="visibility-card-desc">Anyone on Muse Hub can view this repository.</div>
+        </label>
+        <label class="visibility-card selected"
+               :class="{ selected: visibility === 'private' }">
+          <input type="radio" name="visibility" value="private" x-model="visibility"
+                 style="display:none"/>
+          <div class="visibility-icon">🔒</div>
+          <div class="visibility-card-title">Private</div>
+          <div class="visibility-card-desc">Only you and your collaborators can view this repository.</div>
+        </label>
+      </div>
+    </div>
+
+    <hr class="wizard-divider"/>
+
+    {# License — server-rendered dropdown #}
+    <div class="form-group">
+      <label class="form-label" for="f-license">License</label>
+      <div class="form-description">Tell others what they can and cannot do with your music.</div>
+      <select class="form-input" id="f-license" name="license" style="max-width:380px">
+        {% for value, label in licenses %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {# Topics — Alpine.js tag chip input #}
+    <div class="form-group">
+      <label class="form-label">Topics</label>
+      <div class="form-description">Tag your repo with genres, moods, or instruments. Press <kbd>Enter</kbd> or <kbd>,</kbd> to add.</div>
+      <div class="tag-input-container" @click="$refs.topicInput.focus()">
+        <template x-for="(t, i) in topics" :key="i">
+          <span class="tag-pill">
+            <span x-text="t"></span>
+            <button type="button" class="tag-pill-remove" @click.stop="removeTopic(i)">&times;</button>
+          </span>
+        </template>
+        <input class="tag-text-input" x-ref="topicInput" x-model="topicInput"
+               placeholder="jazz, piano, D minor…"
+               @keydown="onTopicKey($event)"
+               @input="topicInput.endsWith(',') && addTopic(topicInput)"/>
+      </div>
+    </div>
+
+    <hr class="wizard-divider"/>
+
+    {# Initialize repository #}
+    <div class="form-group">
+      <label class="form-label">Initialise this repository</label>
+      <div class="form-checkbox-row">
+        <input type="checkbox" id="f-initialize" x-model="showBranch" checked/>
+        <div>
+          <div class="form-checkbox-label">Add an initial commit</div>
+          <div class="form-checkbox-desc">Creates an empty "Initial commit" so the repository is immediately browsable.</div>
+        </div>
+      </div>
+      <div class="branch-row" x-show="showBranch">
+        <label class="form-label" for="f-branch">Default branch name</label>
+        <input class="form-input" id="f-branch" name="defaultBranch" type="text" value="main"
+               maxlength="255" style="max-width:240px" placeholder="main"/>
+      </div>
+    </div>
+
+    <hr class="wizard-divider"/>
+
+    {# Form actions #}
+    <div class="wizard-actions">
+      <button class="btn btn-primary" type="submit" id="submit-btn">
+        Create repository
+      </button>
+      <a class="btn btn-secondary" href="/musehub/ui/explore">Cancel</a>
+      <span class="submit-error" id="submit-error" style="display:none"></span>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+// Minimal form submission — keeps JWT in localStorage, avoids form-action redirect.
+async function submitWizard(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const errorEl = document.getElementById('submit-error');
+  if (errorEl) errorEl.style.display = 'none';
+
+  const owner    = document.getElementById('f-owner').value.trim();
+  const name     = document.getElementById('f-name').value.trim();
+  const desc     = document.getElementById('f-description').value.trim();
+  const license  = document.getElementById('f-license').value || null;
+  const branch   = document.getElementById('f-branch') ? document.getElementById('f-branch').value.trim() || 'main' : 'main';
+  const init     = document.getElementById('f-initialize').checked;
+  const visEl    = document.querySelector('input[name="visibility"]:checked');
+  const vis      = visEl ? visEl.value : 'private';
+
+  // Collect topics from Alpine.js data
+  const alpineRoot = document.querySelector('.wizard-layout');
+  const topics = (alpineRoot && alpineRoot._x_dataStack && alpineRoot._x_dataStack[0])
+    ? [...alpineRoot._x_dataStack[0].topics] : [];
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+  try {
+    const token = typeof getToken === 'function' ? getToken() : '';
+    if (!token) {
+      if (typeof showTokenForm === 'function') showTokenForm('Sign in to create a repository.');
+      return;
+    }
+    const res = await fetch('/musehub/ui/new', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner, name, description: desc, visibility: vis, license,
+                             topics, tags: [], initialize: init, defaultBranch: branch }),
+    });
+    if (res.status === 401 || res.status === 403) {
+      if (typeof showTokenForm === 'function') showTokenForm('Session expired — re-enter your JWT.');
+      return;
+    }
+    const data = await res.json();
+    if (res.status === 201) {
+      window.location.href = data.redirect;
+      return;
+    }
+    if (errorEl) { errorEl.textContent = '❌ ' + (data.detail || 'Failed to create repository.'); errorEl.style.display = ''; }
+  } catch (ex) {
+    if (errorEl) { errorEl.textContent = '❌ ' + ex.message; errorEl.style.display = ''; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Create repository'; }
+  }
+}
+</script>
+{% endblock %}

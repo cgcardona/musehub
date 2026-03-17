@@ -1,0 +1,88 @@
+{% extends "musehub/base.html" %}
+{% from "musehub/macros/empty_state.html" import empty_state %}
+
+{% block title %}Credits — {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / credits
+{% endblock %}
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <h1 style="margin:0">🎶 Credits</h1>
+    <span style="flex:1"></span>
+    <span style="font-size:13px;color:var(--text-muted)">
+      {{ total_contributors }} contributor{{ 's' if total_contributors != 1 else '' }}
+    </span>
+    <form method="get" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted)">
+      <label for="sort-select">Sort:</label>
+      <select id="sort-select" name="sort" class="filter-select" onchange="this.form.submit()">
+        <option value="count"   {% if sort == 'count'   %}selected{% endif %}>Most prolific</option>
+        <option value="recency" {% if sort == 'recency' %}selected{% endif %}>Most recent</option>
+        <option value="alpha"   {% if sort == 'alpha'   %}selected{% endif %}>A – Z</option>
+      </select>
+    </form>
+  </div>
+
+  {% if contributors %}
+    {% for contrib in contributors %}
+    <div class="commit-row" style="align-items:flex-start;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:10px;width:100%">
+        <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
+                    background:hsl({{ (contrib.author | length * 37) % 360 }},45%,32%);
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:16px;font-weight:700;color:#e6edf3;border:2px solid #30363d;">
+          {{ contrib.author[0] | upper }}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <a href="/musehub/ui/users/{{ contrib.author | urlencode }}"
+               style="font-size:15px;color:#e6edf3;font-weight:600;text-decoration:none;"
+               onmouseover="this.style.textDecoration='underline'"
+               onmouseout="this.style.textDecoration='none'">{{ contrib.author }}</a>
+            <span class="badge badge-open" style="font-size:12px;background:#1a3a5c">
+              {{ contrib.session_count }} session{{ 's' if contrib.session_count != 1 else '' }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div>
+        {% for role in contrib.contribution_types %}
+          <span class="label">{{ role }}</span>
+        {% endfor %}
+      </div>
+      <div style="font-size:12px;color:var(--text-muted)">
+        {{ contrib.first_active | fmtdate }} – {{ contrib.last_active | fmtdate }}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    {{ empty_state(
+        "🎵",
+        "No credits yet",
+        "Contributor credits appear here after the first commit is pushed.",
+    ) }}
+  {% endif %}
+</div>
+
+<p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">
+  Machine-readable credits embedded as JSON-LD (schema.org/MusicComposition)
+</p>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "MusicComposition",
+  "contributor": [
+    {% for contrib in contributors %}
+    {
+      "@type": "Person",
+      "name": {{ contrib.author | tojson }},
+      "roleName": {{ contrib.contributionTypes | join(', ') | tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}

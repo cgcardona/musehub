@@ -1,0 +1,228 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}{{ owner }}/{{ repo_slug }} — blame/{{ short_ref }}/{{ short_path }}{% endblock %}
+
+{% block breadcrumb %}
+  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
+  blame /
+  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}/tree/{{ ref }}">{{ short_ref }}</a> /
+  {{ short_path }}
+{% endblock %}
+
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{# Minimal JS context — only what initRepoNav and HTMX push-URL need. #}
+{% block page_data %}
+const repoId = {{ repo_id | tojson }};
+const base   = {{ base_url | tojson }};
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.blame-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 12px; margin-bottom: 16px;
+}
+.blame-filter-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+  padding: 10px 16px; margin-bottom: 16px;
+}
+.blame-filter-bar label { font-size: 13px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+.blame-filter-bar select,
+.blame-filter-bar input[type="number"] {
+  background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 6px; padding: 5px 10px; font-size: 13px; min-width: 90px;
+}
+.blame-filter-bar select:hover,
+.blame-filter-bar input[type="number"]:hover { border-color: #58a6ff; }
+.blame-table-wrap {
+  border: 1px solid #30363d; border-radius: 8px; overflow: hidden; margin-bottom: 16px;
+}
+.blame-table {
+  width: 100%; border-collapse: collapse; background: #0d1117;
+  font-size: 13px;
+}
+.blame-table th {
+  background: #161b22; color: #8b949e; padding: 9px 14px;
+  text-align: left; font-weight: 600; font-size: 12px;
+  border-bottom: 1px solid #30363d; white-space: nowrap;
+}
+.blame-table td {
+  padding: 9px 14px; border-bottom: 1px solid #21262d; color: #c9d1d9;
+  vertical-align: middle;
+}
+.blame-table tr:last-child td { border-bottom: none; }
+.blame-table tr:hover td { background: #161b22; }
+.commit-sha {
+  font-family: monospace; font-size: 12px;
+  color: #58a6ff; text-decoration: none; white-space: nowrap;
+}
+.commit-sha:hover { text-decoration: underline; }
+.blame-author { font-size: 12px; color: #8b949e; }
+.blame-date { font-size: 12px; color: #8b949e; white-space: nowrap; }
+.blame-msg {
+  max-width: 240px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; color: #e6edf3;
+}
+.pitch-badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 12px; font-size: 11px; font-weight: 600;
+  background: #1f6feb33; color: #58a6ff; white-space: nowrap;
+}
+.track-badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 12px; font-size: 11px; font-weight: 600;
+  background: #2ea04333; color: #3fb950; white-space: nowrap;
+}
+.beat-range { font-size: 12px; color: #8b949e; white-space: nowrap; }
+.velocity-bar {
+  display: inline-block; width: 60px; height: 6px;
+  background: #21262d; border-radius: 3px; vertical-align: middle;
+}
+.velocity-fill {
+  display: inline-block; height: 100%; border-radius: 3px;
+  background: #f0883e;
+}
+.blame-empty {
+  padding: 48px 16px; text-align: center; color: #8b949e;
+  font-size: 14px;
+}
+.blame-summary {
+  font-size: 13px; color: #8b949e; margin-bottom: 12px;
+}
+.blame-summary strong { color: #c9d1d9; }
+</style>
+{% endblock %}
+
+{% block content %}
+{# ── Page header ──────────────────────────────────────────────────────────── #}
+<div class="blame-header"
+     style="padding: 0 0 8px; border-bottom: 1px solid #30363d; margin-bottom: 16px; margin-top: -8px;">
+  <div>
+    <h2 style="margin: 0; font-size: 18px; color: #e6edf3;">
+      &#x1F4CB; Blame &#8212;
+      <code style="font-size: 15px; background: #161b22; padding: 2px 8px; border-radius: 4px;">
+        {{ short_path }}
+      </code>
+    </h2>
+    <p style="margin: 4px 0 0; font-size: 13px; color: #8b949e;">
+      Per-note commit attribution at ref
+      <code style="background: #161b22; padding: 2px 6px; border-radius: 4px;">{{ short_ref }}</code>
+      &bull;
+      <a href="{{ base_url }}/tree/{{ ref }}/{{ path }}"
+         style="color: #58a6ff; text-decoration: none; font-size: 13px;">
+        View file &#8599;
+      </a>
+    </p>
+  </div>
+  <div style="display: flex; gap: 8px;">
+    <a href="{{ base_url }}/commits" class="btn btn-secondary" style="font-size: 12px;">
+      &#x1F4DC; Commits
+    </a>
+    <a href="{{ base_url }}/piano-roll/{{ ref }}/{{ path }}"
+       class="btn btn-secondary" style="font-size: 12px;">
+      &#127929; Piano Roll
+    </a>
+  </div>
+</div>
+
+{# ── Filter form — submits as GET, pre-populated from server context ────── #}
+<form class="blame-filter-bar"
+      method="get"
+      action="{{ request.url.path }}"
+      hx-get="{{ request.url.path }}"
+      hx-target="#content"
+      hx-push-url="true"
+      hx-swap="innerHTML">
+  <label>
+    Track:
+    <select id="blame-track-sel" name="track">
+      <option value=""{% if not track %} selected{% endif %}>All tracks</option>
+      {% for t in ["piano", "bass", "drums", "keys", "strings", "guitar", "lead", "pads"] %}
+      <option value="{{ t }}"{% if track == t %} selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Beat start &ge;
+    <input type="number" id="blame-beat-start" name="beatStart" min="0" step="0.25"
+           placeholder="0.0" style="width: 80px;"
+           {% if beat_start is not none %}value="{{ beat_start }}"{% endif %} />
+  </label>
+  <label>
+    Beat end &lt;
+    <input type="number" id="blame-beat-end" name="beatEnd" min="0" step="0.25"
+           placeholder="32.0" style="width: 80px;"
+           {% if beat_end is not none %}value="{{ beat_end }}"{% endif %} />
+  </label>
+  <button type="submit" class="btn btn-primary" style="font-size: 13px;">Apply</button>
+</form>
+
+{# ── Server-side rendered blame table ────────────────────────────────────── #}
+{% if not blame_entries %}
+<div class="blame-empty">
+  <p>&#x1F3B5; No blame entries found for this path and filter combination.</p>
+  <p style="font-size:12px;margin-top:8px">
+    Try removing track or beat range filters, or check that the path is correct.
+  </p>
+</div>
+{% else %}
+<div class="blame-summary">
+  Showing <strong>{{ total_entries }}</strong> blame entr{{ "y" if total_entries == 1 else "ies" }}
+  for <code style="background:#161b22;padding:2px 6px;border-radius:4px">{{ path }}</code>
+  at <code style="background:#161b22;padding:2px 6px;border-radius:4px">{{ short_ref }}</code>
+</div>
+<div class="blame-table-wrap">
+  <table class="blame-table">
+    <thead>
+      <tr>
+        <th>Commit</th>
+        <th>Message</th>
+        <th>Author</th>
+        <th>Date</th>
+        <th>Track</th>
+        <th>Pitch</th>
+        <th>Beat range</th>
+        <th>Velocity</th>
+        <th>Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in blame_entries %}
+      <tr>
+        <td>
+          <a class="commit-sha"
+             href="{{ base_url }}/commits/{{ entry.commit_id }}">
+            {{ entry.commit_id | shortsha }}
+          </a>
+        </td>
+        <td class="blame-msg" title="{{ entry.commit_message | e }}">
+          {{ entry.commit_message | e | truncate(50, True, "…") }}
+        </td>
+        <td class="blame-author">{{ entry.author | e }}</td>
+        <td class="blame-date">{{ entry.timestamp | fmtdate }}</td>
+        <td><span class="track-badge">{{ entry.track | e }}</span></td>
+        <td><span class="pitch-badge">{{ entry.note_pitch | note_name }}</span></td>
+        <td class="beat-range">
+          {{ "%.2f" | format(entry.beat_start) }} – {{ "%.2f" | format(entry.beat_end) }}
+        </td>
+        <td>
+          <div class="velocity-bar" title="Velocity {{ entry.note_velocity }}">
+            <div class="velocity-fill"
+                 style="width:{{ (entry.note_velocity / 127 * 100) | round | int }}%">
+            </div>
+          </div>
+          <span style="font-size:11px;color:#8b949e;margin-left:4px">{{ entry.note_velocity }}</span>
+        </td>
+        <td style="font-size:12px;color:#8b949e">
+          {{ "%.2f" | format(entry.note_duration_beats) }}b
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,345 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}PR {{ pr.pr_id[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
+  <a href="{{ base_url }}/pulls">pulls</a> / {{ pr.pr_id[:8] }}
+{% endblock %}
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{% block page_data %}
+const repoId = {{ repo_id | tojson }};
+const prId   = {{ pr_id | tojson }};
+const base   = {{ base_url | tojson }};
+const apiBase = '/api/v1/musehub/repos/' + repoId;
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── PR detail layout ───────────────────────────────────────────────────── */
+.pr-detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .pr-detail-layout { grid-template-columns: 1fr; }
+  .pr-sidebar { display: none; }
+}
+
+/* ── Branch pills ────────────────────────────────────────────────────────── */
+.branch-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: monospace;
+  background: var(--color-surface-2, #161b22);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg, #e6edf3);
+}
+
+/* ── Diff stats ──────────────────────────────────────────────────────────── */
+.diff-stat { display: flex; gap: var(--space-3); font-size: 13px; flex-wrap: wrap; }
+.diff-stat-additions { color: #3fb950; font-weight: 600; }
+.diff-stat-deletions { color: #f85149; font-weight: 600; }
+.diff-stat-files     { color: #8b949e; }
+
+/* ── Review chips ────────────────────────────────────────────────────────── */
+.reviewer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2, #161b22);
+}
+.reviewer-chip--approved       { border-color: #3fb95055; }
+.reviewer-chip--changes        { border-color: #f0883e55; }
+.reviewer-chip--pending        { border-color: #8b949e33; }
+
+/* ── Comments ────────────────────────────────────────────────────────────── */
+.comment-block {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+.comment-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2, #161b22);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.comment-body-text {
+  padding: var(--space-3);
+  font-size: 13px;
+  color: var(--color-fg, #e6edf3);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comment-reply {
+  margin-left: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── Merge button states ─────────────────────────────────────────────────── */
+.merge-btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.merge-warning {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #341a00;
+  border: 1px solid #f0883e44;
+  font-size: 13px;
+  color: #f0883e;
+  margin-bottom: var(--space-3);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:var(--space-3)">
+  <a href="{{ base_url }}/pulls">← Back to pull requests</a>
+</div>
+
+<div class="pr-detail-layout">
+  {# ── Main column ── #}
+  <div>
+
+    {# PR header card #}
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap">
+        <h1 style="margin:0;font-size:20px;color:var(--color-fg,#e6edf3)">{{ pr.title }}</h1>
+        {% if pr.state == 'merged' %}
+          <span class="badge badge-merged">Merged</span>
+        {% elif pr.state == 'closed' %}
+          <span class="badge badge-closed">Closed</span>
+        {% else %}
+          <span class="badge badge-open">Open</span>
+        {% endif %}
+      </div>
+
+      <div class="meta-row" style="display:flex;flex-wrap:wrap;gap:var(--space-3);font-size:13px;color:#8b949e;margin-bottom:var(--space-3)">
+        {% if pr.author %}
+          <span><strong style="color:var(--color-fg,#e6edf3)">{{ pr.author }}</strong> opened this</span>
+        {% endif %}
+        <span class="branch-pill">{{ pr.from_branch }}</span>
+        <span>→</span>
+        <span class="branch-pill">{{ pr.to_branch }}</span>
+        <span>{{ pr.created_at | fmtdate }}</span>
+        {% if pr.state == 'merged' and pr.merge_commit_id %}
+          <span>merged as
+            <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}"
+               style="font-family:monospace;font-size:11px;color:#8b49da">{{ pr.merge_commit_id[:8] }}</a>
+          </span>
+        {% endif %}
+      </div>
+
+      {% if pr.body %}
+        <div style="border-top:1px solid var(--color-border);padding-top:var(--space-3);
+             font-size:14px;color:var(--color-fg,#e6edf3);line-height:1.6;white-space:pre-wrap">
+          {{ pr.body }}
+        </div>
+      {% endif %}
+    </div>
+
+    {# Review summary #}
+    {% if reviews %}
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <h2 style="margin:0 0 var(--space-3);font-size:16px">Reviewers</h2>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3)">
+          {% for review in reviews %}
+            <div class="reviewer-chip reviewer-chip--{{ 'approved' if review.state == 'approved' else ('changes' if review.state == 'changes_requested' else 'pending') }}"
+                 title="{{ review.reviewer_username }} — {{ review.state }}">
+              <span style="display:inline-flex;align-items:center;justify-content:center;
+                width:22px;height:22px;border-radius:50%;
+                background:{{ '#3fb95033' if review.state == 'approved' else ('#f0883e33' if review.state == 'changes_requested' else '#8b949e33') }};
+                color:{{ '#3fb950' if review.state == 'approved' else ('#f0883e' if review.state == 'changes_requested' else '#8b949e') }};
+                font-size:12px;font-weight:700">
+                {{ review.reviewer_username[0].upper() if review.reviewer_username else '?' }}
+              </span>
+              <span>{{ review.reviewer_username }}</span>
+              <span style="font-size:10px;padding:1px 6px;border-radius:10px;
+                background:{{ '#3fb95022' if review.state == 'approved' else ('#f0883e22' if review.state == 'changes_requested' else '#8b949e22') }};
+                color:{{ '#3fb950' if review.state == 'approved' else ('#f0883e' if review.state == 'changes_requested' else '#8b949e') }}">
+                {{ review.state | replace('_', ' ') | title }}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+        {% if approved_count > 0 or changes_count > 0 %}
+          <div style="font-size:12px;color:#8b949e">
+            {% if approved_count > 0 %}
+              <span style="color:#3fb950">✓ {{ approved_count }} approved</span>
+            {% endif %}
+            {% if changes_count > 0 %}
+              <span style="color:#f0883e;margin-left:var(--space-2)">⚠ {{ changes_count }} changes requested</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {# Merge controls — only for open PRs #}
+    {% if pr.state == 'open' %}
+      <div class="card" style="margin-bottom:var(--space-4)" id="merge-section">
+        <h2 style="margin:0 0 var(--space-3);font-size:16px">Merge Pull Request</h2>
+        <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3);flex-wrap:wrap">
+          <button class="btn btn-primary"
+                  hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
+                  hx-ext="json-enc"
+                  hx-vals='{"mergeStrategy":"merge_commit","deleteBranch":true}'
+                  hx-target="#merge-section"
+                  hx-swap="outerHTML"
+                  hx-confirm="Merge this pull request using 'merge commit' strategy?">
+            ✓ Merge pull request
+          </button>
+          <button class="btn btn-secondary"
+                  hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
+                  hx-ext="json-enc"
+                  hx-vals='{"mergeStrategy":"squash","deleteBranch":true}'
+                  hx-target="#merge-section"
+                  hx-swap="outerHTML"
+                  hx-confirm="Squash and merge this pull request?">
+            Squash &amp; merge
+          </button>
+          <button class="btn btn-secondary"
+                  hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
+                  hx-ext="json-enc"
+                  hx-vals='{"mergeStrategy":"rebase","deleteBranch":true}'
+                  hx-target="#merge-section"
+                  hx-swap="outerHTML"
+                  hx-confirm="Rebase and merge this pull request?">
+            Rebase &amp; merge
+          </button>
+        </div>
+        <div style="font-size:12px;color:#8b949e">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="cb-delete-branch" checked
+                   style="width:14px;height:14px;accent-color:var(--color-accent,#1f6feb)">
+            Delete branch after merge
+          </label>
+        </div>
+      </div>
+    {% elif pr.state == 'merged' %}
+      <div class="card" style="margin-bottom:var(--space-4);background:#0d2b00;border-color:#3fb95055">
+        <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <span style="font-size:20px">✓</span>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#3fb950">Pull request merged</div>
+            {% if pr.merge_commit_id %}
+              <div style="font-size:12px;color:#8b949e">
+                Merge commit:
+                <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}"
+                   style="font-family:monospace;color:#58a6ff">{{ pr.merge_commit_id[:8] }}</a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    {# Comment thread — HTMX fragment target #}
+    <div id="pr-comments">
+      {% include "musehub/fragments/pr_comments.html" %}
+    </div>
+
+    {# New comment form — HTMX POST #}
+    <div class="card" style="margin-top:var(--space-4)">
+      <h3 style="margin:0 0 var(--space-3);font-size:15px">Leave a review comment</h3>
+      <form hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/comments"
+            hx-target="#pr-comments"
+            hx-swap="innerHTML"
+            hx-ext="json-enc">
+        <textarea name="body" id="new-comment-body" rows="4"
+                  placeholder="Write a review comment (Markdown supported)…"
+                  style="width:100%;background:var(--color-surface-2,#21262d);
+                    color:var(--color-fg,#e6edf3);border:1px solid var(--color-border);
+                    border-radius:6px;padding:8px;resize:vertical;font-size:13px;
+                    box-sizing:border-box"></textarea>
+        <input type="hidden" name="target_type" value="general">
+        <div style="margin-top:var(--space-2)">
+          <button type="submit" class="btn btn-primary">Comment</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+  {# ── Sidebar ── #}
+  <aside class="pr-sidebar">
+
+    {# PR timeline #}
+    <div class="card" style="margin-bottom:var(--space-3)">
+      <p style="font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;
+           letter-spacing:.05em;margin:0 0 var(--space-2)">Timeline</p>
+      <div style="font-size:12px;color:#8b949e;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span>🟢</span>
+          <span>Opened by <strong style="color:var(--color-fg,#e6edf3)">{{ pr.author or 'unknown' }}</strong></span>
+        </div>
+        {% if pr.state == 'merged' and pr.merge_commit_id %}
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>🟣</span>
+            <span>Merged —
+              <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}"
+                 style="font-family:monospace;font-size:11px;color:#58a6ff">{{ pr.merge_commit_id[:8] }}</a>
+            </span>
+          </div>
+        {% elif pr.state == 'closed' %}
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>🔴</span>
+            <span>Closed without merging</span>
+          </div>
+        {% else %}
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>⏳</span>
+            <span>Awaiting review</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Review summary in sidebar #}
+    <div class="card" style="margin-bottom:var(--space-3)">
+      <p style="font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;
+           letter-spacing:.05em;margin:0 0 var(--space-2)">Reviews</p>
+      {% if approved_count > 0 %}
+        <div style="font-size:12px;color:#3fb950;margin-bottom:4px">✓ {{ approved_count }} approved</div>
+      {% endif %}
+      {% if changes_count > 0 %}
+        <div style="font-size:12px;color:#f0883e;margin-bottom:4px">⚠ {{ changes_count }} changes requested</div>
+      {% endif %}
+      {% if approved_count == 0 and changes_count == 0 %}
+        <div style="font-size:12px;color:#8b949e">No reviews yet</div>
+      {% endif %}
+    </div>
+
+    {# Comment count #}
+    <div class="card">
+      <p style="font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;
+           letter-spacing:.05em;margin:0 0 var(--space-2)">Comments</p>
+      <div style="font-size:13px;color:var(--color-fg,#e6edf3)">{{ comment_count }} comment{{ '' if comment_count == 1 else 's' }}</div>
+    </div>
+
+  </aside>
+</div>
+{% endblock %}
+
+{% block page_script %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof initRepoNav === 'function') initRepoNav({{ repo_id | tojson }});
+});
+</script>
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}Emotion Diff {{ base_ref[:8] }}...{{ head_ref[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="{{ base_url }}">{{ repo_slug }}</a> /
+  emotion-diff /
+  <span class="text-mono">{{ base_ref[:8] }}...{{ head_ref[:8] }}</span>
+{% endblock %}
+
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{% block page_data %}
+const repoId = {{ repo_id | tojson }};
+const base   = {{ base_url | tojson }};
+{% endblock %}
+
+{% block content %}
+<!-- ── Page header ──────────────────────────────────────────────────────── -->
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+  <div>
+    <h1 style="margin:0;font-size:18px;color:#e6edf3">
+      Emotion Diff:
+      <code style="font-size:14px">{{ base_ref[:10] }}</code>
+      &hellip;
+      <code style="font-size:14px">{{ head_ref[:10] }}</code>
+    </h1>
+    <div style="font-size:12px;color:#8b949e;margin-top:6px;max-width:620px;line-height:1.5">
+      {{ interpretation }}
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
+    <a href="{{ listen_base_url }}" class="btn btn-secondary" style="font-size:13px"
+       title="Listen to base ref: {{ base_ref }}">
+      &#9654; Listen Base
+    </a>
+    <a href="{{ listen_head_url }}" class="btn btn-secondary" style="font-size:13px"
+       title="Listen to head ref: {{ head_ref }}">
+      &#9654; Listen Head
+    </a>
+    <a href="{{ compare_url }}" class="btn btn-primary" style="font-size:13px">
+      &#128200; Full Diff
+    </a>
+  </div>
+</div>
+
+<!-- ── Side-by-side radar charts (server-rendered SVG) ──────────────────── -->
+<div class="card" style="margin-bottom:24px">
+  <h2 style="margin:0 0 16px;font-size:15px;color:#e6edf3">
+    8-Dimension Emotional Signature
+  </h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+    <!-- Base radar -->
+    <div>
+      <div style="text-align:center;margin-bottom:8px">
+        <span style="font-size:12px;color:#58a6ff;font-weight:600">
+          Base — <code style="font-size:11px">{{ base_ref[:10] }}</code>
+        </span>
+      </div>
+      {{ base_radar_svg | safe }}
+    </div>
+    <!-- Head radar -->
+    <div>
+      <div style="text-align:center;margin-bottom:8px">
+        <span style="font-size:12px;color:#f0883e;font-weight:600">
+          Head — <code style="font-size:11px">{{ head_ref[:10] }}</code>
+        </span>
+      </div>
+      {{ head_radar_svg | safe }}
+    </div>
+  </div>
+  <!-- Axis key -->
+  <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px 16px">
+    {% for dim in dim_descriptions %}
+    <div style="font-size:11px;color:#8b949e">
+      <strong style="color:#e6edf3">{{ dim.label }}:</strong> {{ dim.desc }}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── Per-Axis Delta bar chart ─────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:24px;overflow-x:auto">
+  <h2 style="margin:0 0 12px;font-size:15px;color:#e6edf3">
+    Per-Axis Delta
+    <span style="font-size:12px;font-weight:400;color:#8b949e;margin-left:8px">
+      (head &minus; base)
+    </span>
+  </h2>
+  <!-- Legend -->
+  <div style="font-size:11px;color:#8b949e;margin-bottom:12px;display:flex;gap:16px">
+    <span>
+      <span style="display:inline-block;width:10px;height:10px;background:#3fb950;border-radius:2px;vertical-align:middle;margin-right:4px"></span>
+      increase
+    </span>
+    <span>
+      <span style="display:inline-block;width:10px;height:10px;background:#f85149;border-radius:2px;vertical-align:middle;margin-right:4px"></span>
+      decrease
+    </span>
+    <span>
+      <span style="display:inline-block;width:10px;height:10px;background:#8b949e;border-radius:2px;vertical-align:middle;margin-right:4px"></span>
+      unchanged (&lt;4%)
+    </span>
+  </div>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="border-bottom:2px solid #30363d">
+        <th style="padding:8px 12px;text-align:left;color:#8b949e;font-weight:600;font-size:12px">Dimension</th>
+        <th style="padding:8px 12px;text-align:left;color:#8b949e;font-weight:600;font-size:12px">Shift</th>
+        <th style="padding:8px 12px;text-align:right;color:#8b949e;font-weight:600;font-size:12px">Δ</th>
+        <th style="padding:8px 12px;text-align:left;color:#8b949e;font-weight:600;font-size:12px">Direction</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in delta_rows %}
+      <tr style="border-bottom:1px solid #21262d">
+        <td style="padding:8px 12px;font-size:13px;color:#e6edf3;white-space:nowrap;min-width:110px">
+          {{ row.label }}
+        </td>
+        <td style="padding:8px 12px;min-width:200px">
+          <div style="position:relative;height:12px;background:#21262d;border-radius:4px;overflow:hidden">
+            <!-- Centre divider -->
+            <div style="position:absolute;left:50%;top:0;width:1px;height:100%;background:#30363d"></div>
+            <!-- Delta bar -->
+            <div style="position:absolute;top:1px;height:10px;border-radius:2px;
+                        left:{{ row.bar_left_pct }}%;width:{{ row.bar_width_pct }}%;background:{{ row.color }}"></div>
+          </div>
+        </td>
+        <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:600;color:{{ row.color }};white-space:nowrap">
+          {{ row.sign }}{{ row.pct }}%
+        </td>
+        <td style="padding:8px 12px;font-size:11px;color:{{ row.color }};white-space:nowrap">
+          {{ row.direction }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Listen to comparison CTA ────────────────────────────────────────── -->
+<div class="card" style="text-align:center;padding:var(--space-5)">
+  <div style="font-size:14px;color:#e6edf3;margin-bottom:12px">
+    Listen to both refs and compare the emotional character directly
+  </div>
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+    <a href="{{ listen_base_url }}" class="btn btn-secondary" style="font-size:14px;padding:10px 20px">
+      &#9654; Base: <code style="font-size:12px">{{ base_ref[:10] }}</code>
+    </a>
+    <a href="{{ listen_head_url }}" class="btn btn-primary" style="font-size:14px;padding:10px 20px">
+      &#9654; Head: <code style="font-size:12px">{{ head_ref[:10] }}</code>
+    </a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "musehub/base.html" %}
+{% from "musehub/macros/pagination.html" import pagination %}
+
+{% block title %}Activity — {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / activity
+{% endblock %}
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="card" style="padding:0">
+  <div class="card-header" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 20px">
+    <h1 style="margin:0;font-size:18px">Activity</h1>
+    <span class="text-muted" style="font-size:13px">{{ total }} event{{ 's' if total != 1 else '' }}</span>
+
+    <form method="get"
+          hx-get="{{ base_url }}/activity"
+          hx-target="#activity-rows"
+          hx-push-url="true"
+          style="margin-left:auto">
+      <select name="event_type" class="filter-select" onchange="this.form.requestSubmit()">
+        <option value="">All events</option>
+        {% for et in event_types %}
+          <option value="{{ et }}" {% if et == event_type %}selected{% endif %}>{{ et | replace('_', ' ') | title }}</option>
+        {% endfor %}
+      </select>
+      {% if event_type %}
+        <a href="{{ base_url }}/activity" class="btn btn-ghost btn-sm" style="margin-left:4px">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div id="activity-rows" style="padding:0 20px 20px">
+    {% include "musehub/fragments/activity_rows.html" %}
+  </div>
+</div>
+
+<style>
+.activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.activity-row:last-child { border-bottom: none; }
+.activity-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+  margin-top: 2px;
+}
+.activity-body { flex: 1; min-width: 0; }
+.activity-description { font-size: 14px; margin-bottom: 4px; }
+.activity-description a { color: var(--text-primary); text-decoration: none; }
+.activity-description a:hover { text-decoration: underline; }
+.activity-meta { font-size: 12px; color: var(--text-muted); }
+.activity-actor { color: var(--accent-color); text-decoration: none; font-weight: 600; }
+.activity-actor:hover { text-decoration: underline; }
+.activity-type-badge {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+</style>
+{% endblock %}
