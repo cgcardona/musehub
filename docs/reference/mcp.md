@@ -1,8 +1,10 @@
 # MuseHub MCP Reference
 
-> Protocol version: **2025-03-26** | Implementation: pure-Python async, no external MCP SDK
+> Protocol version: **2025-11-25** | Implementation: pure-Python async, no external MCP SDK
 
 MuseHub treats AI agents as first-class citizens. The MCP integration gives agents complete capability parity with the web UI: they can browse, search, compose, review, and publish — over a standard protocol that every major agent runtime supports.
+
+MCP 2025-11-25 adds the full **Streamable HTTP transport** (`GET /mcp` SSE push channel, session management, Origin security) and **Elicitation** (server-initiated user input via form and URL modes), enabling real-time interactive tool calls that interview users mid-execution.
 
 ---
 
@@ -11,16 +13,19 @@ MuseHub treats AI agents as first-class citizens. The MCP integration gives agen
 1. [Architecture](#architecture)
 2. [Transports](#transports)
 3. [Authentication](#authentication)
-4. [Tools — 27 total](#tools)
+4. [Session Management](#session-management)
+5. [Elicitation](#elicitation)
+6. [Tools — 32 total](#tools)
    - [Read Tools (15)](#read-tools-15)
    - [Write Tools (12)](#write-tools-12)
-5. [Resources — 20 total](#resources)
+   - [Elicitation-Powered Tools (5)](#elicitation-powered-tools-5)
+7. [Resources — 20 total](#resources)
    - [Static Resources (5)](#static-resources-5)
    - [Templated Resources (15)](#templated-resources-15)
-6. [Prompts — 6 total](#prompts)
-7. [Error Handling](#error-handling)
-8. [Usage Patterns](#usage-patterns)
-9. [Architecture Diagrams](#architecture-diagrams)
+8. [Prompts — 8 total](#prompts)
+9. [Error Handling](#error-handling)
+10. [Usage Patterns](#usage-patterns)
+11. [Architecture Diagrams](#architecture-diagrams)
 
 ---
 
@@ -29,37 +34,46 @@ MuseHub treats AI agents as first-class citizens. The MCP integration gives agen
 ```
 MCP Client (Cursor, Claude Desktop, any SDK)
         │
-        ├─ HTTP  POST /mcp        (production)
+        ├─ HTTP  POST /mcp   (all client→server)
+        ├─ HTTP  GET  /mcp   (SSE push, server→client)
+        ├─ HTTP  DELETE /mcp (session termination)
         └─ stdio python -m musehub.mcp.stdio_server  (local dev)
+                │
+        musehub/api/routes/mcp.py   ← Streamable HTTP transport (2025-11-25)
                 │
         musehub/mcp/dispatcher.py   ← async JSON-RPC 2.0 engine
                 │
-        ┌───────┼───────────────┐
-        │       │               │
-   tools/call  resources/read  prompts/get
-        │       │               │
-   Read executors   Resource handlers   Prompt assembler
-   (musehub_mcp_executor.py)  (resources.py)  (prompts.py)
-   Write executors
-   (mcp/write_tools/)
+        ┌───────┼───────────────┬────────────────┐
+        │       │               │                │
+   tools/call  resources/read  prompts/get   notifications/*
+        │       │               │                │
+   Read executors   Resource handlers   Prompt   Session/Elicitation
+   (musehub_mcp_executor.py)  (resources.py)  assembler  (session.py)
+   Write executors                                        (context.py)
+   Elicitation tools
+   (mcp/write_tools/elicitation_tools.py)
         │
    AsyncSession → Postgres
 ```
 
-The dispatcher speaks JSON-RPC 2.0 directly. The HTTP envelope is always `200 OK` — tool errors are signalled via `isError: true` on the content block, not via HTTP status codes. Notifications (no `id` field) return `202 Accepted` with an empty body.
+The dispatcher speaks JSON-RPC 2.0 directly. The HTTP envelope is always `200 OK` — tool errors are signalled via `isError: true` on the content block, not via HTTP status codes. Notifications (no `id` field) return `202 Accepted` with an empty body. Elicitation-powered tools return `text/event-stream` so the server can push `elicitation/create` events mid-call.
 
 ---
 
 ## Transports
 
-### HTTP Streamable — `POST /mcp`
+### HTTP Streamable — Full 2025-11-25 Transport
 
-The production transport. Accepts `application/json`.
+#### `POST /mcp`
+
+The production transport. Accepts `application/json`. Returns `application/json` for most requests, or `text/event-stream` for elicitation-powered tool calls.
 
 ```http
 POST /mcp HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer <jwt>
+Mcp-Session-Id: <session-id>        ← required after initialize
+MCP-Protocol-Version: 2025-11-25    ← optional; validated if present
 
 {"jsonrpc":"2.0","id":1,"method":"tools/list"}
 ```
@@ -75,6 +89,32 @@ POST /mcp
 ```
 
 **Notifications** (no `id`) return `202 Accepted` with an empty body.
+
+#### `GET /mcp` — SSE Push Channel
+
+Persistent server-to-client event stream. Required for receiving elicitation requests and progress notifications outside of an active tool call.
+
+```http
+GET /mcp HTTP/1.1
+Accept: text/event-stream
+Mcp-Session-Id: <session-id>
+Last-Event-ID: <last-seen-event-id>  ← optional; triggers replay
+```
+
+Returns `text/event-stream`. Server pushes:
+- `notifications/progress` — tool progress updates
+- `elicitation/create` — server-initiated user input requests
+- `notifications/elicitation/complete` — URL-mode OAuth completion signals
+- `: heartbeat` — comment every 15 s to keep proxies alive
+
+#### `DELETE /mcp` — Session Termination
+
+```http
+DELETE /mcp HTTP/1.1
+Mcp-Session-Id: <session-id>
+```
+
+Returns `200 OK`. Closes all open SSE streams and cancels pending elicitation Futures for the session.
 
 ### stdio — `python -m musehub.mcp.stdio_server`
 
@@ -103,7 +143,7 @@ The stdio server runs without auth (trusted local process). Write tools are avai
 | Context | How |
 |---------|-----|
 | HTTP transport — read tools + public resources | No auth required |
-| HTTP transport — write tools | `Authorization: Bearer <jwt>` |
+| HTTP transport — write / elicitation tools | `Authorization: Bearer <jwt>` |
 | HTTP transport — private repo resources | `Authorization: Bearer <jwt>` |
 | stdio transport | No auth (trusted process) |
 
@@ -113,9 +153,100 @@ Attempting a write tool without a valid token returns a JSON-RPC error (`code: -
 
 ---
 
+## Session Management
+
+Session management is required for elicitation and the GET /mcp SSE push channel.
+
+**Creating a session:**
+
+```http
+POST /mcp
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"elicitation":{"form":{},"url":{}}}}}
+```
+
+Response includes:
+```http
+Mcp-Session-Id: <cryptographically-secure-session-id>
+```
+
+**Using the session:** include `Mcp-Session-Id` in all subsequent requests. Sessions expire after 1 hour of inactivity.
+
+**Ending a session:** `DELETE /mcp` with the `Mcp-Session-Id` header.
+
+**Security:** All requests are validated against an Origin allowlist (`localhost` always permitted; production: `musehub.app`). Requests from unlisted Origins are rejected with `403 Forbidden`.
+
+---
+
+## Elicitation
+
+Elicitation is a MCP 2025-11-25 feature that allows the server to request structured input from the user *mid-tool-call*. MuseHub supports both modes:
+
+### Form Mode
+
+The server sends an `elicitation/create` request with a restricted JSON Schema object describing the fields to collect. The client shows a form to the user, then sends the response back via `POST /mcp`.
+
+```
+Agent                    MuseHub MCP
+  │                           │
+  │  POST tools/call          │
+  │  (musehub_compose_with_preferences)
+  │──────────────────────────►│
+  │                           │ opens SSE stream
+  │◄──────────────────────────│
+  │  SSE: elicitation/create  │
+  │  {mode:"form", schema:{   │
+  │    key, tempo, mood, ...}}│
+  │◄──────────────────────────│
+  │  [user fills form]        │
+  │  POST elicitation result  │
+  │  {action:"accept",        │
+  │   content:{key:"Dm",...}} │
+  │──────────────────────────►│
+  │                           │ tool continues
+  │  SSE: tools/call response │
+  │◄──────────────────────────│
+```
+
+### URL Mode
+
+The server sends an `elicitation/create` request with `mode:"url"` directing the user to a MuseHub OAuth page. After the user completes the flow, the callback fires `notifications/elicitation/complete` into the agent's SSE stream.
+
+```
+Agent                    MuseHub MCP              Browser
+  │                           │                      │
+  │  POST musehub_connect_    │                      │
+  │  streaming_platform       │                      │
+  │──────────────────────────►│                      │
+  │  SSE: elicitation/create  │                      │
+  │  {mode:"url", url:"https://musehub.app/mcp/connect/spotify?..."}
+  │◄──────────────────────────│                      │
+  │  [client opens URL]       │──────────────────────►│
+  │                           │  User authorises OAuth│
+  │                           │◄──────────────────────│
+  │  SSE: notifications/      │                      │
+  │  elicitation/complete     │                      │
+  │◄──────────────────────────│                      │
+  │  SSE: tools/call response │                      │
+  │◄──────────────────────────│                      │
+```
+
+### Elicitation Schemas
+
+MuseHub provides five musical form schemas:
+
+| Schema key | Fields |
+|------------|--------|
+| `compose_preferences` | `key` (24 options), `tempo_bpm`, `time_signature`, `mood` (10 options), `genre` (10 options), `reference_artist`, `duration_bars`, `include_modulation` |
+| `repo_creation` | `daw` (10 options), `primary_genre`, `key_signature`, `tempo_bpm`, `is_collab`, `collaborator_handles`, `initial_readme` |
+| `pr_review_focus` | `dimension_focus` (all/melodic/harmonic/rhythmic/structural/dynamic), `review_depth` (quick/standard/thorough), `check_harmonic_tension`, `check_rhythmic_consistency`, `reviewer_note` |
+| `release_metadata` | `tag`, `title`, `release_notes`, `is_prerelease`, `highlight` |
+| `platform_connect_confirm` | `platform` (8 streaming services), `confirm` |
+
+---
+
 ## Tools
 
-All 27 tools use `server_side: true`. The JSON-RPC envelope is always a success response — errors are represented inside the content block via `isError: true`.
+All 32 tools use `server_side: true`. The JSON-RPC envelope is always a success response — errors are represented inside the content block via `isError: true`.
 
 ### Calling a tool
 
@@ -489,6 +620,83 @@ Create a label scoped to a repository.
 
 ---
 
+### Elicitation-Powered Tools (5)
+
+> All elicitation tools require `Authorization: Bearer <jwt>`, an active session (`Mcp-Session-Id`), and a client that declared elicitation capability during `initialize`. They degrade gracefully for stateless clients, returning an `elicitation_unavailable` error that includes instructions for the non-interactive equivalent.
+
+#### `musehub_compose_with_preferences` _(form elicitation)_
+
+Interview the user about a composition, then return a complete musical plan.
+
+**Elicits:** key, tempo (BPM), time signature, mood, genre, reference artist, duration (bars), key modulation preference.
+
+**Returns:** chord progressions per section, structural form (intro/verse/chorus/bridge/outro), harmonic tension profile, texture guidance, and a step-by-step Muse project workflow.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | no | Optional target repo to scaffold the plan into |
+
+---
+
+#### `musehub_review_pr_interactive` _(form elicitation)_
+
+Interactive PR review: collect the reviewer's focus before running the divergence analysis.
+
+**Elicits:** dimension focus (all/melodic/harmonic/rhythmic/structural/dynamic), review depth (quick/standard/thorough), harmonic tension check, rhythmic consistency check, reviewer note.
+
+**Returns:** per-dimension divergence scores, findings list, and a recommendation (APPROVE / REQUEST_CHANGES / COMMENT).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | yes | Repository UUID |
+| `pr_id` | string | yes | Pull request UUID |
+
+---
+
+#### `musehub_connect_streaming_platform` _(URL elicitation)_
+
+OAuth-connect a streaming platform account for agent-triggered release distribution.
+
+**Elicits (form, if platform not supplied):** platform name, confirm checkbox.  
+**Elicits (URL):** directs user to `GET /musehub/ui/mcp/connect/{platform}?elicitation_id=...` OAuth start page.
+
+**Supported platforms:** Spotify, SoundCloud, Bandcamp, YouTube Music, Apple Music, TIDAL, Amazon Music, Deezer.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `platform` | string | no | Platform name (elicited if omitted) |
+| `repo_id` | string | no | Repository context for distribution |
+
+---
+
+#### `musehub_connect_daw_cloud` _(URL elicitation)_
+
+OAuth-connect a cloud DAW or mastering service for cloud renders and exports.
+
+**Elicits (form, if service not supplied):** service name, confirm checkbox.  
+**Elicits (URL):** directs user to `GET /musehub/ui/mcp/connect/daw/{service}?elicitation_id=...`.
+
+**Supported services:** LANDR (AI mastering + distribution), Splice (sample sync + backup), Soundtrap, BandLab, Audiotool.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `service` | string | no | Service name (elicited if omitted) |
+
+---
+
+#### `musehub_create_release_interactive` _(chained form + URL elicitation)_
+
+Two-phase interactive release creator:
+
+1. **Form elicitation:** collects tag, title, release notes, changelog highlight, and pre-release flag.
+2. **URL elicitation (optional):** offers Spotify connection OAuth for immediate distribution.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | yes | Repository to create the release in |
+
+---
+
 ## Resources
 
 Resources are side-effect-free, cacheable, URI-addressable reads. All resources return `application/json`. They are read via the `resources/read` method.
@@ -781,6 +989,32 @@ Prepare a release:
 
 ---
 
+### `musehub/onboard` _(MCP 2025-11-25)_
+
+**Arguments:** `username` (optional)
+
+Interactive artist onboarding using elicitation. Requires a client with session + elicitation capability:
+
+1. `musehub_create_repo` — scaffold the first project repo
+2. `musehub_compose_with_preferences` — elicits key, tempo, mood, genre; returns composition plan
+3. `musehub_connect_daw_cloud` — URL elicitation: OAuth-connect LANDR/Splice/Soundtrap
+4. Guides through first commit, collaboration invite, and activity feed
+
+---
+
+### `musehub/release_to_world` _(MCP 2025-11-25)_
+
+**Arguments:** `repo_id`
+
+Full elicitation-powered release and distribution pipeline:
+
+1. `musehub_create_release_interactive` — form: collect tag, title, notes, highlight; URL: optional Spotify connect
+2. `musehub_connect_streaming_platform` — URL elicitation for each target platform
+3. `musehub_connect_daw_cloud` — optional cloud mastering via LANDR
+4. Post announcement issue and notify followers
+
+---
+
 ## Error Handling
 
 ### JSON-RPC error codes
@@ -831,31 +1065,64 @@ Tool execution errors are not JSON-RPC errors. The envelope is always a success 
 6. tools/call   musehub_create_pr { repo_id, title, from_branch, to_branch }
 ```
 
-### Pattern 3: Full musical PR review
+### Pattern 3: Full musical PR review (elicitation-powered)
 
 ```
-1. tools/call   musehub_get_pr { repo_id, pr_number }
+1. tools/call   musehub_review_pr_interactive { repo_id, pr_id }
+   → elicitation: "Focus on harmonic divergence, thorough depth"
+   → returns: per-dimension scores, findings, APPROVE/REQUEST_CHANGES recommendation
+```
+
+Or stateless:
+
+```
+1. tools/call   musehub_get_pr { repo_id, pr_id }
 2. tools/call   musehub_compare { repo_id, base_ref, head_ref }
-3. resources/read  musehub://repos/{owner}/{slug}/analysis/{base_ref}
-4. resources/read  musehub://repos/{owner}/{slug}/analysis/{head_ref}
-5. tools/call   musehub_create_pr_comment {
-     repo_id, pr_number, body: "...",
-     target_type: "track", target_track: "Bass",
-     target_beat_start: 0, target_beat_end: 32
-   }
-6. tools/call   musehub_submit_pr_review { repo_id, pr_number, state: "approved" }
+3. tools/call   musehub_create_pr_comment { repo_id, pr_id, body, target_type: "track", ... }
+4. tools/call   musehub_submit_pr_review { repo_id, pr_id, event: "APPROVE" }
 ```
 
-### Pattern 4: Publish a release
+### Pattern 4: Compose with preferences (elicitation-powered)
+
+```
+1. POST initialize  → Mcp-Session-Id: <id>
+2. GET /mcp (SSE)   → open push channel
+3. tools/call       musehub_compose_with_preferences { repo_id }
+   → SSE: elicitation/create { mode: "form", schema: compose_preferences }
+   → [user selects key: "D minor", tempo: 95, mood: "melancholic", genre: "neo-soul"]
+   → POST elicitation result { action: "accept", content: { key: "D minor", ... } }
+   → SSE: tools/call response { composition_plan: { ... } }
+```
+
+### Pattern 5: Publish a release (elicitation-powered)
+
+```
+1. tools/call   musehub_create_release_interactive { repo_id }
+   → elicitation (form): tag, title, release notes, highlight
+   → elicitation (URL, optional): Spotify OAuth
+   → creates release + returns distribution guidance
+```
+
+Or stateless:
 
 ```
 1. tools/call   musehub_list_releases { repo_id }
 2. tools/call   musehub_list_prs { repo_id, state: "closed" }
-3. tools/call   musehub_get_analysis { repo_id, ref: "main" }
+3. tools/call   musehub_get_analysis { repo_id, dimension: "overview" }
 4. tools/call   musehub_create_release {
      repo_id, tag: "v1.2.0", title: "Spring Drop",
      body: "## What changed\n..."
    }
+```
+
+### Pattern 6: Connect and distribute (URL elicitation)
+
+```
+1. tools/call   musehub_connect_streaming_platform { platform: "Spotify" }
+   → SSE: elicitation/create { mode: "url", url: "https://musehub.app/musehub/ui/mcp/connect/spotify?elicitation_id=..." }
+   → [user clicks through OAuth in browser]
+   → SSE: notifications/elicitation/complete { action: "accept" }
+   → returns: { platform: "Spotify", status: "connected" }
 ```
 
 ---
@@ -866,9 +1133,18 @@ Tool execution errors are not JSON-RPC errors. The envelope is always a success 
 
 ```mermaid
 flowchart TD
-    subgraph transports [Transports]
-        HTTP["POST /mcp\nHTTP Streamable"]
+    subgraph transports [Transports — MCP 2025-11-25]
+        POST["POST /mcp\nJSON + SSE stream"]
+        GET["GET /mcp\nSSE push channel"]
+        DEL["DELETE /mcp\nSession termination"]
         stdio["stdio\npython -m musehub.mcp.stdio_server"]
+    end
+
+    subgraph session [Session Layer]
+        SID["Mcp-Session-Id"]
+        ORIGIN["Origin validation"]
+        SSE_Q["asyncio.Queue\nSSE queues"]
+        FUTURES["asyncio.Future\nelicitation registry"]
     end
 
     subgraph dispatcher [musehub/mcp/dispatcher.py]
@@ -876,25 +1152,39 @@ flowchart TD
         D --> INIT["initialize"]
         D --> TL["tools/list"]
         D --> TC["tools/call"]
-        D --> RL["resources/list\nresources/templates/list"]
+        D --> RL["resources/list"]
         D --> RR["resources/read"]
         D --> PL["prompts/list"]
         D --> PG["prompts/get"]
+        D --> NC["notifications/cancelled"]
+        D --> NEC["notifications/elicitation/complete"]
     end
 
     subgraph execution [Execution Layer]
         READ["Read executors\nmusehub_mcp_executor.py"]
         WRITE["Write executors\nmcp/write_tools/"]
-        RES["Resource handlers\nmcp/resources.py"]
-        PROMPTS["Prompt assembler\nmcp/prompts.py"]
+        ELICIT["Elicitation tools\nelicitation_tools.py"]
+        CTX["ToolCallContext\ncontext.py"]
+        RES["Resource handlers\nresources.py"]
+        PROMPTS["Prompt assembler\nprompts.py"]
     end
 
-    HTTP --> D
+    POST --> ORIGIN
+    POST --> SID
+    SID --> D
+    GET --> SSE_Q
+    DEL --> SID
     stdio --> D
     TC --> READ
     TC --> WRITE
+    TC --> ELICIT
+    ELICIT --> CTX
+    CTX --> SSE_Q
+    CTX --> FUTURES
     RR --> RES
     PG --> PROMPTS
+    NC --> FUTURES
+    NEC --> FUTURES
     READ --> DB[("AsyncSession / Postgres")]
     WRITE --> DB
     RES --> DB
@@ -937,13 +1227,22 @@ classDiagram
         musehub_star_repo
         musehub_create_label
     }
+    class MUSEHUB_ELICITATION_TOOLS {
+        <<list of MCPToolDef — 5 tools — MCP 2025-11-25>>
+        musehub_compose_with_preferences
+        musehub_review_pr_interactive
+        musehub_connect_streaming_platform
+        musehub_connect_daw_cloud
+        musehub_create_release_interactive
+    }
     class MCPDispatcher {
-        +handle_request(raw, user_id)
-        +handle_batch(raw, user_id)
+        +handle_request(raw, user_id, session)
+        +handle_batch(raw, user_id, session)
     }
 
     MCPDispatcher ..> MUSEHUB_READ_TOOLS : routes read calls
     MCPDispatcher ..> MUSEHUB_WRITE_TOOLS : routes write calls (JWT required)
+    MCPDispatcher ..> MUSEHUB_ELICITATION_TOOLS : routes interactive calls (session required)
 ```
 
 ### Resource URI hierarchy
@@ -973,4 +1272,61 @@ flowchart TD
     releases --> release["…/releases/{tag}"]
     repos --> analysis["…/analysis/{ref}"]
     repos --> timeline["…/timeline"]
+```
+
+### Elicitation sequence (form mode)
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant MCP as POST /mcp
+    participant Session as Session Store
+    participant Tool as Elicitation Tool
+
+    Agent->>MCP: POST initialize {capabilities: {elicitation: {form:{}, url:{}}}}
+    MCP-->>Agent: 200 OK, Mcp-Session-Id: abc123
+
+    Agent->>MCP: GET /mcp (Accept: text/event-stream, Mcp-Session-Id: abc123)
+    MCP-->>Agent: 200 text/event-stream (SSE channel open)
+
+    Agent->>MCP: POST tools/call musehub_compose_with_preferences
+    Note over MCP: tool needs elicitation → SSE response
+    MCP->>Session: create_pending_elicitation("elicit-1")
+    MCP-->>Agent: 200 text/event-stream (POST SSE open)
+    MCP-->>Agent: SSE: elicitation/create {mode:"form", schema:{key,tempo,mood,...}}
+
+    Note over Agent: Shows form UI to user
+
+    Agent->>MCP: POST {jsonrpc:"2.0", id:"elicit-1", result:{action:"accept", content:{key:"Dm",...}}}
+    MCP->>Session: resolve_elicitation("elicit-1", {action:"accept", content:...})
+    MCP-->>Agent: 202 Accepted
+
+    Note over Tool: Future resolved, tool continues
+
+    MCP-->>Agent: SSE: tools/call response {composition_plan: {...}}
+    Note over MCP: SSE stream closes
+```
+
+### Elicitation sequence (URL mode)
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant MCP as POST /mcp
+    participant Browser as User's Browser
+    participant UI as MuseHub UI /mcp/connect/...
+
+    Agent->>MCP: POST tools/call musehub_connect_streaming_platform {platform:"Spotify"}
+    MCP-->>Agent: SSE: elicitation/create {mode:"url", url:"https://musehub.app/musehub/ui/mcp/connect/spotify?elicitation_id=xyz"}
+
+    Agent->>Browser: opens URL
+    Browser->>UI: GET /musehub/ui/mcp/connect/spotify?elicitation_id=xyz
+    UI-->>Browser: confirmation page
+
+    Browser->>UI: user clicks "Connect Spotify"
+    UI->>UI: resolve_elicitation(session, "xyz", {action:"accept"})
+    UI-->>Browser: callback page (auto-close tab)
+
+    MCP-->>Agent: SSE: notifications/elicitation/complete {elicitationId:"xyz", action:"accept"}
+    MCP-->>Agent: SSE: tools/call response {platform:"Spotify", status:"connected"}
 ```

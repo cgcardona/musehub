@@ -1,0 +1,69 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}
+  {% if status == "accepted" %}Connection Authorised{% else %}Connection Declined{% endif %}
+  — MuseHub MCP
+{% endblock %}
+{% block breadcrumb %}<a href="/musehub">MuseHub</a> / <span>Agent Connection</span>{% endblock %}
+
+{% block content %}
+<div style="max-width:480px;margin:4rem auto;text-align:center">
+
+  <div style="background:var(--color-surface,#fff);border:1px solid var(--color-border,#e5e7eb);border-radius:16px;padding:2.5rem;box-shadow:0 4px 24px rgba(0,0,0,0.07)">
+
+    {% if status == "accepted" %}
+      <div style="font-size:4rem;margin-bottom:1rem">✅</div>
+      <h1 style="font-size:1.5rem;font-weight:700;color:var(--color-success,#16a34a);margin:0 0 0.75rem">
+        Connection Authorised
+      </h1>
+      <p style="color:var(--color-muted,#6b7280);margin:0 0 1.5rem;font-size:0.95rem">
+        The agent has been notified. You can close this tab — the workflow will
+        continue automatically in your agent client.
+      </p>
+    {% else %}
+      <div style="font-size:4rem;margin-bottom:1rem">❌</div>
+      <h1 style="font-size:1.5rem;font-weight:700;color:var(--color-danger,#e11d48);margin:0 0 0.75rem">
+        Connection Declined
+      </h1>
+      <p style="color:var(--color-muted,#6b7280);margin:0 0 1.5rem;font-size:0.95rem">
+        The agent has been notified that you declined. The tool call will
+        return gracefully without connecting the service.
+      </p>
+    {% endif %}
+
+    {# ── Elicitation ID trace ──────────────────────────────────────────── #}
+    <p style="font-size:0.75rem;color:var(--color-muted,#9ca3af);font-family:monospace;word-break:break-all;margin:0 0 2rem">
+      Elicitation: {{ elicitation_id }}
+    </p>
+
+    {# ── Auto-close script ─────────────────────────────────────────────── #}
+    {% if status == "accepted" %}
+    <p style="font-size:0.82rem;color:var(--color-muted,#9ca3af);margin:0 0 1rem">
+      This tab will close automatically in <span id="countdown">5</span>s.
+    </p>
+    <script>
+      let n = 5;
+      const el = document.getElementById("countdown");
+      const t = setInterval(() => {
+        n--;
+        if (el) el.textContent = n;
+        if (n <= 0) { clearInterval(t); window.close(); }
+      }, 1000);
+    </script>
+    {% endif %}
+
+    <div style="display:flex;gap:0.75rem;justify-content:center">
+      <a href="/musehub" class="btn btn-primary" style="padding:0.65rem 1.5rem">
+        ← Back to MuseHub
+      </a>
+      {% if status == "accepted" %}
+      <button onclick="window.close()" class="btn" style="padding:0.65rem 1.5rem;color:var(--color-muted,#6b7280)">
+        Close tab
+      </button>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

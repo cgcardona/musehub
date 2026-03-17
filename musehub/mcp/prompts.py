@@ -3,13 +3,15 @@
 Prompts teach agents how to chain Tools and Resources to accomplish multi-step
 musical collaboration goals on MuseHub.
 
-Six prompts are defined:
+Eight prompts are defined:
   musehub/orientation  — essential onboarding for any new agent
   musehub/contribute   — end-to-end contribution workflow
   musehub/compose      — musical composition workflow
   musehub/review_pr    — musical PR review workflow
   musehub/issue_triage — issue triage workflow
   musehub/release_prep — release preparation workflow
+  musehub/onboard      — interactive artist onboarding (elicitation-aware, 2025-11-25)
+  musehub/release_to_world — full elicitation-powered release + distribution pipeline
 """
 from __future__ import annotations
 
@@ -152,6 +154,43 @@ PROMPT_CATALOGUE: list[MCPPromptDef] = [
             },
         ],
     },
+    {
+        "name": "musehub/onboard",
+        "description": (
+            "Interactive artist onboarding (MCP 2025-11-25 elicitation-aware). "
+            "Guides a new MuseHub artist through: profile setup → first repo creation "
+            "(with elicited DAW, genre, key, tempo preferences) → initial composition scaffold "
+            "(via musehub_compose_with_preferences) → optional cloud DAW connection "
+            "(via musehub_connect_daw_cloud). "
+            "Requires an active session with elicitation capability."
+        ),
+        "arguments": [
+            {
+                "name": "username",
+                "description": "MuseHub username of the artist being onboarded.",
+                "required": False,
+            },
+        ],
+    },
+    {
+        "name": "musehub/release_to_world",
+        "description": (
+            "Full elicitation-powered release and distribution pipeline (MCP 2025-11-25). "
+            "Step 1: interactively create a release via musehub_create_release_interactive "
+            "(form-mode for metadata). "
+            "Step 2: connect streaming platforms via musehub_connect_streaming_platform "
+            "(URL-mode OAuth). "
+            "Step 3: distribute and share the release across all connected services. "
+            "Requires an active session with elicitation capability."
+        ),
+        "arguments": [
+            {
+                "name": "repo_id",
+                "description": "UUID of the repository to release.",
+                "required": True,
+            },
+        ],
+    },
 ]
 
 PROMPT_NAMES: set[str] = {p["name"] for p in PROMPT_CATALOGUE}
@@ -184,6 +223,10 @@ def get_prompt(name: str, arguments: dict[str, str] | None = None) -> MCPPromptR
         return _issue_triage(args.get("repo_id", ""))
     if name == "musehub/release_prep":
         return _release_prep(args.get("repo_id", ""))
+    if name == "musehub/onboard":
+        return _onboard(args.get("username", ""))
+    if name == "musehub/release_to_world":
+        return _release_to_world(args.get("repo_id", ""))
     return None
 
 
@@ -581,6 +624,153 @@ musehub_create_release(
 - `v1.0` — first complete composition
 - `v1.x` — revisions and fixes
 - `v2.0` — major structural rework
+"""),
+        ],
+    }
+
+
+def _onboard(username: str) -> MCPPromptResult:
+    artist = username or "the artist"
+    return {
+        "description": "Interactive artist onboarding with elicitation (MCP 2025-11-25)",
+        "messages": [
+            _msg("user", f"Help me onboard {artist} to MuseHub as a new artist."),
+            _msg("assistant", f"""\
+# MuseHub Artist Onboarding — Elicitation-Powered
+
+Welcome! I'll guide {artist} through a fully interactive onboarding using MCP elicitation.
+This requires an active session with elicitation support.
+
+## Phase 1 — Create the first repository
+
+Call `musehub_create_repo` to create their first Muse project repo.
+Use the elicitation-powered `musehub_compose_with_preferences` to interview the artist
+about their creative vision before scaffolding the project:
+
+```
+musehub_compose_with_preferences()
+```
+
+This will:
+1. Send a form elicitation asking for key, tempo, mood, genre, and reference artist.
+2. Return a complete composition plan with chord progressions and section structure.
+3. Suggest commit messages and issue titles for each section of the piece.
+
+## Phase 2 — Connect a cloud DAW
+
+```
+musehub_connect_daw_cloud()
+```
+
+This will:
+1. Send a form elicitation asking which cloud DAW/mastering service to connect.
+2. Send a URL elicitation opening the service's OAuth page.
+3. Once authorised, future releases can be mastered and exported automatically.
+
+## Phase 3 — Set up collaboration
+
+If {artist} wants collaborators:
+```
+musehub_search_repos(query="similar genre/style")
+musehub_star_repo(repo_id="<discovered_repo>")
+musehub_create_issue(repo_id="<new_repo>", title="Collab opportunity", body="...")
+```
+
+## Phase 4 — First commit
+
+Guide the artist to commit their initial Muse project file:
+```
+musehub_browse_repo(repo_id="<new_repo>")
+musehub_get_context(repo_id="<new_repo>")
+```
+
+## You're set!
+{artist} now has:
+- A repo scaffolded from their creative preferences
+- A cloud DAW connection for cloud renders
+- A composition plan ready to execute in Muse
+"""),
+        ],
+    }
+
+
+def _release_to_world(repo_id: str) -> MCPPromptResult:
+    rid = repo_id or "<repo_id>"
+    return {
+        "description": "Full elicitation-powered release + distribution pipeline (MCP 2025-11-25)",
+        "messages": [
+            _msg("user", f"I want to release and distribute repo {rid} to the world."),
+            _msg("assistant", f"""\
+# Release to the World — Elicitation Pipeline
+
+I'll walk you through an interactive, elicitation-powered release and distribution
+workflow using MCP 2025-11-25 features. Each step collects your input and then acts.
+
+## Step 1 — Review the musical state
+
+Before releasing, understand what we're shipping:
+```
+musehub_get_analysis(repo_id="{rid}", dimension="overview")
+musehub_list_prs(repo_id="{rid}", state="merged")
+musehub_list_releases(repo_id="{rid}")
+```
+
+## Step 2 — Create the release interactively
+
+```
+musehub_create_release_interactive(repo_id="{rid}")
+```
+
+This tool uses **chained elicitation**:
+
+**Form elicitation (Step 2a):** Collects:
+- Release tag (e.g. `v1.0.0`)
+- Release title
+- Release notes / changelog
+- Highlight sentence (shown on streaming platforms)
+- Whether it's a pre-release
+
+**URL elicitation (Step 2b, optional):** Offers to connect Spotify for immediate distribution.
+
+## Step 3 — Connect streaming platforms
+
+If not yet connected:
+```
+musehub_connect_streaming_platform(repo_id="{rid}")
+```
+
+Supported platforms: Spotify, SoundCloud, Bandcamp, YouTube Music, Apple Music, TIDAL,
+Amazon Music, Deezer.
+
+Each platform requires URL-mode elicitation (OAuth browser flow).
+
+## Step 4 — Connect cloud mastering (optional)
+
+For professional-quality masters before distribution:
+```
+musehub_connect_daw_cloud(service="LANDR")
+```
+
+Once connected, LANDR can master your release automatically.
+
+## Step 5 — Share and promote
+
+```
+musehub_create_issue(
+    repo_id="{rid}",
+    title="🎵 Released: <title>",
+    body="Release notes + streaming links..."
+)
+```
+
+Tag it with `release` and `announcement` labels to notify followers.
+
+## Versioning reminder
+- `v1.0` — debut release
+- `v1.x` — polish and fixes post-debut
+- `v2.0` — major new direction
+
+Your release is now live on MuseHub and distributed to your connected platforms.
 """),
         ],
     }

@@ -464,32 +464,6 @@ async def profile_redirect(username: str) -> RedirectResponse:
     )
 
 
-@fixed_router.get(
-    "/users/{username}",
-    summary='Muse Hub user profile page',
-)
-async def profile_page(request: Request, username: str) -> Response:
-    """Render the public user profile page.
-
-    Displays bio, avatar, pinned repos, all public repos with last-activity,
-    a GitHub-style contribution heatmap, and aggregated session credits.
-    Auth is handled client-side -- the profile itself is public.
-    """
-    ctx: dict[str, object] = {
-        "title": f"@{username}",
-        "username": username,
-        "og_meta": _og_tags(
-            title=f"@{username} — Muse Hub",
-            description=f"{username}'s music repos on Muse Hub",
-            og_type="profile",
-        ),
-    }
-    return json_or_html(
-        request,
-        lambda: templates.TemplateResponse(request, "musehub/pages/profile.html", ctx),
-        ctx,
-    )
-
 # ---------------------------------------------------------------------------
 # Repo-scoped pages
 # ---------------------------------------------------------------------------
@@ -1005,6 +979,7 @@ async def pr_detail_page(
     owner: str,
     repo_slug: str,
     pr_id: str,
+    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Render the PR detail page with full SSR data and HTMX fragment support.
@@ -1021,6 +996,30 @@ async def pr_detail_page(
     pr = await musehub_pull_requests.get_pr(db, repo_id, pr_id)
     if pr is None:
         raise HTTPException(status_code=404, detail=f"Pull request {pr_id} not found")
+
+    # JSON content negotiation — return PRDiffResponse for agent/API consumers.
+    if format == "json" or "application/json" in request.headers.get("accept", ""):
+        try:
+            divergence_result = await musehub_divergence.compute_hub_divergence(
+                db,
+                repo_id=repo_id,
+                branch_a=pr.from_branch,
+                branch_b=pr.to_branch,
+            )
+            diff_response = musehub_divergence.build_pr_diff_response(
+                pr_id=pr_id,
+                from_branch=pr.from_branch,
+                to_branch=pr.to_branch,
+                result=divergence_result,
+            )
+        except ValueError:
+            diff_response = musehub_divergence.build_zero_diff_response(
+                pr_id=pr_id,
+                repo_id=repo_id,
+                from_branch=pr.from_branch,
+                to_branch=pr.to_branch,
+            )
+        return JSONResponse(diff_response.model_dump(by_alias=True, mode="json"))
 
     reviews_resp = await musehub_pull_requests.list_reviews(
         db, repo_id=repo_id, pr_id=pr_id
@@ -2492,6 +2491,7 @@ async def branches_page(
     request: Request,
     owner: str,
     repo_slug: str,
+    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> StarletteResponse:
     """Render the branch list page (SSR).
@@ -2500,11 +2500,16 @@ async def branches_page(
     musical divergence scores (placeholder), and compare links rendered
     server-side.  HTMX partial requests (``HX-Request: true``) return only
     the ``fragments/branch_rows.html`` fragment for in-place swap.
+
+    JSON (``Accept: application/json`` or ``?format=json``): returns
+    ``BranchDetailListResponse`` with camelCase keys.
     """
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
     branch_data: BranchDetailListResponse = (
         await musehub_repository.list_branches_with_detail(db, repo_id)
     )
+    if format == "json" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse(branch_data.model_dump(by_alias=True, mode="json"))
     default_branch = next((b for b in branch_data.branches if b.is_default), None)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2533,6 +2538,7 @@ async def tags_page(
     owner: str,
     repo_slug: str,
     namespace: str | None = Query(None, description="Filter tags by namespace prefix"),
+    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> StarletteResponse:
     """Render the tag browser page (SSR).
@@ -2570,6 +2576,9 @@ async def tags_page(
         filtered_tags = all_tags
 
     namespaces: list[str] = sorted({t.namespace for t in all_tags})
+    if format == "json" or "application/json" in request.headers.get("accept", ""):
+        tag_list = TagListResponse(tags=filtered_tags, namespaces=namespaces)
+        return JSONResponse(tag_list.model_dump(by_alias=True, mode="json"))
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,

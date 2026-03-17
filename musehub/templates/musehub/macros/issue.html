@@ -30,6 +30,9 @@
   <span class="badge badge-{{ issue.state }}">#{{ issue.number }}</span>
   <div style="flex:1;min-width:0">
     <a href="{{ base_url }}/issues/{{ issue.number }}">{{ issue.title }}</a>
+    {% if issue.body %}
+    <p class="issue-preview">{{ issue.body | truncate(120) }}</p>
+    {% endif %}
     <div class="issue-meta">
       {% for label_name in issue.labels %}
         {% set label_obj = labels | selectattr('name', 'equalto', label_name) | first | default(None) %}
