@@ -15,7 +15,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -133,8 +134,10 @@ app = FastAPI(
     },
     lifespan=lifespan,
     openapi_url="/api/v1/openapi.json",
-    docs_url="/docs" if settings.debug else None,
-    redoc_url="/redoc" if settings.debug else None,
+    # Docs are served via custom routes below that use locally-bundled assets,
+    # so we disable the default CDN-dependent auto-generated routes.
+    docs_url=None,
+    redoc_url=None,
 )
 
 
@@ -190,6 +193,23 @@ app.mount(
     name="musehub-static",
 )
 
+if settings.debug:
+    @app.get("/docs", include_in_schema=False)
+    async def swagger_ui() -> HTMLResponse:
+        return get_swagger_ui_html(
+            openapi_url="/api/v1/openapi.json",
+            title="MuseHub API — Swagger UI",
+            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
+            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+        )
+
+    @app.get("/redoc", include_in_schema=False)
+    async def redoc_ui() -> HTMLResponse:
+        return get_redoc_html(
+            openapi_url="/api/v1/openapi.json",
+            title="MuseHub API — ReDoc",
+        )
+
 
 @app.get("/")
 async def root() -> dict[str, str]:
@@ -197,5 +217,7 @@ async def root() -> dict[str, str]:
     return {
         "service": "MuseHub",
         "version": settings.app_version,
-        "docs": "/docs",
+        "ui": "/explore",
+        "docs": "/docs" if settings.debug else "/api/v1/openapi.json",
+        "openapi": "/api/v1/openapi.json",
     }
