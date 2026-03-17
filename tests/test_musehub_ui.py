@@ -8528,8 +8528,7 @@ async def test_explore_page_has_repo_grid(
     assert response.status_code == 200
     body = response.text
     assert "repo-grid" in body
-    assert "loadExplore" in body
-    assert "DISCOVER_API" in body
+    assert "filter-form" in body
 
 
 @pytest.mark.anyio
