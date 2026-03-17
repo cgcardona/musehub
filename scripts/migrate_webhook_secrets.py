@@ -4,7 +4,7 @@ Context
 -------
 PR #336 added Fernet envelope encryption to ``musehub_webhooks.secret`` via
 ``musehub.services.musehub_webhook_crypto``.  Existing rows written before
-STORI_WEBHOOK_SECRET_KEY was set contain plaintext secrets.  When the key is
+MUSE_WEBHOOK_SECRET_KEY was set contain plaintext secrets.  When the key is
 first enabled in production, ``decrypt_secret()`` would normally raise a
 ValueError for those rows.  PR #347 added a transparent fallback, but the
 recommended path is to run this script once to encrypt every legacy row before
@@ -24,7 +24,7 @@ Run inside the container (bind mount makes this file available):
 
     docker compose exec muse python3 /app/scripts/migrate_webhook_secrets.py
 
-Requires STORI_WEBHOOK_SECRET_KEY to be set; exits with an error if absent.
+Requires MUSE_WEBHOOK_SECRET_KEY to be set; exits with an error if absent.
 """
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ async def migrate(db: AsyncSession) -> tuple[int, int]:
 async def main() -> None:
     if not settings.webhook_secret_key:
         logger.error(
-            "❌ STORI_WEBHOOK_SECRET_KEY is not set. "
+            "❌ MUSE_WEBHOOK_SECRET_KEY is not set. "
             "Set this environment variable before running the migration."
         )
         sys.exit(1)

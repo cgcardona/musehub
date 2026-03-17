@@ -4,14 +4,14 @@ Webhook signing secrets must be recoverable at delivery time (so we can compute 
 HMAC-SHA256 header for subscribers). One-way hashing (bcrypt/SHA256) is therefore
 not an option. Instead we use Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256
 under the hood, equivalent security to AES-256 for the threat model here) keyed with
-STORI_WEBHOOK_SECRET_KEY from the environment.
+MUSE_WEBHOOK_SECRET_KEY from the environment.
 
 Encryption contract
 -------------------
 - ``encrypt_secret(plaintext)`` → base64url-encoded Fernet token (str).
 - ``decrypt_secret(ciphertext)`` → original plaintext str.
 - Both functions are pure (no I/O) and synchronous.
-- When STORI_WEBHOOK_SECRET_KEY is not configured, the functions are transparent
+- When MUSE_WEBHOOK_SECRET_KEY is not configured, the functions are transparent
   pass-throughs so local dev works without extra setup (see warning in decrypt).
 
 Key management
@@ -20,7 +20,7 @@ Generate a key once and store it in the environment:
 
     python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-Set STORI_WEBHOOK_SECRET_KEY to that value in your .env or secret manager.
+Set MUSE_WEBHOOK_SECRET_KEY to that value in your .env or secret manager.
 Rotate keys by re-encrypting all secrets and updating the env var; Fernet tokens
 carry the key version so future decryption needs the matching key.
 """
@@ -42,7 +42,7 @@ _fernet_initialised = False
 def _get_fernet() -> Fernet | None:
     """Return the singleton Fernet instance, initialising it on first call.
 
-    Returns None when STORI_WEBHOOK_SECRET_KEY is not set (local dev fallback).
+    Returns None when MUSE_WEBHOOK_SECRET_KEY is not set (local dev fallback).
     """
     global _fernet, _fernet_initialised
     if _fernet_initialised:
@@ -51,7 +51,7 @@ def _get_fernet() -> Fernet | None:
     key = settings.webhook_secret_key
     if not key:
         logger.warning(
-            "⚠️ STORI_WEBHOOK_SECRET_KEY is not set — webhook secrets stored as plaintext. "
+            "⚠️ MUSE_WEBHOOK_SECRET_KEY is not set — webhook secrets stored as plaintext. "
             "Set this key in production to encrypt secrets at rest."
         )
         return None
@@ -63,7 +63,7 @@ def encrypt_secret(plaintext: str) -> str:
     """Encrypt a webhook signing secret for storage in the database.
 
     Returns a Fernet token (base64url string) when a key is configured, or the
-    original plaintext when STORI_WEBHOOK_SECRET_KEY is absent (dev fallback).
+    original plaintext when MUSE_WEBHOOK_SECRET_KEY is absent (dev fallback).
     Empty secrets are returned as-is regardless of key configuration.
     """
     if not plaintext:
@@ -128,5 +128,5 @@ def decrypt_secret(ciphertext: str) -> str:
             return ciphertext
         raise ValueError(
             "Failed to decrypt webhook secret — the value may have been encrypted "
-            "with a different key or is corrupt. Check STORI_WEBHOOK_SECRET_KEY."
+            "with a different key or is corrupt. Check MUSE_WEBHOOK_SECRET_KEY."
         ) from exc

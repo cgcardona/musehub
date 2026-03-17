@@ -1,6 +1,6 @@
 # MuseHub
 
-**MuseHub** — the music composition version control platform for Stori DAW.
+**MuseHub** — the music composition version control platform powered by Muse VCS.
 
 GitHub for music. Push commits, open pull requests, track issues, browse public repos, publish releases, and expose your work to AI agents via MCP tools.
 
@@ -70,4 +70,4 @@ MuseHub exposes 7 server-side MCP browsing tools:
 
 ## License
 
-Proprietary — Tellurstori / Stori.
+Proprietary — Muse VCS.

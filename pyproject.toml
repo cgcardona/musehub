@@ -1,7 +1,7 @@
 [project]
 name = "musehub"
 version = "0.1.0"
-description = "MuseHub — the music composition version control platform for Stori DAW"
+description = "MuseHub — the music composition version control platform powered by Muse VCS"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

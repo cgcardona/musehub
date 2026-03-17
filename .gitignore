@@ -211,10 +211,10 @@ __marimo__/
 
 .DS_Store
 
-# Maestro
+# Muse
 # Database files
 *.db
-stori.db
+muse.db
 
 # QA test results (contain server URLs)
 qa_results_*.json
@@ -246,7 +246,7 @@ storpheus/artifacts_export/
 # Tour de Force artifacts and secrets
 artifacts/
 .env.tourdeforce
-stori_tourdeforce/*.db
+muse_tourdeforce/*.db
 
 # Cursor worktree coordination artifacts
 .agent-id

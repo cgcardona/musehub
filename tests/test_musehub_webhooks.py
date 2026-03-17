@@ -728,7 +728,7 @@ def test_decrypt_plaintext_secret_returns_value_when_key_set() -> None:
     """decrypt_secret returns a plaintext secret as-is when it lacks the Fernet prefix.
 
     This is the transparent migration fallback: secrets written
-    before STORI_WEBHOOK_SECRET_KEY was enabled do not start with "gAAAAAB".
+    before MUSE_WEBHOOK_SECRET_KEY was enabled do not start with "gAAAAAB".
     Rather than raising ValueError and breaking all existing webhooks, we
     return the plaintext and emit a deprecation warning so operators know they
     need to run the migration script.
@@ -1066,7 +1066,7 @@ def test_migrate_webhook_secrets_logic() -> None:
 
 
 def test_encrypt_decrypt_no_key_passthrough() -> None:
-    """When STORI_WEBHOOK_SECRET_KEY is absent, encrypt/decrypt are transparent."""
+    """When MUSE_WEBHOOK_SECRET_KEY is absent, encrypt/decrypt are transparent."""
     from unittest.mock import patch
     from musehub.services import musehub_webhook_crypto as crypto
 
