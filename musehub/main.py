@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
-from typing import Awaitable, Callable, cast
+from typing import Awaitable, Callable
 
 from pathlib import Path
 
@@ -143,7 +143,8 @@ app = FastAPI(
 
 def _handle_rate_limit(request: Request, exc: Exception) -> Response:
     if isinstance(exc, RateLimitExceeded):
-        return cast(Response, _rate_limit_exceeded_handler(request, exc))
+        result: Response = _rate_limit_exceeded_handler(request, exc)
+        return result
     raise exc
 
 
