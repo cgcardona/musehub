@@ -71,7 +71,7 @@ _EVENT_TYPES = [
 ]
 
 
-def _fmt_relative(value: str) -> str:
+def _fmt_relative(value: str | datetime) -> str:
     """Format an ISO 8601 datetime string as a human-readable relative duration.
 
     Used as a Jinja2 template filter (``| fmtrelative``) so notification

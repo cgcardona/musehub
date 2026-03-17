@@ -54,12 +54,12 @@ async def protocol_events() -> ProtocolEventsResponse:
 @router.get("/protocol/tools.json")
 async def protocol_tools() -> ProtocolToolsResponse:
     """Unified tool schema (MCP format) for all registered tools."""
-    from musehub.mcp.tools import MCP_TOOLS
+    from musehub.mcp.tools import MUSEHUB_TOOLS
 
     return ProtocolToolsResponse(
         protocolVersion=MUSE_VERSION,
-        tools=[MCPToolDefWire.model_validate(t) for t in MCP_TOOLS],
-        toolCount=len(MCP_TOOLS),
+        tools=[MCPToolDefWire.model_validate(t) for t in MUSEHUB_TOOLS],
+        toolCount=len(MUSEHUB_TOOLS),
     )
 
 
@@ -70,7 +70,7 @@ async def protocol_schema() -> ProtocolSchemaResponse:
     Single fetch for FE type generation, cacheable by protocolHash.
     """
     from musehub.core.intent_config.enums import SSEState, Intent
-    from musehub.mcp.tools import MCP_TOOLS
+    from musehub.mcp.tools import MUSEHUB_TOOLS
 
     return ProtocolSchemaResponse(
         protocolVersion=MUSE_VERSION,
@@ -85,7 +85,7 @@ async def protocol_schema() -> ProtocolSchemaResponse:
             "Intent": sorted(m.value for m in Intent),
             "SSEState": sorted(m.value for m in SSEState),
         },
-        tools=[MCPToolDefWire.model_validate(t) for t in MCP_TOOLS],
-        toolCount=len(MCP_TOOLS),
+        tools=[MCPToolDefWire.model_validate(t) for t in MUSEHUB_TOOLS],
+        toolCount=len(MUSEHUB_TOOLS),
         eventCount=len(EVENT_REGISTRY),
     )
