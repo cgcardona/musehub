@@ -426,27 +426,23 @@ async def test_create_issue_author_persisted_in_list(
 @pytest.mark.anyio
 async def test_issue_detail_page_shows_author_label(
     client: AsyncClient,
-    db_session: AsyncSession,
+    auth_headers: dict[str, str],
 ) -> None:
     """issue_detail.html template contains the 'Author' meta-label — regression f."""
-    from musehub.db.musehub_models import MusehubRepo
-    repo = MusehubRepo(
-        name="author-detail-beats",
-        owner="testuser",
-        slug="author-detail-beats",
-        visibility="private",
-        owner_user_id="test-owner",
+    repo_id = await _create_repo(client, auth_headers, "author-detail-beats")
+    issue = await _create_issue(
+        client,
+        auth_headers,
+        repo_id,
+        title="Author label regression check",
     )
-    db_session.add(repo)
-    await db_session.commit()
-    await db_session.refresh(repo)
+    number = issue["number"]
 
-    response = await client.get("/musehub/ui/testuser/author-detail-beats/issues/1")
+    response = await client.get(f"/musehub/ui/testuser/author-detail-beats/issues/{number}")
     assert response.status_code == 200
     body = response.text
-    # The JS template string containing the author meta-item must be in the page
-    assert "Author" in body
-    assert "meta-label" in body
+    # The SSR template renders author inline: "Opened … by <strong>…</strong>"
+    assert "by <strong>" in body
 
 
 # ---------------------------------------------------------------------------
