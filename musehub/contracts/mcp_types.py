@@ -47,10 +47,9 @@ stdio JSON-RPC server continue to use the TypedDict variants.
 """
 from __future__ import annotations
 
-from typing import Literal, Union
+from typing import Literal, NotRequired, Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import NotRequired, Required, TypedDict
 
 from musehub.contracts.json_types import JSONValue, JSONObject
 from musehub.contracts.pydantic_types import PydanticJson
@@ -196,7 +195,7 @@ class MCPErrorResponse(TypedDict):
     error: MCPErrorDetail
 
 
-MCPResponse = Union[MCPSuccessResponse, MCPErrorResponse]
+MCPResponse = MCPSuccessResponse | MCPErrorResponse
 """Discriminated union of all JSON-RPC 2.0 response shapes."""
 
 
@@ -254,7 +253,7 @@ class MCPCallResponse(TypedDict):
     result: MCPCallResult
 
 
-MCPMethodResponse = Union[MCPInitializeResponse, MCPToolsListResponse, MCPCallResponse, MCPSuccessResponse, MCPErrorResponse]
+MCPMethodResponse = MCPInitializeResponse | MCPToolsListResponse | MCPCallResponse | MCPSuccessResponse | MCPErrorResponse
 """Union of all concrete JSON-RPC response types produced by the stdio server."""
 
 

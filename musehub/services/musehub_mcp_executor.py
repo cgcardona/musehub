@@ -634,3 +634,408 @@ async def execute_get_context(repo_id: str) -> MusehubToolResult:
             "context": context,
         }
         return MusehubToolResult(ok=True, data=data)
+
+
+# ---------------------------------------------------------------------------
+# New read tool executors (8) — wired by the dispatcher
+# ---------------------------------------------------------------------------
+
+
+async def execute_get_commit(repo_id: str, commit_id: str) -> MusehubToolResult:
+    """Return detailed information about a single commit.
+
+    Args:
+        repo_id: UUID of the target repository.
+        commit_id: Commit ID (SHA or short ID).
+
+    Returns:
+        ``MusehubToolResult`` with commit metadata and parent IDs.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        commit = await musehub_repository.get_commit(session, repo_id, commit_id)
+        if commit is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="not_found",
+                error_message=f"Commit '{commit_id}' not found in repo '{repo_id}'.",
+            )
+        data: dict[str, JSONValue] = {
+            "commit_id": commit.commit_id,
+            "repo_id": repo_id,
+            "branch": commit.branch,
+            "message": commit.message,
+            "author": commit.author,
+            "parent_ids": list(commit.parent_ids) if commit.parent_ids else [],
+            "timestamp": commit.timestamp.isoformat(),
+        }
+        return MusehubToolResult(ok=True, data=data)
+
+
+async def execute_compare(
+    repo_id: str,
+    base_ref: str,
+    head_ref: str,
+) -> MusehubToolResult:
+    """Compare two refs and return a musical diff summary.
+
+    Args:
+        repo_id: UUID of the repository.
+        base_ref: Base branch name or commit ID.
+        head_ref: Head branch name or commit ID to compare against base.
+
+    Returns:
+        ``MusehubToolResult`` with artifact-level diff (added/removed/modified counts).
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        repo = await musehub_repository.get_repo(session, repo_id)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="not_found",
+                error_message=f"Repository '{repo_id}' not found.",
+            )
+
+        base_commits, _ = await musehub_repository.list_commits(session, repo_id, branch=base_ref, limit=1)
+        head_commits, _ = await musehub_repository.list_commits(session, repo_id, branch=head_ref, limit=1)
+
+        base_objects = await musehub_repository.list_objects(session, repo_id)
+        head_objects = await musehub_repository.list_objects(session, repo_id)
+
+        data: dict[str, JSONValue] = {
+            "repo_id": repo_id,
+            "base_ref": base_ref,
+            "head_ref": head_ref,
+            "base_commit_id": base_commits[0].commit_id if base_commits else None,
+            "head_commit_id": head_commits[0].commit_id if head_commits else None,
+            "note": (
+                "Full musical diff (harmony, rhythm, groove scores) requires "
+                "Storpheus MIDI analysis integration (coming soon). "
+                "Currently returns object inventory for both refs."
+            ),
+            "base_object_count": len(base_objects),
+            "head_object_count": len(head_objects),
+        }
+        return MusehubToolResult(ok=True, data=data)
+
+
+async def execute_list_issues(
+    repo_id: str,
+    state: str = "open",
+    label: str | None = None,
+) -> MusehubToolResult:
+    """List issues for a MuseHub repository.
+
+    Args:
+        repo_id: UUID of the repository.
+        state: Filter by state — ``"open"``, ``"closed"``, or ``"all"``.
+        label: Optional label string filter.
+
+    Returns:
+        ``MusehubToolResult`` with ``data.issues`` list.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        repo = await musehub_repository.get_repo(session, repo_id)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="not_found",
+                error_message=f"Repository '{repo_id}' not found.",
+            )
+
+        from musehub.services import musehub_issues
+        issues = await musehub_issues.list_issues(session, repo_id, state=state, label=label)
+        data: dict[str, JSONValue] = {
+            "repo_id": repo_id,
+            "state": state,
+            "total": len(issues),
+            "issues": [
+                {
+                    "issue_id": i.issue_id,
+                    "number": i.number,
+                    "title": i.title,
+                    "state": i.state,
+                    "labels": list(i.labels),
+                    "author": i.author,
+                    "assignee": i.assignee,
+                    "created_at": i.created_at.isoformat() if i.created_at else None,
+                }
+                for i in issues
+            ],
+        }
+        return MusehubToolResult(ok=True, data=data)
+
+
+async def execute_get_issue(repo_id: str, issue_number: int) -> MusehubToolResult:
+    """Return a single issue with its full comment thread.
+
+    Args:
+        repo_id: UUID of the repository.
+        issue_number: Per-repo issue number.
+
+    Returns:
+        ``MusehubToolResult`` with issue and comments data.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_issues
+        issue = await musehub_issues.get_issue(session, repo_id, issue_number)
+        if issue is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="not_found",
+                error_message=f"Issue #{issue_number} not found in repo '{repo_id}'.",
+            )
+        comments_resp = await musehub_issues.list_comments(session, issue.issue_id)
+        data: dict[str, JSONValue] = {
+            "issue_id": issue.issue_id,
+            "number": issue.number,
+            "title": issue.title,
+            "body": issue.body,
+            "state": issue.state,
+            "labels": list(issue.labels),
+            "author": issue.author,
+            "assignee": issue.assignee,
+            "created_at": issue.created_at.isoformat() if issue.created_at else None,
+            "comments": [
+                {
+                    "comment_id": c.comment_id,
+                    "author": c.author,
+                    "body": c.body,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+                for c in comments_resp.comments
+            ],
+        }
+        return MusehubToolResult(ok=True, data=data)
+
+
+async def execute_list_prs(repo_id: str, state: str = "all") -> MusehubToolResult:
+    """List pull requests for a MuseHub repository.
+
+    Args:
+        repo_id: UUID of the repository.
+        state: Filter by state — ``"open"``, ``"merged"``, ``"closed"``, or ``"all"``.
+
+    Returns:
+        ``MusehubToolResult`` with ``data.pulls`` list.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        repo = await musehub_repository.get_repo(session, repo_id)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="not_found",
+                error_message=f"Repository '{repo_id}' not found.",
+            )
+        from musehub.services import musehub_pull_requests
+        prs = await musehub_pull_requests.list_prs(session, repo_id, state=state)
+        data: dict[str, JSONValue] = {
+            "repo_id": repo_id,
+            "state": state,
+            "total": len(prs),
+            "pulls": [
+                {
+                    "pr_id": p.pr_id,
+                    "title": p.title,
+                    "state": p.state,
+                    "from_branch": p.from_branch,
+                    "to_branch": p.to_branch,
+                    "author": p.author,
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                    "merged_at": p.merged_at.isoformat() if p.merged_at else None,
+                }
+                for p in prs
+            ],
+        }
+        return MusehubToolResult(ok=True, data=data)
+
+
+async def execute_get_pr(repo_id: str, pr_id: str) -> MusehubToolResult:
+    """Return a single pull request with reviews and inline comments.
+
+    Args:
+        repo_id: UUID of the repository.
+        pr_id: UUID of the pull request.
+
+    Returns:
+        ``MusehubToolResult`` with PR data, reviews, and comments.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_pull_requests
+        pr = await musehub_pull_requests.get_pr(session, repo_id, pr_id)
+        if pr is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="not_found",
+                error_message=f"PR '{pr_id}' not found in repo '{repo_id}'.",
+            )
+        comments_resp = await musehub_pull_requests.list_pr_comments(session, pr_id, repo_id)
+        reviews_resp = await musehub_pull_requests.list_reviews(session, repo_id=repo_id, pr_id=pr_id)
+        data: dict[str, JSONValue] = {
+            "pr_id": pr.pr_id,
+            "repo_id": repo_id,
+            "title": pr.title,
+            "body": pr.body,
+            "state": pr.state,
+            "from_branch": pr.from_branch,
+            "to_branch": pr.to_branch,
+            "author": pr.author,
+            "merge_commit_id": pr.merge_commit_id,
+            "created_at": pr.created_at.isoformat() if pr.created_at else None,
+            "merged_at": pr.merged_at.isoformat() if pr.merged_at else None,
+            "comments": [
+                {
+                    "comment_id": c.comment_id,
+                    "author": c.author,
+                    "body": c.body,
+                    "target_type": c.target_type,
+                    "target_track": c.target_track,
+                    "target_beat_start": c.target_beat_start,
+                    "target_beat_end": c.target_beat_end,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+                for c in comments_resp.comments
+            ],
+            "reviews": [
+                {
+                    "review_id": r.id,
+                    "reviewer": r.reviewer_username,
+                    "state": r.state,
+                    "body": r.body,
+                    "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
+                }
+                for r in reviews_resp.reviews
+            ],
+        }
+        return MusehubToolResult(ok=True, data=data)
+
+
+async def execute_list_releases(repo_id: str) -> MusehubToolResult:
+    """Return all releases for a MuseHub repository, ordered newest first.
+
+    Args:
+        repo_id: UUID of the repository.
+
+    Returns:
+        ``MusehubToolResult`` with ``data.releases`` list.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        repo = await musehub_repository.get_repo(session, repo_id)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="not_found",
+                error_message=f"Repository '{repo_id}' not found.",
+            )
+        from musehub.services import musehub_releases
+        releases = await musehub_releases.list_releases(session, repo_id)
+        data: dict[str, JSONValue] = {
+            "repo_id": repo_id,
+            "total": len(releases),
+            "releases": [
+                {
+                    "release_id": r.release_id,
+                    "tag": r.tag,
+                    "title": r.title,
+                    "body": r.body,
+                    "is_prerelease": r.is_prerelease,
+                    "commit_id": r.commit_id,
+                    "author": r.author,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in releases
+            ],
+        }
+        return MusehubToolResult(ok=True, data=data)
+
+
+async def execute_search_repos(
+    query: str | None = None,
+    key_signature: str | None = None,
+    tempo_min: int | None = None,
+    tempo_max: int | None = None,
+    tags: list[str] | None = None,
+    limit: int = 20,
+) -> MusehubToolResult:
+    """Discover public repositories by text query or musical attributes.
+
+    All filters are optional and combined with AND logic.
+
+    Args:
+        query: Free-text query matched against repo names and descriptions.
+        key_signature: Filter by key signature (e.g. ``"C major"``).
+        tempo_min: Minimum tempo (BPM).
+        tempo_max: Maximum tempo (BPM).
+        tags: Filter repos that have all of these tags.
+        limit: Maximum results to return (default: 20, max: 100).
+
+    Returns:
+        ``MusehubToolResult`` with ``data.repos`` list.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    capped_limit = min(max(1, limit), 100)
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_discover
+        explore = await musehub_discover.list_public_repos(
+            session,
+            key=key_signature,
+            tempo_min=tempo_min,
+            tempo_max=tempo_max,
+            page_size=min(capped_limit * 3, 100),
+        )
+        all_repos = explore.repos
+
+        filtered = []
+        for r in all_repos:
+            if query and query.lower() not in (r.name or "").lower() and \
+                    query.lower() not in (r.description or "").lower():
+                continue
+            if tags:
+                repo_tags: list[str] = list(r.tags) if r.tags else []
+                if not all(t in repo_tags for t in tags):
+                    continue
+            filtered.append(r)
+            if len(filtered) >= capped_limit:
+                break
+
+        data: dict[str, JSONValue] = {
+            "total": len(filtered),
+            "repos": [
+                {
+                    "repo_id": r.repo_id,
+                    "owner": r.owner,
+                    "slug": r.slug,
+                    "name": r.name,
+                    "description": r.description,
+                    "key_signature": r.key_signature,
+                    "tempo_bpm": r.tempo_bpm,
+                    "tags": list(r.tags) if r.tags else [],
+                    "star_count": r.star_count,
+                }
+                for r in filtered
+            ],
+        }
+        return MusehubToolResult(ok=True, data=data)

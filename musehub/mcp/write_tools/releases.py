@@ -1,0 +1,90 @@
+"""Write executor for release operations: create_release."""
+from __future__ import annotations
+
+import logging
+
+from musehub.contracts.json_types import JSONValue
+from musehub.db.database import AsyncSessionLocal
+from musehub.services import musehub_releases, musehub_repository
+from musehub.services.musehub_mcp_executor import MusehubToolResult, _check_db_available
+
+logger = logging.getLogger(__name__)
+
+
+async def execute_create_release(
+    *,
+    repo_id: str,
+    tag: str,
+    title: str,
+    body: str = "",
+    commit_id: str | None = None,
+    is_prerelease: bool = False,
+    actor: str = "",
+) -> MusehubToolResult:
+    """Publish a new release for a MuseHub repository.
+
+    A release pins a version tag to a specific commit and optionally marks
+    it as a pre-release. Tags must be unique per repo (e.g. ``"v1.0"``).
+
+    Args:
+        repo_id: UUID of the repository.
+        tag: Version tag string (e.g. ``"v1.0"``). Must be unique per repo.
+        title: Human-readable release title.
+        body: Markdown release notes.
+        commit_id: Optional commit UUID to pin this release to.
+        is_prerelease: When True, shows a pre-release badge in the UI.
+        actor: Authenticated user ID (JWT ``sub`` claim).
+
+    Returns:
+        ``MusehubToolResult`` with ``data.release_id`` and ``data.tag`` on success.
+    """
+    if (err := _check_db_available()) is not None:
+        return err
+
+    try:
+        async with AsyncSessionLocal() as session:
+            repo = await musehub_repository.get_repo(session, repo_id)
+            if repo is None:
+                return MusehubToolResult(
+                    ok=False,
+                    error_code="not_found",
+                    error_message=f"Repository '{repo_id}' not found.",
+                )
+
+            release = await musehub_releases.create_release(
+                session,
+                repo_id=repo_id,
+                tag=tag,
+                title=title,
+                body=body,
+                commit_id=commit_id,
+                author=actor,
+                is_prerelease=is_prerelease,
+            )
+            await session.commit()
+            data: dict[str, JSONValue] = {
+                "release_id": release.release_id,
+                "repo_id": repo_id,
+                "tag": release.tag,
+                "title": release.title,
+                "body": release.body,
+                "is_prerelease": release.is_prerelease,
+                "commit_id": release.commit_id,
+                "author": release.author,
+                "created_at": release.created_at.isoformat() if release.created_at else None,
+            }
+            logger.info("MCP create_release %s for repo %s: %s", tag, repo_id, title)
+            return MusehubToolResult(ok=True, data=data)
+    except ValueError as exc:
+        return MusehubToolResult(
+            ok=False,
+            error_code="not_found",
+            error_message=str(exc),
+        )
+    except Exception as exc:
+        logger.exception("MCP create_release failed: %s", exc)
+        return MusehubToolResult(
+            ok=False,
+            error_code="not_found",
+            error_message=str(exc),
+        )

@@ -43,12 +43,38 @@ _HERE = [str(Path(__file__).parent)]
 # generic /{dimension} catch-all declared in analysis.router.
 router.include_router(analysis.harmony_router, tags=["Analysis"])
 
+# Modules registered directly in main.py (with their own prefix/placement)
+# must be excluded here to prevent double-registration and duplicate operationIds.
+_DIRECT_REGISTERED = {
+    "discover",        # registered in main.py at /api/v1 (has /musehub/discover hardcoded)
+    "sitemap",         # registered in main.py at root (sitemap.xml, robots.txt)
+    "ui_new_repo",     # registered in main.py at root (has /musehub/ui hardcoded prefix)
+    "ui",              # registered in main.py at root (router + fixed_router)
+    "ui_blame",        # registered in main.py at root
+    "ui_collaborators",# registered in main.py at root
+    "ui_emotion_diff", # registered in main.py at root
+    "ui_forks",        # registered in main.py at root
+    "ui_labels",       # registered in main.py at root
+    "ui_milestones",   # registered in main.py at root
+    "ui_notifications",# registered in main.py at root
+    "ui_settings",     # registered in main.py at root
+    "ui_similarity",   # registered in main.py at root
+    "ui_stash",        # registered in main.py at root
+    "ui_topics",       # registered in main.py at root
+    "ui_user_profile", # registered in main.py at root
+    "users",           # registered in main.py at /api/v1/musehub (same path as auto-discovery)
+    "oembed",          # registered in main.py at root
+    "raw",             # registered in main.py at /api/v1
+}
+
 # Load every sibling module that exposes a `router` attribute, alphabetically.
 # repos goes last to avoid shadowing fixed-path routes with its wildcard.
 for _mod_info in sorted(
     pkgutil.iter_modules(_HERE),
     key=lambda m: (m.name == "repos", m.name),
 ):
+    if _mod_info.name in _DIRECT_REGISTERED:
+        continue
     _mod = importlib.import_module(f"{_PACKAGE}.{_mod_info.name}")
     if hasattr(_mod, "router"):
         _tag = _mod_info.name.replace("_", " ").title()

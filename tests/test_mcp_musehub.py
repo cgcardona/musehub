@@ -115,9 +115,14 @@ class TestMusehubToolsRegistered:
 
     def test_musehub_tools_in_categories(self) -> None:
         """Every musehub_* tool has an entry in TOOL_CATEGORIES."""
+        from musehub.mcp.tools import MUSEHUB_WRITE_TOOL_NAMES
+
         for name in MUSEHUB_TOOL_NAMES:
             assert name in TOOL_CATEGORIES, f"Tool '{name}' missing from TOOL_CATEGORIES"
-            assert TOOL_CATEGORIES[name] == "musehub"
+            expected_category = "musehub-write" if name in MUSEHUB_WRITE_TOOL_NAMES else "musehub-read"
+            assert TOOL_CATEGORIES[name] == expected_category, (
+                f"Tool '{name}' has category '{TOOL_CATEGORIES[name]}', expected '{expected_category}'"
+            )
 
     def test_musehub_tools_have_required_fields(self) -> None:
         """Every musehub_* tool has name, description, and inputSchema."""
@@ -134,9 +139,9 @@ class TestMusehubToolsRegistered:
                 f"Tool '{tool['name']}' must be server_side=True"
             )
 
-    def test_all_seven_tools_defined(self) -> None:
-        """Exactly the seven MuseHub tools are defined."""
-        expected = {
+    def test_all_tools_defined(self) -> None:
+        """All 27 MuseHub tools (15 read + 12 write) are defined."""
+        expected_read = {
             "musehub_browse_repo",
             "musehub_list_branches",
             "musehub_list_commits",
@@ -144,8 +149,30 @@ class TestMusehubToolsRegistered:
             "musehub_get_analysis",
             "musehub_search",
             "musehub_get_context",
+            "musehub_get_commit",
+            "musehub_compare",
+            "musehub_list_issues",
+            "musehub_get_issue",
+            "musehub_list_prs",
+            "musehub_get_pr",
+            "musehub_list_releases",
+            "musehub_search_repos",
         }
-        assert MUSEHUB_TOOL_NAMES == expected
+        expected_write = {
+            "musehub_create_repo",
+            "musehub_fork_repo",
+            "musehub_create_issue",
+            "musehub_update_issue",
+            "musehub_create_issue_comment",
+            "musehub_create_pr",
+            "musehub_merge_pr",
+            "musehub_create_pr_comment",
+            "musehub_submit_pr_review",
+            "musehub_create_release",
+            "musehub_star_repo",
+            "musehub_create_label",
+        }
+        assert MUSEHUB_TOOL_NAMES == expected_read | expected_write
 
 
 # ---------------------------------------------------------------------------

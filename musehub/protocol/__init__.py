@@ -1,28 +1,15 @@
-"""Muse Protocol — single source of truth for the FE ↔ BE wire contract.
+"""Muse Hub Protocol — single source of truth for the wire contract.
 
-Public re-exports for convenience:
+Public re-exports:
 
-    from musehub.protocol import (
-        MUSE_VERSION,
-        MuseEvent,
-        emit,
-        parse_event,
-        ProtocolSerializationError,
-    )
+    from musehub.protocol import MUSE_VERSION, MuseEvent
 """
 from __future__ import annotations
 
-from musehub.protocol.version import MUSE_VERSION, MAESTRO_VERSION
-from musehub.protocol.events import MuseEvent, MaestroEvent
-from musehub.protocol.emitter import emit, parse_event, ProtocolSerializationError
+from musehub.protocol.version import MUSE_VERSION
+from musehub.protocol.events import MuseEvent
 
 __all__ = [
     "MUSE_VERSION",
     "MuseEvent",
-    # Back-compat aliases
-    "MAESTRO_VERSION",
-    "MaestroEvent",
-    "emit",
-    "parse_event",
-    "ProtocolSerializationError",
 ]

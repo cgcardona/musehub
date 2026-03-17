@@ -10,7 +10,7 @@ import hashlib
 import jwt
 from datetime import datetime, timedelta, timezone
 
-from typing_extensions import Required, TypedDict
+from typing import Required, TypedDict
 
 from musehub.config import settings
 
@@ -121,8 +121,7 @@ def generate_access_code(
         secret,
         algorithm=settings.access_token_algorithm,
     )
-    
-    return token
+    return str(token)
 
 
 def create_access_token(
@@ -218,7 +217,8 @@ def get_user_id_from_token(token: str) -> str | None:
             token,
             options={"verify_signature": False},
         )
-        return payload.get("sub")
+        sub = payload.get("sub")
+        return str(sub) if sub is not None else None
     except jwt.InvalidTokenError:
         return None
 

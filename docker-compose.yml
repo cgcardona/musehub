@@ -29,6 +29,14 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    # Expose on 5434 (not 5432/5433) to avoid colliding with a locally-installed
+    # Postgres or another project's container (e.g. agentception uses 5433).
+    # This lets the local test suite and Alembic CLI reach the DB directly:
+    #   DATABASE_URL=postgresql+asyncpg://musehub:musehub@localhost:5434/musehub
+    #   make test       (the Makefile sets this automatically)
+    #   alembic upgrade head
+    ports:
+      - "127.0.0.1:5434:5432"
 
 volumes:
   musehub_data:

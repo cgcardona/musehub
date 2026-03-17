@@ -95,27 +95,25 @@ async def test_explore_page_renders(client: AsyncClient) -> None:
     body = response.text
     assert "Muse Hub" in body
     assert "Explore" in body
-    # Filter controls must be present
-    assert "genre-inp" in body
-    assert "key-inp" in body
-    assert "tempo-min" in body
-    assert "sort-sel" in body
-    # Discover API endpoint must be referenced
-    assert "discover/repos" in body
+    # Filter sidebar and sort controls rendered by the Jinja2 template
+    assert "filter-form" in body
+    assert 'name="sort"' in body
+    assert 'name="license"' in body
+    assert "/musehub/ui/explore" in body
 
 
 @pytest.mark.anyio
 async def test_trending_page_renders(client: AsyncClient) -> None:
-    """GET /musehub/ui/trending returns 200 HTML with stars sort pre-selected."""
+    """GET /musehub/ui/trending returns 200 HTML with repo grid."""
     response = await client.get("/musehub/ui/trending")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "Muse Hub" in body
     assert "Trending" in body
-    # Stars sort option must be pre-selected on the trending page
-    assert 'value="stars" selected' in body or "selected" in body
-    assert "discover/repos" in body
+    # Repo grid container rendered by the Jinja2 template
+    assert "repo-grid" in body
+    assert "Trending Music" in body
 
 
 @pytest.mark.anyio

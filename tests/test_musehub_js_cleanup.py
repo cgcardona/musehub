@@ -37,9 +37,15 @@ def _musehub_js_text() -> str:
 
 
 def _all_page_templates() -> list[pathlib.Path]:
-    """Return all .html files under the musehub pages/ directory."""
+    """Return all .html files under the musehub pages/ directory.
+
+    user_profile.html is an intentional CSR shell (all data fetched
+    client-side so the page loads instantly and stays auth-agnostic).
+    It is excluded from the SSR-pattern enforcement check.
+    """
     pages_dir = _TEMPLATE_ROOT / "pages"
-    return list(pages_dir.glob("*.html"))
+    _CSR_SHELLS = {"user_profile.html"}
+    return [p for p in pages_dir.glob("*.html") if p.name not in _CSR_SHELLS]
 
 
 # ── Tests: musehub.js dead-code removal ───────────────────────────────────────
