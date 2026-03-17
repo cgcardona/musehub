@@ -530,6 +530,10 @@ async def repo_page(
     if format == "json" or "application/json" in request.headers.get("accept", ""):
         return JSONResponse(repo.model_dump(by_alias=True, mode="json"))
 
+    # Resolve "HEAD" → real branch name so tree links use a stable, routable ref.
+    if ref == "HEAD":
+        ref = await musehub_repository.resolve_head_ref(db, repo_id)
+
     # Fetch all SSR data in parallel.
     tree_response = await musehub_repository.list_tree(db, repo_id, owner, repo_slug, ref, "")
     (commits, _) = await musehub_repository.list_commits(db, repo_id, limit=5)

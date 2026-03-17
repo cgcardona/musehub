@@ -61,7 +61,10 @@ async def htmx_fragment_or_full(
     Returns:
         ``TemplateResponse`` using either ``fragment_template`` or ``full_template``.
     """
-    if is_htmx(request) and fragment_template is not None:
+    # hx-boost navigations send HX-Request + HX-Boosted — they need the full
+    # page so HTMX can extract the <body> / target element.  Only non-boosted
+    # HTMX sub-requests (e.g. comment refresh after POST) get the fragment.
+    if is_htmx(request) and not is_htmx_boosted(request) and fragment_template is not None:
         return templates.TemplateResponse(request, fragment_template, ctx)
     return templates.TemplateResponse(request, full_template, ctx)
 

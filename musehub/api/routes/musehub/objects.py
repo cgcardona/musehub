@@ -483,7 +483,10 @@ async def list_tree_root(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ref '{ref}' not found in repo",
         )
-    return await musehub_repository.list_tree(db, repo_id, owner, repo_slug, ref, "")
+    resolved_ref = (
+        await musehub_repository.resolve_head_ref(db, repo_id) if ref == "HEAD" else ref
+    )
+    return await musehub_repository.list_tree(db, repo_id, owner, repo_slug, resolved_ref, "")
 
 
 @router.get(
@@ -521,4 +524,7 @@ async def list_tree_subdir(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ref '{ref}' not found in repo",
         )
-    return await musehub_repository.list_tree(db, repo_id, owner, repo_slug, ref, path)
+    resolved_ref = (
+        await musehub_repository.resolve_head_ref(db, repo_id) if ref == "HEAD" else ref
+    )
+    return await musehub_repository.list_tree(db, repo_id, owner, repo_slug, resolved_ref, path)
