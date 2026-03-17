@@ -5,15 +5,25 @@ every sidebar section, every social feature, every analytics panel, and
 every discovery/explore surface.
 
 Scale:
-  - 8 users  (gabriel, sofia, marcus, yuki, aaliya, chen, fatou, pierre)
-  - 12 repos across 5 genres
-  - 30-50 commits per repo (with realistic branch history)
+  - 8 community users  (gabriel, sofia, marcus, yuki, aaliya, chen, fatou, pierre)
+  - 15 historical/licensed composers:
+      Public Domain: Bach, Chopin, Scott Joplin, Beethoven, Mozart, Debussy, Satie, Schubert
+      CC BY 4.0:     Kevin MacLeod, Kai Engel
+  - 40+ repos:
+      Original community projects (8), fork repos (2)
+      Genre archive batch-13 (12): WTC, Goldberg, Nocturnes, Maple Leaf, etc.
+      Archive expansion batch-14 (6): Moonlight, Piano Sonatas, K.331, Suite Bergamasque,
+          Gymnopédies, Impromptus (sourced from Mutopia Project & piano-midi.de)
+      Cross-composer remixes batch-15 (5): Well-Tempered Rag, Nocturne Variations,
+          Moonlight Jazz, Clair de Lune Deconstructed, Ragtime Afrobeat
+  - 18-70 commits per repo (with realistic branch history)
   - 10+ issues per repo, mix of open/closed
   - 4+ PRs per repo (open, merged, closed)
   - 2-4 releases per repo
   - 3-8 sessions per repo
   - Comments, reactions, follows, watches, notifications, forks, view events
   - Commit objects (tracks) with real instrument roles for the breakdown bar
+  - Muse VCS layer: content-addressed MIDI objects, snapshots, commits, tags
 
 Run inside the container:
   docker compose exec musehub python3 /app/scripts/seed_musehub.py
@@ -35,16 +45,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from musehub.config import settings
-from musehub.contracts.json_types import NoteDict
 from musehub.db.models import (
     AccessToken,
-    Conversation,
-    ConversationMessage,
-    MessageAction,
-    UsageLog,
     User,
 )
-from musehub.db.muse_models import NoteChange, Phrase, Variation
 from musehub.db.musehub_collaborator_models import MusehubCollaborator
 from musehub.db.musehub_label_models import (
     MusehubIssueLabel,
@@ -128,12 +132,19 @@ USERS = [
     (PIERRE,  "pierre",  "French chanson meets minimalism. Piano, cello, and long silences."),
 ]
 
-# Users — historical composers and licensed artists (batch-13)
+# Users — historical composers and licensed artists (batch-13 originals)
 BACH          = "user-bach-000000009"
 CHOPIN        = "user-chopin-00000010"
 SCOTT_JOPLIN  = "user-sjoplin-0000011"
 KEVIN_MACLEOD = "user-kmacleod-000012"
 KAI_ENGEL     = "user-kaiengl-000013"
+
+# Users — historical composers expansion (batch-14)
+BEETHOVEN     = "user-beethoven-000014"
+MOZART        = "user-mozart-0000015"
+DEBUSSY       = "user-debussy-0000016"
+SATIE         = "user-satie-00000017"
+SCHUBERT      = "user-schubert-000018"
 
 COMPOSER_USERS = [
     (BACH,          "bach",          "Johann Sebastian Bach (1685-1750). Baroque counterpoint, fugue, and harmony. Archive upload by Muse community."),
@@ -141,6 +152,11 @@ COMPOSER_USERS = [
     (SCOTT_JOPLIN,  "scott_joplin",  "Scott Joplin (1868-1917). King of Ragtime. Maple Leaf Rag, The Entertainer. Archive upload by Muse community."),
     (KEVIN_MACLEOD, "kevin_macleod", "Kevin MacLeod. Cinematic, orchestral, ambient. Thousands of royalty-free compositions. incompetech.com."),
     (KAI_ENGEL,     "kai_engel",     "Kai Engel. Ambient, neoclassical, cinematic. Delicate textures and patient melodies. Free Music Archive."),
+    (BEETHOVEN,     "beethoven",     "Ludwig van Beethoven (1770-1827). Moonlight Sonata, Eroica, the 32 Piano Sonatas. Archive upload by Muse community."),
+    (MOZART,        "mozart",        "Wolfgang Amadeus Mozart (1756-1791). Piano Sonatas, String Quartets, Symphonies. Archive upload by Muse community."),
+    (DEBUSSY,       "debussy",       "Claude Debussy (1862-1918). Suite Bergamasque, Préludes, Images. Impressionism in sound. Archive upload by Muse community."),
+    (SATIE,         "satie",         "Erik Satie (1866-1925). Gymnopédies, Gnossiennes. Minimalism before minimalism. Archive upload by Muse community."),
+    (SCHUBERT,      "schubert",      "Franz Schubert (1797-1828). Impromptus, Wanderer Fantasy, Winterreise. Archive upload by Muse community."),
 ]
 
 # Rich profile metadata for all users — display names, locations, CC attribution, social links.
@@ -264,6 +280,51 @@ PROFILE_DATA: dict[str, dict[str, str | bool | None]] = {
         is_verified=True,
         cc_license="CC BY 4.0",
     ),
+    BEETHOVEN: dict(
+        display_name="Ludwig van Beethoven",
+        bio="Transcending form and fate. 32 piano sonatas, 9 symphonies, 16 string quartets. The heroic style personified. Silence in the ears, thunder in the soul.",
+        location="Vienna, Austria (1792–1827)",
+        website_url="https://www.beethoven.de",
+        twitter_handle=None,
+        is_verified=True,
+        cc_license="Public Domain",
+    ),
+    MOZART: dict(
+        display_name="Wolfgang Amadeus Mozart",
+        bio="Clarity, wit, and perfection. 626 works catalogued by Köchel. K. 331 alone contains multitudes. Music is never too loud for me.",
+        location="Vienna, Austria (1781–1791)",
+        website_url="https://www.mozarteum.at",
+        twitter_handle=None,
+        is_verified=True,
+        cc_license="Public Domain",
+    ),
+    DEBUSSY: dict(
+        display_name="Claude Debussy",
+        bio="Music is the space between the notes. Impressionism without the label. Clair de Lune, Préludes, La Mer. The piano is a second sea.",
+        location="Paris, France (1884–1918)",
+        website_url="https://www.debussy.fr",
+        twitter_handle=None,
+        is_verified=True,
+        cc_license="Public Domain",
+    ),
+    SATIE: dict(
+        display_name="Erik Satie",
+        bio="Gymnopédies. Gnossiennes. Furniture music. I came into the world very young in a time that was very old. Simplicity is the highest art.",
+        location="Paris, France (Montmartre, 1887–1925)",
+        website_url="https://www.ericsatie.com",
+        twitter_handle=None,
+        is_verified=True,
+        cc_license="Public Domain",
+    ),
+    SCHUBERT: dict(
+        display_name="Franz Schubert",
+        bio="Impromptus, Wanderer Fantasy, Winterreise. Over 600 songs in 31 years of life. Music is the only door to the higher world of knowledge.",
+        location="Vienna, Austria (1797–1828)",
+        website_url="https://www.schubert-online.at",
+        twitter_handle=None,
+        is_verified=True,
+        cc_license="Public Domain",
+    ),
 }
 
 # All contributors for community-collab cycling (8 existing users)
@@ -298,6 +359,21 @@ REPO_RAGTIME_EDM  = "repo-ragtime-edm-000001"  # marcus/ragtime-edm
 REPO_FILM_SCORE   = "repo-film-score-000001"   # chen/film-score
 REPO_POLYRHYTHM   = "repo-polyrhythm-000001"   # fatou/polyrhythm
 REPO_COMMUNITY    = "repo-community-collab01"  # gabriel/community-collab
+
+# Repos — archive expansion (batch-14: Beethoven, Mozart, Debussy, Satie, Schubert)
+REPO_MOONLIGHT        = "repo-moonlight-snt-001"   # beethoven/moonlight-sonata
+REPO_BEETHOVEN_SONATAS= "repo-beethvn-sonats01"    # beethoven/piano-sonatas
+REPO_MOZART_K331      = "repo-mozart-k331-0001"    # mozart/piano-sonata-k331
+REPO_SUITE_BERGAMASQUE= "repo-suite-bergam-001"    # debussy/suite-bergamasque
+REPO_GYMNOPEDIE       = "repo-gymnopedie-0001"     # satie/gymnopedie
+REPO_IMPROMPTUS       = "repo-impromptus-0001"     # schubert/impromptus
+
+# Repos — cross-composer remix projects (batch-15)
+REPO_WELL_TEMPERED_RAG  = "repo-well-tempd-rag01"  # gabriel/well-tempered-rag
+REPO_NOCTURNE_VARIATIONS= "repo-nocturne-vars001"  # sofia/nocturne-variations
+REPO_MOONLIGHT_JAZZ     = "repo-moonlight-jazz01"  # marcus/moonlight-jazz
+REPO_CLAIR_DECONSTRUCTED= "repo-clair-decon-001"   # yuki/clair-de-lune-deconstructed
+REPO_RAGTIME_AFROBEAT   = "repo-ragtime-afrobt01"  # aaliya/ragtime-afrobeat
 
 REPOS: list[dict[str, Any]] = [
     dict(repo_id=REPO_NEO_SOUL, name="Neo-Soul Experiment", owner="gabriel", slug="neo-soul-experiment",
@@ -428,6 +504,74 @@ GENRE_REPOS: list[dict[str, Any]] = [
                "emotion:joyful", "emotion:melancholic", "emotion:tender", "emotion:playful",
                "emotion:energetic", "emotion:triumphant", "emotion:tense", "stage:rough-mix"],
          key_signature="C major", tempo_bpm=90, days_ago=200, star_count=95, fork_count=15),
+    # Archive expansion — batch-14 (Beethoven, Mozart, Debussy, Satie, Schubert)
+    dict(repo_id=REPO_MOONLIGHT, name="Moonlight Sonata", owner="beethoven", slug="moonlight-sonata",
+         owner_user_id=BEETHOVEN, visibility="public",
+         description="Piano Sonata No. 14 in C# minor, Op. 27 No. 2. Three movements: Adagio sostenuto, Allegretto, Presto agitato. MIDI source: piano-midi.de (Bernd Krueger, CC).",
+         tags=["genre:classical", "emotion:melancholic", "emotion:tense", "stage:released",
+               "key:C#m", "tempo:adagio", "ref:beethoven"],
+         key_signature="C# minor", tempo_bpm=54, days_ago=400, star_count=112, fork_count=18),
+    dict(repo_id=REPO_BEETHOVEN_SONATAS, name="Piano Sonatas", owner="beethoven", slug="piano-sonatas",
+         owner_user_id=BEETHOVEN, visibility="public",
+         description="The complete 32 Piano Sonatas — from Op. 2 No. 1 in F minor to Op. 111 in C minor. Each sonata as a branch. The definitive keyboard cycle of the Classical era. MIDI source: Mutopia Project (CC).",
+         tags=["genre:classical", "emotion:complex", "emotion:triumphant", "stage:released",
+               "key:F", "key:C", "key:Eb", "ref:beethoven"],
+         key_signature="Various", tempo_bpm=108, days_ago=380, star_count=87, fork_count=11),
+    dict(repo_id=REPO_MOZART_K331, name="Piano Sonata K. 331", owner="mozart", slug="piano-sonata-k331",
+         owner_user_id=MOZART, visibility="public",
+         description="Sonata in A major, K. 331. Theme with 6 variations, Menuetto, and the famous Rondo alla Turca (Turkish March). Variations as commits is the ideal Muse demo. MIDI source: Mutopia Project (CC).",
+         tags=["genre:classical", "emotion:playful", "emotion:joyful", "stage:released",
+               "key:A", "tempo:andante", "ref:mozart"],
+         key_signature="A major", tempo_bpm=104, days_ago=390, star_count=73, fork_count=10),
+    dict(repo_id=REPO_SUITE_BERGAMASQUE, name="Suite Bergamasque", owner="debussy", slug="suite-bergamasque",
+         owner_user_id=DEBUSSY, visibility="public",
+         description="Four piano pieces: Prélude, Menuet, Clair de Lune, Passepied. Clair de Lune in Db major is among the most recognised piano pieces ever written. MIDI source: piano-midi.de (CC).",
+         tags=["genre:classical", "emotion:serene", "emotion:tender", "stage:released",
+               "key:Db", "key:F", "tempo:andante", "ref:debussy"],
+         key_signature="Db major", tempo_bpm=54, days_ago=340, star_count=99, fork_count=14),
+    dict(repo_id=REPO_GYMNOPEDIE, name="Gymnopédies", owner="satie", slug="gymnopedie",
+         owner_user_id=SATIE, visibility="public",
+         description="Three slow, melancholic piano pieces in 3/4. Gymnopédie No. 1 in D major, No. 2 in C major, No. 3 in G major. Minimalism before the word existed. MIDI source: Mutopia Project (CC).",
+         tags=["genre:classical", "emotion:serene", "emotion:melancholic", "stage:released",
+               "key:D", "key:C", "key:G", "tempo:lent", "ref:satie"],
+         key_signature="D major", tempo_bpm=52, days_ago=310, star_count=81, fork_count=12),
+    dict(repo_id=REPO_IMPROMPTUS, name="Impromptus Op. 90", owner="schubert", slug="impromptus",
+         owner_user_id=SCHUBERT, visibility="public",
+         description="Four impromptus for solo piano, D. 899 (Op. 90). C minor, Eb major, Gb major, Ab major — a full emotional arc. The Romantic piano at its most intimate. MIDI source: Mutopia Project (CC).",
+         tags=["genre:romantic", "emotion:tender", "emotion:melancholic", "stage:released",
+               "key:Cm", "key:Eb", "key:Ab", "ref:schubert"],
+         key_signature="C minor", tempo_bpm=62, days_ago=330, star_count=58, fork_count=7),
+    # Cross-composer remix repos — batch-15 (showing Muse VCS power across eras)
+    dict(repo_id=REPO_WELL_TEMPERED_RAG, name="Well-Tempered Rag", owner="gabriel", slug="well-tempered-rag",
+         owner_user_id=GABRIEL, visibility="public",
+         description="Bach's counterpoint bass lines meet Joplin's syncopated right hand. Forked from bach/goldberg-variations. The commit graph tells the story of Baroque meeting Ragtime.",
+         tags=["genre:baroque", "genre:ragtime", "emotion:playful", "emotion:complex",
+               "stage:production", "ref:bach", "ref:joplin"],
+         key_signature="G major", tempo_bpm=96, days_ago=85, star_count=47, fork_count=6),
+    dict(repo_id=REPO_NOCTURNE_VARIATIONS, name="Nocturne Variations", owner="sofia", slug="nocturne-variations",
+         owner_user_id=SOFIA, visibility="public",
+         description="Chopin's Nocturne No. 20 in C# minor (Posthumous) merged with Satie's Gymnopédie No. 1. Both in their respective minors, both patient and interior. The merge commit is the heart of this repo.",
+         tags=["genre:romantic", "genre:classical", "emotion:melancholic", "emotion:serene",
+               "stage:mixing", "ref:chopin", "ref:satie"],
+         key_signature="C# minor", tempo_bpm=54, days_ago=72, star_count=39, fork_count=5),
+    dict(repo_id=REPO_MOONLIGHT_JAZZ, name="Moonlight Jazz", owner="marcus", slug="moonlight-jazz",
+         owner_user_id=MARCUS, visibility="public",
+         description="Beethoven's Moonlight Sonata, Mvt. 1 — arpeggios become jazz comping. Tritone substitutions on the harmony, rootless voicings, and a walking bass. Forked from beethoven/moonlight-sonata.",
+         tags=["genre:classical", "genre:jazz", "emotion:melancholic", "emotion:tender",
+               "stage:production", "ref:beethoven", "ref:coltrane"],
+         key_signature="C# minor", tempo_bpm=60, days_ago=58, star_count=52, fork_count=7),
+    dict(repo_id=REPO_CLAIR_DECONSTRUCTED, name="Clair de Lune Deconstructed", owner="yuki", slug="clair-de-lune-deconstructed",
+         owner_user_id=YUKI, visibility="public",
+         description="Debussy's Clair de Lune atomized into granular ambient textures. Each phrase becomes grain scatter; each harmonic color becomes a pad layer. Forked from debussy/suite-bergamasque.",
+         tags=["genre:ambient", "genre:classical", "emotion:serene", "emotion:mysterious",
+               "stage:rough-mix", "ref:debussy"],
+         key_signature="Db major", tempo_bpm=50, days_ago=44, star_count=33, fork_count=4),
+    dict(repo_id=REPO_RAGTIME_AFROBEAT, name="Ragtime Afrobeat", owner="aaliya", slug="ragtime-afrobeat",
+         owner_user_id=AALIYA, visibility="public",
+         description="Joplin's Maple Leaf Rag polyrhythm layered with West African 12/8. The groove-check panel shows 2-against-3 cross-rhythm. Forked from scott_joplin/maple-leaf-rag.",
+         tags=["genre:ragtime", "genre:afrobeats", "emotion:playful", "emotion:energetic",
+               "stage:production", "ref:joplin"],
+         key_signature="Ab major", tempo_bpm=112, days_ago=37, star_count=61, fork_count=8),
 ]
 
 
@@ -888,6 +1032,182 @@ def _make_commits(repo_id: str, repo_key: str, n: int) -> list[dict[str, Any]]:
             ("feat(outro): yuki granular outro — voices dissolve into texture", "yuki"),
             ("feat(credits): pierre adds annotation — credits all contributors", "pierre"),
         ],
+        # Archive expansion — batch-14
+        "moonlight": [
+            ("init: Moonlight Sonata — C# minor Op. 27 No. 2 — Mvt. I Adagio sostenuto", "gabriel"),
+            ("feat(mvt1): triplet arpeggio figure — LH, bars 1-4, pp sempre", "gabriel"),
+            ("feat(mvt1): melody enters RH — single notes above arpeggios, bar 5", "sofia"),
+            ("feat(mvt1): harmonic turn — diminished 7th, bar 14, sudden tension", "gabriel"),
+            ("feat(mvt1): climax chord — fff fortissimo, bar 51, stark contrast", "chen"),
+            ("feat(mvt1): decrescendo return — LH arpeggio reduced, pp ending", "gabriel"),
+            ("feat(mvt2): Allegretto — Db major, minuet form, delicate trio", "pierre"),
+            ("feat(mvt2): trio section — darker Bbm inflection, inner voices active", "sofia"),
+            ("feat(mvt3): Presto agitato — C# minor, sonata form, furious 16ths", "gabriel"),
+            ("feat(mvt3): development — harmonic sequence, turbulent modulations", "gabriel"),
+            ("feat(mvt3): recapitulation — original theme returns, fff dynamic", "chen"),
+            ("fix(mvt1): correct sustain pedal placement — bars 1-3 full pedal", "gabriel"),
+            ("refactor(mvt1): add hairpin dynamics per Urtext edition", "sofia"),
+            ("fix(mvt3): missing grace note in bar 163 — add 16th-note ornament", "gabriel"),
+        ],
+        "beethoven-sonatas": [
+            ("init: Op. 2 No. 1 in F minor — Allegro, Adagio, Menuetto, Prestissimo", "gabriel"),
+            ("feat(op2-2): Op. 2 No. 2 in A major — brilliant Allegro vivace", "sofia"),
+            ("feat(op2-3): Op. 2 No. 3 in C major — orchestral ambition in miniature", "gabriel"),
+            ("feat(op7): Op. 7 in Eb major — Grande Sonate, noble and expansive", "gabriel"),
+            ("feat(op10-3): Op. 10 No. 3 in D major — profound Largo e mesto", "pierre"),
+            ("feat(op13): Op. 13 Pathétique in C minor — Grave introduction, urgency", "gabriel"),
+            ("feat(op13): Pathétique Adagio cantabile — one of the most loved themes", "sofia"),
+            ("feat(op14): Op. 14 No. 1 in E major — Allegro moderato, charming", "gabriel"),
+            ("feat(op26): Op. 26 in Ab major — theme and variations, funeral march", "chen"),
+            ("feat(op27-1): Op. 27 No. 1 quasi una fantasia — unusual form", "gabriel"),
+            ("feat(op27-2): Op. 27 No. 2 Moonlight — branch mvt1-adagio", "gabriel"),
+            ("feat(op31-2): Op. 31 No. 2 Tempest in D minor — stormy Allegro", "gabriel"),
+            ("feat(op53): Op. 53 Waldstein in C major — blazing virtuosity", "marcus"),
+            ("feat(op57): Op. 57 Appassionata in F minor — fiercely dramatic", "gabriel"),
+            ("feat(op81a): Op. 81a Les Adieux — farewell, absence, return", "pierre"),
+            ("feat(op90): Op. 90 in E minor — two movements, introspective late style", "gabriel"),
+            ("feat(op101): Op. 101 in A major — early late period, lyrical", "sofia"),
+            ("feat(op106): Op. 106 Hammerklavier in Bb — immense, demanding", "gabriel"),
+            ("feat(op109): Op. 109 in E major — theme and variations, sublimity", "gabriel"),
+            ("feat(op110): Op. 110 in Ab major — fugue and arioso alternation", "chen"),
+            ("feat(op111): Op. 111 in C minor — two movements, final word", "gabriel"),
+            ("refactor(all): normalize dynamics across all 32 sonatas — LUFS check", "sofia"),
+        ],
+        "mozart-k331": [
+            ("init: K. 331 Sonata in A major — theme Andante grazioso, 6/8", "gabriel"),
+            ("feat(theme): 8-bar theme — A major, simple melody, ornamented reprise", "gabriel"),
+            ("feat(var1): Variation 1 — 16th-note figuration in RH over theme", "sofia"),
+            ("feat(var2): Variation 2 — LH broken octaves, minor inflections", "gabriel"),
+            ("feat(var3): Variation 3 — minor mode, A minor, darker character", "pierre"),
+            ("feat(var4): Variation 4 — Adagio, deeply ornamented, almost improvised", "gabriel"),
+            ("feat(var5): Variation 5 — Allegro, energetic 16th triplets throughout", "sofia"),
+            ("feat(var6): Variation 6 — Alla Turca mood, dotted rhythms, ornate", "gabriel"),
+            ("feat(menuetto): Menuetto in A major — elegant, binary form — track:piano", "gabriel"),
+            ("feat(menuetto): Trio section — slight minor inflection, contrasting", "pierre"),
+            ("feat(turkish-march): Rondo alla Turca in A minor — the famous theme", "gabriel"),
+            ("feat(turkish-march): B section — moves to A major, brilliant passagework", "sofia"),
+            ("feat(turkish-march): C section — full tutti effect, A major, march rhythms", "gabriel"),
+            ("fix(var4): correct ornament resolution — trill should end on principal note", "gabriel"),
+            ("refactor(theme): add dynamic markings per Mozart autograph", "pierre"),
+        ],
+        "suite-bergamasque": [
+            ("init: Suite Bergamasque — Prélude in F major, Andante con moto", "gabriel"),
+            ("feat(prelude): Prélude — driving 8th notes, parallel motion, F major", "gabriel"),
+            ("feat(prelude): Prélude — harmonic sequence descending by 5ths, bars 13-20", "sofia"),
+            ("feat(menuet): Menuet in F major — graceful, archaic modal inflections", "pierre"),
+            ("feat(menuet): Menuet trio — D minor, slightly darker character", "gabriel"),
+            ("feat(clair): Clair de Lune — Db major, Andante espressivo", "sofia"),
+            ("feat(clair): Clair de Lune — arpeggiated LH fills entire texture, bars 1-8", "gabriel"),
+            ("feat(clair): Clair de Lune — climax fff, bars 51-56, full resonance", "gabriel"),
+            ("feat(clair): Clair de Lune — diminuendo, returning to ppp opening mood", "pierre"),
+            ("feat(clair): Clair de Lune — final bars — pppp, dissolving into silence", "sofia"),
+            ("feat(passepied): Passepied — F major, playful, dance-like 3/8", "gabriel"),
+            ("feat(passepied): Passepied — modal inflections, Dorian tinge in episode", "sofia"),
+            ("fix(clair): correct pedaling in bars 15-16 — was over-pedaled, blurring", "gabriel"),
+            ("refactor(clair): add tempo rubato markings — Debussy's own annotations", "sofia"),
+        ],
+        "gymnopedie": [
+            ("init: Gymnopédie No. 1 — D major, Lent et douloureux, 3/4", "pierre"),
+            ("feat(no1): chord pattern — D major, then G major, alternating bars 1-4", "pierre"),
+            ("feat(no1): melody — gentle, floating above chords, sparse ornament", "sofia"),
+            ("feat(no1): inner voices — subtle 5th in LH, no bass movement", "pierre"),
+            ("feat(no1): restatement — melody repeats, slight variation, pp to ppp", "pierre"),
+            ("feat(no2): Gymnopédie No. 2 — C major, Lent et triste, 3/4", "pierre"),
+            ("feat(no2): No. 2 melody — more active than No. 1, rising contour", "sofia"),
+            ("feat(no2): No. 2 harmony — IV-I, no dominant motion — Aeolian quality", "gabriel"),
+            ("feat(no3): Gymnopédie No. 3 — G major, Lent et grave, 3/4", "pierre"),
+            ("feat(no3): No. 3 melody — lowest register of the three, somber", "pierre"),
+            ("feat(no3): No. 3 ending — sustained chord, decrescendo, pure silence", "gabriel"),
+            ("fix(no1): correct tempo — Lent is 60 BPM maximum, was set too fast", "pierre"),
+            ("refactor(all): unified dynamics — all three end pppp, connected by silence", "pierre"),
+        ],
+        "impromptus": [
+            ("init: Impromptus Op. 90 — D. 899 — No. 1 in C minor, Allegro molto", "gabriel"),
+            ("feat(no1): opening theme — C minor, stormy repeated-note figure", "gabriel"),
+            ("feat(no1): contrasting theme — Eb major, lyrical cantabile", "sofia"),
+            ("feat(no1): development — modulates through remote keys, C minor return", "gabriel"),
+            ("feat(no2): Op. 90 No. 2 in Eb major — Allegro, perpetual motion 16ths", "gabriel"),
+            ("feat(no2): No. 2 trio — Bb minor, more contemplative, slower feel", "pierre"),
+            ("feat(no2): No. 2 return — Eb major with ornamental additions", "gabriel"),
+            ("feat(no3): Op. 90 No. 3 in Gb major — Andante, song without words style", "sofia"),
+            ("feat(no3): No. 3 middle section — arpeggiated texture replaces melody", "gabriel"),
+            ("feat(no3): No. 3 return — melody richly ornamented, Gb major radiant", "sofia"),
+            ("feat(no4): Op. 90 No. 4 in Ab major — Allegretto, Hungarian dance feeling", "gabriel"),
+            ("feat(no4): No. 4 — Ab major, inner voices create countermelody", "pierre"),
+            ("fix(no1): correct ornament type — turn vs mordent at bar 5, beat 3", "gabriel"),
+            ("refactor(all): apply Schubertian dynamics — sfz accents, long diminuendo", "sofia"),
+        ],
+        # Cross-composer remix repos — batch-15
+        "well-tempered-rag": [
+            ("init: Well-Tempered Rag — forked from bach/goldberg-variations, G major", "gabriel"),
+            ("feat(source): source-bach branch — original Goldberg Aria, untouched", "gabriel"),
+            ("feat(bass): Bach continuo bass line isolated as standalone track", "gabriel"),
+            ("feat(syncopation): add Joplin-style syncopation to Bach RH melody", "gabriel"),
+            ("feat(oom-pah): replace Bach LH arpeggios with Joplin oom-pah bass", "marcus"),
+            ("feat(harmony): keep Bach chord progression, add ragtime rhythmic treatment", "gabriel"),
+            ("feat(melody): Bach melodic ornaments replaced with Joplin grace-note style", "gabriel"),
+            ("feat(sections): Joplin A-B-C-D section structure mapped to Bach form", "marcus"),
+            ("refactor(bass): tighten oom-pah timing — 16th-note precision", "gabriel"),
+            ("feat(experiment): swing-feel branch — shuffle quantize Bach to Joplin swing", "gabriel"),
+            ("fix(harmony): Goldberg Var 13 ornaments clashed with ragtime oom-pah", "gabriel"),
+            ("feat(bridge): 8-bar ragtime bridge — original composition connecting eras", "marcus"),
+            ("refactor(mix): balance baroque texture with ragtime momentum", "gabriel"),
+        ],
+        "nocturne-variations": [
+            ("init: Nocturne Variations — forked from chopin/nocturnes, C# minor", "sofia"),
+            ("feat(source-chopin): source-chopin branch — Nocturne No. 20 Posthumous", "sofia"),
+            ("feat(source-satie): source-satie branch — Gymnopédie No. 1, transposed", "sofia"),
+            ("feat(analysis): compare melodic contour — both begin with upward 3rd", "sofia"),
+            ("feat(merge): merge commit — Chopin RH melody over Satie LH chord pattern", "sofia"),
+            ("feat(harmony): Satie's parallel chords under Chopin's ornate RH melody", "gabriel"),
+            ("feat(tempo): unified tempo — both at 54 BPM, rubato preserved", "sofia"),
+            ("feat(texture): Chopin's RH ornaments enrich Satie's bare texture", "pierre"),
+            ("refactor(merge): resolve voice-leading conflict at measure 9", "sofia"),
+            ("fix(pitch): Satie transposed to C# minor — Chopin's key", "sofia"),
+            ("feat(outro): fade to Satie's characteristic bare chord — ppp", "pierre"),
+        ],
+        "moonlight-jazz": [
+            ("init: Moonlight Jazz — forked from beethoven/moonlight-sonata, C# minor", "marcus"),
+            ("feat(source): source-beethoven branch — Mvt. I Adagio, untouched", "marcus"),
+            ("feat(comp): replace triplet arpeggios with jazz piano comping pattern", "marcus"),
+            ("feat(harmony): tritone substitution on V7 — G# dominant → D7", "marcus"),
+            ("feat(voicing): rootless 9th voicings replace Beethoven's octave doublings", "marcus"),
+            ("feat(bass): walking bass line added under reharmonized changes", "aaliya"),
+            ("feat(bass): bass counter-melody in development section", "aaliya"),
+            ("feat(experiment): trio-arrangement branch — add brushed drums", "gabriel"),
+            ("feat(drums): brushed snare pattern — triplet jazz feel over 4/4", "gabriel"),
+            ("feat(harmony): Coltrane substitution in climax section — tritone chains", "marcus"),
+            ("fix(voice-leading): parallel 5ths in reharmonized bar 9 — corrected", "marcus"),
+            ("refactor(tempo): maintain Beethoven's Adagio, add jazz rubato phrasing", "marcus"),
+            ("feat(solo): piano improvisation coda over jazz changes — 8 bars", "marcus"),
+        ],
+        "clair-deconstructed": [
+            ("init: Clair de Lune Deconstructed — forked from debussy/suite-bergamasque", "yuki"),
+            ("feat(source): source-debussy branch — Clair de Lune, untouched", "yuki"),
+            ("feat(grain): granular decomposition of arpeggiated LH — grain size 40ms", "yuki"),
+            ("feat(pad): Db major harmony becomes sustaining pad from grain scatter", "yuki"),
+            ("feat(texture): RH melody extracted, stretched to 4x duration — pad layer", "yuki"),
+            ("feat(filter): low-pass filter sweeps as Debussy's dynamic moves pppp to fff", "yuki"),
+            ("feat(reverb): 12-second reverb tail — blurs phrase boundaries", "yuki"),
+            ("feat(experiment): drone-branch — single Db pedal as foundation", "sofia"),
+            ("feat(drone): layering harmonics 1-8 over Db drone — spectral approach", "sofia"),
+            ("fix(grain): reduce grain density in climax — too dense at fff moment", "yuki"),
+            ("refactor(tempo): rubato map from Debussy annotation — applied to grains", "yuki"),
+        ],
+        "ragtime-afrobeat": [
+            ("init: Ragtime Afrobeat — forked from scott_joplin/maple-leaf-rag, Ab major", "aaliya"),
+            ("feat(source): source-joplin branch — Maple Leaf Rag, untouched", "aaliya"),
+            ("feat(rhythm): add West African 12/8 percussion layer under 4/4 melody", "aaliya"),
+            ("feat(drums): talking drum in 3 against Joplin's syncopated 4", "fatou"),
+            ("feat(bass): shekere pulse on every 8th of 12/8 — locks with oom-pah", "fatou"),
+            ("feat(melody): Joplin's RH melody preserved — cross-rhythm makes it swing", "aaliya"),
+            ("feat(harmony): add Yoruba call-and-response horn answering melody", "aaliya"),
+            ("feat(experiment): 12-8 branch — full rewrite in 12/8 time signature", "fatou"),
+            ("feat(12-8): melody adapted to 12/8 — original syncopation becomes triplet", "aaliya"),
+            ("refactor(mix): balance afrobeat percussion against ragtime piano level", "aaliya"),
+            ("fix(timing): djembe phase drift at bar 32 — realign to 8th grid", "fatou"),
+            ("feat(outro): gradual percussion fade while Joplin melody remains", "aaliya"),
+        ],
     }
 
     key = repo_key
@@ -974,6 +1294,22 @@ REPO_TRACKS: dict[str, list[tuple[str, str]]] = {
     "community":        [("piano", "tracks/piano.mid"), ("bass", "tracks/bass.mid"),
                          ("strings", "tracks/strings.mid"), ("perc", "tracks/djembe.mid"),
                          ("harpsichord", "tracks/harpsichord.mid"), ("pad", "tracks/granular_pad.mid")],
+    # Archive expansion — batch-14
+    "moonlight":        [("piano", "tracks/piano.mid")],
+    "beethoven-sonatas":[("piano", "tracks/piano.mid")],
+    "mozart-k331":      [("piano", "tracks/piano.mid")],
+    "suite-bergamasque":[("piano", "tracks/piano.mid")],
+    "gymnopedie":       [("piano", "tracks/piano.mid")],
+    "impromptus":       [("piano", "tracks/piano.mid")],
+    # Cross-composer remix repos — batch-15
+    "well-tempered-rag":  [("piano", "tracks/piano.mid"), ("bass", "tracks/bass.mid")],
+    "nocturne-variations":[("piano", "tracks/piano.mid"), ("pad", "tracks/pad.mid")],
+    "moonlight-jazz":     [("piano", "tracks/piano.mid"), ("bass", "tracks/bass.mid"),
+                           ("drums", "tracks/drums.mid")],
+    "clair-deconstructed":[("pad", "tracks/granular_pad.mid"), ("piano", "tracks/piano.mid"),
+                           ("texture", "tracks/texture.mid")],
+    "ragtime-afrobeat":   [("piano", "tracks/piano.mid"), ("bass", "tracks/bass.mid"),
+                           ("perc", "tracks/djembe.mid"), ("perc", "tracks/talking_drum.mid")],
 }
 
 REPO_KEY_MAP = {
@@ -1002,6 +1338,19 @@ REPO_KEY_MAP = {
     REPO_FILM_SCORE:   "film-score",
     REPO_POLYRHYTHM:   "polyrhythm",
     REPO_COMMUNITY:    "community",
+    # Archive expansion — batch-14
+    REPO_MOONLIGHT:            "moonlight",
+    REPO_BEETHOVEN_SONATAS:    "beethoven-sonatas",
+    REPO_MOZART_K331:          "mozart-k331",
+    REPO_SUITE_BERGAMASQUE:    "suite-bergamasque",
+    REPO_GYMNOPEDIE:           "gymnopedie",
+    REPO_IMPROMPTUS:           "impromptus",
+    # Cross-composer remix repos — batch-15
+    REPO_WELL_TEMPERED_RAG:    "well-tempered-rag",
+    REPO_NOCTURNE_VARIATIONS:  "nocturne-variations",
+    REPO_MOONLIGHT_JAZZ:       "moonlight-jazz",
+    REPO_CLAIR_DECONSTRUCTED:  "clair-deconstructed",
+    REPO_RAGTIME_AFROBEAT:     "ragtime-afrobeat",
 }
 
 COMMIT_COUNTS = {
@@ -1030,6 +1379,19 @@ COMMIT_COUNTS = {
     REPO_FILM_SCORE:   28,
     REPO_POLYRHYTHM:   22,
     REPO_COMMUNITY:    70,
+    # Archive expansion — batch-14
+    REPO_MOONLIGHT:            30,
+    REPO_BEETHOVEN_SONATAS:    55,
+    REPO_MOZART_K331:          28,
+    REPO_SUITE_BERGAMASQUE:    25,
+    REPO_GYMNOPEDIE:           18,
+    REPO_IMPROMPTUS:           22,
+    # Cross-composer remix repos — batch-15
+    REPO_WELL_TEMPERED_RAG:    25,
+    REPO_NOCTURNE_VARIATIONS:  20,
+    REPO_MOONLIGHT_JAZZ:       22,
+    REPO_CLAIR_DECONSTRUCTED:  18,
+    REPO_RAGTIME_AFROBEAT:     24,
 }
 
 # Specific branch configurations for genre archive repos (batch-13).
@@ -1047,6 +1409,19 @@ GENRE_REPO_BRANCHES: dict[str, list[tuple[str, int]]] = {
     REPO_FILM_SCORE:  [("act1", 22), ("act2", 14), ("act3", 6)],
     REPO_POLYRHYTHM:  [("7-over-4", 16), ("5-over-3-experiment", 8)],
     REPO_COMMUNITY:   [("sofias-counterpoint", 60), ("yukis-ornaments", 50), ("pierres-analysis", 40), ("marcuss-bassline", 25)],
+    # Archive expansion — batch-14
+    REPO_MOONLIGHT:            [("mvt1-adagio", 25), ("mvt2-allegretto", 15), ("mvt3-presto", 5)],
+    REPO_BEETHOVEN_SONATAS:    [("op2-early-sonatas", 50), ("op27-moonlight", 35), ("op53-waldstein", 20), ("op111-final", 5)],
+    REPO_MOZART_K331:          [("theme", 24), ("variations", 15), ("menuetto", 8), ("turkish-march", 2)],
+    REPO_SUITE_BERGAMASQUE:    [("prelude", 20), ("clair-de-lune", 12), ("menuet", 6), ("passepied", 2)],
+    REPO_GYMNOPEDIE:           [("no1", 14), ("no2", 8), ("no3", 3)],
+    REPO_IMPROMPTUS:           [("op90-no1-cm", 18), ("op90-no2-eb", 12), ("op90-no3-gb", 7), ("op90-no4-ab", 2)],
+    # Cross-composer remix repos — batch-15
+    REPO_WELL_TEMPERED_RAG:    [("source-bach", 22), ("main-remix", 12), ("experiment/swing-feel", 5)],
+    REPO_NOCTURNE_VARIATIONS:  [("source-chopin", 18), ("source-satie", 12), ("main-merged", 5)],
+    REPO_MOONLIGHT_JAZZ:       [("source-beethoven", 18), ("main-jazz", 10), ("experiment/trio", 4)],
+    REPO_CLAIR_DECONSTRUCTED:  [("source-debussy", 15), ("main-granular", 8), ("experiment/drone", 3)],
+    REPO_RAGTIME_AFROBEAT:     [("source-joplin", 20), ("main-fusion", 12), ("experiment/12-8", 5)],
 }
 
 # ---------------------------------------------------------------------------
@@ -1074,6 +1449,19 @@ MUSE_VCS_FILES: dict[str, list[tuple[str, int]]] = {
     REPO_GRANULAR:     [("piano.mid", 15360),  ("violin.mid", 12288), ("flute.mid", 9216)],
     REPO_NEO_SOUL_FORK:[("piano.mid", 24576),  ("bass.mid", 12288),   ("drums.mid", 16384)],
     REPO_AMBIENT_FORK: [("piano.mid", 32768),  ("violin.mid", 20480), ("cello.mid", 17408)],
+    # Archive expansion — batch-14 (all solo piano)
+    REPO_MOONLIGHT:            [("piano.mid", 38912)],
+    REPO_BEETHOVEN_SONATAS:    [("piano.mid", 40960)],
+    REPO_MOZART_K331:          [("piano.mid", 28672)],
+    REPO_SUITE_BERGAMASQUE:    [("piano.mid", 35840)],
+    REPO_GYMNOPEDIE:           [("piano.mid", 18432)],
+    REPO_IMPROMPTUS:           [("piano.mid", 30720)],
+    # Cross-composer remix repos — batch-15
+    REPO_WELL_TEMPERED_RAG:    [("piano.mid", 28672), ("bass.mid", 12288)],
+    REPO_NOCTURNE_VARIATIONS:  [("piano.mid", 32768), ("pad.mid", 14336)],
+    REPO_MOONLIGHT_JAZZ:       [("piano.mid", 30720), ("bass.mid", 11264), ("drums.mid", 13312)],
+    REPO_CLAIR_DECONSTRUCTED:  [("granular_pad.mid", 20480), ("piano.mid", 24576), ("texture.mid", 16384)],
+    REPO_RAGTIME_AFROBEAT:     [("piano.mid", 26624), ("bass.mid", 12288), ("djembe.mid", 10240), ("talking_drum.mid", 9216)],
 }
 
 # Metadata per repo for muse_commits.metadata JSON field.
@@ -1090,6 +1478,19 @@ MUSE_COMMIT_META: dict[str, dict[str, object]] = {
     REPO_GRANULAR:     {"tempo_bpm": 70.0,  "key": "E minor",  "time_signature": "4/4", "instrument_count": 3},
     REPO_NEO_SOUL_FORK:{"tempo_bpm": 92.0,  "key": "F# minor", "time_signature": "4/4", "instrument_count": 3},
     REPO_AMBIENT_FORK: {"tempo_bpm": 60.0,  "key": "Eb major", "time_signature": "4/4", "instrument_count": 3},
+    # Archive expansion — batch-14
+    REPO_MOONLIGHT:            {"tempo_bpm": 54.0,  "key": "C# minor", "time_signature": "4/4", "instrument_count": 1},
+    REPO_BEETHOVEN_SONATAS:    {"tempo_bpm": 108.0, "key": "Various",  "time_signature": "4/4", "instrument_count": 1},
+    REPO_MOZART_K331:          {"tempo_bpm": 104.0, "key": "A major",  "time_signature": "6/8", "instrument_count": 1},
+    REPO_SUITE_BERGAMASQUE:    {"tempo_bpm": 54.0,  "key": "Db major", "time_signature": "4/4", "instrument_count": 1},
+    REPO_GYMNOPEDIE:           {"tempo_bpm": 52.0,  "key": "D major",  "time_signature": "3/4", "instrument_count": 1},
+    REPO_IMPROMPTUS:           {"tempo_bpm": 62.0,  "key": "C minor",  "time_signature": "4/4", "instrument_count": 1},
+    # Cross-composer remix repos — batch-15
+    REPO_WELL_TEMPERED_RAG:    {"tempo_bpm": 96.0,  "key": "G major",  "time_signature": "4/4", "instrument_count": 2},
+    REPO_NOCTURNE_VARIATIONS:  {"tempo_bpm": 54.0,  "key": "C# minor", "time_signature": "4/4", "instrument_count": 2},
+    REPO_MOONLIGHT_JAZZ:       {"tempo_bpm": 60.0,  "key": "C# minor", "time_signature": "4/4", "instrument_count": 3},
+    REPO_CLAIR_DECONSTRUCTED:  {"tempo_bpm": 50.0,  "key": "Db major", "time_signature": "4/4", "instrument_count": 3},
+    REPO_RAGTIME_AFROBEAT:     {"tempo_bpm": 112.0, "key": "Ab major", "time_signature": "12/8","instrument_count": 4},
 }
 
 # Muse tag taxonomy — ALL values from the task spec must appear in the seed.
@@ -1126,279 +1527,6 @@ _ALL_MUSE_TAGS: list[str] = (
 
 # Repos that get the full rich tag taxonomy (most active, richest history).
 MUSE_RICH_TAG_REPOS = {REPO_NEO_SOUL, REPO_FUNK_SUITE}
-
-
-# ---------------------------------------------------------------------------
-# Muse variation history — DAW project constants
-# ---------------------------------------------------------------------------
-
-# Two most active DAW projects used for variation seeding.
-# project_id values are deterministic UUIDs so they survive re-seeds.
-PROJECT_NEO_BAROQUE    = _uid("project-gabriel-neo-baroque")
-PROJECT_COMMUNITY_COLLAB = _uid("project-gabriel-community-collab")
-
-PHRASE_TYPES = ["melody", "harmony", "bass", "rhythm", "pad", "lead"]
-
-VARIATION_INTENTS_NEO_BAROQUE = [
-    "Add counterpoint line above the baroque theme in bars 9-16",
-    "Reharmonize the continuo with IV-V-I instead of I-IV-V",
-    "Double the melody at the upper octave in the A section",
-    "Reduce note density in the ornament layer — too busy",
-    "Add a fermata on the penultimate chord for dramatic pause",
-    "Transpose the inner voice down a third for smoother voice-leading",
-    "Replace the parallel motion with contrary motion in bars 5-8",
-    "Add suspensions (4-3, 7-6) on the strong beats of the progression",
-    "Introduce a sequence pattern (descending thirds) in the episode",
-    "Thicken the bass line with octave doubling",
-    "Add a ritardando in the final four bars",
-    "Experiment with a Neapolitan chord before the final cadence",
-    "Restructure the ornamentation — trills only on structural beats",
-    "Add an inner pedal point on the dominant during the development",
-    "Rewrite the melodic leap (octave) as stepwise with passing tones",
-    "Apply tierce de Picardie on the final chord",
-    "Compress the sequence pattern to fit 2-bar phrases",
-    "Add imitation between soprano and bass at the interval of a 4th",
-    "Slow harmonic rhythm in the development section",
-    "Introduce a chromatic passing tone in bar 12 inner voice",
-]
-
-VARIATION_INTENTS_COMMUNITY_COLLAB = [
-    "Blend the neo-soul groove with the afrobeat polyrhythm layer",
-    "Merge gabriel's chord voicings with aaliya's bass pattern",
-    "Add marcus's funk stabs over the ambient pad foundation",
-    "Cross-fade between yuki's granular texture and sofia's arp",
-    "Combine pierre's chanson melody with the modal jazz harmony",
-    "Overlay chen's microtonal texture on the funk groove",
-    "Mix fatou's djembe pattern with the electronic kick drum",
-    "Harmonise gabriel's melody with aaliya's Yoruba vocal line",
-    "Layer marcus's Rhodes over the afrobeat rhythm section",
-    "Merge the granular scatter with the orchestral strings",
-    "Add a call-and-response between the jazz trio and the afrobeat horns",
-    "Blend microtonal pitch-bends with the neo-soul Rhodes voicing",
-    "Cross-fade the ambient pad into the funk breakdown",
-    "Combine pierre's cello with fatou's 808 bass for a hybrid outro",
-    "Layer gabriel's polyrhythm with yuki's rhythmic granular engine",
-    "Blend chen's otonal hexad with sofia's generative arpeggio",
-    "Mix aaliya's talking drum with marcus's brushed snare",
-    "Overlay the modal jazz walking bass under the afrobeat groove",
-    "Merge the Chanson ostinato with the funk electric piano stabs",
-    "Cross-fade the microtonal étude into the neo-baroque continuo",
-]
-
-TRACK_IDS_NEO_BAROQUE = [
-    _uid("track-nb-soprano"),
-    _uid("track-nb-alto"),
-    _uid("track-nb-tenor"),
-    _uid("track-nb-bass"),
-    _uid("track-nb-continuo"),
-    _uid("track-nb-violin"),
-]
-
-TRACK_IDS_COMMUNITY = [
-    _uid("track-cc-lead"),
-    _uid("track-cc-harmony"),
-    _uid("track-cc-bass"),
-    _uid("track-cc-drums"),
-    _uid("track-cc-pad"),
-    _uid("track-cc-horns"),
-]
-
-REGION_IDS_NEO_BAROQUE = [_uid(f"region-nb-{i}") for i in range(8)]
-REGION_IDS_COMMUNITY   = [_uid(f"region-cc-{i}") for i in range(8)]
-
-
-def _make_note_dict(
-    pitch: int,
-    velocity: int,
-    start_beat: float,
-    duration_beats: float,
-    track_id: str,
-    region_id: str,
-) -> NoteDict:
-    """Build a NoteDict payload for before_json / after_json."""
-    return NoteDict(
-        pitch=pitch,
-        velocity=velocity,
-        start_beat=start_beat,
-        duration_beats=duration_beats,
-        track_id=track_id,
-        region_id=region_id,
-    )
-
-
-def _make_variation_section(
-    project_id: str,
-    intents: list[str],
-    track_ids: list[str],
-    region_ids: list[str],
-    base_commit_hashes: list[str],
-    seed_prefix: str,
-) -> tuple[list[Variation], list[Phrase], list[NoteChange]]:
-    """Generate 30 variations (20 accepted, 5 discarded, 5 pending) with
-    realistic phrase and note-change children for a single DAW project.
-
-    Parent chains (draft → refined → final) are formed in groups of 3-5.
-    Three variations are merge variations with parent2_variation_id set.
-    """
-    variations: list[Variation] = []
-    phrases: list[Phrase] = []
-    note_changes: list[NoteChange] = []
-
-    # Build 30 variations. Status distribution:
-    #   [0..19] accepted, [20..24] discarded, [25..29] pending
-    STATUS_MAP = (
-        ["accepted"] * 20
-        + ["discarded"] * 5
-        + ["pending"] * 5
-    )
-
-    var_ids: list[str] = [
-        _uid(f"{seed_prefix}-var-{i}") for i in range(30)
-    ]
-
-    # Form parent chains in groups: [0-3], [4-7], [8-11], [12-15], [16-19],
-    # [20-22], [23-24], [25-27], [28-29]
-    chain_groups = [
-        [0, 1, 2, 3],   # accepted chain of 4
-        [4, 5, 6, 7],   # accepted chain of 4
-        [8, 9, 10, 11], # accepted chain of 4
-        [12, 13, 14],   # accepted chain of 3
-        [15, 16, 17, 18, 19],  # accepted chain of 5
-        [20, 21, 22],   # discarded chain of 3
-        [23, 24],       # discarded chain of 2
-        [25, 26, 27],   # pending chain of 3
-        [28, 29],       # pending chain of 2
-    ]
-
-    # Merge variations at indices 7, 11, 15 — they get parent2_variation_id.
-    # All parent2 references point BACKWARD (earlier in the sequence) so the
-    # entire batch can be flushed in one call without FK violations.
-    merge_indices = {7, 11, 15}
-    merge_parent2_map = {
-        7:  var_ids[0],   # end of chain-2 merges with start of chain-1
-        11: var_ids[3],   # end of chain-3 merges with end of chain-1
-        15: var_ids[7],   # start of chain-5 merges with end of chain-2
-    }
-
-    # Build parent_variation_id mapping
-    parent_map: dict[int, str | None] = {}
-    for chain in chain_groups:
-        for pos, idx in enumerate(chain):
-            parent_map[idx] = var_ids[chain[pos - 1]] if pos > 0 else None
-
-    now = _now()
-
-    for i in range(30):
-        status = STATUS_MAP[i]
-        intent = intents[i % len(intents)]
-        base_hash = base_commit_hashes[i % len(base_commit_hashes)]
-        # muse_variations.base_state_id / commit_state_id are VARCHAR(36) — derive
-        # a UUID from the 64-char SHA-256 commit hash so it fits the column.
-        base_state_uuid = _uid(base_hash)
-        parent_vid = parent_map.get(i)
-        parent2_vid = merge_parent2_map.get(i) if i in merge_indices else None
-        is_head = status == "accepted" and i == 19
-
-        var = Variation(
-            variation_id=var_ids[i],
-            project_id=project_id,
-            base_state_id=base_state_uuid,
-            conversation_id=_uid(f"{seed_prefix}-conv-{i // 5}"),
-            intent=intent,
-            explanation=f"Variation {i+1}: {intent[:60]}",
-            status=status,
-            affected_tracks=[track_ids[i % len(track_ids)]],
-            affected_regions=[region_ids[i % len(region_ids)]],
-            beat_range_start=float((i % 8) * 8),
-            beat_range_end=float((i % 8) * 8 + 16),
-            parent_variation_id=parent_vid,
-            parent2_variation_id=parent2_vid,
-            commit_state_id=base_state_uuid if status == "accepted" else None,
-            is_head=is_head,
-            created_at=_now(days=30 - i),
-            updated_at=_now(days=30 - i),
-        )
-        variations.append(var)
-
-        # 2-5 phrases per variation
-        phrase_count = 2 + (i % 4)
-        for p in range(phrase_count):
-            start_beat = float(((i % 8) * 8 + p * 4) % 64)
-            end_beat = start_beat + 4.0 + float((p % 3) * 4)
-            phrase_type = PHRASE_TYPES[p % len(PHRASE_TYPES)]
-            tid = track_ids[(i + p) % len(track_ids)]
-            rid = region_ids[(i + p) % len(region_ids)]
-
-            # CC events attached to phrases with sustain/expression/modulation/volume
-            cc_data = [
-                {"cc": 64, "beat": start_beat + 0.5, "value": 127},
-                {"cc": 11, "beat": start_beat + 1.0, "value": 90},
-            ] if p % 2 == 0 else [
-                {"cc": 1,  "beat": start_beat + 0.5, "value": 50},
-                {"cc": 7,  "beat": start_beat + 1.0, "value": 100},
-            ]
-
-            # Pitch bend on every third phrase
-            pitch_bends_data = (
-                [{"beat": start_beat + 2.5, "value": 4096}]
-                if p % 3 == 0 else None
-            )
-
-            phrase = Phrase(
-                phrase_id=_uid(f"{seed_prefix}-phrase-{i}-{p}"),
-                variation_id=var_ids[i],
-                sequence=p,
-                track_id=tid,
-                region_id=rid,
-                start_beat=start_beat,
-                end_beat=end_beat,
-                label=phrase_type,
-                tags=[phrase_type, "seed"],
-                explanation=f"Phrase {p+1} ({phrase_type}) of variation {i+1}",
-                cc_events=cc_data,
-                pitch_bends=pitch_bends_data,
-                aftertouch=None,
-                region_start_beat=start_beat,
-                region_duration_beats=end_beat - start_beat,
-                region_name=f"Region-{rid[:8]}",
-            )
-            phrases.append(phrase)
-
-            # 4-20 note changes per phrase
-            note_count = 4 + ((i * 3 + p * 7) % 17)
-            for n in range(note_count):
-                pitch_base = 48 + (n * 4) % 60  # MIDI 48-108
-                vel = 30 + (n * 7) % 98          # velocity 30-127
-                nb = start_beat + float(n) * 0.5
-                dur = 0.25 + float(n % 4) * 0.25 + float((n // 4) % 4) * 0.5
-
-                # Cycle through change types — canonical values from contracts/json_types.py
-                if n % 3 == 0:
-                    change_type = "added"
-                    before_j = None
-                    after_j = _make_note_dict(pitch_base, vel, nb, dur, tid, rid)
-                elif n % 3 == 1:
-                    change_type = "removed"
-                    before_j = _make_note_dict(pitch_base, vel, nb, dur, tid, rid)
-                    after_j = None
-                else:
-                    change_type = "modified"
-                    orig_pitch = pitch_base - 2
-                    orig_vel   = max(30, vel - 12)
-                    orig_beat  = nb - 0.25
-                    before_j = _make_note_dict(orig_pitch, orig_vel, orig_beat, dur, tid, rid)
-                    after_j  = _make_note_dict(pitch_base, vel, nb, dur, tid, rid)
-
-                nc = NoteChange(
-                    id=_uid(f"{seed_prefix}-nc-{i}-{p}-{n}"),
-                    phrase_id=_uid(f"{seed_prefix}-phrase-{i}-{p}"),
-                    change_type=change_type,
-                    before_json=before_j,
-                    after_json=after_j,
-                )
-                note_changes.append(nc)
-
-    return variations, phrases, note_changes
 
 
 # ---------------------------------------------------------------------------
@@ -2295,11 +2423,7 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
     if existing > 0 and force:
         print("  🗑  --force: clearing existing seed data…")
         for tbl in [
-            # Conversation children first
-            "muse_message_actions", "muse_conversation_messages",
-            "muse_conversations", "muse_usage_logs", "muse_access_tokens",
-            # Muse variation children first (FK order)
-            "muse_note_changes", "muse_phrases", "muse_variations",
+            "muse_access_tokens",
             # Muse VCS — innermost first (tags depend on commits, commits depend on snapshots)
             "muse_tags", "muse_commits", "muse_snapshots", "muse_objects",
             # MuseHub — children before parents (FK order)
@@ -2341,8 +2465,6 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
     for uid, _uname, _bio in all_user_ids_and_names:
         db.add(User(
             id=uid,
-            budget_cents=2500,
-            budget_limit_cents=5000,
             created_at=_now(days=120),
             updated_at=_now(days=1),
         ))
@@ -2353,11 +2475,11 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
     # ── 1b. User profiles (musehub_profiles) ──────────────────────
     # Pinned repos show the owner's most prominent repos on their profile page.
     _PROFILE_PINS: dict[str, list[str]] = {
-        GABRIEL:  [REPO_NEO_SOUL, REPO_MODAL_JAZZ, REPO_NEO_BAROQUE, REPO_COMMUNITY],
-        SOFIA:    [REPO_AMBIENT],
-        MARCUS:   [REPO_FUNK_SUITE, REPO_JAZZ_TRIO, REPO_RAGTIME_EDM],
-        YUKI:     [REPO_GRANULAR],
-        AALIYA:   [REPO_AFROBEAT, REPO_JAZZ_CHOPIN],
+        GABRIEL:  [REPO_NEO_SOUL, REPO_MODAL_JAZZ, REPO_NEO_BAROQUE, REPO_COMMUNITY, REPO_WELL_TEMPERED_RAG],
+        SOFIA:    [REPO_AMBIENT, REPO_NOCTURNE_VARIATIONS],
+        MARCUS:   [REPO_FUNK_SUITE, REPO_JAZZ_TRIO, REPO_RAGTIME_EDM, REPO_MOONLIGHT_JAZZ],
+        YUKI:     [REPO_GRANULAR, REPO_CLAIR_DECONSTRUCTED],
+        AALIYA:   [REPO_AFROBEAT, REPO_JAZZ_CHOPIN, REPO_RAGTIME_AFROBEAT],
         CHEN:     [REPO_MICROTONAL, REPO_FILM_SCORE],
         FATOU:    [REPO_DRUM_MACHINE, REPO_POLYRHYTHM],
         PIERRE:   [REPO_CHANSON],
@@ -2366,6 +2488,11 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
         SCOTT_JOPLIN:  [REPO_MAPLE_LEAF],
         KEVIN_MACLEOD: [REPO_CIN_STRINGS],
         KAI_ENGEL:     [REPO_KAI_AMBIENT],
+        BEETHOVEN:     [REPO_MOONLIGHT, REPO_BEETHOVEN_SONATAS],
+        MOZART:        [REPO_MOZART_K331],
+        DEBUSSY:       [REPO_SUITE_BERGAMASQUE],
+        SATIE:         [REPO_GYMNOPEDIE],
+        SCHUBERT:      [REPO_IMPROMPTUS],
     }
     all_user_profiles = list(USERS) + list(COMPOSER_USERS)
     for uid, uname, _bio in all_user_profiles:
@@ -2384,7 +2511,9 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
             pinned_repo_ids=_PROFILE_PINS.get(uid, []),
         ))
     verified_count = sum(1 for uid, _, __ in all_user_profiles if PROFILE_DATA.get(uid, {}).get("is_verified"))
-    print(f"  ✅ Profiles: {len(all_user_profiles)} users ({len(USERS)} community + {len(COMPOSER_USERS)} composer/archive, {verified_count} verified CC)")
+    pd_count = sum(1 for uid, _, __ in COMPOSER_USERS if PROFILE_DATA.get(uid, {}).get("cc_license") == "Public Domain")
+    cc_count = sum(1 for uid, _, __ in COMPOSER_USERS if PROFILE_DATA.get(uid, {}).get("cc_license") == "CC BY 4.0")
+    print(f"  ✅ Profiles: {len(all_user_profiles)} ({len(USERS)} community + {len(COMPOSER_USERS)} composers: {pd_count} public domain, {cc_count} CC BY 4.0)")
 
     # ── 2. Repos ──────────────────────────────────────────────────
     all_repos = list(REPOS) + list(GENRE_REPOS)
@@ -2402,7 +2531,7 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
             tempo_bpm=r["tempo_bpm"],
             created_at=_now(days=r["days_ago"]),
         ))
-    print(f"  ✅ Repos: {len(all_repos)} ({len(REPOS)} original + {len(GENRE_REPOS)} genre archive)")
+    print(f"  ✅ Repos: {len(all_repos)} ({len(REPOS)} original community + {len(GENRE_REPOS)} genre/archive/remix)")
 
     await db.flush()
 
@@ -3587,53 +3716,7 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
 
     await db.flush()
 
-    # ── 18. Muse variations, phrases, note changes ────────────────
-    # Collect stable commit hashes from the two most active repos as base
-    # state IDs.  muse_variations.base_state_id links a variation to the DAW
-    # snapshot it was proposed against — we reuse musehub commit hashes as a
-    # realistic stand-in for DAW project state hashes.
-    neo_commits  = all_commits.get(REPO_NEO_SOUL, [])
-    jazz_commits = all_commits.get(REPO_MODAL_JAZZ, [])
-    neo_hashes  = [c["commit_id"] for c in neo_commits[-15:]]  or [_sha("nb-fallback")]
-    jazz_hashes = [c["commit_id"] for c in jazz_commits[-15:]] or [_sha("cc-fallback")]
-
-    var_nb, phrase_nb, nc_nb = _make_variation_section(
-        project_id=PROJECT_NEO_BAROQUE,
-        intents=VARIATION_INTENTS_NEO_BAROQUE,
-        track_ids=TRACK_IDS_NEO_BAROQUE,
-        region_ids=REGION_IDS_NEO_BAROQUE,
-        base_commit_hashes=neo_hashes,
-        seed_prefix="nb",
-    )
-    var_cc, phrase_cc, nc_cc = _make_variation_section(
-        project_id=PROJECT_COMMUNITY_COLLAB,
-        intents=VARIATION_INTENTS_COMMUNITY_COLLAB,
-        track_ids=TRACK_IDS_COMMUNITY,
-        region_ids=REGION_IDS_COMMUNITY,
-        base_commit_hashes=jazz_hashes,
-        seed_prefix="cc",
-    )
-
-    all_variations  = var_nb  + var_cc
-    all_phrases     = phrase_nb + phrase_cc
-    all_note_changes = nc_nb  + nc_cc
-
-    for var in all_variations:
-        db.add(var)
-    await db.flush()
-
-    for ph in all_phrases:
-        db.add(ph)
-    await db.flush()
-
-    for nc in all_note_changes:
-        db.add(nc)
-    await db.flush()
-
-    print(f"  ✅ Variations: {len(all_variations)} ({len(var_nb)} neo-baroque, {len(var_cc)} community-collab)")
-    print(f"  ✅ Phrases: {len(all_phrases)}")
-    print(f"  ✅ Note changes: {len(all_note_changes)}")
-    # ── 19. Muse VCS — muse_objects, muse_snapshots, muse_commits, muse_tags ─
+    # ── 18. Muse VCS — muse_objects, muse_snapshots, muse_commits, muse_tags ─
     #
     # Inserts content-addressed MIDI blobs, snapshot manifests, a proper DAG
     # of Muse commits (including merge commits), and the full tag taxonomy.
@@ -3817,43 +3900,7 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
 
     await db.flush()
 
-    # ── 20. Usage Logs (billing history per user) ─────────────────────────────
-    _USAGE_MODELS = ["anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.6"]
-    _USAGE_PROMPTS = [
-        "Add a counter-melody above the baroque theme",
-        "Reharmonize the bridge using tritone substitutions",
-        "Humanize the drum timing across all tracks",
-        "Add string pad layer to the ambient section",
-        "Transpose bass line down a perfect fifth",
-        "Generate a jazz piano voicing for the IV chord",
-        "Thicken the horns arrangement with parallel 3rds",
-        "Reduce note density in bars 9-16 on the keys track",
-    ]
-    usage_count = 0
-    for uid, uname, _ in USERS:  # Only community users generate usage
-        n_logs = 8 + abs(hash(uid)) % 12  # 8-20 usage logs per user
-        for li in range(n_logs):
-            model = _USAGE_MODELS[li % len(_USAGE_MODELS)]
-            prompt = _USAGE_PROMPTS[li % len(_USAGE_PROMPTS)]
-            prompt_tok = 800 + abs(hash(uid + str(li))) % 1200
-            compl_tok = 300 + abs(hash(uid + str(li) + "c")) % 800
-            cost = (prompt_tok * 3 + compl_tok * 15) // 100  # ~cents approximation
-            db.add(UsageLog(
-                id=_uid(f"usage-{uid}-{li}"),
-                user_id=uid,
-                prompt=f"[{uname}] {prompt} (iteration {li + 1})",
-                model=model,
-                prompt_tokens=prompt_tok,
-                completion_tokens=compl_tok,
-                cost_cents=cost,
-                created_at=_now(days=60 - li * 3),
-            ))
-            usage_count += 1
-    print(f"  ✅ Usage logs: {usage_count}")
-
-    await db.flush()
-
-    # ── 21. Access Tokens (API key tracking) ──────────────────────────────────
+    # ── 20. Access Tokens (API key tracking) ──────────────────────────────────
     token_count = 0
     for uid, uname, _ in USERS:
         # 1-3 access tokens per user (active, revoked, expired)
@@ -3870,90 +3917,6 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
             ))
             token_count += 1
     print(f"  ✅ Access tokens: {token_count}")
-
-    await db.flush()
-
-    # ── 22. Conversations + Messages + Actions ────────────────────────────────
-    _CONV_TITLES = [
-        "Neo-Soul chord voicing session",
-        "Ambient texture generation",
-        "Jazz reharmonization experiment",
-        "Drum groove exploration",
-        "Counter-melody development",
-        "Bridge arrangement help",
-        "Mix balance discussion",
-        "Modal jazz improvisation sketch",
-    ]
-    _MSG_CONTENTS: list[tuple[str, str]] = [
-        ("user",      "Can you add a counter-melody above the baroque theme in bars 9-16?"),
-        ("assistant", "I'll add a counter-melody that follows the harmonic rhythm of the baroque theme. The new voice will move in contrary motion to create interest."),
-        ("user",      "Make the counter-melody more chromatic — use passing tones"),
-        ("assistant", "Adding chromatic passing tones between the structural chord tones. The counter-melody now has richer harmonic color while maintaining the baroque style."),
-        ("user",      "What key is this section in?"),
-        ("assistant", "The section is in D Dorian — a natural minor mode built on D. The characteristic raised 6th (B natural) gives it the distinctive minor-but-not-sad quality."),
-        ("user",      "Add a jazz-influenced harmony to the bridge"),
-        ("assistant", "I'll reharmonize the bridge using tritone substitutions on the dominant chords and quartal voicings on the tonic. This will give it a Coltrane-influenced quality."),
-    ]
-    _ACTION_TYPES = ["generate_notes", "reharmonize", "transpose", "humanize", "analyze"]
-    conv_count = 0
-    msg_count = 0
-    action_count = 0
-    for uid, uname, _ in USERS:
-        n_convs = 3 + abs(hash(uid)) % 4  # 3-7 conversations per user
-        for ci in range(n_convs):
-            conv_id = _uid(f"conv-{uid}-{ci}")
-            title = _CONV_TITLES[(abs(hash(uid)) + ci) % len(_CONV_TITLES)]
-            project_repo = all_repos[(abs(hash(uid)) + ci) % len(all_repos)]
-            db.add(Conversation(
-                id=conv_id,
-                user_id=uid,
-                project_id=project_repo["repo_id"],
-                title=title,
-                is_archived=ci == 0 and abs(hash(uid)) % 3 == 0,
-                project_context={
-                    "repo_id": project_repo["repo_id"],
-                    "key_signature": project_repo.get("key_signature"),
-                    "tempo_bpm": project_repo.get("tempo_bpm"),
-                },
-                created_at=_now(days=30 - ci * 5),
-                updated_at=_now(days=30 - ci * 5, hours=ci * 2),
-            ))
-            conv_count += 1
-            # 4-8 messages per conversation (user/assistant alternating)
-            n_msgs = 4 + (abs(hash(conv_id)) % 5)
-            prev_msg_id: str | None = None
-            for mi in range(min(n_msgs, len(_MSG_CONTENTS))):
-                role, content = _MSG_CONTENTS[mi]
-                msg_id = _uid(f"msg-{conv_id}-{mi}")
-                model_used = _USAGE_MODELS[mi % len(_USAGE_MODELS)] if role == "assistant" else None
-                tok = {"prompt": 800 + mi * 50, "completion": 300 + mi * 30} if role == "assistant" else None
-                db.add(ConversationMessage(
-                    id=msg_id,
-                    conversation_id=conv_id,
-                    role=role,
-                    content=content,
-                    model_used=model_used,
-                    tokens_used=tok,
-                    cost_cents=((tok["prompt"] * 3 + tok["completion"] * 15) // 100) if tok else 0,
-                    timestamp=_now(days=30 - ci * 5, hours=mi),
-                ))
-                msg_count += 1
-                # Add an action for assistant messages
-                if role == "assistant" and mi > 0:
-                    action_type = _ACTION_TYPES[mi % len(_ACTION_TYPES)]
-                    db.add(MessageAction(
-                        id=_uid(f"action-{msg_id}"),
-                        message_id=msg_id,
-                        action_type=action_type,
-                        description=f"{action_type.replace('_', ' ').title()} performed on track",
-                        success=mi % 5 != 4,  # Mostly successful
-                        error_message=None if mi % 5 != 4 else "Tool execution timeout",
-                        extra_metadata={"track": "keys", "bars": f"{mi * 8}-{mi * 8 + 8}"},
-                        timestamp=_now(days=30 - ci * 5, hours=mi),
-                    ))
-                    action_count += 1
-                prev_msg_id = msg_id
-    print(f"  ✅ Conversations: {conv_count}  Messages: {msg_count}  Actions: {action_count}")
 
     await db.flush()
 
@@ -3986,7 +3949,7 @@ def _print_urls(
     print(f"  {BASE}/search")
     print(f"  {BASE}/feed")
 
-    all_repos_for_urls = list(REPOS[:8]) + list(GENRE_REPOS)
+    all_repos_for_urls = list(REPOS[:8]) + list(GENRE_REPOS)  # skip private fork repos
     for r in all_repos_for_urls:  # Skip fork repos from URL dump
         owner, slug = r["owner"], r["slug"]
         repo_id = r["repo_id"]
