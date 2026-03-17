@@ -83,10 +83,14 @@ def _fmt_relative(value: str) -> str:
     Returns the raw value unchanged if parsing fails.
     """
     try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if dt.tzinfo is not None:
-            now: datetime = datetime.now(timezone.utc)
+        if isinstance(value, datetime):
+            dt = value
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
         else:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        now: datetime = datetime.now(timezone.utc)
+        if dt.tzinfo is None:
             now = datetime.now()
         diff = int((now - dt).total_seconds())
         if diff < 60:
@@ -96,7 +100,7 @@ def _fmt_relative(value: str) -> str:
         if diff < 86400:
             return f"{diff // 3600}h ago"
         return f"{diff // 86400}d ago"
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, TypeError):
         return str(value)
 
 

@@ -1375,12 +1375,32 @@ async def get_session(
     return _to_session_response(row)
 
 
+async def resolve_head_ref(session: AsyncSession, repo_id: str) -> str:
+    """Resolve the symbolic "HEAD" ref to the repo's default branch name.
+
+    Prefers "main" when that branch exists; otherwise returns the
+    lexicographically first branch name, and falls back to "main" when the
+    repo has no branches yet.
+    """
+    branch_stmt = (
+        select(db.MusehubBranch)
+        .where(db.MusehubBranch.repo_id == repo_id)
+        .order_by(db.MusehubBranch.name)
+    )
+    branches = (await session.execute(branch_stmt)).scalars().all()
+    if not branches:
+        return "main"
+    names = [b.name for b in branches]
+    return "main" if "main" in names else names[0]
+
+
 async def resolve_ref_for_tree(
     session: AsyncSession, repo_id: str, ref: str
 ) -> bool:
     """Return True if ref resolves to a known branch or commit in this repo.
 
     The ref can be:
+    - ``"HEAD"`` — always valid; resolves to the default branch.
     - A branch name (e.g. "main", "feature/groove") — validated via the
       musehub_branches table.
     - A commit ID prefix or full SHA — validated via musehub_commits.
@@ -1389,6 +1409,9 @@ async def resolve_ref_for_tree(
     a 404. This is a lightweight existence check; callers that need the full
     commit object should call ``get_commit()`` separately.
     """
+    if ref == "HEAD":
+        return True
+
     branch_stmt = select(db.MusehubBranch).where(
         db.MusehubBranch.repo_id == repo_id,
         db.MusehubBranch.name == ref,
