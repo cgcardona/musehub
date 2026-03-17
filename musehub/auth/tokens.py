@@ -10,7 +10,7 @@ import hashlib
 import jwt
 from datetime import datetime, timedelta, timezone
 
-from typing_extensions import Required, TypedDict
+from typing import Required, TypedDict
 
 from musehub.config import settings
 

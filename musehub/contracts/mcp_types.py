@@ -47,10 +47,9 @@ stdio JSON-RPC server continue to use the TypedDict variants.
 """
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, NotRequired, Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import NotRequired, Required, TypedDict
 
 from musehub.contracts.json_types import JSONValue, JSONObject
 from musehub.contracts.pydantic_types import PydanticJson

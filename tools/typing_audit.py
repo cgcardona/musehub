@@ -13,10 +13,10 @@ Checks every rule from .cursorrules and AGENTS.md:
 Outputs JSON (machine-readable) + a human summary to stdout.
 
 Usage:
-    python tools/typing_audit.py                        # muse/ + tests/
+    python tools/typing_audit.py                        # musehub/ + tests/
     python tools/typing_audit.py --json artifacts/typing_audit.json
-    python tools/typing_audit.py --dirs muse/ tests/
-    python tools/typing_audit.py --dirs muse/ --max-any 0
+    python tools/typing_audit.py --dirs musehub/ tests/
+    python tools/typing_audit.py --dirs musehub/ --max-any 0
 """
 
 from __future__ import annotations
@@ -305,7 +305,7 @@ def main() -> None:
     parser.add_argument(
         "--dirs",
         nargs="+",
-        default=["muse/", "tests/"],
+        default=["musehub/", "tests/"],
         help="Directories to scan",
     )
     parser.add_argument("--json", type=str, help="Write JSON report to file")

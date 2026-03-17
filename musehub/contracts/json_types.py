@@ -1,18 +1,18 @@
 """Canonical type definitions for JSON data and music-domain dicts.
 
 This module is the **single source of truth for every named data shape** in
-Muse. Import from here; do not redefine shapes ad hoc.
+Muse Hub. Import from here; do not redefine shapes ad hoc.
 
 ## When to use which type
 
 Use ``JSONValue`` / ``JSONObject`` only when the shape is genuinely unknown
-(e.g. raw LLM output before validation, or an arbitrary external payload).
-For every known structure, use the named TypedDict below.
+(e.g. an arbitrary external payload). For every known structure, use the
+named TypedDict below.
 
 Do **not** use ``JSONValue`` or ``JSONObject`` in Pydantic ``BaseModel``
 fields — Pydantic v2 cannot resolve the recursive forward references and
 raises ``RecursionError`` at schema generation time. Use
-``app.contracts.pydantic_types.PydanticJson`` instead.
+``musehub.contracts.pydantic_types.PydanticJson`` instead.
 
 ## Conversion helpers
 
@@ -38,33 +38,6 @@ MIDI note types:
 Composition types:
   SectionDict — a composition section (verse, chorus, bridge…)
 
-SSE / protocol types:
-  ToolCallDict — internal tool call payload {tool, params}
-  ToolCallPreviewDict — plan preview tool call {name, params}
-
-Summary event types:
-  TrackSummaryDict — summary.final track info
-  EffectSummaryDict — summary.final effect info
-  SectionSummaryDict — per-section summary in batch_complete result
-  CCEnvelopeDict — CC envelope info in summary.final
-  CompositionSummary — aggregated metadata for the summary.final SSE event
-  AppliedRegionInfo — per-region result from apply_variation_phrases
-
-Variation / note change types:
-  NoteChangeDict — snapshot of a MIDI note's properties (before/after)
-  NoteChangeEntryDict — wire shape of one noteChanges entry
-
-Generation constraints:
-  GenerationConstraintsDict — serialized GenerationConstraints sent to Orpheus
-  IntentGoalDict — a single intent goal sent to Orpheus
-
-State store types:
-  StateEventData — payload of a StateStore event's data field
-
-Region metadata:
-  RegionMetadataWire — region position metadata in camelCase (handler path)
-  RegionMetadataDB — region position metadata in snake_case (database path)
-
 Region event map aliases (region_id → list of events):
   RegionNotesMap — dict[str, list[NoteDict]]
   RegionCCMap — dict[str, list[CCEventDict]]
@@ -74,14 +47,12 @@ Region event map aliases (region_id → list of events):
 Protocol introspection aliases:
   EventJsonSchema — dict[str, JSONValue] (single event JSON Schema)
   EventSchemaMap — dict[str, EventJsonSchema] (event_type → JSON Schema)
-  EnumDefinitionMap — dict[str, list[str]] (enum name → member values)
 """
 
 from __future__ import annotations
 
-from typing import Iterable, Literal, TypeGuard, overload
-
-from typing_extensions import Required, TypedDict
+from collections.abc import Iterable
+from typing import Required, TypedDict, TypeGuard, overload
 
 from musehub.contracts.midi_types import (
     BeatDuration,
@@ -113,11 +84,8 @@ from musehub.contracts.midi_types import (
 # JSONValue / JSONObject — TypedDicts, dataclasses, function signatures.
 # Pure mypy land; Pydantic never sees them.
 # dict[str, object] — Pydantic BaseModel fields that must hold opaque
-# external JSON (e.g. pre-validation LLM output,
-# external API payloads). ``object`` is not ``Any``
-# — mypy requires explicit narrowing before use
-# but carries no forward refs that Pydantic cannot
-# resolve.
+# external JSON. ``object`` is not ``Any`` — mypy requires
+# explicit narrowing before use.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 JSONScalar = str | int | float | bool | None
@@ -129,22 +97,16 @@ JSONValue = str | int | float | bool | None | list["JSONValue"] | dict[str, "JSO
 Use this type for JSON payloads whose shape is not statically known.
 
 **Pydantic restriction:** Do NOT use in Pydantic ``BaseModel`` fields.
-The recursive forward references (``list["JSONValue"]``, ``dict[str, "JSONValue"]``)
-cannot be resolved by Pydantic v2 at schema generation time, causing
-``RecursionError``. Use ``PydanticJson`` from
-``app.contracts.pydantic_types`` for Pydantic model fields instead, and
-convert at the boundary with ``unwrap()`` / ``wrap()``.
+Use ``PydanticJson`` from ``musehub.contracts.pydantic_types`` instead.
 
 **Mypy usage:** Use ``isinstance`` guards, ``jint()``, ``jfloat()``, or
 ``is_note_dict()`` to narrow ``JSONValue`` before dereferencing fields.
-Never index a ``JSONValue`` without first narrowing to ``dict``.
 """
 
 JSONObject = dict[str, JSONValue]
 """A JSON object with unknown key set.
 
-Use when the object's keys are not statically known (e.g. LLM output before
-validation, arbitrary config dicts).
+Use when the object's keys are not statically known.
 
 **Pydantic restriction:** Do NOT use in Pydantic ``BaseModel`` fields.
 See ``JSONValue`` for the full explanation.
@@ -261,250 +223,11 @@ class SectionDict(TypedDict, total=False):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SSE / protocol types
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class ToolCallDict(TypedDict):
-    """Shape of a collected tool call dict in CompleteEvent.tool_calls.
-
-    Every producer (editing handler, composing coordinator, agent teams)
-    writes exactly ``{"tool": "muse_xxx", "params": {...}}``.
-
-    ``params`` is ``dict[str, JSONValue]`` — LLM-generated arguments are
-    JSON values and must be narrowed before dereferencing.
-    """
-
-    tool: str
-    params: dict[str, JSONValue]
-
-
-class ToolCallPreviewDict(TypedDict):
-    """Shape produced by ``ToolCall.to_dict()`` for plan previews.
-
-    Distinct from ``ToolCallDict``: uses ``name`` (not ``tool``) to match
-    ``ToolCall``'s dataclass field name.
-    """
-
-    name: str
-    params: dict[str, JSONValue]
-
-
-class TrackSummaryDict(TypedDict, total=False):
-    """Track info in SummaryFinalEvent.tracks_created / tracks_reused."""
-
-    name: str
-    trackId: str # noqa: N815
-    instrument: str
-    color: str
-
-
-class EffectSummaryDict(TypedDict, total=False):
-    """Effect info in SummaryFinalEvent.effects_added."""
-
-    type: str
-    trackId: str # noqa: N815
-    name: str
-
-
-class SectionSummaryDict(TypedDict, total=False):
-    """Per-section summary in batch_complete tool result (agent teams)."""
-
-    name: str
-    status: str
-    regionId: str | None # noqa: N815
-    notesGenerated: int # noqa: N815
-    error: str
-
-
-class CCEnvelopeDict(TypedDict, total=False):
-    """CC envelope info in SummaryFinalEvent.cc_envelopes."""
-
-    cc: int
-    trackId: str # noqa: N815
-    name: str
-    pointCount: int # noqa: N815
-
-
-class CompositionSummary(TypedDict, total=False):
-    """Aggregated metadata for the summary.final SSE event.
-
-    Produced by ``_build_composition_summary`` and consumed by the
-    SSE layer and frontend to display the completion paragraph.
-    """
-
-    tracksCreated: list[TrackSummaryDict] # noqa: N815
-    tracksReused: list[TrackSummaryDict] # noqa: N815
-    trackCount: int # noqa: N815
-    regionsCreated: int # noqa: N815
-    notesGenerated: int # noqa: N815
-    effectsAdded: list[EffectSummaryDict] # noqa: N815
-    effectCount: int # noqa: N815
-    sendsCreated: int # noqa: N815
-    ccEnvelopes: list[CCEnvelopeDict] # noqa: N815
-    automationLanes: int # noqa: N815
-    text: str
-
-
-class AppliedRegionInfo(TypedDict, total=False):
-    """Per-region result from applying variation phrases.
-
-    Produced by ``apply_variation_phrases`` and carried in
-    ``VariationApplyResult.updated_regions``. All MIDI event lists are
-    the *full* post-commit state for the region (not just the delta).
-    """
-
-    region_id: str
-    track_id: str
-    notes: list[NoteDict]
-    cc_events: list[CCEventDict]
-    pitch_bends: list[PitchBendDict]
-    aftertouch: list[AftertouchDict]
-    start_beat: float | None
-    duration_beats: float | None
-    name: str | None
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Variation / note change types
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class NoteChangeDict(TypedDict, total=False):
-    """Snapshot of a MIDI note's properties — used as ``before``/``after`` in ``NoteChangeEntryDict``.
-
-    Serialized form of ``MidiNoteSnapshot`` (camelCase keys, matching ``by_alias=True`` output).
-    Also used for CC/pitch-bend snapshots where ``cc``, ``beat``, and ``value`` apply.
-
-    Field ranges:
-        pitch 0–127 MIDI note number
-        startBeat ≥ 0.0 beat position (fractional allowed)
-        durationBeats > 0.0 beat duration (fractional allowed)
-        velocity 0–127 note velocity
-        channel 0–15 MIDI channel
-        cc 0–127 CC controller number
-        beat ≥ 0.0 CC/bend/aftertouch beat position
-        value varies CC: 0–127; pitch bend: −8192–8191
-    """
-
-    pitch: MidiPitch
-    startBeat: BeatPosition # noqa: N815
-    durationBeats: BeatDuration # noqa: N815
-    velocity: MidiVelocity
-    channel: MidiChannel
-    cc: MidiCC
-    beat: BeatPosition
-    value: int # intentionally plain int: context-dependent (CC value vs. pitch bend)
-
-
-class NoteChangeEntryDict(TypedDict, total=False):
-    """Wire shape of one entry in ``PhrasePayload.noteChanges``.
-
-    Serialized form of a ``NoteChange`` Pydantic model. Produced by
-    ``_note_change_to_wire()`` in ``propose.py`` and consumed by
-    ``_record_to_variation()`` in ``commit.py``.
-
-    ``noteId`` and ``changeType`` are always present (``Required``).
-    ``before`` and ``after`` follow the same semantics as ``NoteChange``:
-
-    - ``added`` → ``before=None``, ``after`` is set
-    - ``removed`` → ``before`` is set, ``after=None``
-    - ``modified`` → both ``before`` and ``after`` are set
-    """
-
-    noteId: Required[str] # noqa: N815
-    changeType: Required[Literal["added", "removed", "modified"]] # noqa: N815
-    before: NoteChangeDict | None
-    after: NoteChangeDict | None
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Generation constraints (typed version of the dict built in StorpheusBackend)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class GenerationConstraintsDict(TypedDict, total=False):
-    """Serialized GenerationConstraints — the dict form sent to Orpheus."""
-
-    drum_density: float
-    subdivision: int
-    swing_amount: float
-    register_center: int
-    register_spread: int
-    rest_density: float
-    leap_probability: float
-    chord_extensions: bool
-    borrowed_chord_probability: float
-    harmonic_rhythm_bars: float
-    velocity_floor: int
-    velocity_ceiling: int
-
-
-class IntentGoalDict(TypedDict):
-    """A single intent goal sent to Orpheus."""
-
-    name: str
-    weight: float
-    constraint_type: str
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Entity metadata
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# State store serialization types
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class StateEventData(TypedDict, total=False):
-    """Payload of a StateStore event's ``data`` field.
-
-    Not all keys are present in every event — ``total=False`` allows
-    the various EventType payloads to share one TypedDict.
-    """
-
-    name: str
-    metadata: dict[str, JSONValue]
-    parent_track_id: str
-    description: str
-    event_count: int
-    rolled_back_events: int
-    notes_count: int
-    notes: list[NoteDict]
-    old_tempo: int
-    new_tempo: int
-    old_key: str
-    new_key: str
-    effect_type: str
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Region metadata — position + name for a single region
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class RegionMetadataWire(TypedDict, total=False):
-    """Region position metadata in camelCase (handler → storage path)."""
-
-    startBeat: float
-    durationBeats: float
-    name: str
-
-
-class RegionMetadataDB(TypedDict, total=False):
-    """Region position metadata in snake_case (database path)."""
-
-    start_beat: float
-    duration_beats: float
-    name: str
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # Region event map aliases
 #
 # These replace the repeated pattern ``dict[str, list[XxxDict]]`` across the
-# Muse VCS, StateStore, and variation pipeline. The key is always a region_id
-# string; the value is the ordered list of events for that region.
+# analysis and export layers. The key is always a region_id string; the value
+# is the ordered list of events for that region.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 RegionNotesMap = dict[str, list[NoteDict]]
@@ -529,13 +252,10 @@ RegionAftertouchMap = dict[str, list[AftertouchDict]]
 # ═══════════════════════════════════════════════════════════════════════════════
 
 EventJsonSchema = dict[str, JSONValue]
-"""JSON Schema dict for a single SSE event type, as produced by Pydantic's model_json_schema()."""
+"""JSON Schema dict for a single event type, as produced by Pydantic's model_json_schema()."""
 
 EventSchemaMap = dict[str, EventJsonSchema]
 """Maps event_type → its JSON Schema. Returned by the protocol /events.json endpoint."""
-
-EnumDefinitionMap = dict[str, list[str]]
-"""Maps enum name → sorted list of member values. Used in the protocol /schema.json endpoint."""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -551,8 +271,8 @@ def is_note_dict(v: JSONValue) -> TypeGuard[NoteDict]:
     """Narrow a ``JSONValue`` to ``NoteDict``.
 
     ``NoteDict`` is ``total=False`` — every field is optional — so any ``dict``
-    that arrives from a trusted internal source (StateStore, SSE wire, Storpheus
-    result) can be safely treated as ``NoteDict`` once we confirm it is a dict.
+    that arrives from a trusted internal source (StateStore, SSE wire) can be
+    safely treated as ``NoteDict`` once we confirm it is a dict.
 
     Use in list comprehensions to filter a ``list[JSONValue]`` into
     ``list[NoteDict]`` without ``cast()``::
@@ -565,12 +285,10 @@ def is_note_dict(v: JSONValue) -> TypeGuard[NoteDict]:
 def jfloat(v: JSONValue, default: float = 0.0) -> float:
     """Safely extract a ``float`` from a ``JSONValue``.
 
-    Returns *default* when *v* is not numeric. Use when pulling float fields
-    out of a ``dict[str, JSONValue]`` — avoids the two-step ``float(v.get("x"))``
-    pattern that mypy cannot narrow::
+    Returns *default* when *v* is not numeric::
 
-        beat = jfloat(event.get("beat")) # 0.0 if key absent or non-numeric
-        value = jfloat(event.get("value"), 0.5) # custom default
+        beat = jfloat(event.get("beat"))          # 0.0 if key absent or non-numeric
+        value = jfloat(event.get("value"), 0.5)   # custom default
     """
     return float(v) if isinstance(v, (int, float)) else default
 
@@ -578,10 +296,10 @@ def jfloat(v: JSONValue, default: float = 0.0) -> float:
 def jint(v: JSONValue, default: int = 0) -> int:
     """Safely extract an ``int`` from a ``JSONValue``.
 
-    Returns *default* when *v* is not numeric. Same rationale as ``jfloat``::
+    Returns *default* when *v* is not numeric::
 
-        cc = jint(event.get("cc")) # 0 if absent
-        vel = jint(note.get("velocity")) # 0 if absent
+        cc = jint(event.get("cc"))          # 0 if absent
+        vel = jint(note.get("velocity"))    # 0 if absent
     """
     return int(v) if isinstance(v, (int, float)) else default
 
@@ -594,7 +312,7 @@ def jint(v: JSONValue, default: int = 0) -> int:
 # per-call ``type: ignore``) is ``@overload`` declarations: enumerate every
 # domain TypedDict explicitly so call sites are validated precisely. The
 # single ``type: ignore[arg-type]`` lives only inside the implementation body
-# it is the designated coercion boundary for the whole codebase.
+# — it is the designated coercion boundary for the whole codebase.
 #
 # To add a new TypedDict overload: add one ``@overload`` line here.
 
@@ -616,8 +334,8 @@ def json_list(items: Iterable[object]) -> list[JSONValue]:
     Each overload is typed precisely for a specific domain dict so call sites
     are statically verified without needing ``cast()`` or ``type: ignore``::
 
-        params["notes"] = json_list(result.notes) # list[NoteDict]
-        params["cc_events"] = json_list(result.cc_events) # list[CCEventDict]
+        params["notes"] = json_list(result.notes)       # list[NoteDict]
+        params["cc_events"] = json_list(result.cc_events)  # list[CCEventDict]
 
     The implementation uses ``Iterable[object]`` so mypy validates call sites
     against the overloads, not the body. The ``type: ignore[arg-type]`` below
@@ -626,5 +344,5 @@ def json_list(items: Iterable[object]) -> list[JSONValue]:
     """
     result: list[JSONValue] = []
     for item in items:
-        result.append(item) # type: ignore[arg-type]
+        result.append(item)  # type: ignore[arg-type]
     return result

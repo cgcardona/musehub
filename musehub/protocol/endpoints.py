@@ -1,24 +1,24 @@
 """Protocol introspection endpoints.
 
-Exposes the protocol version, hash, event schemas, and tool schemas
-so FE (and CI) can detect drift without reading source code.
+Exposes the protocol version, hash, event schemas, and MCP tool schemas
+so clients can detect contract drift without reading source code.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from musehub.protocol.hash import compute_protocol_hash
-from musehub.protocol.registry import EVENT_REGISTRY, ALL_EVENT_TYPES
-from musehub.protocol.version import MUSE_VERSION
 from musehub.contracts.mcp_types import MCPToolDefWire
 from musehub.contracts.pydantic_types import PydanticJson
+from musehub.protocol.hash import compute_protocol_hash
+from musehub.protocol.registry import ALL_EVENT_TYPES, EVENT_REGISTRY
 from musehub.protocol.responses import (
-    ProtocolInfoResponse,
     ProtocolEventsResponse,
-    ProtocolToolsResponse,
+    ProtocolInfoResponse,
     ProtocolSchemaResponse,
+    ProtocolToolsResponse,
 )
+from musehub.protocol.version import MUSE_VERSION
 
 router = APIRouter()
 
@@ -36,10 +36,7 @@ async def protocol_info() -> ProtocolInfoResponse:
 
 @router.get("/protocol/events.json")
 async def protocol_events() -> ProtocolEventsResponse:
-    """JSON Schema for every registered SSE event type.
-
-    FE can consume this to auto-generate Swift Codable structs.
-    """
+    """JSON Schema for every registered event type."""
     return ProtocolEventsResponse(
         protocolVersion=MUSE_VERSION,
         events={
@@ -53,7 +50,7 @@ async def protocol_events() -> ProtocolEventsResponse:
 
 @router.get("/protocol/tools.json")
 async def protocol_tools() -> ProtocolToolsResponse:
-    """Unified tool schema (MCP format) for all registered tools."""
+    """MCP tool definitions for all registered server-side tools."""
     from musehub.mcp.tools import MUSEHUB_TOOLS
 
     return ProtocolToolsResponse(
@@ -65,11 +62,7 @@ async def protocol_tools() -> ProtocolToolsResponse:
 
 @router.get("/protocol/schema.json")
 async def protocol_schema() -> ProtocolSchemaResponse:
-    """Unified protocol schema — version + hash + events + enums + tools.
-
-    Single fetch for FE type generation, cacheable by protocolHash.
-    """
-    from musehub.core.intent_config.enums import SSEState, Intent
+    """Unified protocol schema — version + hash + events + tools in one fetch."""
     from musehub.mcp.tools import MUSEHUB_TOOLS
 
     return ProtocolSchemaResponse(
@@ -80,10 +73,6 @@ async def protocol_schema() -> ProtocolSchemaResponse:
                 EVENT_REGISTRY[event_type].model_json_schema()
             )
             for event_type in sorted(EVENT_REGISTRY)
-        },
-        enums={
-            "Intent": sorted(m.value for m in Intent),
-            "SSEState": sorted(m.value for m in SSEState),
         },
         tools=[MCPToolDefWire.model_validate(t) for t in MUSEHUB_TOOLS],
         toolCount=len(MUSEHUB_TOOLS),
