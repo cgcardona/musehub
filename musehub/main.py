@@ -16,7 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -211,13 +211,7 @@ if settings.debug:
         )
 
 
-@app.get("/")
-async def root() -> dict[str, str]:
-    """Root endpoint with service info."""
-    return {
-        "service": "MuseHub",
-        "version": settings.app_version,
-        "ui": "/explore",
-        "docs": "/docs" if settings.debug else "/api/v1/openapi.json",
-        "openapi": "/api/v1/openapi.json",
-    }
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    """Redirect browsers to the UI; agents should use /api/v1/openapi.json."""
+    return RedirectResponse(url="/musehub/ui/explore")
