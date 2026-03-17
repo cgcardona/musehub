@@ -18,37 +18,39 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 # ---------------------------------------------------------------------------
 # Write endpoints — always require auth (401 without token)
+# Parametrized: eliminates five near-identical test functions.
 # ---------------------------------------------------------------------------
 
-
 @pytest.mark.anyio
-async def test_hub_routes_require_auth_create_repo(client: AsyncClient) -> None:
-    """POST /musehub/repos returns 401 without a Bearer token."""
-    response = await client.post(
-        "/api/v1/musehub/repos",
-        json={"name": "beats", "owner": "testuser"},
+@pytest.mark.parametrize("method,url,body", [
+    # POST endpoints that require auth regardless of whether the repo exists
+    ("POST", "/api/v1/musehub/repos",                            {"name": "beats", "owner": "testuser"}),
+    ("POST", "/api/v1/musehub/repos/any-repo-id/issues",         {"title": "Bug report"}),
+    ("POST", "/api/v1/musehub/repos/any-repo-id/issues/1/close", {}),
+])
+async def test_write_endpoints_require_auth(
+    client: AsyncClient,
+    method: str,
+    url: str,
+    body: dict,
+) -> None:
+    """Write endpoints return 401 when no Bearer token is supplied."""
+    fn = getattr(client, method.lower())
+    response = await fn(url, json=body)
+    assert response.status_code == 401, (
+        f"{method} {url} expected 401, got {response.status_code}: {response.text[:200]}"
     )
-    assert response.status_code == 401
 
 
 @pytest.mark.anyio
-async def test_hub_routes_require_auth_create_issue(client: AsyncClient) -> None:
-    """POST /musehub/repos/{id}/issues returns 401 without a Bearer token."""
-    response = await client.post(
-        "/api/v1/musehub/repos/any-repo-id/issues",
-        json={"title": "Bug report"},
-    )
-    assert response.status_code == 401
-
-
-@pytest.mark.anyio
-async def test_hub_routes_require_auth_close_issue(client: AsyncClient) -> None:
-    """POST /musehub/repos/{id}/issues/{n}/close returns 401 without a Bearer token."""
-    response = await client.post("/api/v1/musehub/repos/any-repo-id/issues/1/close")
+async def test_delete_webhook_requires_auth(client: AsyncClient, db_session: AsyncSession) -> None:
+    """DELETE /webhooks/{id} returns 401 without a token."""
+    response = await client.delete("/api/v1/musehub/repos/any-repo-id/webhooks/fake-hook-id")
     assert response.status_code == 401
 
 
@@ -57,74 +59,43 @@ async def test_hub_routes_require_auth_close_issue(client: AsyncClient) -> None:
 #
 # Rationale: optional_token + visibility guard — unauthenticated requests
 # reach the DB; a non-existent repo returns 404 before the auth check fires.
-# The old test expectation of 401 was incorrect for the new auth model.
 # ---------------------------------------------------------------------------
 
-
 @pytest.mark.anyio
-async def test_hub_get_nonexistent_repo_returns_404_without_auth(
+@pytest.mark.parametrize("url", [
+    "/api/v1/musehub/repos/non-existent-repo-id",
+    "/api/v1/musehub/repos/non-existent-repo-id/branches",
+    "/api/v1/musehub/repos/non-existent-repo-id/commits",
+    "/api/v1/musehub/repos/non-existent-repo-id/issues",
+    "/api/v1/musehub/repos/non-existent-repo-id/issues/1",
+    "/api/v1/musehub/repos/non-existent-repo-id/pulls",
+    "/api/v1/musehub/repos/non-existent-repo-id/releases",
+])
+async def test_get_nonexistent_repo_returns_404_without_auth(
     client: AsyncClient,
+    url: str,
 ) -> None:
-    """GET /musehub/repos/{id} returns 404 for a non-existent repo without auth.
+    """GET on a non-existent resource returns 404 without auth (not 401).
 
-    The auth check is now visibility-based: the DB lookup happens first,
-    so a missing repo returns 404 regardless of auth status.
+    The DB lookup happens before the visibility guard fires, so a missing
+    repo surfaces as 404 regardless of authentication status.
     """
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo-id")
-    assert response.status_code == 404
-
-
-@pytest.mark.anyio
-async def test_hub_get_nonexistent_branches_returns_404_without_auth(
-    client: AsyncClient,
-) -> None:
-    """GET /musehub/repos/{id}/branches returns 404 for a non-existent repo without auth."""
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo-id/branches")
-    assert response.status_code == 404
-
-
-@pytest.mark.anyio
-async def test_hub_get_nonexistent_commits_returns_404_without_auth(
-    client: AsyncClient,
-) -> None:
-    """GET /musehub/repos/{id}/commits returns 404 for a non-existent repo without auth."""
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo-id/commits")
-    assert response.status_code == 404
-
-
-@pytest.mark.anyio
-async def test_hub_get_nonexistent_issues_returns_404_without_auth(
-    client: AsyncClient,
-) -> None:
-    """GET /musehub/repos/{id}/issues returns 404 for a non-existent repo without auth."""
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo-id/issues")
-    assert response.status_code == 404
-
-
-@pytest.mark.anyio
-async def test_hub_get_nonexistent_issue_returns_404_without_auth(
-    client: AsyncClient,
-) -> None:
-    """GET /musehub/repos/{id}/issues/1 returns 404 for a non-existent repo without auth."""
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo-id/issues/1")
-    assert response.status_code == 404
+    response = await client.get(url)
+    assert response.status_code == 404, (
+        f"GET {url} expected 404, got {response.status_code}"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Private repo visibility — GET returns 401 for private repos without token
 # ---------------------------------------------------------------------------
 
-
 @pytest.mark.anyio
 async def test_private_repo_returns_401_without_auth(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/repos/{id} returns 401 for a private repo without a token.
-
-    Creates a private repo, then verifies unauthenticated access returns 401.
-    """
-    # Create a private repo
+    """GET /musehub/repos/{id} returns 401 for a private repo without a token."""
     create_resp = await client.post(
         "/api/v1/musehub/repos",
         json={"name": "private-auth-test", "owner": "authtest", "visibility": "private"},
@@ -133,7 +104,6 @@ async def test_private_repo_returns_401_without_auth(
     assert create_resp.status_code == 201
     repo_id = create_resp.json()["repoId"]
 
-    # Unauthenticated access should return 401
     unauth_resp = await client.get(f"/api/v1/musehub/repos/{repo_id}")
     assert unauth_resp.status_code == 401, (
         f"Expected 401 for private repo, got {unauth_resp.status_code}"
@@ -145,11 +115,7 @@ async def test_public_repo_accessible_without_auth(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/repos/{id} returns 200 for a public repo without a token.
-
-    Verifies the new auth model: public repos are browseable anonymously.
-    """
-    # Create a public repo
+    """GET /musehub/repos/{id} returns 200 for a public repo without a token."""
     create_resp = await client.post(
         "/api/v1/musehub/repos",
         json={"name": "public-auth-test", "owner": "authtest", "visibility": "public"},
@@ -158,31 +124,33 @@ async def test_public_repo_accessible_without_auth(
     assert create_resp.status_code == 201
     repo_id = create_resp.json()["repoId"]
 
-    # Unauthenticated access should return 200
     unauth_resp = await client.get(f"/api/v1/musehub/repos/{repo_id}")
     assert unauth_resp.status_code == 200, (
         f"Expected 200 for public repo, got {unauth_resp.status_code}: {unauth_resp.text}"
     )
+    # Body should contain the repo data
+    body = unauth_resp.json()
+    assert body["repoId"] == repo_id
+    assert body["visibility"] == "public"
 
 
 # ---------------------------------------------------------------------------
-# Sanity check — authenticated requests are NOT blocked
+# Authenticated requests are accepted
 # ---------------------------------------------------------------------------
-
 
 @pytest.mark.anyio
 async def test_hub_routes_accept_valid_token(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """POST /musehub/repos succeeds (201) with a valid Bearer token.
-
-    Ensures the auth dependency passes through valid tokens — guards against
-    accidentally blocking all traffic.
-    """
+    """POST /musehub/repos succeeds (201) with a valid Bearer token."""
     response = await client.post(
         "/api/v1/musehub/repos",
         json={"name": "auth-sanity-repo", "owner": "testuser"},
         headers=auth_headers,
     )
     assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "auth-sanity-repo"
+    assert body["owner"] == "testuser"
+    assert "repoId" in body

@@ -33,9 +33,11 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.5.0",
     "coverage>=7.0.0",
     "anyio>=4.2.0",
     "mypy>=1.8.0",
+    "factory-boy>=3.3.0",
 ]
 
 [build-system]
@@ -46,7 +48,7 @@ build-backend = "hatchling.build"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 cache_dir = "/tmp/pytest_cache"
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -p no:randomly"
 filterwarnings = [
     "ignore:The 'is_flag' and 'flag_value' parameters are not supported by Typer:DeprecationWarning",
 ]
