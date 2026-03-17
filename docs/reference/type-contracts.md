@@ -2,7 +2,8 @@
 
 > Updated: 2026-03-17 | Covers every named entity in the Muse Hub surface:
 > MIDI type aliases, JSON wire types, MCP protocol types, Pydantic API models,
-> auth tokens, SSE event hierarchy, SQLAlchemy ORM models.
+> auth tokens, SSE event hierarchy, SQLAlchemy ORM models, and the full
+> MCP integration layer (dispatcher, resources, prompts, write tools, transports).
 > `Any` and bare `list` / `dict` (without type arguments) do not appear in any
 > production file. Every type boundary is named. The mypy strict ratchet
 > enforces zero violations on every CI run across 111 source files.
@@ -16,14 +17,15 @@
 3. [JSON Type Aliases (`contracts/json_types.py`)](#json-type-aliases)
 4. [JSON Wire TypedDicts (`contracts/json_types.py`)](#json-wire-typeddicts)
 5. [MCP Protocol Types (`contracts/mcp_types.py`)](#mcp-protocol-types)
-6. [Pydantic Base Types (`contracts/pydantic_types.py`, `models/base.py`)](#pydantic-base-types)
-7. [Auth Types (`auth/tokens.py`)](#auth-types)
-8. [Protocol Events (`protocol/events.py`)](#protocol-events)
-9. [Protocol HTTP Responses (`protocol/responses.py`)](#protocol-http-responses)
-10. [API Models (`models/musehub.py`)](#api-models)
-11. [Database ORM Models (`db/`)](#database-orm-models)
-12. [Entity Hierarchy](#entity-hierarchy)
-13. [Entity Graphs (Mermaid)](#entity-graphs-mermaid)
+6. [MCP Integration Layer (`mcp/`)](#mcp-integration-layer)
+7. [Pydantic Base Types (`contracts/pydantic_types.py`, `models/base.py`)](#pydantic-base-types)
+8. [Auth Types (`auth/tokens.py`)](#auth-types)
+9. [Protocol Events (`protocol/events.py`)](#protocol-events)
+10. [Protocol HTTP Responses (`protocol/responses.py`)](#protocol-http-responses)
+11. [API Models (`models/musehub.py`)](#api-models)
+12. [Database ORM Models (`db/`)](#database-orm-models)
+13. [Entity Hierarchy](#entity-hierarchy)
+14. [Entity Graphs (Mermaid)](#entity-graphs-mermaid)
 
 ---
 
@@ -267,6 +269,125 @@ FastAPI response serialisation.
 | `MCPPropertyDefWire` | Pydantic-safe JSON Schema property for FastAPI responses |
 | `MCPInputSchemaWire` | Pydantic-safe tool input schema for FastAPI responses |
 | `MCPToolDefWire` | Pydantic-safe tool definition for FastAPI route return types |
+
+---
+
+## MCP Integration Layer
+
+**Paths:** `musehub/mcp/dispatcher.py`, `musehub/mcp/resources.py`,
+`musehub/mcp/prompts.py`, `musehub/mcp/tools/`, `musehub/mcp/write_tools/`,
+`musehub/api/routes/mcp.py`, `musehub/mcp/stdio_server.py`
+
+The MCP integration layer implements the full [MCP 2025-03-26 specification](https://spec.modelcontextprotocol.io/)
+as a pure-Python async stack. No external MCP SDK dependency. Two transports
+are supported: HTTP Streamable (`POST /mcp`) and stdio.
+
+### Tool Catalogue (`mcp/tools/`)
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `MUSEHUB_READ_TOOLS` | `list[MCPToolDef]` | 15 read-only tool definitions (browsing, search, inspect) |
+| `MUSEHUB_WRITE_TOOLS` | `list[MCPToolDef]` | 12 write tool definitions (create, update, merge, star) |
+| `MUSEHUB_TOOLS` | `list[MCPToolDef]` | Combined catalogue of all 27 `musehub_*` tools |
+| `MUSEHUB_TOOL_NAMES` | `set[str]` | All tool name strings for fast routing |
+| `MUSEHUB_WRITE_TOOL_NAMES` | `set[str]` | Write-only names; presence triggers JWT auth check |
+| `MCP_TOOLS` | `list[MCPToolDef]` | Full registered tool list (alias of `MUSEHUB_TOOLS`) |
+| `TOOL_CATEGORIES` | `dict[str, str]` | Maps tool name → `"musehub-read"` or `"musehub-write"` |
+
+**Read tools:** `musehub_browse_repo`, `musehub_list_branches`, `musehub_list_commits`,
+`musehub_read_file`, `musehub_get_analysis`, `musehub_search`, `musehub_get_context`,
+`musehub_get_commit`, `musehub_compare`, `musehub_list_issues`, `musehub_get_issue`,
+`musehub_list_prs`, `musehub_get_pr`, `musehub_list_releases`, `musehub_search_repos`
+
+**Write tools:** `musehub_create_repo`, `musehub_fork_repo`, `musehub_create_issue`,
+`musehub_update_issue`, `musehub_create_issue_comment`, `musehub_create_pr`,
+`musehub_merge_pr`, `musehub_create_pr_comment`, `musehub_submit_pr_review`,
+`musehub_create_release`, `musehub_star_repo`, `musehub_create_label`
+
+### Resource Catalogue (`mcp/resources.py`)
+
+TypedDicts for the `musehub://` URI scheme.
+
+| Name | Kind | Description |
+|------|------|-------------|
+| `MCPResource` | `TypedDict total=False` | Static resource entry: `uri`, `name`, `description`, `mimeType` |
+| `MCPResourceTemplate` | `TypedDict total=False` | RFC 6570 URI template entry: `uriTemplate`, `name`, `description`, `mimeType` |
+| `MCPResourceContent` | `TypedDict` | Content block returned by `resources/read`: `uri`, `mimeType`, `text` |
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `STATIC_RESOURCES` | `list[MCPResource]` | 5 static URIs (`trending`, `me`, `me/notifications`, `me/starred`, `me/feed`) |
+| `RESOURCE_TEMPLATES` | `list[MCPResourceTemplate]` | 15 RFC 6570 URI templates for repos, issues, PRs, releases, users |
+| `read_resource(uri, user_id)` | `async (str, str \| None) → dict[str, JSONValue]` | Dispatches a `musehub://` URI to the appropriate handler |
+
+### Prompt Catalogue (`mcp/prompts.py`)
+
+TypedDicts for workflow-oriented agent guidance.
+
+| Name | Kind | Description |
+|------|------|-------------|
+| `MCPPromptArgument` | `TypedDict total=False` | Named argument for a prompt: `name` (required), `description`, `required` |
+| `MCPPromptDef` | `TypedDict total=False` | Prompt definition: `name` (required), `description` (required), `arguments` |
+| `MCPPromptMessageContent` | `TypedDict` | Content inside a prompt message: `type`, `text` |
+| `MCPPromptMessage` | `TypedDict` | A single prompt message: `role`, `content` |
+| `MCPPromptResult` | `TypedDict` | Prompt assembly result: `description`, `messages` |
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `PROMPT_CATALOGUE` | `list[MCPPromptDef]` | 6 workflow prompts |
+| `PROMPT_NAMES` | `set[str]` | All prompt name strings for fast lookup |
+| `get_prompt(name, arguments)` | `(str, dict[str, str] \| None) → MCPPromptResult \| None` | Assembles a prompt by name with optional argument substitution |
+
+**Prompts:** `musehub/orientation`, `musehub/contribute`, `musehub/compose`,
+`musehub/review_pr`, `musehub/issue_triage`, `musehub/release_prep`
+
+### Dispatcher (`mcp/dispatcher.py`)
+
+The pure-Python async JSON-RPC 2.0 engine. Receives parsed request dicts,
+routes to tools/resources/prompts, and returns JSON-RPC 2.0 response dicts.
+
+| Export | Signature | Description |
+|--------|-----------|-------------|
+| `handle_request(raw, user_id)` | `async (JSONObject, str \| None) → JSONObject \| None` | Handle one JSON-RPC 2.0 message; returns `None` for notifications |
+| `handle_batch(raw, user_id)` | `async (list[JSONValue], str \| None) → list[JSONObject]` | Handle a batch (array) of JSON-RPC messages; filters out notification `None`s |
+
+**Supported methods:**
+
+| Method | Auth required | Description |
+|--------|---------------|-------------|
+| `initialize` | No | Server capabilities handshake (MCP 2025-03-26) |
+| `tools/list` | No | Returns all 27 tool definitions |
+| `tools/call` | Write tools only | Routes to read or write executor |
+| `resources/list` | No | Returns 5 static resources |
+| `resources/templates/list` | No | Returns 15 URI templates |
+| `resources/read` | No (visibility checked) | Reads a `musehub://` URI |
+| `prompts/list` | No | Returns 6 prompt definitions |
+| `prompts/get` | No | Assembles a named prompt |
+
+### HTTP Transport (`api/routes/mcp.py`)
+
+`POST /mcp` — HTTP Streamable endpoint. Accepts both single (`object`) and
+batch (`array`) JSON-RPC 2.0 bodies. JWT from `Authorization: Bearer <token>`
+is decoded; the extracted `sub` is passed as `user_id` to the dispatcher.
+Notifications return `202 No Content`. Parse errors return standard
+JSON-RPC error envelopes.
+
+### Stdio Transport (`mcp/stdio_server.py`)
+
+Line-delimited JSON-RPC over `stdin` / `stdout` for local development and
+Cursor IDE integration. Registered in `.cursor/mcp.json` as:
+
+```json
+{
+  "mcpServers": {
+    "musehub": {
+      "command": "python",
+      "args": ["-m", "musehub.mcp.stdio_server"],
+      "cwd": "/Users/gabriel/musehub"
+    }
+  }
+}
+```
 
 ---
 
@@ -667,13 +788,37 @@ Muse Hub
 │   ├── ProtocolToolsResponse       — GET /protocol/tools.json
 │   └── ProtocolSchemaResponse      — GET /protocol/schema.json
 │
-├── MCP Tools (mcp/)
-│   ├── MUSEHUB_TOOLS               — 7 read-only browsing tool definitions
-│   ├── MUSEHUB_TOOL_NAMES          — frozenset of tool name strings
-│   ├── MCP_TOOLS                   — combined list of all registered tools
-│   ├── TOOL_CATEGORIES             — dict[str, str] tool → category
-│   ├── MuseMCPServer               — routes musehub_* calls to executor
-│   └── ToolCallResult              — server routing result (success, is_error, content)
+├── MCP Integration Layer (mcp/)
+│   ├── Tools (mcp/tools/)
+│   │   ├── MUSEHUB_READ_TOOLS      — 15 read tool definitions
+│   │   ├── MUSEHUB_WRITE_TOOLS     — 12 write tool definitions
+│   │   ├── MUSEHUB_TOOLS           — combined 27-tool catalogue
+│   │   ├── MUSEHUB_TOOL_NAMES      — set[str] for routing
+│   │   ├── MUSEHUB_WRITE_TOOL_NAMES — set[str] auth-gated writes
+│   │   ├── MCP_TOOLS               — registered list (alias)
+│   │   └── TOOL_CATEGORIES         — dict[str, str] tool → category
+│   ├── Resources (mcp/resources.py)
+│   │   ├── MCPResource             — TypedDict (total=False): static resource
+│   │   ├── MCPResourceTemplate     — TypedDict (total=False): RFC 6570 template
+│   │   ├── MCPResourceContent      — TypedDict: read result content block
+│   │   ├── STATIC_RESOURCES        — 5 static musehub:// URIs
+│   │   ├── RESOURCE_TEMPLATES      — 15 RFC 6570 URI templates
+│   │   └── read_resource()         — async URI dispatcher
+│   ├── Prompts (mcp/prompts.py)
+│   │   ├── MCPPromptArgument       — TypedDict (total=False): prompt argument
+│   │   ├── MCPPromptDef            — TypedDict (total=False): prompt definition
+│   │   ├── MCPPromptMessage        — TypedDict: role + content
+│   │   ├── MCPPromptResult         — TypedDict: description + messages
+│   │   ├── PROMPT_CATALOGUE        — 6 workflow prompts
+│   │   ├── PROMPT_NAMES            — set[str] for lookup
+│   │   └── get_prompt()            — assembler with argument substitution
+│   ├── Dispatcher (mcp/dispatcher.py)
+│   │   ├── handle_request()        — async JSON-RPC 2.0 single request
+│   │   └── handle_batch()          — async JSON-RPC 2.0 batch
+│   ├── HTTP Transport (api/routes/mcp.py)
+│   │   └── POST /mcp               — HTTP Streamable, JWT auth, batch support
+│   └── Stdio Transport (mcp/stdio_server.py)
+│       └── line-delimited JSON-RPC over stdin/stdout
 │
 ├── API Models (models/musehub.py)            ~98 Pydantic models
 │   ├── VCS: PushRequest, PullResponse, …
@@ -900,21 +1045,41 @@ classDiagram
         "invalid_mode"
         "db_unavailable"
     }
-    class MUSEHUB_TOOLS {
-        <<list of MCPToolDef>>
-        musehub_browse_repo
-        musehub_list_branches
-        musehub_list_commits
-        musehub_read_file
-        musehub_get_analysis
-        musehub_search
-        musehub_get_context
+    class MUSEHUB_READ_TOOLS {
+        <<list of MCPToolDef — 15 tools>>
+        musehub_browse_repo · musehub_list_branches
+        musehub_list_commits · musehub_read_file
+        musehub_get_analysis · musehub_search
+        musehub_get_context · musehub_get_commit
+        musehub_compare · musehub_list_issues
+        musehub_get_issue · musehub_list_prs
+        musehub_get_pr · musehub_list_releases
+        musehub_search_repos
+    }
+    class MUSEHUB_WRITE_TOOLS {
+        <<list of MCPToolDef — 12 tools>>
+        musehub_create_repo · musehub_fork_repo
+        musehub_create_issue · musehub_update_issue
+        musehub_create_issue_comment · musehub_create_pr
+        musehub_merge_pr · musehub_create_pr_comment
+        musehub_submit_pr_review · musehub_create_release
+        musehub_star_repo · musehub_create_label
+    }
+    class MCPDispatcher {
+        +handle_request(raw, user_id) JSONObject | None
+        +handle_batch(raw, user_id) list~JSONObject~
+        -initialize() MCPSuccessResponse
+        -tools_list() MCPSuccessResponse
+        -tools_call(name, args, user_id) MCPSuccessResponse
+        -resources_read(uri, user_id) MCPSuccessResponse
+        -prompts_get(name, args) MCPSuccessResponse
     }
 
-    MuseMCPServer --> ToolCallResult : returns
-    MuseMCPServer ..> MusehubToolResult : executor produces
+    MCPDispatcher --> ToolCallResult : returns
+    MCPDispatcher ..> MusehubToolResult : executor produces
     MusehubToolResult --> MusehubErrorCode : error_code
-    MuseMCPServer ..> MUSEHUB_TOOLS : routes via MUSEHUB_TOOL_NAMES
+    MCPDispatcher ..> MUSEHUB_READ_TOOLS : routes read calls
+    MCPDispatcher ..> MUSEHUB_WRITE_TOOLS : routes write calls (auth required)
 ```
 
 ---
@@ -1190,11 +1355,14 @@ classDiagram
         ProtocolToolsResponse
         ProtocolSchemaResponse
     }
-    class MCPTools {
+    class MCPIntegration {
         <<mcp/>>
-        MUSEHUB_TOOLS (7 tools)
-        MuseMCPServer · ToolCallResult
-        MusehubToolResult
+        27 tools (15 read + 12 write)
+        20 resources (5 static + 15 templates)
+        6 workflow prompts
+        MCPDispatcher · handle_request · handle_batch
+        HTTP transport POST /mcp
+        stdio transport
     }
     class APIModels {
         <<models/musehub.py>>
@@ -1212,8 +1380,99 @@ classDiagram
     ProtocolEvents ..> PydanticBase : MuseEvent extends CamelModel
     ProtocolResponses ..> PydanticBase : all extend BaseModel
     ProtocolResponses ..> MCPTypes : MCPToolDefWire in tools fields
-    MCPTools ..> MCPTypes : MUSEHUB_TOOLS match MCPToolDef shape
-    MCPTools ..> JSONTypes : MusehubToolResult.data uses JSONValue
+    MCPIntegration ..> MCPTypes : tool defs match MCPToolDef shape
+    MCPIntegration ..> JSONTypes : MusehubToolResult.data uses JSONValue
+    MCPIntegration ..> AuthTypes : JWT → user_id for write tools
+    MCPIntegration ..> DatabaseORM : executors query DB via AsyncSessionLocal
     APIModels ..> PydanticBase : all extend CamelModel
     AuthTypes ..> DatabaseORM : TokenClaims.sub → User.id
+```
+
+---
+
+### Diagram 10 — MCP Transport and Resource Architecture
+
+The full request path from an MCP client through transports, dispatcher,
+and executors to the database and back.
+
+```mermaid
+classDiagram
+    class HTTPTransport {
+        <<api/routes/mcp.py>>
+        +POST /mcp
+        +JWT auth (Authorization: Bearer)
+        +batch support (array body)
+        +202 for notifications
+    }
+    class StdioTransport {
+        <<mcp/stdio_server.py>>
+        +stdin line reader
+        +stdout JSON-RPC responses
+        +Cursor IDE integration
+    }
+    class MCPDispatcher {
+        <<mcp/dispatcher.py>>
+        +handle_request(raw, user_id) JSONObject|None
+        +handle_batch(raw, user_id) list~JSONObject~
+        -initialize() capabilities
+        -tools_list() 27 tools
+        -tools_call(name, args, user_id)
+        -resources_read(uri, user_id)
+        -prompts_get(name, args)
+    }
+    class ReadExecutors {
+        <<mcp/services/musehub_mcp_executor.py>>
+        execute_browse_repo()
+        execute_list_branches()
+        execute_list_commits()
+        execute_read_file()
+        execute_get_analysis()
+        execute_search()
+        execute_get_context()
+        execute_get_commit()
+        execute_compare()
+        execute_list_issues()
+        execute_get_issue()
+        execute_list_prs()
+        execute_get_pr()
+        execute_list_releases()
+        execute_search_repos()
+    }
+    class WriteExecutors {
+        <<mcp/write_tools/>>
+        repos: execute_create_repo() execute_fork_repo()
+        issues: execute_create_issue() execute_update_issue() execute_create_issue_comment()
+        pulls: execute_create_pr() execute_merge_pr() execute_create_pr_comment() execute_submit_pr_review()
+        releases: execute_create_release()
+        social: execute_star_repo() execute_create_label()
+    }
+    class ResourceHandlers {
+        <<mcp/resources.py>>
+        read_resource(uri, user_id)
+        STATIC: trending · me · me/notifications · me/starred · me/feed
+        TEMPLATED: repos/{owner}/{slug} + 14 sub-resources
+        users/{username}
+    }
+    class PromptAssembler {
+        <<mcp/prompts.py>>
+        get_prompt(name, arguments)
+        orientation · contribute · compose
+        review_pr · issue_triage · release_prep
+    }
+    class MusehubToolResult {
+        <<dataclass frozen>>
+        +ok : bool
+        +data : dict~str, JSONValue~
+        +error_code : MusehubErrorCode | None
+        +error_message : str | None
+    }
+
+    HTTPTransport ..> MCPDispatcher : delegates
+    StdioTransport ..> MCPDispatcher : delegates
+    MCPDispatcher ..> ReadExecutors : tools/call (read)
+    MCPDispatcher ..> WriteExecutors : tools/call (write, auth required)
+    MCPDispatcher ..> ResourceHandlers : resources/read
+    MCPDispatcher ..> PromptAssembler : prompts/get
+    ReadExecutors --> MusehubToolResult : returns
+    WriteExecutors --> MusehubToolResult : returns
 ```

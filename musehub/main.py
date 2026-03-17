@@ -47,6 +47,7 @@ from musehub.api.routes.musehub import (
     sitemap as musehub_sitemap_routes,
 )
 from musehub.api.routes import musehub as musehub_router_pkg
+from musehub.api.routes.mcp import router as mcp_router
 from musehub.db import init_db, close_db
 
 
@@ -186,6 +187,10 @@ app.include_router(musehub_ui_emotion_diff_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_oembed_routes.router, tags=["musehub-oembed"])
 app.include_router(musehub_raw_routes.router, prefix="/api/v1", tags=["musehub-raw"])
 app.include_router(musehub_sitemap_routes.router, tags=["musehub-sitemap"])
+
+# MCP endpoint — mounted at root (no prefix) per MCP spec.
+# POST /mcp accepts JSON-RPC 2.0 single requests and batch arrays.
+app.include_router(mcp_router)
 
 _STATIC_DIR = Path(__file__).parent / "templates" / "musehub" / "static"
 app.mount(

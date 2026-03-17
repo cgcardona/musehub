@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "musehub": {
+      "command": "python",
+      "args": ["-m", "musehub.mcp.stdio_server"],
+      "env": {
+        "DATABASE_URL": "${DATABASE_URL}",
+        "SECRET_KEY": "${SECRET_KEY}"
+      },
+      "description": "MuseHub MCP server — 27 tools, 20 resources, 6 prompts for full platform access"
+    }
+  }
+}
