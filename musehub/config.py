@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",  # silently discard unknown env vars (e.g. OPENROUTER_API_KEY from other tools)
     )
 
 

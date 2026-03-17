@@ -2370,7 +2370,6 @@ async def test_profile_forked_repos_no_auth_required(
     assert response.status_code != 401
 
 
-@pytest.mark.skip(reason="Pre-existing failure: profile page template missing loadForkedRepos JS")
 @pytest.mark.anyio
 async def test_profile_page_has_forked_section_js(
     client: AsyncClient,
@@ -2516,7 +2515,6 @@ async def test_profile_starred_repos_ordered_newest_first(
     assert data["starred"][1]["repo"]["slug"] == "track-alpha"
 
 
-@pytest.mark.skip(reason="Pre-existing failure: profile page template missing loadStarredRepos JS")
 @pytest.mark.anyio
 async def test_profile_page_has_starred_section_js(
     client: AsyncClient,
@@ -2662,7 +2660,6 @@ async def test_profile_watched_repos_ordered_newest_first(
     assert data["watched"][1]["repo"]["slug"] == "song-alpha"
 
 
-@pytest.mark.skip(reason="Pre-existing failure: profile page template missing loadWatchedRepos JS")
 @pytest.mark.anyio
 async def test_profile_page_has_watched_section_js(
     client: AsyncClient,
@@ -4974,7 +4971,6 @@ async def test_harmony_page_has_token_form(
     assert "musehub.js" in body
 
 
-@pytest.mark.skip(reason="Pre-existing failure: harmony API response missing 'dimension' field")
 @pytest.mark.anyio
 async def test_harmony_json_response(
     client: AsyncClient,
@@ -7963,7 +7959,6 @@ async def _make_follow(
     return row
 
 
-@pytest.mark.skip(reason="Pre-existing failure: profile page template missing tab-btn-followers element")
 @pytest.mark.anyio
 async def test_profile_page_has_followers_following_tabs(
     client: AsyncClient,
@@ -7978,7 +7973,6 @@ async def test_profile_page_has_followers_following_tabs(
     assert "tab-btn-following" in body
 
 
-@pytest.mark.skip(reason="Pre-existing failure: profile page template missing userCardHtml JS")
 @pytest.mark.anyio
 async def test_profile_page_has_user_card_js(
     client: AsyncClient,

@@ -190,23 +190,24 @@ def test_pitch_to_name_a0() -> None:
 # ---------------------------------------------------------------------------
 
 
-_OBJ_COUNTER = 0
-
-
 async def _seed_repo_and_obj(
     db_session: AsyncSession,
     disk_path: str = "/nonexistent/track.mid",
     path: str = "tracks/bass.mid",
 ) -> tuple[str, str]:
-    """Seed a repo and object; return (repo_id, object_id)."""
-    global _OBJ_COUNTER
-    _OBJ_COUNTER += 1
-    object_id = f"sha256:test{_OBJ_COUNTER:04d}"
+    """Seed a repo and object; return (repo_id, object_id).
+
+    Uses a uuid4-derived suffix so each call produces unique slugs even when
+    tests are run in parallel across multiple xdist workers.
+    """
+    import uuid
+    suffix = uuid.uuid4().hex[:8]
+    object_id = f"sha256:test{suffix}"
 
     repo = MusehubRepo(
-        name=f"midi-test-{_OBJ_COUNTER}",
+        name=f"midi-test-{suffix}",
         owner="testuser",
-        slug=f"midi-test-{_OBJ_COUNTER}",
+        slug=f"midi-test-{suffix}",
         visibility="public",
         owner_user_id="test-owner",
     )

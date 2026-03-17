@@ -2,7 +2,13 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncGenerator, Generator
+
+# Set before any musehub imports so the Settings lru_cache picks up the value.
+# This is a test-only secret; in CI/Docker the real secret comes from the environment.
+os.environ.setdefault("ACCESS_TOKEN_SECRET", "test-secret-for-unit-tests-do-not-use-in-prod")
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
@@ -20,7 +26,6 @@ from musehub.main import app
 
 
 def pytest_configure(config: pytest.Config) -> None:
-
     """Ensure asyncio_mode is auto so async fixtures work (e.g. in Docker when pyproject not in cwd)."""
     if hasattr(config.option, "asyncio_mode") and config.option.asyncio_mode is None:
         config.option.asyncio_mode = "auto"
@@ -34,10 +39,16 @@ def anyio_backend() -> str:
 
 @pytest.fixture(autouse=True)
 def _reset_variation_store() -> Generator[None, None, None]:
-    """Reset the singleton VariationStore between tests to prevent cross-test pollution."""
+    """Reset the singleton VariationStore between tests to prevent cross-test pollution.
+
+    Gracefully no-ops if the variation module has been removed (MuseHub extraction).
+    """
     yield
-    from musehub.variation.storage.variation_store import reset_variation_store
-    reset_variation_store()
+    try:
+        from musehub.variation.storage.variation_store import reset_variation_store
+        reset_variation_store()
+    except ModuleNotFoundError:
+        pass
 
 
 @pytest_asyncio.fixture
