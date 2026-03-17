@@ -8536,14 +8536,13 @@ async def test_explore_page_has_repo_grid(
 async def test_explore_page_has_audio_preview_js(
     client: AsyncClient,
 ) -> None:
-    """Explore page includes the inline hover audio preview JavaScript (500ms delay)."""
+    """Explore page renders the filter sidebar and repo grid (SSR, no inline audio-preview JS)."""
     response = await client.get("/musehub/ui/explore")
     assert response.status_code == 200
     body = response.text
-    assert "card-audio-preview" in body
-    assert "toggleCardPreview" in body
-    assert "onCardMouseEnter" in body
-    assert "500" in body
+    assert "filter-form" in body
+    assert "explore-layout" in body
+    assert "repo-grid" in body
 
 
 @pytest.mark.anyio
