@@ -169,9 +169,9 @@ async def check_repo_name(
     existing = await musehub_repository.get_repo_by_owner_slug(db, owner, slug)
     available = existing is None
     if is_htmx(request):
-        if available:
-            html = '<span style="color:var(--color-success,#3fb950)">✓ Available</span>'
-        else:
-            html = '<span style="color:var(--color-danger,#f85149)">✗ Already taken</span>'
-        return HTMLResponse(html)
+        return _templates.TemplateResponse(
+            request,
+            "musehub/fragments/slug_check.html",
+            {"available": available},
+        )
     return JSONResponse({"available": available})
