@@ -537,10 +537,13 @@ async def test_push_triggers_render(
             {"repo_id": repo_id, "commit_id": commit_id, "objects": objects}
         )
 
-    with patch(
+    with tempfile.TemporaryDirectory() as tmp, patch(
+        "musehub.services.musehub_sync.settings"
+    ) as mock_cfg, patch(
         "musehub.api.routes.musehub.sync.trigger_render_background",
         side_effect=fake_trigger,
     ):
+        mock_cfg.musehub_objects_dir = tmp
         payload = {
             "branch": "main",
             "headCommitId": "a" * 64,

@@ -208,6 +208,7 @@ class _FakeIssue:
     state = "open"
     labels: list[str] = ["bug", "audio"]
     createdAt = "2025-01-15T10:00:00Z"
+    created_at = "2025-01-15T10:00:00Z"
     author = "alice"
 
 

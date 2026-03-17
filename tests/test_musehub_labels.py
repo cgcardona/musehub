@@ -34,7 +34,7 @@ async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: 
     """Create a repo and return its repo_id."""
     response = await client.post(
         "/api/v1/musehub/repos",
-        json={"name": name, "owner": "testuser"},
+        json={"name": name, "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
     assert response.status_code == 201
@@ -358,22 +358,20 @@ async def test_assign_labels_to_issue(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """POST .../issues/{number}/labels assigns labels and returns them."""
+    """POST .../issues/{number}/labels assigns labels and returns the updated issue."""
     repo_id = await _create_repo(client, auth_headers, "issue-label-assign-repo")
-    label = await _create_label(client, auth_headers, repo_id, name="bug", color="#d73a4a")
-    label_id = label.get("label_id") or label.get("labelId")
+    await _create_label(client, auth_headers, repo_id, name="bug", color="#d73a4a")
     issue = await _create_issue(client, auth_headers, repo_id)
     issue_number = issue["number"]
 
     response = await client.post(
         f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels",
-        json={"label_ids": [label_id]},
+        json={"labels": ["bug"]},
         headers=auth_headers,
     )
     assert response.status_code == 200
-    assigned = response.json()
-    assert len(assigned) == 1
-    assert assigned[0]["name"] == "bug"
+    updated_issue = response.json()
+    assert "bug" in updated_issue.get("labels", [])
 
 
 @pytest.mark.anyio
@@ -383,15 +381,14 @@ async def test_assign_labels_to_issue_idempotent(
 ) -> None:
     """Assigning the same label twice does not raise an error."""
     repo_id = await _create_repo(client, auth_headers, "issue-label-idem-repo")
-    label = await _create_label(client, auth_headers, repo_id)
-    label_id = label.get("label_id") or label.get("labelId")
+    await _create_label(client, auth_headers, repo_id)
     issue = await _create_issue(client, auth_headers, repo_id)
     issue_number = issue["number"]
 
     for _ in range(2):
         response = await client.post(
             f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels",
-            json={"label_ids": [label_id]},
+            json={"labels": ["bug"]},
             headers=auth_headers,
         )
         assert response.status_code == 200
@@ -402,26 +399,26 @@ async def test_remove_label_from_issue(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """DELETE .../issues/{number}/labels/{label_id} removes the association."""
+    """DELETE .../issues/{number}/labels/{label_name} removes the association."""
     repo_id = await _create_repo(client, auth_headers, "issue-label-remove-repo")
-    label = await _create_label(client, auth_headers, repo_id)
-    label_id = label.get("label_id") or label.get("labelId")
+    await _create_label(client, auth_headers, repo_id, name="bug", color="#d73a4a")
     issue = await _create_issue(client, auth_headers, repo_id)
     issue_number = issue["number"]
 
     # Assign first.
     await client.post(
         f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels",
-        json={"label_ids": [label_id]},
+        json={"labels": ["bug"]},
         headers=auth_headers,
     )
 
-    # Then remove.
+    # Then remove (by label name, returns updated issue with 200).
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels/{label_id}",
+        f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels/bug",
         headers=auth_headers,
     )
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert "bug" not in response.json().get("labels", [])
 
 
 @pytest.mark.anyio

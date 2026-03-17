@@ -45,7 +45,11 @@ def _b64(data: bytes) -> str:
 
 
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "export-test") -> str:
-    r = await client.post("/api/v1/musehub/repos", json={"name": name, "owner": "testuser"}, headers=auth_headers)
+    r = await client.post(
+        "/api/v1/musehub/repos",
+        json={"name": name, "owner": "testuser", "initialize": False},
+        headers=auth_headers,
+    )
     assert r.status_code == 201
     repo_id: str = r.json()["repoId"]
     return repo_id
