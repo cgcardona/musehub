@@ -5308,7 +5308,7 @@ async def _seed_commit_list_repo(
             branch="main",
             parent_ids=[],
             message="feat(bass): root commit with walking bass line",
-            author="composer@stori.io",
+            author="composer@muse.app",
             timestamp=now - timedelta(hours=4),
         ),
         MusehubCommit(
@@ -5317,7 +5317,7 @@ async def _seed_commit_list_repo(
             branch="main",
             parent_ids=[_SHA_MAIN_1],
             message="feat(keys): add rhodes chord voicings in verse",
-            author="composer@stori.io",
+            author="composer@muse.app",
             timestamp=now - timedelta(hours=2),
         ),
         MusehubCommit(
@@ -5326,7 +5326,7 @@ async def _seed_commit_list_repo(
             branch="main",
             parent_ids=[_SHA_MAIN_2, _SHA_FEAT],
             message="merge(feat/drums): integrate drum pattern into main",
-            author="composer@stori.io",
+            author="composer@muse.app",
             timestamp=now - timedelta(hours=1),
         ),
         MusehubCommit(
@@ -5335,7 +5335,7 @@ async def _seed_commit_list_repo(
             branch="feat/drums",
             parent_ids=[_SHA_MAIN_1],
             message="feat(drums): add kick and snare pattern at 120 BPM",
-            author="drummer@stori.io",
+            author="drummer@muse.app",
             timestamp=now - timedelta(hours=3),
         ),
     ]
@@ -6454,7 +6454,7 @@ async def _make_repo_with_branches(
         branch="main",
         parent_ids=[],
         message="Initial commit",
-        author="composer@stori.com",
+        author="composer@muse.app",
         timestamp=now,
     )
     c2 = MusehubCommit(
@@ -6463,7 +6463,7 @@ async def _make_repo_with_branches(
         branch="main",
         parent_ids=["aaa000"],
         message="Add bridge",
-        author="composer@stori.com",
+        author="composer@muse.app",
         timestamp=now,
     )
     c3 = MusehubCommit(
@@ -6472,7 +6472,7 @@ async def _make_repo_with_branches(
         branch="feat/jazz-bridge",
         parent_ids=["aaa000"],
         message="Add jazz chord",
-        author="composer@stori.com",
+        author="composer@muse.app",
         timestamp=now,
     )
     db_session.add_all([c1, c2, c3])
@@ -8465,8 +8465,8 @@ async def test_repo_home_clone_widget_renders(
     # Clone URL constants injected by repo_page()
     assert "CLONE_MUSEHUB" in body
     assert "musehub://cloneowner/clone-widget-test" in body
-    assert "ssh://git@musehub.stori.app/cloneowner/clone-widget-test.git" in body
-    assert "https://musehub.stori.app/cloneowner/clone-widget-test.git" in body
+    assert "ssh://git@musehub.app/cloneowner/clone-widget-test.git" in body
+    assert "https://musehub.app/cloneowner/clone-widget-test.git" in body
 
     # DOM elements rendered by renderCloneWidget()
     assert "clone-widget" in body

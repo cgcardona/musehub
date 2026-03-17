@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import selectinload
 
 from musehub.db.database import Base
-from musehub.db import models as _user_models # noqa: F401 — register maestro_users table
+from musehub.db import models as _user_models # noqa: F401 — register muse_users table
 from musehub.db import musehub_models as _hub_models # noqa: F401 — register musehub_repos table
 from musehub.db.musehub_stash_models import MusehubStash, MusehubStashEntry
 

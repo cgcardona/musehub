@@ -35,7 +35,7 @@ def jsonld_repo(repo: RepoResponse, page_url: str) -> dict[str, object]:
     Args:
         repo: Full repo response model (owner, name, description, tags, etc.).
         page_url: Canonical absolute URL of the repo landing page,
-                  e.g. ``https://musehub.stori.com/musehub/ui/miles/kind-of-blue``.
+                  e.g. ``https://musehub.app/musehub/ui/miles/kind-of-blue``.
 
     Returns:
         JSON-LD dict ready for ``json.dumps()`` and embedding in a
@@ -82,7 +82,7 @@ def jsonld_release(
         release: Full release response model (tag, title, body, author, etc.).
         repo: Parent repo (used to populate ``inAlbum`` and ``byArtist``).
         page_url: Canonical absolute URL of the release detail page,
-                  e.g. ``https://musehub.stori.com/musehub/ui/miles/kind-of-blue/releases/v1.0``.
+                  e.g. ``https://musehub.app/musehub/ui/miles/kind-of-blue/releases/v1.0``.
 
     Returns:
         JSON-LD dict ready for ``json.dumps()`` and embedding in a

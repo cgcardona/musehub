@@ -95,7 +95,7 @@ class MusicalFeatures:
 def extract_features_from_message(message: str) -> MusicalFeatures:
     """Derive musical features from a commit message string.
 
-    This is the primary extraction path for MVP: the Stori DAW encodes
+    This is the primary extraction path for MVP: the Muse DAW encodes
     composition metadata into structured commit messages (key, tempo, mode)
     as part of the push protocol. We parse the most common patterns here.
 

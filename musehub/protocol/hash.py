@@ -17,7 +17,7 @@ import hashlib
 import json
 
 from musehub.protocol.registry import EVENT_REGISTRY
-from musehub.protocol.version import MAESTRO_VERSION
+from musehub.protocol.version import MUSE_VERSION
 
 
 def _event_schemas_canonical() -> list[dict[str, object]]:
@@ -65,7 +65,7 @@ def _enum_definitions_canonical() -> list[dict[str, object]]:
 def compute_protocol_hash() -> str:
     """Compute deterministic SHA-256 hash of the entire protocol surface."""
     payload = {
-        "version": MAESTRO_VERSION,
+        "version": MUSE_VERSION,
         "events": _event_schemas_canonical(),
         "tools": _tool_schemas_canonical(),
         "enums": _enum_definitions_canonical(),

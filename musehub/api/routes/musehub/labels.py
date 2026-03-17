@@ -13,7 +13,7 @@ Endpoint summary:
 Read endpoints use optional_token — unauthenticated access is allowed for public repos.
 Write endpoints always require a valid JWT Bearer token.
 
-ORM dependency: maestro.db.musehub_label_models (batch-01 / PR-464).
+ORM dependency: musehub.db.musehub_label_models (batch-01 / PR-464).
 If that module is not yet merged, mypy will report a missing import — this is
 expected and resolves once the batch-01 migration PR merges.
 """

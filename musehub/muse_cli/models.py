@@ -1,6 +1,6 @@
 """Re-exports of Muse CLI ORM models for MuseHub compatibility.
 
-The canonical definitions now live in maestro.db.muse_cli_models.
+The canonical definitions now live in musehub.db.muse_cli_models.
 This module exists only so that MuseHub code and tests can keep importing
 from the original path while MuseHub extraction is pending.
 

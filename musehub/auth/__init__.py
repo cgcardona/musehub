@@ -1,5 +1,5 @@
 """
-Maestro Authentication Module
+Muse Authentication Module
 
 Provides JWT-based access token generation and validation.
 """

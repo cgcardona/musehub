@@ -1,6 +1,6 @@
 """Tests for the Muse Hub new-repo creation wizard.
 
-Covers ``maestro/api/routes/musehub/ui_new_repo.py``:
+Covers ``musehub/api/routes/musehub/ui_new_repo.py``:
 
   GET /musehub/ui/new
   POST /musehub/ui/new

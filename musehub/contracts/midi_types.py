@@ -1,6 +1,6 @@
 """Canonical MIDI primitive type aliases.
 
-Single source of truth for MIDI value ranges used throughout Maestro.
+Single source of truth for MIDI value ranges used throughout Muse.
 
 These ``Annotated`` aliases carry constraint metadata at every layer:
 

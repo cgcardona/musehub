@@ -268,7 +268,7 @@ GET  /api/v1/musehub/users/{username}/activity    ← public activity feed
 - [ ] Language/instrument breakdown chip (shows dominant instrument)
 - [ ] Pagination + infinite scroll
 - [ ] Topic/tag browse sidebar
-- [ ] Featured collections carousel (curated by Stori team)
+- [ ] Featured collections carousel (curated by Muse team)
 
 ### 3.2 `/musehub/ui/{owner}/{repo}` — Repo Landing
 
@@ -284,7 +284,7 @@ GET  /api/v1/musehub/users/{username}/activity    ← public activity feed
 - [ ] Topics/tags as clickable chips → explore filter
 - [ ] License badge
 - [ ] Clone URL widget with copy button (`muse clone musehub://owner/repo`)
-- [ ] Open in DAW button (deep link to Stori DAW)
+- [ ] Open in DAW button (deep link to Muse DAW)
 - [ ] Branch picker with branch list + default branch indicator
 - [ ] Last commit message + author + relative timestamp on branch selector
 - [ ] File tree with MIDI file sizes

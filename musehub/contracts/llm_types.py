@@ -93,7 +93,7 @@ ChatMessage = Union[SystemMessage, UserMessage, AssistantMessage, ToolResultMess
 class OpenAIPropertyDef(TypedDict, total=False):
     """JSON Schema definition for a single OpenAI function parameter.
 
-    Covers the subset of JSON Schema used in Maestro tool definitions.
+    Covers the subset of JSON Schema used in Muse tool definitions.
     All constraint fields are optional.
     """
 

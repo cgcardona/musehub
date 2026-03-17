@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Type
 
 from musehub.protocol.events import (
-    MaestroEvent,
+    MuseEvent,
     StateEvent,
     ReasoningEvent,
     ReasoningEndEvent,
@@ -37,7 +37,7 @@ from musehub.protocol.events import (
     MCPPingEvent,
 )
 
-EVENT_REGISTRY: dict[str, Type[MaestroEvent]] = {
+EVENT_REGISTRY: dict[str, Type[MuseEvent]] = {
     "state": StateEvent,
     "reasoning": ReasoningEvent,
     "reasoningEnd": ReasoningEndEvent,
@@ -66,7 +66,7 @@ EVENT_REGISTRY: dict[str, Type[MaestroEvent]] = {
 ALL_EVENT_TYPES: frozenset[str] = frozenset(EVENT_REGISTRY.keys())
 
 
-def get_event_class(event_type: str) -> Type[MaestroEvent]:
+def get_event_class(event_type: str) -> Type[MuseEvent]:
     """Look up the model class for an event type. Raises KeyError for unknown types."""
     return EVENT_REGISTRY[event_type]
 

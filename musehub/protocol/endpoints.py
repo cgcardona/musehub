@@ -10,7 +10,7 @@ from fastapi import APIRouter
 
 from musehub.protocol.hash import compute_protocol_hash
 from musehub.protocol.registry import EVENT_REGISTRY, ALL_EVENT_TYPES
-from musehub.protocol.version import MAESTRO_VERSION
+from musehub.protocol.version import MUSE_VERSION
 from musehub.contracts.mcp_types import MCPToolDefWire
 from musehub.contracts.pydantic_types import PydanticJson
 from musehub.protocol.responses import (
@@ -27,7 +27,7 @@ router = APIRouter()
 async def protocol_info() -> ProtocolInfoResponse:
     """Protocol version, hash, and registered event types."""
     return ProtocolInfoResponse(
-        protocolVersion=MAESTRO_VERSION,
+        protocolVersion=MUSE_VERSION,
         protocolHash=compute_protocol_hash(),
         eventTypes=sorted(ALL_EVENT_TYPES),
         eventCount=len(EVENT_REGISTRY),
@@ -41,7 +41,7 @@ async def protocol_events() -> ProtocolEventsResponse:
     FE can consume this to auto-generate Swift Codable structs.
     """
     return ProtocolEventsResponse(
-        protocolVersion=MAESTRO_VERSION,
+        protocolVersion=MUSE_VERSION,
         events={
             event_type: PydanticJson.model_validate(
                 EVENT_REGISTRY[event_type].model_json_schema()
@@ -57,7 +57,7 @@ async def protocol_tools() -> ProtocolToolsResponse:
     from musehub.mcp.tools import MCP_TOOLS
 
     return ProtocolToolsResponse(
-        protocolVersion=MAESTRO_VERSION,
+        protocolVersion=MUSE_VERSION,
         tools=[MCPToolDefWire.model_validate(t) for t in MCP_TOOLS],
         toolCount=len(MCP_TOOLS),
     )
@@ -73,7 +73,7 @@ async def protocol_schema() -> ProtocolSchemaResponse:
     from musehub.mcp.tools import MCP_TOOLS
 
     return ProtocolSchemaResponse(
-        protocolVersion=MAESTRO_VERSION,
+        protocolVersion=MUSE_VERSION,
         protocolHash=compute_protocol_hash(),
         events={
             event_type: PydanticJson.model_validate(

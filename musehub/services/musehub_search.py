@@ -4,12 +4,12 @@ Provides four search modes over a repo's commit history, all operating on the
 shared ``muse_cli_commits`` table and scoped to a single ``repo_id``.
 
 Modes and their underlying algorithms:
-- ``property`` — musical property filter (delegates to :mod:`maestro.services.muse_find`)
+- ``property`` — musical property filter (delegates to :mod:`musehub.services.muse_find`)
 - ``ask`` — natural-language query; keyword extraction + overlap scoring
 - ``keyword`` — raw keyword/phrase overlap (normalised overlap coefficient)
 - ``pattern`` — substring pattern match against message and branch name
 
-All four modes return :class:`~maestro.models.musehub.SearchResponse` so the
+All four modes return :class:`~musehub.models.musehub.SearchResponse` so the
 UI can render results with a single shared commit-row template regardless of mode.
 
 Date-range filtering (``since`` / ``until``) is applied at the SQL layer for
@@ -191,7 +191,7 @@ async def search_by_ask(
         limit: Maximum results to return.
 
     Returns:
-        :class:`~maestro.models.musehub.SearchResponse` with mode="ask".
+        :class:`~musehub.models.musehub.SearchResponse` with mode="ask".
     """
     rows, total_scanned = await _fetch_candidates(
         session, repo_id=repo_id, since=since, until=until
@@ -251,7 +251,7 @@ async def search_by_keyword(
         limit: Maximum results to return.
 
     Returns:
-        :class:`~maestro.models.musehub.SearchResponse` with mode="keyword".
+        :class:`~musehub.models.musehub.SearchResponse` with mode="keyword".
     """
     rows, total_scanned = await _fetch_candidates(
         session, repo_id=repo_id, since=since, until=until
@@ -303,7 +303,7 @@ async def search_by_pattern(
         limit: Maximum results to return.
 
     Returns:
-        :class:`~maestro.models.musehub.SearchResponse` with mode="pattern".
+        :class:`~musehub.models.musehub.SearchResponse` with mode="pattern".
     """
     rows, total_scanned = await _fetch_candidates(
         session, repo_id=repo_id, since=since, until=until

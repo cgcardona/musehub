@@ -26,7 +26,7 @@ Boundary rules
 --------------
 - Pure data — no side effects, no external I/O beyond reading ``ref``.
 - Must NOT import StateStore, EntityRegistry, or executor modules.
-- Must NOT import LLM handlers or maestro_* pipeline modules.
+- Must NOT import LLM handlers or muse_* pipeline modules.
 """
 from __future__ import annotations
 
@@ -1495,7 +1495,7 @@ def compute_ref_similarity(
 ) -> RefSimilarityResponse:
     """Compute cross-ref similarity between two Muse refs.
 
-    Returns a :class:`~maestro.models.musehub_analysis.RefSimilarityResponse`
+    Returns a :class:`~musehub.models.musehub_analysis.RefSimilarityResponse`
     with per-dimension scores and an overall weighted mean.
 
     Scores are deterministic stubs derived from both ref hashes so that:
@@ -1512,7 +1512,7 @@ def compute_ref_similarity(
         compare_ref: The ref to compare against ``base_ref``.
 
     Returns:
-        :class:`~maestro.models.musehub_analysis.RefSimilarityResponse`
+        :class:`~musehub.models.musehub_analysis.RefSimilarityResponse`
         containing 10 dimension scores, an overall similarity, and an
         auto-generated interpretation string.
     """
@@ -1778,7 +1778,7 @@ async def get_context(
     """Return a musical context summary for the given ref for SSR rendering.
 
     Produces deterministic stub data keyed on the ref value.  Full LLM-generated
-    summaries will replace this once the Maestro pipeline is wired to the context
+    summaries will replace this once the Muse pipeline is wired to the context
     endpoint.
 
     Consumed directly by ``pages/analysis/context.html``.
@@ -1806,7 +1806,7 @@ async def get_context(
         f"Ref {ref[:8]} establishes a {_pick(seed, _MODES)}-mode foundation "
         f"at {60 + (seed % 60)} BPM with a {_pick(seed + 1, _GROOVES)} groove. "
         f"The arrangement currently features {5 - n_missing} of the expected core elements. "
-        f"Maestro suggests {n_suggestions} compositional refinements."
+        f"Muse suggests {n_suggestions} compositional refinements."
     )
     logger.info("✅ get-context repo=%s ref=%s", repo_id[:8], ref[:8])
     return ContextResult(summary=summary, missing_elements=missing, suggestions=suggestions)

@@ -26,7 +26,7 @@ Score 1.0 = no overlap — completely diverged.
 Boundary rules
 --------------
 - Must NOT import StateStore, executor, MCP tools, or handlers.
-- May import ``maestro.db.musehub_models``.
+- May import ``musehub.db.musehub_models``.
 """
 from __future__ import annotations
 

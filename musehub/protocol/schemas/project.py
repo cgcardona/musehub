@@ -1,6 +1,6 @@
 """Project state snapshot schema.
 
-Validates the project payload sent by the Stori macOS app.
+Validates the project payload sent by the Muse macOS app.
 Uses extra="allow" so unknown fields from newer FE versions
 pass through without breaking older backends.
 
@@ -80,7 +80,7 @@ class BusSnapshot(CamelModel):
 
 
 class ProjectSnapshot(CamelModel):
-    """Project state snapshot from the Stori macOS app.
+    """Project state snapshot from the Muse macOS app.
 
     Validated but permissive: extra fields allowed, most fields optional.
     Only ``id`` is required — an empty project with just an ID is valid.

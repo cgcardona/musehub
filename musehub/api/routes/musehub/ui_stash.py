@@ -19,7 +19,7 @@ Auth:
 Content negotiation (GET only):
   - Default (HTML): Jinja2 template with the stash list.
   - ``?format=json`` or ``Accept: application/json``: ``StashListPageResponse``
-    — the same contract consumed by the Stori DAW MCP tool.
+    — the same contract consumed by the Muse DAW MCP tool.
 
 POST responses:
   Always redirect back to the stash list page after a successful action.
@@ -27,7 +27,7 @@ POST responses:
     POST /api/v1/musehub/repos/{repo_id}/stash/{stash_id}/apply|pop
     DELETE /api/v1/musehub/repos/{repo_id}/stash/{stash_id}
 
-Auto-discovered by ``maestro.api.routes.musehub.__init__`` because this module
+Auto-discovered by ``musehub.api.routes.musehub.__init__`` because this module
 exposes a ``router`` attribute. No changes to ``__init__.py`` are needed.
 """
 from __future__ import annotations

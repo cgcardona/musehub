@@ -21,7 +21,7 @@ Auth contract:
   (``<span>`` with availability text). Otherwise returns JSON for scripts/agents.
 
 The POST handler delegates all persistence to
-``maestro.services.musehub_repository.create_repo``, keeping this handler
+``musehub.services.musehub_repository.create_repo``, keeping this handler
 thin per the routes-as-thin-adapters architecture rule.
 """
 from __future__ import annotations

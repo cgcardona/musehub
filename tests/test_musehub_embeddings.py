@@ -183,7 +183,7 @@ def test_embedding_computed_on_push_calls_upsert() -> None:
             commits=commits,
             repo_id="repo-001",
             branch="main",
-            author="composer@stori",
+            author="composer@muse.app",
             is_public=True,
         )
 
@@ -203,7 +203,7 @@ def test_embedding_computed_on_push_empty_commits_is_noop() -> None:
             commits=[],
             repo_id="repo-001",
             branch="main",
-            author="composer@stori",
+            author="composer@muse.app",
             is_public=True,
         )
 
@@ -241,7 +241,7 @@ def test_embedding_computed_on_push_qdrant_error_does_not_raise() -> None:
             commits=commits,
             repo_id="repo-001",
             branch="main",
-            author="composer@stori",
+            author="composer@muse.app",
             is_public=False,
         )
     # No exception raised — test passes by reaching this line

@@ -256,7 +256,7 @@ async def parse_midi_object(
     """Parse a stored MIDI artifact and return a structured MidiParseResult.
 
     Reads the binary MIDI file from disk, delegates to
-    :func:`maestro.services.musehub_midi_parser.parse_midi_bytes`, and returns
+    :func:`musehub.services.musehub_midi_parser.parse_midi_bytes`, and returns
     the result as JSON. The response shape is:
 
     .. code-block:: json

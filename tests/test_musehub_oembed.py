@@ -172,7 +172,7 @@ async def test_oembed_standard_fields_complete(client: AsyncClient) -> None:
         assert field in data, f"Missing required oEmbed field: {field}"
 
     assert data["provider_name"] == "MuseHub"
-    assert data["provider_url"] == "https://musehub.stori.app"
+    assert data["provider_url"] == "https://musehub.app"
     assert isinstance(data["thumbnail_width"], int)
     assert isinstance(data["thumbnail_height"], int)
     assert repo_id in data["thumbnail_url"]

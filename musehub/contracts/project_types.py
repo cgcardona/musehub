@@ -1,6 +1,6 @@
 """Typed structures for DAW project state snapshots.
 
-The macOS Stori DAW sends project state as JSON on every request.
+The macOS Muse DAW sends project state as JSON on every request.
 These TypedDicts describe the exact shape so callers can access
 fields without ``dict[str, Any]``.
 
@@ -47,7 +47,7 @@ class ProjectTrack(TypedDict, total=False):
 
     The track's own identifier is ``id``. ``trackId`` is reserved for
     foreign-key references in tool-call params and event payloads
-    (e.g. ``stori_add_midi_region(trackId=…)``).
+    (e.g. ``muse_add_midi_region(trackId=…)``).
 
     ``gmProgram`` and ``drumKitId`` are nullable (sent as ``null`` when
     not applicable, e.g. ``gmProgram`` is ``null`` on a drum track).
@@ -85,7 +85,7 @@ class TimeSignatureDict(TypedDict):
 
 
 class ProjectContext(TypedDict, total=False):
-    """Full project snapshot from the Stori macOS app.
+    """Full project snapshot from the Muse macOS app.
 
     This is the canonical type for every ``project_context`` parameter
     in the codebase. ``timeSignature`` may arrive as ``"4/4"`` (string)

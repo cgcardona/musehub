@@ -25,7 +25,7 @@ Design decisions
 Boundary rules
 --------------
 - Must NOT import StateStore, EntityRegistry, or executor modules.
-- Must NOT import LLM handlers or maestro_* pipeline modules.
+- Must NOT import LLM handlers or muse_* pipeline modules.
 - Must NOT import Storpheus service directly (data flows via route params).
 """
 from __future__ import annotations

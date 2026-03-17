@@ -10,7 +10,7 @@ Serves artifact bytes from disk with:
 - No auth required for public repos; JWT required for private repos
 
 This endpoint is intentionally **not** added to the auth-protected musehub
-router (``maestro.api.routes.musehub.__init__``) so that public-repo files
+router (``musehub.api.routes.musehub.__init__``) so that public-repo files
 can be fetched without a Bearer token — matching GitHub's raw.githubusercontent
 semantics. The privacy check is enforced inside the handler itself.
 """

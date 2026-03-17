@@ -1,7 +1,7 @@
 """Muse Hub route package.
 
 Auto-discovers and registers all sub-routers under the shared ``/musehub``
-prefix. Registered in ``maestro.main`` as:
+prefix. Registered in ``musehub.main`` as:
 
     app.include_router(musehub.router, prefix="/api/v1", tags=["musehub"])
 

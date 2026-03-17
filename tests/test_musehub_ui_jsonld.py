@@ -59,7 +59,7 @@ def _make_repo(
         slug="kind-of-blue",
         visibility="public",
         owner_user_id="user-uuid-123",
-        clone_url="https://musehub.stori.com/api/v1/musehub/repos/aabbccdd",
+        clone_url="https://musehub.app/api/v1/musehub/repos/aabbccdd",
         description=description,
         tags=tags or [],
         key_signature=key_signature,

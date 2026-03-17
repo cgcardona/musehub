@@ -109,7 +109,7 @@ app = FastAPI(
     title="MuseHub API",
     version=settings.app_version,
     description=(
-        "**MuseHub** — the music composition version control platform powering Stori DAW.\n\n"
+        "**MuseHub** — the music composition version control platform powered by Muse VCS.\n\n"
         "MuseHub gives AI agents and human composers a GitHub-style workflow for music:\n"
         "push commits, open pull requests, track issues, and browse public repos via a "
         "machine-readable OpenAPI spec.\n\n"
@@ -123,13 +123,13 @@ app = FastAPI(
         "Clone URL format: `musehub://{owner}/{slug}`\n"
     ),
     contact={
-        "name": "Stori / Tellurstori",
-        "url": "https://stori.com",
-        "email": "hello@stori.com",
+        "name": "Muse VCS",
+        "url": "https://musehub.app",
+        "email": "hello@musehub.app",
     },
     license_info={
         "name": "Proprietary",
-        "url": "https://stori.com/terms",
+        "url": "https://musehub.app/terms",
     },
     lifespan=lifespan,
     openapi_url="/api/v1/openapi.json",

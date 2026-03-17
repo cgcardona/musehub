@@ -1,7 +1,7 @@
 """Tests for Muse Hub repo settings page.
 
 Covers the new ``GET /musehub/ui/{owner}/{repo_slug}/settings`` endpoint
-implemented in ``maestro/api/routes/musehub/ui_settings.py``.
+implemented in ``musehub/api/routes/musehub/ui_settings.py``.
 
 Test matrix:
 - test_settings_page_returns_200 — happy-path HTML response

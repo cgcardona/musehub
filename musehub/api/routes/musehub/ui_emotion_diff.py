@@ -10,7 +10,7 @@ Endpoint summary:
                      server-rendered SVG radar charts, delta bar chart,
                      and CSS timeline bars.
     JSON (``?format=json`` or ``Accept: application/json``)
-         → raw :class:`~maestro.models.musehub_analysis.EmotionDiffResponse`.
+         → raw :class:`~musehub.models.musehub_analysis.EmotionDiffResponse`.
 
 Why a dedicated page instead of reusing the PR detail emotion widget:
   The PR detail page embeds the emotion radar as one panel among many. This
@@ -180,7 +180,7 @@ async def emotion_diff_page(
     Content negotiation:
     - HTML (default): SSR Jinja2 template with embedded SVGs.
     - JSON (``Accept: application/json`` or ``?format=json``):
-      returns the raw :class:`~maestro.models.musehub_analysis.EmotionDiffResponse`.
+      returns the raw :class:`~musehub.models.musehub_analysis.EmotionDiffResponse`.
 
     Returns 404 when:
     - The repo owner/slug is unknown.

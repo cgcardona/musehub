@@ -3,7 +3,7 @@
 Context
 -------
 PR #336 added Fernet envelope encryption to ``musehub_webhooks.secret`` via
-``maestro.services.musehub_webhook_crypto``.  Existing rows written before
+``musehub.services.musehub_webhook_crypto``.  Existing rows written before
 STORI_WEBHOOK_SECRET_KEY was set contain plaintext secrets.  When the key is
 first enabled in production, ``decrypt_secret()`` would normally raise a
 ValueError for those rows.  PR #347 added a transparent fallback, but the
@@ -22,7 +22,7 @@ Usage
 -----
 Run inside the container (bind mount makes this file available):
 
-    docker compose exec maestro python3 /app/scripts/migrate_webhook_secrets.py
+    docker compose exec muse python3 /app/scripts/migrate_webhook_secrets.py
 
 Requires STORI_WEBHOOK_SECRET_KEY to be set; exits with an error if absent.
 """

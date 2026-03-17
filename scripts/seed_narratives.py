@@ -19,7 +19,7 @@ Creates 5 interconnected stories that make demo data feel alive:
      25 debate (18 comments), Variation 29 PR with yuki requesting ornamentation.
 
 Run inside the container (after seed_musehub.py):
-  docker compose exec maestro python3 /app/scripts/seed_narratives.py
+  docker compose exec muse python3 /app/scripts/seed_narratives.py
 
 Idempotent: checks for the sentinel repo ID before inserting.
 Pass --force to wipe narrative data and re-insert.
@@ -459,8 +459,8 @@ async def _seed_chopin_coltrane(db: AsyncSession) -> None:
         parent_ids=[yuki_head, fatou_head],
         message=(
             "merge: resolve piano.mid conflict — quartal voicings + clave coexist\n\n"
-            "Co-authored-by: yuki <yuki@stori.music>\n"
-            "Co-authored-by: fatou <fatou@stori.music>\n\n"
+            "Co-authored-by: yuki <yuki@muse.app>\n"
+            "Co-authored-by: fatou <fatou@muse.app>\n\n"
             "Resolution: yuki's quartal voicings moved to octave above middle C, "
             "fatou's bass register kept below C3. No spectral overlap."
         ),

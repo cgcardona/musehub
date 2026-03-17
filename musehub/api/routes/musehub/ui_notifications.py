@@ -26,7 +26,7 @@ handler fetches and renders notification data server-side.  When absent, the
 page renders a login prompt.  The JSON path enforces auth directly because
 there is no HTML shell to fall back to.
 
-Auto-discovered by ``maestro.api.routes.musehub.__init__`` because this
+Auto-discovered by ``musehub.api.routes.musehub.__init__`` because this
 module exposes a ``router`` attribute.  No changes to ``__init__.py`` needed.
 """
 from __future__ import annotations

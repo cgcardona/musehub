@@ -66,7 +66,7 @@ class ProtocolInfoResponse(BaseModel):
 class ProtocolEventsResponse(BaseModel):
     """Response for ``GET /protocol/events.json``.
 
-    Full JSON Schema for every registered SSE event type. The Stori DAW
+    Full JSON Schema for every registered SSE event type. The Muse DAW
     frontend consumes this endpoint to auto-generate Swift ``Codable`` structs
     and to validate incoming SSE payloads at runtime.
 

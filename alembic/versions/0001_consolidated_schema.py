@@ -8,13 +8,13 @@ THIS IS THE ONLY MIGRATION. All new tables are folded in here during
 development. Do NOT create new migration files — add tables directly to
 upgrade() and their drops (in reverse order) to the top of downgrade().
 
-Single source-of-truth migration for Maestro. Creates:
+Single source-of-truth migration for Muse. Creates:
 
   Auth & usage
-  - maestro_users, maestro_usage_logs, maestro_access_tokens
+  - muse_users, muse_usage_logs, muse_access_tokens
 
   Conversations
-  - maestro_conversations, maestro_conversation_messages, maestro_message_actions
+  - muse_conversations, muse_conversation_messages, muse_message_actions
 
   Muse — DAW-level variation history
   - muse_variations, muse_phrases, muse_note_changes
@@ -49,7 +49,7 @@ Single source-of-truth migration for Maestro. Creates:
   - musehub_repos.settings (nullable JSON column for feature-flag settings)
 
 Fresh install:
-  docker compose exec maestro alembic upgrade head
+  docker compose exec muse alembic upgrade head
 """
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ depends_on = None
 def upgrade() -> None:
     # ── Users & auth ──────────────────────────────────────────────────────
     op.create_table(
-        "maestro_users",
+        "muse_users",
         sa.Column("id", sa.String(36), nullable=False),
         sa.Column("budget_cents", sa.Integer(), nullable=False, server_default="500"),
         sa.Column("budget_limit_cents", sa.Integer(), nullable=False, server_default="500"),
@@ -76,7 +76,7 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "maestro_usage_logs",
+        "muse_usage_logs",
         sa.Column("id", sa.String(36), nullable=False),
         sa.Column("user_id", sa.String(36), nullable=False),
         sa.Column("prompt", sa.Text(), nullable=True),
@@ -85,29 +85,29 @@ def upgrade() -> None:
         sa.Column("completion_tokens", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("cost_cents", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["user_id"], ["maestro_users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["muse_users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_maestro_usage_logs_user_id", "maestro_usage_logs", ["user_id"])
-    op.create_index("ix_maestro_usage_logs_created_at", "maestro_usage_logs", ["created_at"])
+    op.create_index("ix_muse_usage_logs_user_id", "muse_usage_logs", ["user_id"])
+    op.create_index("ix_muse_usage_logs_created_at", "muse_usage_logs", ["created_at"])
 
     op.create_table(
-        "maestro_access_tokens",
+        "muse_access_tokens",
         sa.Column("id", sa.String(36), nullable=False),
         sa.Column("user_id", sa.String(36), nullable=False),
         sa.Column("token_hash", sa.String(64), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["user_id"], ["maestro_users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["muse_users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_maestro_access_tokens_user_id", "maestro_access_tokens", ["user_id"])
-    op.create_index("ix_maestro_access_tokens_token_hash", "maestro_access_tokens", ["token_hash"], unique=True)
+    op.create_index("ix_muse_access_tokens_user_id", "muse_access_tokens", ["user_id"])
+    op.create_index("ix_muse_access_tokens_token_hash", "muse_access_tokens", ["token_hash"], unique=True)
 
     # ── Conversations ─────────────────────────────────────────────────────
     op.create_table(
-        "maestro_conversations",
+        "muse_conversations",
         sa.Column("id", sa.String(36), nullable=False),
         sa.Column("user_id", sa.String(36), nullable=False),
         sa.Column("project_id", sa.String(36), nullable=True),
@@ -116,16 +116,16 @@ def upgrade() -> None:
         sa.Column("project_context", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["user_id"], ["maestro_users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["muse_users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_maestro_conversations_user_id", "maestro_conversations", ["user_id"])
-    op.create_index("ix_maestro_conversations_project_id", "maestro_conversations", ["project_id"])
-    op.create_index("ix_maestro_conversations_is_archived", "maestro_conversations", ["is_archived"])
-    op.create_index("ix_maestro_conversations_updated_at", "maestro_conversations", ["updated_at"])
+    op.create_index("ix_muse_conversations_user_id", "muse_conversations", ["user_id"])
+    op.create_index("ix_muse_conversations_project_id", "muse_conversations", ["project_id"])
+    op.create_index("ix_muse_conversations_is_archived", "muse_conversations", ["is_archived"])
+    op.create_index("ix_muse_conversations_updated_at", "muse_conversations", ["updated_at"])
 
     op.create_table(
-        "maestro_conversation_messages",
+        "muse_conversation_messages",
         sa.Column("id", sa.String(36), nullable=False),
         sa.Column("conversation_id", sa.String(36), nullable=False),
         sa.Column("role", sa.String(20), nullable=False),
@@ -137,14 +137,14 @@ def upgrade() -> None:
         sa.Column("sse_events", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("extra_metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["conversation_id"], ["maestro_conversations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["conversation_id"], ["muse_conversations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_maestro_conversation_messages_conversation_id", "maestro_conversation_messages", ["conversation_id"])
-    op.create_index("ix_maestro_conversation_messages_timestamp", "maestro_conversation_messages", ["timestamp"])
+    op.create_index("ix_muse_conversation_messages_conversation_id", "muse_conversation_messages", ["conversation_id"])
+    op.create_index("ix_muse_conversation_messages_timestamp", "muse_conversation_messages", ["timestamp"])
 
     op.create_table(
-        "maestro_message_actions",
+        "muse_message_actions",
         sa.Column("id", sa.String(36), nullable=False),
         sa.Column("message_id", sa.String(36), nullable=False),
         sa.Column("action_type", sa.String(50), nullable=False),
@@ -153,10 +153,10 @@ def upgrade() -> None:
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("extra_metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["message_id"], ["maestro_conversation_messages.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["message_id"], ["muse_conversation_messages.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_maestro_message_actions_message_id", "maestro_message_actions", ["message_id"])
+    op.create_index("ix_muse_message_actions_message_id", "muse_message_actions", ["message_id"])
 
     # ── Muse VCS — DAW-level variation history ────────────────────────────
     op.create_table(
@@ -948,8 +948,8 @@ def upgrade() -> None:
         ),
         sa.Column("accepted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["repo_id"], ["musehub_repos.repo_id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["user_id"], ["maestro_users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["invited_by"], ["maestro_users.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["user_id"], ["muse_users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["invited_by"], ["muse_users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("repo_id", "user_id", name="uq_musehub_collaborators_repo_user"),
     )
@@ -973,7 +973,7 @@ def upgrade() -> None:
         ),
         sa.Column("applied_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["repo_id"], ["musehub_repos.repo_id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["user_id"], ["maestro_users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["muse_users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_musehub_stash_repo_id", "musehub_stash", ["repo_id"])
@@ -1228,22 +1228,22 @@ def downgrade() -> None:
     op.drop_table("muse_variations")
 
     # Conversations
-    op.drop_index("ix_maestro_message_actions_message_id", table_name="maestro_message_actions")
-    op.drop_table("maestro_message_actions")
-    op.drop_index("ix_maestro_conversation_messages_timestamp", table_name="maestro_conversation_messages")
-    op.drop_index("ix_maestro_conversation_messages_conversation_id", table_name="maestro_conversation_messages")
-    op.drop_table("maestro_conversation_messages")
-    op.drop_index("ix_maestro_conversations_updated_at", table_name="maestro_conversations")
-    op.drop_index("ix_maestro_conversations_is_archived", table_name="maestro_conversations")
-    op.drop_index("ix_maestro_conversations_project_id", table_name="maestro_conversations")
-    op.drop_index("ix_maestro_conversations_user_id", table_name="maestro_conversations")
-    op.drop_table("maestro_conversations")
+    op.drop_index("ix_muse_message_actions_message_id", table_name="muse_message_actions")
+    op.drop_table("muse_message_actions")
+    op.drop_index("ix_muse_conversation_messages_timestamp", table_name="muse_conversation_messages")
+    op.drop_index("ix_muse_conversation_messages_conversation_id", table_name="muse_conversation_messages")
+    op.drop_table("muse_conversation_messages")
+    op.drop_index("ix_muse_conversations_updated_at", table_name="muse_conversations")
+    op.drop_index("ix_muse_conversations_is_archived", table_name="muse_conversations")
+    op.drop_index("ix_muse_conversations_project_id", table_name="muse_conversations")
+    op.drop_index("ix_muse_conversations_user_id", table_name="muse_conversations")
+    op.drop_table("muse_conversations")
 
     # Auth & usage
-    op.drop_index("ix_maestro_access_tokens_token_hash", table_name="maestro_access_tokens")
-    op.drop_index("ix_maestro_access_tokens_user_id", table_name="maestro_access_tokens")
-    op.drop_table("maestro_access_tokens")
-    op.drop_index("ix_maestro_usage_logs_created_at", table_name="maestro_usage_logs")
-    op.drop_index("ix_maestro_usage_logs_user_id", table_name="maestro_usage_logs")
-    op.drop_table("maestro_usage_logs")
-    op.drop_table("maestro_users")
+    op.drop_index("ix_muse_access_tokens_token_hash", table_name="muse_access_tokens")
+    op.drop_index("ix_muse_access_tokens_user_id", table_name="muse_access_tokens")
+    op.drop_table("muse_access_tokens")
+    op.drop_index("ix_muse_usage_logs_created_at", table_name="muse_usage_logs")
+    op.drop_index("ix_muse_usage_logs_user_id", table_name="muse_usage_logs")
+    op.drop_table("muse_usage_logs")
+    op.drop_table("muse_users")

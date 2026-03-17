@@ -29,7 +29,7 @@ from musehub.db.musehub_models import (
     MusehubObject,
     MusehubRepo,
 )
-from musehub.mcp.server import MaestroMCPServer, ToolCallResult
+from musehub.mcp.server import MuseMCPServer, ToolCallResult
 from musehub.mcp.tools import MCP_TOOLS, MUSEHUB_TOOL_NAMES, TOOL_CATEGORIES
 from musehub.mcp.tools.musehub import MUSEHUB_TOOLS
 from musehub.services import musehub_mcp_executor as executor
@@ -510,14 +510,14 @@ class TestMusehubMcpServerRouting:
     """Verify that the MCP server correctly routes musehub_* calls."""
 
     @pytest.fixture
-    def server(self) -> MaestroMCPServer:
+    def server(self) -> MuseMCPServer:
         with patch("musehub.config.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(app_version="0.0.0-test")
-            return MaestroMCPServer()
+            return MuseMCPServer()
 
     @pytest.mark.anyio
     async def test_musehub_browse_repo_routed_to_executor(
-        self, server: MaestroMCPServer
+        self, server: MuseMCPServer
     ) -> None:
         """call_tool routes musehub_browse_repo to the MuseHub executor."""
         mock_result = MusehubToolResult(
@@ -538,7 +538,7 @@ class TestMusehubMcpServerRouting:
 
     @pytest.mark.anyio
     async def test_musehub_tool_not_found_returns_error(
-        self, server: MaestroMCPServer
+        self, server: MuseMCPServer
     ) -> None:
         """musehub_browse_repo propagates not_found as an error response."""
         mock_result = MusehubToolResult(
@@ -560,7 +560,7 @@ class TestMusehubMcpServerRouting:
 
     @pytest.mark.anyio
     async def test_musehub_invalid_dimension_is_bad_request(
-        self, server: MaestroMCPServer
+        self, server: MuseMCPServer
     ) -> None:
         """invalid_dimension error is surfaced as bad_request=True."""
         mock_result = MusehubToolResult(
@@ -581,7 +581,7 @@ class TestMusehubMcpServerRouting:
 
     @pytest.mark.anyio
     async def test_musehub_browse_repo_db_unavailable_returns_error(
-        self, server: MaestroMCPServer
+        self, server: MuseMCPServer
     ) -> None:
         """musehub tools return db_unavailable when session factory is not initialised."""
         mock_result = MusehubToolResult(
@@ -604,7 +604,7 @@ class TestMusehubMcpServerRouting:
 
     @pytest.mark.anyio
     async def test_musehub_get_context_response_is_json(
-        self, server: MaestroMCPServer
+        self, server: MuseMCPServer
     ) -> None:
         """musehub_get_context response content is valid JSON."""
         mock_result = MusehubToolResult(

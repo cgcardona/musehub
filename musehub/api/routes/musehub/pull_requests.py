@@ -16,7 +16,7 @@ Endpoint summary:
 All endpoints require a valid JWT Bearer token (except diff which accepts anonymous reads
 of public repos, matching the same visibility rules as get_pull_request).
 No business logic lives here — all persistence is delegated to
-maestro.services.musehub_pull_requests.
+musehub.services.musehub_pull_requests.
 """
 from __future__ import annotations
 

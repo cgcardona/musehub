@@ -1042,7 +1042,7 @@ async function sendCompose() {
   stream.textContent = '';
 
   try {
-    const res = await fetch('/api/v1/maestro/stream', {
+    const res = await fetch('/api/v1/muse/stream', {
       method: 'POST',
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1267,7 +1267,7 @@ loadComments();
     </div>
     <div style="padding:var(--space-4)">
       <p class="text-sm text-muted" style="margin-bottom:var(--space-3)">
-        Describe what you want Maestro to compose, using this commit as musical context.
+        Describe what you want Muse to compose, using this commit as musical context.
         The AI will reason about the current key, tempo, and tracks.
       </p>
       <div class="form-group">

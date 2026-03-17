@@ -51,7 +51,7 @@ class MusehubStash(Base):
     )
     user_id: Mapped[str] = mapped_column(
         String(36),
-        ForeignKey("maestro_users.id", ondelete="CASCADE"),
+        ForeignKey("muse_users.id", ondelete="CASCADE"),
         nullable=False,
     )
     branch: Mapped[str] = mapped_column(String(255), nullable=False)

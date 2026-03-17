@@ -1727,7 +1727,7 @@ async def test_patch_repo_settings_updates_fields(
             "visibility": "public",
             "hasIssues": False,
             "allowRebaseMerge": True,
-            "homepageUrl": "https://stori.com",
+            "homepageUrl": "https://muse.app",
             "topics": ["classical", "baroque"],
         },
         headers=auth_headers,
@@ -1738,7 +1738,7 @@ async def test_patch_repo_settings_updates_fields(
     assert body["visibility"] == "public"
     assert body["hasIssues"] is False
     assert body["allowRebaseMerge"] is True
-    assert body["homepageUrl"] == "https://stori.com"
+    assert body["homepageUrl"] == "https://muse.app"
     assert body["topics"] == ["classical", "baroque"]
     # Untouched field should retain its default
     assert body["allowMergeCommit"] is True

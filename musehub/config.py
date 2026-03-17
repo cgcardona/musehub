@@ -1,7 +1,7 @@
 """
-Maestro Configuration
+Muse Configuration
 
-Environment-based configuration for the Maestro service.
+Environment-based configuration for the Muse service.
 """
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def _app_version_from_package() -> str:
     """Read version from the single source of truth (pyproject.toml via protocol.version)."""
-    from musehub.protocol.version import MAESTRO_VERSION
-    return MAESTRO_VERSION
+    from musehub.protocol.version import MUSE_VERSION
+    return MUSE_VERSION
 
 
-# Models shown in the Maestro model picker.
+# Models shown in the Muse model picker.
 # Update this list when new versions ship; slugs must match OpenRouter IDs exactly.
 # Sorted cheapest-first by convention; the endpoint re-sorts by cost anyway.
 ALLOWED_MODEL_IDS: list[str] = [
@@ -62,7 +62,7 @@ APPROVED_MODELS: dict[str, dict[str, str | float]] = {
 
 
 # Context window sizes (input token capacity) per supported model.
-# Maestro only supports the two models listed in ALLOWED_MODEL_IDS; anything else
+# Muse only supports the two models listed in ALLOWED_MODEL_IDS; anything else
 # returns 0 so the frontend leaves the context-usage ring at its previous value.
 CONTEXT_WINDOW_TOKENS: dict[str, int] = {
     "anthropic/claude-sonnet-4.6": 200_000,
@@ -75,8 +75,8 @@ def get_context_window_tokens(model: str) -> int:
     return CONTEXT_WINDOW_TOKENS.get(model, 0)
 
 
-# Single source of truth for default tempo (BPM). Referenced by the executor,
-# Storpheus client, request models, and planner so they all agree.
+    # Single source of truth for default tempo (BPM). Referenced by the executor,
+    # generation client, request models, and planner so they all agree.
 DEFAULT_TEMPO: int = 120
 
 
@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Service Info (app_version: single source is pyproject.toml when installed; else fallback)
-    app_name: str = "Maestro"
+    app_name: str = "Muse"
     app_version: str = _app_version_from_package()
     debug: bool = False
     
@@ -93,8 +93,8 @@ class Settings(BaseSettings):
     port: int = 10001
     
     # Database Configuration
-    # PostgreSQL: postgresql+asyncpg://user:pass@localhost:5432/maestro
-    # SQLite (dev): sqlite+aiosqlite:///./maestro.db
+    # PostgreSQL: postgresql+asyncpg://user:pass@localhost:5432/muse
+    # SQLite (dev): sqlite+aiosqlite:///./muse.db
     database_url: str | None = None
     db_password: str | None = None # PostgreSQL password
     
@@ -134,9 +134,9 @@ class Settings(BaseSettings):
     hf_api_key: str | None = None # HuggingFace API key
     hf_timeout: int = 120 # seconds (HF can be slow on cold starts)
     
-    # Maestro Service Configuration
-    maestro_host: str = "0.0.0.0"
-    maestro_port: int = 10001
+    # Muse Service Configuration
+    muse_host: str = "0.0.0.0"
+    muse_port: int = 10001
     
     # LLM Parameters
     llm_temperature: float = 0.7
@@ -148,7 +148,7 @@ class Settings(BaseSettings):
     orchestration_temperature: float = 0.1 # Low temp for deterministic tool selection
     composition_max_tokens: int = 32768 # Higher token budget for GENERATE_MUSIC in EDITING mode
     composition_reasoning_fraction: float = 0.08 # Keep reasoning tight for tool-calling; ~2,600 tokens on 32K budget
-    agent_reasoning_fraction: float = 0.05 # Minimal reasoning — agents execute a fixed pipeline; Storpheus handles musical decisions
+    agent_reasoning_fraction: float = 0.05 # Minimal reasoning — agents execute a fixed pipeline; the generation service handles musical decisions
 
     # Agent watchdog timeouts (seconds) — prevents orphaned subagents
     section_child_timeout: int = 300 # 5 min per section child (region + generate + optional refinement)
@@ -156,8 +156,8 @@ class Settings(BaseSettings):
     bass_signal_wait_timeout: int = 240 # 4 min waiting for drum section signal before giving up
     
     # CORS Settings (fail closed: no default origins)
-    # set CORS_ORIGINS (JSON array) in .env. Local dev: ["http://localhost:5173", "stori://"].
-    # Production: exact origins only, e.g. ["https://your-domain.com", "stori://"]. Never use "*" in production.
+    # set CORS_ORIGINS (JSON array) in .env. Local dev: ["http://localhost:5173", "muse://"].
+    # Production: exact origins only, e.g. ["https://your-domain.com", "muse://"]. Never use "*" in production.
     cors_origins: list[str] = []
 
     @model_validator(mode="after")
@@ -180,8 +180,8 @@ class Settings(BaseSettings):
     # AWS S3 Asset Delivery (drum kits, GM soundfont)
     # Region MUST match the bucket's region (S3 returns 301 if URL uses wrong region).
     # Override with AWS_REGION if your bucket is in a different region.
-    aws_region: str = "eu-west-1" # stori-assets bucket region; set AWS_REGION if different
-    aws_s3_asset_bucket: str | None = None # e.g. stori-assets
+    aws_region: str = "eu-west-1" # set AWS_REGION if your bucket is in a different region
+    aws_s3_asset_bucket: str | None = None # e.g. muse-assets
     aws_cloudfront_domain: str | None = None # e.g. assets.example.com (optional)
     presign_expiry_seconds: int = 1800 # 30 min default for presigned download URLs (leaked URLs die faster)
     
@@ -190,9 +190,9 @@ class Settings(BaseSettings):
     asset_rate_limit_per_device: str = "30/minute"
     asset_rate_limit_per_ip: str = "120/minute"
 
-    # Stdio MCP server: proxy DAW tools to Maestro backend (so Cursor sees the same DAW as the app)
+    # Stdio MCP server: proxy DAW tools to Muse backend (so Cursor sees the same DAW as the app)
     # When set, stdio server forwards DAW tool calls to this URL with the token; backend has the WebSocket.
-    maestro_mcp_url: str | None = None # e.g. http://localhost:10001
+    muse_mcp_url: str | None = None # e.g. http://localhost:10001
     mcp_token: str | None = None # JWT for Authorization: Bearer when proxying
 
     # Muse Hub object storage — binary artifacts (MIDI, MP3, WebP) written here as

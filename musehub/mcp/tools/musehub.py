@@ -8,7 +8,7 @@ Every tool in this module is ``server_side: True``. The MCP server routes
 them to ``musehub_mcp_executor`` rather than forwarding them to the DAW.
 
 Naming convention: ``musehub_<verb>_<noun>`` — distinct from DAW tools
-which use the ``stori_`` prefix.
+which use the ``muse_`` prefix.
 """
 from __future__ import annotations
 

@@ -64,7 +64,7 @@ _MAX_WIDTH = 1200
 _MAX_HEIGHT = 400
 
 _PROVIDER_NAME = "MuseHub"
-_PROVIDER_URL = "https://musehub.stori.app"
+_PROVIDER_URL = "https://musehub.app"
 
 # Functional TypedDict form required because field names contain colons (e.g. "musehub:key"),
 # which are not valid Python identifiers for the class-based TypedDict syntax.

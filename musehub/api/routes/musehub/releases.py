@@ -17,7 +17,7 @@ per repo — POSTing a duplicate tag returns 409 Conflict.
 Write endpoints require a valid JWT Bearer token.
 Read endpoints use optional auth — visibility is gated by repo visibility.
 No business logic lives here — all persistence is delegated to
-``maestro.services.musehub_releases``.
+``musehub.services.musehub_releases``.
 """
 from __future__ import annotations
 

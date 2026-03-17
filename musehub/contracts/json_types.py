@@ -1,7 +1,7 @@
 """Canonical type definitions for JSON data and music-domain dicts.
 
 This module is the **single source of truth for every named data shape** in
-Maestro. Import from here; do not redefine shapes ad hoc.
+Muse. Import from here; do not redefine shapes ad hoc.
 
 ## When to use which type
 
@@ -286,7 +286,7 @@ class ToolCallDict(TypedDict):
     """Shape of a collected tool call dict in CompleteEvent.tool_calls.
 
     Every producer (editing handler, composing coordinator, agent teams)
-    writes exactly ``{"tool": "stori_xxx", "params": {...}}``.
+    writes exactly ``{"tool": "muse_xxx", "params": {...}}``.
 
     ``params`` is ``dict[str, JSONValue]`` — LLM-generated arguments are
     JSON values and must be narrowed before dereferencing.

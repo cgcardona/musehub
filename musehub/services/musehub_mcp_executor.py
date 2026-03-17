@@ -12,12 +12,12 @@ Design contract
 - ``MusehubToolResult.ok`` distinguishes success from failure.
 - ``MusehubToolResult.error_code`` is one of: ``"not_found"``,
   ``"invalid_dimension"``, ``"invalid_mode"``, ``"db_unavailable"``.
-- Callers (``MaestroMCPServer._execute_musehub_tool``) pattern-match on
+- Callers (``MuseMCPServer._execute_musehub_tool``) pattern-match on
   these codes to build appropriate ``MCPContentBlock`` responses.
 - This module must NOT import MCP protocol types — it is pure service layer.
 
 ``AsyncSessionLocal`` is imported at module level so tests can patch it as
-``maestro.services.musehub_mcp_executor.AsyncSessionLocal``.
+``musehub.services.musehub_mcp_executor.AsyncSessionLocal``.
 """
 from __future__ import annotations
 

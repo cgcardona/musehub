@@ -1,11 +1,11 @@
 """SQLAlchemy ORM models for the Muse CLI commit tables.
 
-These models are retained in Maestro because MuseHub reads from
+These models are retained in Muse because MuseHub reads from
 muse_commits / muse_snapshots / muse_tags / muse_objects to display
 repository history.
 
 TODO(musehub-extraction): move these models into the MuseHub repo
-once MuseHub is extracted from Maestro.
+once MuseHub is extracted from Muse.
 """
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Maestro version — single source of truth is pyproject.toml.
+"""Muse version — single source of truth is pyproject.toml.
 
 All version references (app, protocol, MCP server) read from here.
 """
@@ -24,13 +24,15 @@ def _read_version() -> str:
     return "0.0.0-unknown"
 
 
-MAESTRO_VERSION: str = _read_version()
+MUSE_VERSION: str = _read_version()
 
+# Back-compat alias — remove once all callers are updated.
+MAESTRO_VERSION = MUSE_VERSION
 
-_version_parts = MAESTRO_VERSION.split(".")
-MAESTRO_VERSION_MAJOR: int = int(_version_parts[0]) if len(_version_parts) > 0 else 0
-MAESTRO_VERSION_MINOR: int = int(_version_parts[1]) if len(_version_parts) > 1 else 0
-MAESTRO_VERSION_PATCH: int = int(_version_parts[2].split("-")[0]) if len(_version_parts) > 2 else 0
+_version_parts = MUSE_VERSION.split(".")
+MUSE_VERSION_MAJOR: int = int(_version_parts[0]) if len(_version_parts) > 0 else 0
+MUSE_VERSION_MINOR: int = int(_version_parts[1]) if len(_version_parts) > 1 else 0
+MUSE_VERSION_PATCH: int = int(_version_parts[2].split("-")[0]) if len(_version_parts) > 2 else 0
 
 
 def is_compatible(client_version: str) -> bool:
@@ -38,6 +40,6 @@ def is_compatible(client_version: str) -> bool:
     try:
         parts = client_version.split(".")
         client_major = int(parts[0])
-        return client_major == MAESTRO_VERSION_MAJOR
+        return client_major == MUSE_VERSION_MAJOR
     except (ValueError, IndexError):
         return False

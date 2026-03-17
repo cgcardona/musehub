@@ -32,7 +32,7 @@ const base   = {{ base_url | tojson }};
  * 5. History Summary card — head commit metadata + ancestor list
  * 6. Raw JSON card — collapsible, copyable
  * 7. Compose modal — same pattern as commit.html; streams via
- *    POST /api/v1/maestro/stream
+ *    POST /api/v1/muse/stream
  */
 
 // ── Role → colour mapping ────────────────────────────────────────────────
@@ -131,7 +131,7 @@ async function sendCompose() {
   stream.textContent = '';
 
   try {
-    const res = await fetch('/api/v1/maestro/stream', {
+    const res = await fetch('/api/v1/muse/stream', {
       method: 'POST',
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -367,7 +367,7 @@ load();
     </div>
     <div style="padding:var(--space-4)">
       <p class="text-sm text-muted" style="margin-bottom:var(--space-3)">
-        Describe what you want Maestro to compose. The suggestion text is pre-filled —
+        Describe what you want Muse to compose. The suggestion text is pre-filled —
         edit it or add more detail before generating.
       </p>
       <div class="form-group">

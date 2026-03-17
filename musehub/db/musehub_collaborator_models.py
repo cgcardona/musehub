@@ -46,14 +46,14 @@ class MusehubCollaborator(Base):
     )
     user_id: Mapped[str] = mapped_column(
         String(36),
-        ForeignKey("maestro_users.id", ondelete="CASCADE"),
+        ForeignKey("muse_users.id", ondelete="CASCADE"),
         nullable=False,
     )
     # Permission level: "read" | "write" | "admin"
     permission: Mapped[str] = mapped_column(String(20), nullable=False, default="write")
     invited_by: Mapped[str | None] = mapped_column(
         String(36),
-        ForeignKey("maestro_users.id", ondelete="SET NULL"),
+        ForeignKey("muse_users.id", ondelete="SET NULL"),
         nullable=True,
     )
     invited_at: Mapped[datetime] = mapped_column(

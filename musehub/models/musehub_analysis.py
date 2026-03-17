@@ -14,7 +14,7 @@ aggregate endpoint returns :class:`AggregateAnalysisResponse` containing
 one ``AnalysisResponse`` per dimension.
 
 Design contract:
-- CamelCase on the wire (via :class:`~maestro.models.base.CamelModel`).
+- CamelCase on the wire (via :class:`~musehub.models.base.CamelModel`).
 - All float fields are rounded to 4 decimal places in the service layer.
 - Stub data is deterministic for a given ``ref`` value.
 - ``filters_applied`` records which query-param filters were active so
@@ -1138,7 +1138,7 @@ class DivergenceResult(CamelModel):
 class ContextResult(CamelModel):
     """Server-side payload for the context page.
 
-    Aggregates summary text, Maestro suggestions, and a list of musically
+    Aggregates summary text, Muse suggestions, and a list of musically
     absent elements for the given commit ref.  Consumed by
     ``pages/analysis/context.html``.
     """
@@ -1150,5 +1150,5 @@ class ContextResult(CamelModel):
     )
     suggestions: dict[str, str] = Field(
         default_factory=dict,
-        description="Keyed Maestro composition suggestions (key=short label, value=instruction text)",
+        description="Keyed Muse composition suggestions (key=short label, value=instruction text)",
     )

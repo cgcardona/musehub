@@ -11,9 +11,9 @@ All feed endpoints are restricted to **public** repos only. Private repos return
 without credentials — adding auth would break standard feed readers.
 
 No business logic lives here. Persistence is delegated to:
-  - maestro.services.musehub_repository (commits)
-  - maestro.services.musehub_releases (releases)
-  - maestro.services.musehub_issues (issues)
+  - musehub.services.musehub_repository (commits)
+  - musehub.services.musehub_releases (releases)
+  - musehub.services.musehub_issues (issues)
 """
 from __future__ import annotations
 

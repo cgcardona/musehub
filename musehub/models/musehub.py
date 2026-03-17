@@ -43,7 +43,7 @@ class CommitInput(CamelModel):
     author: str | None = Field(
         default=None,
         description="Commit author identifier; defaults to the JWT sub claim when absent",
-        examples=["composer@stori.com"],
+        examples=["composer@muse.app"],
     )
 
 
@@ -189,7 +189,7 @@ class RepoResponse(CamelModel):
     slug: str = Field(..., description="URL-safe slug auto-generated from name", examples=["jazz-standards-2024"])
     visibility: str = Field(..., description="'public' or 'private'", examples=["public"])
     owner_user_id: str = Field(..., description="UUID of the owning user account")
-    clone_url: str = Field(..., description="URL used by the CLI for push/pull", examples=["https://musehub.stori.com/api/v1/musehub/repos/e3b0c44298fc"])
+    clone_url: str = Field(..., description="URL used by the CLI for push/pull", examples=["https://musehub.app/api/v1/musehub/repos/e3b0c44298fc"])
     description: str = Field("", description="Short description shown on the explore page", examples=["Classic jazz standards arranged for quartet"])
     tags: list[str] = Field(default_factory=list, description="Free-form tags (genre, key, instrumentation)", examples=[["jazz", "F# minor", "bass"]])
     key_signature: str | None = Field(None, description="Musical key (e.g. 'C major', 'F# minor')", examples=["F# minor"])
@@ -237,7 +237,7 @@ class CommitResponse(CamelModel):
         description="Musical commit message",
         examples=["Increase tempo from 120→132 BPM in the chorus for more energy"],
     )
-    author: str = Field(..., description="Commit author identifier", examples=["composer@stori.com"])
+    author: str = Field(..., description="Commit author identifier", examples=["composer@muse.app"])
     timestamp: datetime = Field(..., description="Commit creation time (ISO-8601 UTC)")
     snapshot_id: str | None = Field(default=None, description="Optional snapshot artifact ID")
 
@@ -939,7 +939,7 @@ class ReleaseAssetCreate(CamelModel):
 
     ``name`` is the filename shown in the UI (e.g. "summer-v1.0.mid").
     ``download_url`` is the pre-signed or CDN URL from which clients
-    download the artifact; Maestro stores it verbatim.
+    download the artifact; Muse stores it verbatim.
     """
 
     name: str = Field(
@@ -1169,7 +1169,7 @@ class TimelineResponse(CamelModel):
 class DivergenceDimensionResponse(CamelModel):
     """Wire representation of divergence scores for a single musical dimension.
 
-    Mirrors :class:`maestro.services.musehub_divergence.MuseHubDimensionDivergence`
+    Mirrors :class:`musehub.services.musehub_divergence.MuseHubDimensionDivergence`
     for JSON serialization. AI agents consume this to decide which dimension
     of a branch needs creative attention before merging.
     """

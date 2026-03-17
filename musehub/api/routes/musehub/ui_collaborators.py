@@ -24,7 +24,7 @@ to replace the collaborator list fragment without a full page reload.
 JSON alternate
 --------------
 ``?format=json`` or ``Accept: application/json`` returns
-:class:`~maestro.api.routes.musehub.collaborators.CollaboratorListResponse`
+:class:`~musehub.api.routes.musehub.collaborators.CollaboratorListResponse`
 populated from the database, suitable for agent consumption.
 
 Endpoint summary:

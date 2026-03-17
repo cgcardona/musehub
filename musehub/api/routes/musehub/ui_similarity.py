@@ -8,7 +8,7 @@ Endpoint summary:
     refs encodes ``base...head`` (same convention as the compare page).
     HTML (default) → interactive similarity report with server-side SVG radar chart.
     JSON (``?format=json`` or ``Accept: application/json``)
-         → raw :class:`~maestro.models.musehub_analysis.RefSimilarityResponse`.
+         → raw :class:`~musehub.models.musehub_analysis.RefSimilarityResponse`.
 
 Why a dedicated page instead of reusing compare:
   The compare page shows *divergence* (how much changed). This page shows
@@ -191,7 +191,7 @@ async def similarity_page(
     Content negotiation:
     - HTML (default): SSR Jinja2 template with embedded SVG radar.
     - JSON (``Accept: application/json`` or ``?format=json``):
-      returns the full :class:`~maestro.models.musehub_analysis.RefSimilarityResponse`.
+      returns the full :class:`~musehub.models.musehub_analysis.RefSimilarityResponse`.
 
     Returns 404 when:
     - The repo owner/slug is unknown.

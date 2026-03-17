@@ -14,7 +14,7 @@
      Emits a <link> tag pointing to the oEmbed endpoint for the current URL.
      Individual pages may override this block to supply a more specific ref. #}
   {% block oembed_link %}<link rel="alternate" type="application/json+oembed"
-       href="https://musehub.stori.app/musehub/oembed?url={{ request.url | urlencode }}"
+       href="https://musehub.app/musehub/oembed?url={{ request.url | urlencode }}"
        title="MuseHub oEmbed">{% endblock %}
   {% block extra_css %}{% endblock %}
   {% block jsonld %}{% endblock %}
@@ -71,7 +71,7 @@
   <div class="container{% block container_extra_class %}{% endblock %}" hx-boost="true"{% block container_attrs %}{% endblock %}>
     {% block token_form %}
     <div class="token-form" id="token-form" style="display:none">
-      <p id="token-msg">Enter your Maestro JWT to browse this repo.</p>
+      <p id="token-msg">Enter your Muse JWT to browse this repo.</p>
       <input type="password" id="token-input" placeholder="eyJ..." />
       <button class="btn btn-primary" onclick="saveToken()">Save &amp; Load</button>
       &nbsp;

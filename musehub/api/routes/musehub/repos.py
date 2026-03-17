@@ -20,8 +20,8 @@ Endpoint summary:
 
 All endpoints require a valid JWT Bearer token.
 No business logic lives here — all persistence is delegated to
-maestro.services.musehub_repository, maestro.services.musehub_credits,
-and maestro.services.musehub_context.
+musehub.services.musehub_repository, musehub.services.musehub_credits,
+and musehub.services.musehub_context.
 """
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Tests for maestro.api.routes.musehub.htmx_helpers.
+"""Tests for musehub.api.routes.musehub.htmx_helpers.
 
 Covers HX-Request detection, HX-Boosted detection, fragment/full routing,
 HX-Trigger header emission, and HX-Redirect response generation.

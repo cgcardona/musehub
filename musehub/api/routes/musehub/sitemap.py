@@ -7,7 +7,7 @@ Endpoint summary:
 These endpoints live at the top level (no /api/v1 prefix) so standard crawlers
 and search engines find them at the expected paths.
 
-Registration: registered in ``maestro.main`` directly:
+Registration: registered in ``musehub.main`` directly:
   app.include_router(sitemap_routes.router, tags=["musehub-sitemap"])
 NOT via the musehub __init__.py auto-discovery (these are not /musehub/ sub-paths).
 
@@ -136,7 +136,7 @@ async def _fetch_sitemap_entries(
 
     Args:
         session: Async SQLAlchemy session.
-        base_url: Scheme + host of the server (e.g. ``https://musehub.stori.app``),
+        base_url: Scheme + host of the server (e.g. ``https://musehub.app``),
                   used as the URL prefix for all sitemap loc entries.
 
     Returns:

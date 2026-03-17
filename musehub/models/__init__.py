@@ -1,9 +1,9 @@
-"""Pydantic models for the Maestro API."""
+"""Pydantic models for the Muse API."""
 from __future__ import annotations
 
-from musehub.models.requests import MaestroRequest, GenerateRequest
+from musehub.models.requests import MuseRequest, GenerateRequest
 from musehub.models.responses import (
-    MaestroResponse,
+    MuseResponse,
     SSEMessage,
     SSEStatus,
     SSEReasoning,
@@ -17,9 +17,16 @@ from musehub.models.tools import (
     AutomationPoint,
 )
 
+# Back-compat aliases — remove once all callers are updated.
+MaestroRequest = MuseRequest
+MaestroResponse = MuseResponse
+
 __all__ = [
-    "MaestroRequest",
+    "MuseRequest",
     "GenerateRequest",
+    "MuseResponse",
+    # Back-compat aliases
+    "MaestroRequest",
     "MaestroResponse",
     "SSEMessage",
     "SSEStatus",

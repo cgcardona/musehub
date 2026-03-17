@@ -49,7 +49,7 @@ def _piano_roll_url(path: str, object_map: dict[str, str], repo_id: str) -> str 
 
     Looks for an image file (e.g. ``.webp``) whose basename (without extension)
     matches the audio file's basename — a naming convention produced by the
-    Stori DAW when exporting piano-roll snapshots alongside audio stems.
+    Muse DAW when exporting piano-roll snapshots alongside audio stems.
     """
     stem = os.path.splitext(os.path.basename(path))[0]
     for obj_path, obj_id in object_map.items():

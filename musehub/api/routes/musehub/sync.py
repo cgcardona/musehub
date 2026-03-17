@@ -5,7 +5,7 @@ Endpoint summary:
   POST /musehub/repos/{repo_id}/pull — fetch missing commits and objects
 
 Both endpoints require a valid JWT Bearer token. No business logic lives
-here — all persistence is delegated to maestro.services.musehub_sync.
+here — all persistence is delegated to musehub.services.musehub_sync.
 
 After a successful push, embeddings are computed for the new commits and
 upserted to Qdrant as a BackgroundTask — the response is returned

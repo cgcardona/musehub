@@ -45,7 +45,7 @@ class CompositionContext(TypedDict, total=False):
     """Contextual data threaded through generator tool calls.
 
     Carries resolved intent signals (emotion, quality, section continuity)
-    that backends consume when executing ``stori_generate_midi``.
+    that backends consume when executing ``muse_generate_midi``.
     All fields are optional — callers populate only what they know.
     """
 

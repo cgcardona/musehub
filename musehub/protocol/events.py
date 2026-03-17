@@ -1,6 +1,6 @@
-"""Maestro Protocol event models — single source of truth for SSE wire format.
+"""Muse Protocol event models — single source of truth for SSE wire format.
 
-Every SSE event the backend emits is an instance of a MaestroEvent subclass.
+Every SSE event the backend emits is an instance of a MuseEvent subclass.
 Raw dicts are forbidden. The emitter validates and serializes through these
 models, guaranteeing wire-format consistency.
 
@@ -33,7 +33,7 @@ from musehub.contracts.json_types import (
 )
 from musehub.contracts.pydantic_types import PydanticJson
 from musehub.models.base import CamelModel
-from musehub.protocol.version import MAESTRO_VERSION
+from musehub.protocol.version import MUSE_VERSION
 
 
 class ToolCallWire(CamelModel):
@@ -77,7 +77,7 @@ class ToolCallWire(CamelModel):
         return cls(tool=tc["tool"], params=wrap_dict(tc["params"]))
 
 
-class MaestroEvent(CamelModel):
+class MuseEvent(CamelModel):
     """Base class for all SSE events.
 
     ``seq`` and ``protocol_version`` are injected by the emitter, not
@@ -89,7 +89,11 @@ class MaestroEvent(CamelModel):
 
     type: str
     seq: int = -1
-    protocol_version: str = MAESTRO_VERSION
+    protocol_version: str = MUSE_VERSION
+
+
+# Back-compat alias — remove once all callers are updated.
+MaestroEvent = MuseEvent
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -97,7 +101,7 @@ class MaestroEvent(CamelModel):
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class StateEvent(MaestroEvent):
+class StateEvent(MuseEvent):
     """Intent classification result. Always seq=0."""
 
     type: Literal["state"] = "state"
@@ -108,7 +112,7 @@ class StateEvent(MaestroEvent):
     execution_mode: Literal["variation", "apply", "reasoning"] = "apply"
 
 
-class ReasoningEvent(MaestroEvent):
+class ReasoningEvent(MuseEvent):
     """Sanitized analysis summary for the user.
 
     Carries user-safe musical reasoning produced by ReasoningBuffer +
@@ -122,7 +126,7 @@ class ReasoningEvent(MaestroEvent):
     section_name: str | None = None
 
 
-class ReasoningEndEvent(MaestroEvent):
+class ReasoningEndEvent(MuseEvent):
     """Marks end of a reasoning stream for an agent."""
 
     type: Literal["reasoningEnd"] = "reasoningEnd"
@@ -130,14 +134,14 @@ class ReasoningEndEvent(MaestroEvent):
     section_name: str | None = None
 
 
-class ContentEvent(MaestroEvent):
+class ContentEvent(MuseEvent):
     """User-facing text response (incremental)."""
 
     type: Literal["content"] = "content"
     content: str
 
 
-class StatusEvent(MaestroEvent):
+class StatusEvent(MuseEvent):
     """Human-readable status message."""
 
     type: Literal["status"] = "status"
@@ -146,7 +150,7 @@ class StatusEvent(MaestroEvent):
     section_name: str | None = None
 
 
-class ErrorEvent(MaestroEvent):
+class ErrorEvent(MuseEvent):
     """Error message (may be followed by CompleteEvent)."""
 
     type: Literal["error"] = "error"
@@ -155,7 +159,7 @@ class ErrorEvent(MaestroEvent):
     code: str | None = None
 
 
-class CompleteEvent(MaestroEvent):
+class CompleteEvent(MuseEvent):
     """Stream termination. ALWAYS the final event."""
 
     type: Literal["complete"] = "complete"
@@ -197,7 +201,7 @@ class PlanStepSchema(CamelModel):
     phase: str = "composition"
 
 
-class PlanEvent(MaestroEvent):
+class PlanEvent(MuseEvent):
     """Structured execution plan."""
 
     type: Literal["plan"] = "plan"
@@ -206,7 +210,7 @@ class PlanEvent(MaestroEvent):
     steps: list[PlanStepSchema]
 
 
-class PlanStepUpdateEvent(MaestroEvent):
+class PlanStepUpdateEvent(MuseEvent):
     """Step lifecycle transition."""
 
     type: Literal["planStepUpdate"] = "planStepUpdate"
@@ -222,7 +226,7 @@ class PlanStepUpdateEvent(MaestroEvent):
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class ToolStartEvent(MaestroEvent):
+class ToolStartEvent(MuseEvent):
     """Fires before tool execution begins."""
 
     type: Literal["toolStart"] = "toolStart"
@@ -233,7 +237,7 @@ class ToolStartEvent(MaestroEvent):
     section_name: str | None = None
 
 
-class ToolCallEvent(MaestroEvent):
+class ToolCallEvent(MuseEvent):
     """Resolved tool call — FE applies this to DAW state."""
 
     type: Literal["toolCall"] = "toolCall"
@@ -247,7 +251,7 @@ class ToolCallEvent(MaestroEvent):
     section_name: str | None = None
 
 
-class ToolErrorEvent(MaestroEvent):
+class ToolErrorEvent(MuseEvent):
     """Non-fatal tool validation or execution error."""
 
     type: Literal["toolError"] = "toolError"
@@ -263,7 +267,7 @@ class ToolErrorEvent(MaestroEvent):
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class PreflightEvent(MaestroEvent):
+class PreflightEvent(MuseEvent):
     """Pre-allocation hint for latency masking."""
 
     type: Literal["preflight"] = "preflight"
@@ -277,7 +281,7 @@ class PreflightEvent(MaestroEvent):
     track_color: str | None = None
 
 
-class GeneratorStartEvent(MaestroEvent):
+class GeneratorStartEvent(MuseEvent):
     """Orpheus generation started."""
 
     type: Literal["generatorStart"] = "generatorStart"
@@ -290,7 +294,7 @@ class GeneratorStartEvent(MaestroEvent):
     section_name: str | None = None
 
 
-class GeneratorCompleteEvent(MaestroEvent):
+class GeneratorCompleteEvent(MuseEvent):
     """Orpheus generation finished."""
 
     type: Literal["generatorComplete"] = "generatorComplete"
@@ -301,7 +305,7 @@ class GeneratorCompleteEvent(MaestroEvent):
     section_name: str | None = None
 
 
-class AgentCompleteEvent(MaestroEvent):
+class AgentCompleteEvent(MuseEvent):
     """Instrument agent finished all sections."""
 
     type: Literal["agentComplete"] = "agentComplete"
@@ -314,7 +318,7 @@ class AgentCompleteEvent(MaestroEvent):
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class SummaryEvent(MaestroEvent):
+class SummaryEvent(MuseEvent):
     """Composition summary (tracks, regions, notes, effects)."""
 
     type: Literal["summary"] = "summary"
@@ -324,7 +328,7 @@ class SummaryEvent(MaestroEvent):
     effects: int
 
 
-class SummaryFinalEvent(MaestroEvent):
+class SummaryFinalEvent(MuseEvent):
     """Rich composition summary from Agent Teams."""
 
     type: Literal["summary.final"] = "summary.final"
@@ -358,7 +362,7 @@ class NoteChangeSchema(CamelModel):
     after: NoteChangeDict | None = None
 
 
-class MetaEvent(MaestroEvent):
+class MetaEvent(MuseEvent):
     """Variation summary (emitted before phrases)."""
 
     type: Literal["meta"] = "meta"
@@ -371,7 +375,7 @@ class MetaEvent(MaestroEvent):
     note_counts: dict[str, int] | None = None
 
 
-class PhraseEvent(MaestroEvent):
+class PhraseEvent(MuseEvent):
     """One musical phrase in a variation."""
 
     type: Literal["phrase"] = "phrase"
@@ -389,7 +393,7 @@ class PhraseEvent(MaestroEvent):
     aftertouch: list[AftertouchDict] = Field(default_factory=list)
 
 
-class DoneEvent(MaestroEvent):
+class DoneEvent(MuseEvent):
     """End-of-variation marker."""
 
     type: Literal["done"] = "done"
@@ -408,14 +412,14 @@ class DoneEvent(MaestroEvent):
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class MCPMessageEvent(MaestroEvent):
+class MCPMessageEvent(MuseEvent):
     """MCP tool-call message relayed over SSE."""
 
     type: Literal["mcp.message"] = "mcp.message"
     payload: dict[str, object] = Field(default_factory=dict)
 
 
-class MCPPingEvent(MaestroEvent):
+class MCPPingEvent(MuseEvent):
     """MCP SSE keepalive heartbeat."""
 
     type: Literal["mcp.ping"] = "mcp.ping"

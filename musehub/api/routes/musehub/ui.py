@@ -4,7 +4,7 @@ Serves browser-readable HTML pages for navigating a Muse Hub repo --
 analogous to GitHub's repository browser but for music projects.
 
 All pages are rendered via Jinja2 templates stored in
-``maestro/templates/musehub/``.  Route handlers resolve server-side data
+``musehub/templates/musehub/``.  Route handlers resolve server-side data
 (repo_id, owner, slug) and pass a minimal context dict to the template
 engine; all HTML, CSS, and JavaScript lives in the template files, not here.
 
@@ -525,8 +525,8 @@ async def repo_page(
 
     Clone URL variants passed to the template:
     - ``clone_url_musehub``: native DAW protocol (``musehub://{owner}/{slug}``)
-    - ``clone_url_ssh``: SSH git remote (``ssh://git@musehub.stori.app/{owner}/{slug}.git``)
-    - ``clone_url_https``: HTTPS git remote (``https://musehub.stori.app/{owner}/{slug}.git``)
+    - ``clone_url_ssh``: SSH git remote (``ssh://git@musehub.app/{owner}/{slug}.git``)
+    - ``clone_url_https``: HTTPS git remote (``https://musehub.app/{owner}/{slug}.git``)
     """
     repo, base_url = await _resolve_repo_full(owner, repo_slug, db)
     repo_id = repo.repo_id
@@ -563,8 +563,8 @@ async def repo_page(
             og_type="website",
         ),
         "clone_url_musehub": f"musehub://{owner}/{repo_slug}",
-        "clone_url_ssh": f"ssh://git@musehub.stori.app/{owner}/{repo_slug}.git",
-        "clone_url_https": f"https://musehub.stori.app/{owner}/{repo_slug}.git",
+        "clone_url_ssh": f"ssh://git@musehub.app/{owner}/{repo_slug}.git",
+        "clone_url_https": f"https://musehub.app/{owner}/{repo_slug}.git",
     }
     return await htmx_fragment_or_full(
         request,
@@ -1193,7 +1193,7 @@ async def context_page(
     """Render the AI context viewer for a given commit ref — fully SSR.
 
     Calls :func:`musehub_analysis.get_context` to fetch musical summary,
-    missing elements, and Maestro suggestions server-side so the template
+    missing elements, and Muse suggestions server-side so the template
     receives a populated ``context_data`` object with no client fetch required.
     """
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
@@ -1626,7 +1626,7 @@ async def motifs_page(
 ) -> Response:
     """Render the motif browser for a given commit ref — SSR.
 
-    Fetches motif data server-side via :func:`~maestro.services.musehub_analysis.compute_dimension`
+    Fetches motif data server-side via :func:`~musehub.services.musehub_analysis.compute_dimension`
     and passes it directly to the Jinja2 template so all motif patterns,
     occurrences, and recurrence grids are rendered server-side without
     a client-side fetch.
@@ -2038,7 +2038,7 @@ async def contour_page(
 ) -> Response:
     """Render the melodic contour analysis page for a Muse commit ref — SSR.
 
-    Fetches contour data server-side via :func:`~maestro.services.musehub_analysis.compute_dimension`
+    Fetches contour data server-side via :func:`~musehub.services.musehub_analysis.compute_dimension`
     and passes the pitch curve directly to the Jinja2 template so the SVG
     polyline is rendered server-side without a client-side fetch.
     """
@@ -2114,7 +2114,7 @@ async def dynamics_analysis_page(
     """Render the dynamics analysis page for a Muse commit ref — SSR.
 
     Fetches per-track dynamics data server-side via
-    :func:`~maestro.services.musehub_analysis.compute_dynamics_page_data`
+    :func:`~musehub.services.musehub_analysis.compute_dynamics_page_data`
     and passes it directly to the Jinja2 template so velocity bars and arc
     badges are rendered server-side without a client-side fetch.
     """
@@ -2230,7 +2230,7 @@ async def chord_map_analysis_page(
     """Render the chord map analysis page for a Muse commit ref — SSR.
 
     Fetches chord progression data server-side via
-    :func:`~maestro.services.musehub_analysis.compute_dimension` and passes it
+    :func:`~musehub.services.musehub_analysis.compute_dimension` and passes it
     directly to the Jinja2 template so the chord timeline bars are rendered
     server-side without a client-side fetch.
     """
@@ -2307,7 +2307,7 @@ async def emotion_analysis_page(
     """Render the emotion analysis page for a Muse commit ref — SSR.
 
     Fetches emotion map data server-side via
-    :func:`~maestro.services.musehub_analysis.compute_emotion_map` and passes it
+    :func:`~musehub.services.musehub_analysis.compute_emotion_map` and passes it
     directly to the Jinja2 template so the valence/arousal scatter plot and
     trajectory are rendered server-side without a client-side fetch.
     """
@@ -2638,7 +2638,7 @@ async def harmony_analysis_page(
     """Render the harmony analysis page for a Muse commit ref — SSR.
 
     Fetches Roman-numeral harmonic analysis server-side via
-    :func:`~maestro.services.musehub_analysis.compute_harmony_analysis`
+    :func:`~musehub.services.musehub_analysis.compute_harmony_analysis`
     and passes it directly to the Jinja2 template so cadences, modulations,
     and the harmonic rhythm are rendered without a client-side API fetch.
     """

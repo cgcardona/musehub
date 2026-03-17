@@ -1,7 +1,7 @@
 """Drop Muse variation tables (muse_variations, muse_phrases, muse_note_changes).
 
 Muse VCS was extracted to cgcardona/muse. These three tables tracked
-DAW-level note editing history and are no longer needed in Maestro.
+DAW-level note editing history and are no longer needed in Muse VCS.
 
 Note: muse_commits, muse_snapshots, muse_objects, and muse_tags are
 intentionally NOT dropped here — MuseHub reads those tables to display

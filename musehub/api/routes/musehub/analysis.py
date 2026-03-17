@@ -28,7 +28,7 @@ Cache semantics:
 
 Auth: all endpoints require a valid JWT Bearer token (inherited from the
 musehub router-level dependency). No business logic lives here — all
-analysis is delegated to :mod:`maestro.services.musehub_analysis`.
+analysis is delegated to :mod:`musehub.services.musehub_analysis`.
 """
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ async def get_aggregate_analysis(
     """Return all 13 dimension analyses for a Muse repo ref.
 
     The response envelope carries ``computed_at``, ``ref``, and per-dimension
-    :class:`~maestro.models.musehub_analysis.AnalysisResponse` entries.
+    :class:`~musehub.models.musehub_analysis.AnalysisResponse` entries.
     Use ``?track=`` and ``?section=`` to narrow analysis to a specific instrument
     or musical section.
     """
@@ -397,7 +397,7 @@ async def get_dimension_analysis(
     signal rather than a generic 422 validation error.
 
     The ``data`` field in the response is the dimension-specific typed model
-    (e.g. :class:`~maestro.models.musehub_analysis.HarmonyData` for ``harmony``).
+    (e.g. :class:`~musehub.models.musehub_analysis.HarmonyData` for ``harmony``).
     """
     if dimension not in ALL_DIMENSIONS:
         raise HTTPException(
@@ -457,7 +457,7 @@ async def get_dynamics_page_data(
 
     Unlike the single-dimension ``dynamics`` endpoint (which returns aggregate
     metrics for the whole piece), this endpoint returns one
-    :class:`~maestro.models.musehub_analysis.TrackDynamicsProfile` per active
+    :class:`~musehub.models.musehub_analysis.TrackDynamicsProfile` per active
     instrument track so the page can render individual velocity graphs and arc
     badges.
 
@@ -490,7 +490,7 @@ async def get_dynamics_page_data(
 
 # Dedicated harmony router — must be included BEFORE the main analysis router in
 # __init__.py so this specific path takes priority over the generic /{dimension}
-# catch-all route. See: maestro/api/routes/musehub/__init__.py.
+# catch-all route. See: musehub/api/routes/musehub/__init__.py.
 harmony_router = APIRouter()
 
 

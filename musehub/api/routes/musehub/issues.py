@@ -17,12 +17,12 @@ Endpoint summary:
   POST /musehub/repos/{repo_id}/issues/{issue_number}/comments — create comment (auth required)
   DELETE /musehub/repos/{repo_id}/issues/{issue_number}/comments/{comment_id} — delete comment (auth)
 
-Milestone CRUD (GET/POST/GET-single/PATCH/DELETE) lives in maestro.api.routes.musehub.milestones.
+Milestone CRUD (GET/POST/GET-single/PATCH/DELETE) lives in musehub.api.routes.musehub.milestones.
 
 Read endpoints use optional_token — unauthenticated access is allowed for public repos.
 Write endpoints always require a valid JWT Bearer token.
 No business logic lives here — all persistence is delegated to
-maestro.services.musehub_issues.
+musehub.services.musehub_issues.
 """
 from __future__ import annotations
 

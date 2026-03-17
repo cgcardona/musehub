@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.db.musehub_models import MusehubCommit, MusehubEvent, MusehubRepo
 
-_OWNER = "stori-artist"
+_OWNER = "muse-artist"
 _SLUG = "debut-album"
 _USER_ID = "550e8400-e29b-41d4-a716-446655440000"  # matches test_user fixture
 

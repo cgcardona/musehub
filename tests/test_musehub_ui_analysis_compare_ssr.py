@@ -244,7 +244,7 @@ async def test_context_page_renders_suggestions(
     assert response.status_code == 200
     body = response.text
     assert "suggestion-card" in body
-    assert "Maestro Suggestions" in body
+    assert "Muse Suggestions" in body
 
 
 @pytest.mark.anyio

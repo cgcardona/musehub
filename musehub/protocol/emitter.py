@@ -3,18 +3,18 @@
 Every SSE event the backend emits passes through ``emit()``.
 Two entry points:
 
-  ``emit(MaestroEvent)`` — serialize a typed event object to SSE wire format.
+  ``emit(MuseEvent)`` — serialize a typed event object to SSE wire format.
   ``parse_event(dict)`` — deserialize a wire-format dict back into the
-                            correct MaestroEvent subclass (inverse of ``emit``).
+                            correct MuseEvent subclass (inverse of ``emit``).
                             Use in tests and any consumer that needs typed
                             access to received events.
 
-Handlers construct typed MaestroEvent subclasses directly — raw-dict emission
+Handlers construct typed MuseEvent subclasses directly — raw-dict emission
 is forbidden. The type safety is enforced at construction time by Pydantic
 model validation, not at serialization time.
 
 The ``seq`` field defaults to -1 (sentinel); the route-layer ``_with_seq()``
-wrapper in maestro.py overwrites it with the monotonic stream counter.
+wrapper overwrites it with the monotonic stream counter.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import json
 import logging
 from collections.abc import Mapping
 
-from musehub.protocol.events import MaestroEvent
+from musehub.protocol.events import MuseEvent
 from musehub.protocol.registry import EVENT_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -37,17 +37,17 @@ class ProtocolSerializationError(Exception):
     """
 
 
-def emit(event: MaestroEvent) -> str:
-    """Serialize a MaestroEvent to SSE wire format.
+def emit(event: MuseEvent) -> str:
+    """Serialize a MuseEvent to SSE wire format.
 
     Returns ``data: {json}\\n\\n``.
 
-    Raises TypeError for non-MaestroEvent arguments.
+    Raises TypeError for non-MuseEvent arguments.
     Raises ValueError for unregistered event types.
     """
-    if not isinstance(event, MaestroEvent):
+    if not isinstance(event, MuseEvent):
         raise TypeError(
-            f"emit() requires a MaestroEvent, got {type(event).__name__}."
+            f"emit() requires a MuseEvent, got {type(event).__name__}."
         )
 
     event_type = event.type
@@ -61,12 +61,12 @@ def emit(event: MaestroEvent) -> str:
     return f"data: {json.dumps(data, separators=(',', ':'), ensure_ascii=False)}\n\n"
 
 
-def parse_event(data: Mapping[str, object]) -> MaestroEvent:
-    """Deserialize a wire-format dict back into the correct MaestroEvent subclass.
+def parse_event(data: Mapping[str, object]) -> MuseEvent:
+    """Deserialize a wire-format dict back into the correct MuseEvent subclass.
 
     Dispatches through the registry and validates via the Pydantic model,
     returning the concrete subclass (e.g. ``ErrorEvent``, ``StateEvent``)
-    rather than the base ``MaestroEvent``.
+    rather than the base ``MuseEvent``.
 
     The wire format uses camelCase keys (``by_alias=True``). ``CamelModel``
     has ``populate_by_name=True`` so both snake_case and camelCase keys are

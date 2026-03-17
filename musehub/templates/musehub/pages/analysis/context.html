@@ -50,7 +50,7 @@ const apiBase = '/api/v1/musehub/repos/' + repoId;
   {# ── Suggestions ────────────────────────────────────────────────────────── #}
   {% if context_data.suggestions %}
   <div class="context-suggestions">
-    <h2 style="margin:0 0 var(--space-3);font-size:1rem;color:#8b949e;text-transform:uppercase;letter-spacing:.06em">Maestro Suggestions</h2>
+    <h2 style="margin:0 0 var(--space-3);font-size:1rem;color:#8b949e;text-transform:uppercase;letter-spacing:.06em">Muse Suggestions</h2>
     <div style="display:grid;gap:var(--space-3)">
       {% for key, suggestion in context_data.suggestions.items() %}
       <div class="suggestion-card card" style="border-left:3px solid var(--color-accent)">
