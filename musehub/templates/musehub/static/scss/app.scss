@@ -1,0 +1,13 @@
+// MuseHub — SCSS entry point
+//
+// Import order matters: tokens must come first so all partials
+// can reference the CSS custom properties they define.
+//
+// embed.css is intentionally excluded — it is self-contained
+// (hardcoded colours) and served independently for iframe embeds.
+
+@use "tokens";
+@use "components";
+@use "layout";
+@use "icons";
+@use "music";

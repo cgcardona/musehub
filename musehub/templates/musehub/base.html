@@ -3,11 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/musehub/static/tokens.css">
-  <link rel="stylesheet" href="/musehub/static/components.css">
-  <link rel="stylesheet" href="/musehub/static/layout.css">
-  <link rel="stylesheet" href="/musehub/static/icons.css">
-  <link rel="stylesheet" href="/musehub/static/music.css">
+  <link rel="stylesheet" href="/musehub/static/app.css">
   <title>{% block title %}Muse Hub{% endblock %} — Muse Hub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
   {# oEmbed discovery — lets CMS/blog platforms auto-embed MuseHub pages.
@@ -103,7 +99,7 @@
     <button class="player-btn" onclick="closePlayer()" title="Close">&#10005;</button>
   </div>
 
-  <script src="/musehub/static/musehub.js"></script>
+  <script src="/musehub/static/app.js"></script>
   <script>
     async function loadNotifBadge() {
       if (!getToken()) return;

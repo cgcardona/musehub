@@ -1,0 +1,18 @@
+{
+  "name": "musehub-frontend",
+  "version": "0.1.0",
+  "scripts": {
+    "build:js": "esbuild musehub/templates/musehub/static/js/app.ts --bundle --format=iife --minify --outfile=musehub/templates/musehub/static/app.js",
+    "build:css": "sass --style=compressed --no-source-map musehub/templates/musehub/static/scss/app.scss musehub/templates/musehub/static/app.css",
+    "build": "npm run build:js && npm run build:css",
+    "watch:js": "esbuild musehub/templates/musehub/static/js/app.ts --bundle --format=iife --outfile=musehub/templates/musehub/static/app.js --watch",
+    "watch:css": "sass --watch musehub/templates/musehub/static/scss/app.scss musehub/templates/musehub/static/app.css",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.27.3",
+    "sass": "^1.89.2",
+    "typescript": "^5.9.3"
+  }
+}
