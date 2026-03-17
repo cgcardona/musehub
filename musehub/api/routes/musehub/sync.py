@@ -30,7 +30,6 @@ from musehub.models.musehub import (
 )
 from musehub.services import musehub_repository, musehub_sync
 from musehub.services.musehub_render_pipeline import trigger_render_background
-from musehub.services.musehub_sync import embed_push_commits
 from musehub.services.musehub_webhook_dispatcher import dispatch_event_background
 
 logger = logging.getLogger(__name__)
@@ -61,9 +60,8 @@ async def push(
     ~1 MB are fine; larger files will require pre-signed URL upload in a
     future release.
 
-    After the DB commit, musical feature vectors are computed for the pushed
-    commits and upserted to Qdrant as a background task so the push response
-    is not delayed by embedding computation.
+    After the DB commit, a render pipeline background task auto-generates
+    MP3 stubs and piano-roll images for any MIDI objects in the push.
     """
     repo = await musehub_repository.get_repo(db, repo_id)
     if repo is None:
@@ -92,16 +90,6 @@ async def push(
         raise
 
     await db.commit()
-
-    # Schedule embedding as background task — does not block the push response.
-    background_tasks.add_task(
-        embed_push_commits,
-        commits=body.commits,
-        repo_id=repo_id,
-        branch=body.branch,
-        author=author,
-        is_public=is_public,
-    )
 
     # Schedule render pipeline — auto-generate MP3 stubs and piano-roll images
     # for any MIDI objects in this push. Idempotent: re-pushing the same

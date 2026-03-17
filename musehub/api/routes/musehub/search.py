@@ -2,9 +2,8 @@
 """MuseHub search route handlers.
 
 Endpoints:
-  GET /musehub/search/similar?commit={sha}&limit=10
-    — Cross-repo vector similarity search. Returns the N most musically
-      similar public commits to the given SHA using Qdrant cosine distance.
+  GET /musehub/search?q={q}&mode={mode}
+    — Global cross-repo commit search (keyword or pattern).
 
   GET /musehub/repos/{repo_id}/search?q={q}&mode={mode}
     — In-repo commit search with four modes:
@@ -18,23 +17,17 @@ Authentication: JWT Bearer token required (inherited from musehub router).
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.auth.dependencies import TokenClaims, optional_token
 from musehub.db import get_db
-
-from musehub.db import musehub_models as db
-from musehub.models.musehub import GlobalSearchResult, SearchResponse, SimilarCommitResponse, SimilarSearchResponse
+from musehub.models.musehub import GlobalSearchResult, SearchResponse
 
 from musehub.services import musehub_repository, musehub_search
-from musehub.services.musehub_embeddings import compute_embedding
-from musehub.services.musehub_qdrant import MusehubQdrantClient, get_qdrant_client
 
 logger = logging.getLogger(__name__)
 
@@ -100,75 +93,6 @@ async def global_search(
         len(result.groups),
     )
     return result
-
-
-
-@router.get(
-    "/search/similar",
-    response_model=SimilarSearchResponse,
-    operation_id="searchSimilar",
-    summary="Find musically similar commits across public repos",
-)
-async def search_similar(
-    commit: str = Query(..., description="Commit SHA to use as the similarity query"),
-    limit: int = Query(10, ge=1, le=50, description="Maximum number of results"),
-    db_session: AsyncSession = Depends(get_db),
-    _: TokenClaims | None = Depends(optional_token),
-    qdrant: MusehubQdrantClient = Depends(get_qdrant_client),
-) -> SimilarSearchResponse:
-    """Return the N most musically similar public commits to the given commit SHA.
-
-    Resolves the query commit from Postgres to obtain its message (which encodes
-    musical metadata), computes its embedding, then queries Qdrant for the closest
-    vectors. Only commits from public repos appear in results — visibility is
-    enforced server-side by Qdrant payload filtering.
-
-    Raises:
-        404: If the commit SHA is not found in the Muse Hub.
-        503: If Qdrant is unavailable.
-    """
-    stmt = select(db.MusehubCommit).where(db.MusehubCommit.commit_id == commit)
-    row = (await db_session.execute(stmt)).scalar_one_or_none()
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Commit '{commit}' not found in Muse Hub.",
-        )
-
-    query_vector = compute_embedding(row.message)
-
-    try:
-        raw_results = await asyncio.to_thread(
-            qdrant.search_similar,
-            query_vector=query_vector,
-            limit=limit,
-            public_only=True,
-            exclude_commit_id=commit,
-        )
-    except Exception as exc:
-        logger.error("❌ Qdrant search failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Similarity search is temporarily unavailable.",
-        ) from exc
-
-    results = [
-        SimilarCommitResponse(
-            commit_id=r.commit_id,
-            repo_id=r.repo_id,
-            score=r.score,
-            branch=r.branch,
-            author=r.author,
-        )
-        for r in raw_results
-    ]
-
-    logger.info(
-        "✅ Similarity search for commit=%s returned %d results",
-        commit,
-        len(results),
-    )
-    return SimilarSearchResponse(query_commit=commit, results=results)
 
 
 @router.get(

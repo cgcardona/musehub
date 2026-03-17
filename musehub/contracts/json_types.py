@@ -38,9 +38,6 @@ MIDI note types:
 Composition types:
   SectionDict — a composition section (verse, chorus, bridge…)
 
-Storpheus adapter:
-  StorpheusResultBucket — return shape of normalize_storpheus_tool_calls
-
 SSE / protocol types:
   ToolCallDict — internal tool call payload {tool, params}
   ToolCallPreviewDict — plan preview tool call {name, params}
@@ -261,20 +258,6 @@ class SectionDict(TypedDict, total=False):
     length_beats: float
     description: str
     per_track_description: dict[str, str]
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Storpheus adapter types
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class StorpheusResultBucket(TypedDict):
-    """Return shape of ``normalize_storpheus_tool_calls``."""
-
-    notes: list[NoteDict]
-    cc_events: list[CCEventDict]
-    pitch_bends: list[PitchBendDict]
-    aftertouch: list[AftertouchDict]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -1352,13 +1352,10 @@ def compute_recall(
     groove"``). This endpoint bridges semantic intent and the vector index so that
     retrieval is based on musical meaning rather than exact keyword matching.
 
-    Stub implementation
+    Implementation note
     -------------------
-    The full implementation will embed ``query`` into the 128-dim musical feature
-    space (via ``musehub_embeddings.compute_embedding``), then call
-    ``MusehubQdrantClient.search_similar`` scoped to ``repo_id``. Until Qdrant
-    is wired, this returns deterministic stub results keyed on the XOR of the ref
-    and query hashes so agents receive consistent responses across retries.
+    Returns deterministic stub results keyed on the XOR of the ref and query
+    hashes so agents receive consistent responses across retries.
 
     Args:
         repo_id: Muse Hub repo UUID (used for scoping and logging).

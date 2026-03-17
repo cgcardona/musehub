@@ -33,16 +33,6 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture(autouse=True)
-def _disable_storpheus_hard_gate() -> Generator[None, None, None]:
-    """Tests don't have Storpheus running — disable the pre-flight hard gate."""
-    from musehub.config import settings
-    original = settings.storpheus_required
-    settings.storpheus_required = False
-    yield
-    settings.storpheus_required = original
-
-
-@pytest.fixture(autouse=True)
 def _reset_variation_store() -> Generator[None, None, None]:
     """Reset the singleton VariationStore between tests to prevent cross-test pollution."""
     yield
