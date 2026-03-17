@@ -25,7 +25,7 @@ Organisation:
 """
 from __future__ import annotations
 
-from typing import Literal, Union
+from typing import Literal
 
 from typing_extensions import NotRequired, Required, TypedDict
 
@@ -83,7 +83,7 @@ class ToolResultMessage(TypedDict):
     content: str
 
 
-ChatMessage = Union[SystemMessage, UserMessage, AssistantMessage, ToolResultMessage]
+ChatMessage = SystemMessage | UserMessage | AssistantMessage | ToolResultMessage
 """Discriminated union of all OpenAI chat message shapes."""
 
 
@@ -358,7 +358,7 @@ class DoneStreamEvent(TypedDict):
     usage: UsageStats
 
 
-StreamEvent = Union[ReasoningDeltaEvent, ContentDeltaEvent, DoneStreamEvent]
+StreamEvent = ReasoningDeltaEvent | ContentDeltaEvent | DoneStreamEvent
 """Discriminated union of all events yielded by ``LLMClient.chat_completion_stream``."""
 
 # Kept as a type alias: either a string shorthand ("auto", "none", "required")

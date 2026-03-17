@@ -35,7 +35,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -141,7 +141,7 @@ def _utc_now() -> datetime:
 # ---------------------------------------------------------------------------
 
 
-def _build_harmony(ref: str, track: Optional[str], section: Optional[str]) -> HarmonyData:
+def _build_harmony(ref: str, track: str | None, section: str | None) -> HarmonyData:
     """Build stub harmonic analysis. Deterministic for a given ref."""
     seed = _ref_hash(ref)
     tonic = _pick(seed, _TONICS)
@@ -181,7 +181,7 @@ def _build_harmony(ref: str, track: Optional[str], section: Optional[str]) -> Ha
     )
 
 
-def _build_dynamics(ref: str, track: Optional[str], section: Optional[str]) -> DynamicsData:
+def _build_dynamics(ref: str, track: str | None, section: str | None) -> DynamicsData:
     seed = _ref_hash(ref)
     base_vel = 64 + (seed % 32)
     peak = min(127, base_vel + 30)
@@ -230,7 +230,7 @@ def _retrograde_intervals(intervals: list[int]) -> list[int]:
     return list(reversed(intervals))
 
 
-def _build_motifs(ref: str, track: Optional[str], section: Optional[str]) -> MotifsData:
+def _build_motifs(ref: str, track: str | None, section: str | None) -> MotifsData:
     """Build stub motif analysis with transformations, contour, and recurrence grid.
 
     Deterministic for a given ``ref`` value. Produces 2–4 motifs, each with:
@@ -365,7 +365,7 @@ def _build_motifs(ref: str, track: Optional[str], section: Optional[str]) -> Mot
     )
 
 
-def _build_form(ref: str, track: Optional[str], section: Optional[str]) -> FormData:
+def _build_form(ref: str, track: str | None, section: str | None) -> FormData:
     seed = _ref_hash(ref)
     form_label = _pick(seed, _FORMS)
     sections = [
@@ -378,7 +378,7 @@ def _build_form(ref: str, track: Optional[str], section: Optional[str]) -> FormD
     return FormData(form_label=form_label, total_beats=64, sections=sections)
 
 
-def _build_groove(ref: str, track: Optional[str], section: Optional[str]) -> GrooveData:
+def _build_groove(ref: str, track: str | None, section: str | None) -> GrooveData:
     seed = _ref_hash(ref)
     style = _pick(seed, _GROOVES)
     swing = 0.5 if style == "straight" else round(0.55 + (seed % 20) / 100, 4)
@@ -393,7 +393,7 @@ def _build_groove(ref: str, track: Optional[str], section: Optional[str]) -> Gro
     )
 
 
-def _build_emotion(ref: str, track: Optional[str], section: Optional[str]) -> EmotionData:
+def _build_emotion(ref: str, track: str | None, section: str | None) -> EmotionData:
     seed = _ref_hash(ref)
     emotion = _pick(seed, _EMOTIONS)
     valence_map: dict[str, float] = {
@@ -413,7 +413,7 @@ def _build_emotion(ref: str, track: Optional[str], section: Optional[str]) -> Em
     )
 
 
-def _build_chord_map(ref: str, track: Optional[str], section: Optional[str]) -> ChordMapData:
+def _build_chord_map(ref: str, track: str | None, section: str | None) -> ChordMapData:
     harmony = _build_harmony(ref, track, section)
     return ChordMapData(
         progression=harmony.chord_progression,
@@ -422,7 +422,7 @@ def _build_chord_map(ref: str, track: Optional[str], section: Optional[str]) -> 
     )
 
 
-def _build_contour(ref: str, track: Optional[str], section: Optional[str]) -> ContourData:
+def _build_contour(ref: str, track: str | None, section: str | None) -> ContourData:
     seed = _ref_hash(ref)
     shapes = ["arch", "ascending", "descending", "flat", "wave"]
     shape = _pick(seed, shapes)
@@ -441,7 +441,7 @@ def _build_contour(ref: str, track: Optional[str], section: Optional[str]) -> Co
     )
 
 
-def _build_key(ref: str, track: Optional[str], section: Optional[str]) -> KeyData:
+def _build_key(ref: str, track: str | None, section: str | None) -> KeyData:
     seed = _ref_hash(ref)
     tonic = _pick(seed, _TONICS)
     mode = _pick(seed, _MODES[:2])
@@ -463,7 +463,7 @@ def _build_key(ref: str, track: Optional[str], section: Optional[str]) -> KeyDat
     )
 
 
-def _build_tempo(ref: str, track: Optional[str], section: Optional[str]) -> TempoData:
+def _build_tempo(ref: str, track: str | None, section: str | None) -> TempoData:
     seed = _ref_hash(ref)
     bpm = round(80.0 + (seed % 80), 1)
     stability = round(0.7 + (seed % 30) / 100, 4)
@@ -477,7 +477,7 @@ def _build_tempo(ref: str, track: Optional[str], section: Optional[str]) -> Temp
     return TempoData(bpm=bpm, stability=stability, time_feel=feel, tempo_changes=changes)
 
 
-def _build_meter(ref: str, track: Optional[str], section: Optional[str]) -> MeterData:
+def _build_meter(ref: str, track: str | None, section: str | None) -> MeterData:
     seed = _ref_hash(ref)
     sigs = ["4/4", "3/4", "6/8", "5/4", "7/8"]
     sig = _pick(seed, sigs[:2])
@@ -498,7 +498,7 @@ def _build_meter(ref: str, track: Optional[str], section: Optional[str]) -> Mete
     )
 
 
-def _build_similarity(ref: str, track: Optional[str], section: Optional[str]) -> SimilarityData:
+def _build_similarity(ref: str, track: str | None, section: str | None) -> SimilarityData:
     seed = _ref_hash(ref)
     n = 1 + (seed % 3)
     similar = [
@@ -513,7 +513,7 @@ def _build_similarity(ref: str, track: Optional[str], section: Optional[str]) ->
     return SimilarityData(similar_commits=similar, embedding_dimensions=128)
 
 
-def _build_divergence(ref: str, track: Optional[str], section: Optional[str]) -> DivergenceData:
+def _build_divergence(ref: str, track: str | None, section: str | None) -> DivergenceData:
     seed = _ref_hash(ref)
     score = round((seed % 60) / 100, 4)
     changed = [
@@ -540,7 +540,7 @@ def _build_divergence(ref: str, track: Optional[str], section: Optional[str]) ->
 # ---------------------------------------------------------------------------
 
 # Each builder has signature (ref: str, track: str | None, section: str | None) -> DimensionData
-_DimBuilder = Callable[[str, Optional[str], Optional[str]], DimensionData]
+_DimBuilder = Callable[[str, str | None, str | None], DimensionData]
 
 _BUILDERS: dict[str, _DimBuilder] = {
     "harmony": _build_harmony,
@@ -567,8 +567,8 @@ _BUILDERS: dict[str, _DimBuilder] = {
 def compute_dimension(
     dimension: str,
     ref: str,
-    track: Optional[str] = None,
-    section: Optional[str] = None,
+    track: str | None = None,
+    section: str | None = None,
 ) -> DimensionData:
     """Compute analysis data for a single musical dimension.
 
@@ -598,8 +598,8 @@ def compute_analysis_response(
     repo_id: str,
     dimension: str,
     ref: str,
-    track: Optional[str] = None,
-    section: Optional[str] = None,
+    track: str | None = None,
+    section: str | None = None,
 ) -> AnalysisResponse:
     """Build a complete :class:`AnalysisResponse` envelope for one dimension.
 
@@ -785,8 +785,8 @@ def compute_dynamics_page_data(
     *,
     repo_id: str,
     ref: str,
-    track: Optional[str] = None,
-    section: Optional[str] = None,
+    track: str | None = None,
+    section: str | None = None,
 ) -> DynamicsPageData:
     """Build per-track dynamics data for the Dynamics Analysis page.
 
@@ -827,8 +827,8 @@ def compute_emotion_map(
     *,
     repo_id: str,
     ref: str,
-    track: Optional[str] = None,
-    section: Optional[str] = None,
+    track: str | None = None,
+    section: str | None = None,
 ) -> EmotionMapResponse:
     """Build a complete :class:`EmotionMapResponse` for an emotion map page.
 
@@ -983,8 +983,8 @@ def compute_aggregate_analysis(
     *,
     repo_id: str,
     ref: str,
-    track: Optional[str] = None,
-    section: Optional[str] = None,
+    track: str | None = None,
+    section: str | None = None,
 ) -> AggregateAnalysisResponse:
     """Build a complete :class:`AggregateAnalysisResponse` for all 13 dimensions.
 
