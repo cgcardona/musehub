@@ -8,9 +8,10 @@ Covers:
   - prompts/get: known prompt assembly and unknown prompt error
   - Batch request handling
   - Notification handling (no id → returns None)
-  - Tool catalogue completeness (27 tools)
+  - Tool catalogue completeness (32 tools)
   - Resource catalogue completeness (5 static, 15 templated)
-  - Prompt catalogue completeness (6 prompts)
+  - Prompt catalogue completeness (8 prompts)
+  - MCP 2025-11-25: elicitation capability in initialize, new notifications
 """
 from __future__ import annotations
 
@@ -49,18 +50,25 @@ def _notification(method: str, params: dict | None = None) -> dict:
 
 @pytest.mark.asyncio
 async def test_initialize_returns_capabilities() -> None:
-    """initialize should return protocolVersion and capabilities."""
-    resp = await handle_request(_req("initialize", {"protocolVersion": "2025-03-26"}))
+    """initialize should return protocolVersion 2025-11-25 and capabilities."""
+    resp = await handle_request(_req("initialize", {"protocolVersion": "2025-11-25"}))
     assert resp is not None
     assert resp["jsonrpc"] == "2.0"
     assert resp["id"] == 1
     result = resp["result"]
     assert isinstance(result, dict)
-    assert result["protocolVersion"] == "2025-03-26"
+    assert result["protocolVersion"] == "2025-11-25"
     assert "capabilities" in result
     assert "tools" in result["capabilities"]
     assert "resources" in result["capabilities"]
     assert "prompts" in result["capabilities"]
+    assert "elicitation" in result["capabilities"]
+    assert "form" in result["capabilities"]["elicitation"]
+    assert "url" in result["capabilities"]["elicitation"]
+    # serverInfo must only contain name and version (not capabilities)
+    assert "name" in result["serverInfo"]
+    assert "version" in result["serverInfo"]
+    assert "capabilities" not in result["serverInfo"]
 
 
 @pytest.mark.asyncio
@@ -91,7 +99,7 @@ async def test_notification_returns_none() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tools_list_returns_27_tools() -> None:
+async def test_tools_list_returns_32_tools() -> None:
     """tools/list should return all 27 registered tools."""
     resp = await handle_request(_req("tools/list"))
     assert resp is not None
@@ -99,7 +107,7 @@ async def test_tools_list_returns_27_tools() -> None:
     assert isinstance(result, dict)
     tools = result["tools"]
     assert isinstance(tools, list)
-    assert len(tools) == 27
+    assert len(tools) == 32  # 15 read + 12 write + 5 elicitation
 
 
 @pytest.mark.asyncio
@@ -122,9 +130,9 @@ async def test_tools_list_all_have_required_fields() -> None:
         assert "inputSchema" in tool, f"Missing inputSchema for {tool.get('name')}"
 
 
-def test_tool_catalogue_has_27_tools() -> None:
-    """The MCP_TOOLS list must contain exactly 27 tools."""
-    assert len(MCP_TOOLS) == 27
+def test_tool_catalogue_has_32_tools() -> None:
+    """The MCP_TOOLS list must contain exactly 32 tools (27 original + 5 elicitation)."""
+    assert len(MCP_TOOLS) == 32
 
 
 def test_write_tool_names_all_in_catalogue() -> None:
@@ -294,21 +302,21 @@ async def test_resources_read_me_requires_auth() -> None:
 
 
 @pytest.mark.asyncio
-async def test_prompts_list_returns_6_prompts() -> None:
-    """prompts/list should return all 6 workflow prompts."""
+async def test_prompts_list_returns_8_prompts() -> None:
+    """prompts/list should return all 8 workflow prompts (6 + 2 elicitation-aware)."""
     resp = await handle_request(_req("prompts/list"))
     assert resp is not None
     prompts = resp["result"]["prompts"]
-    assert len(prompts) == 6
+    assert len(prompts) == 8
 
 
 def test_prompt_catalogue_completeness() -> None:
-    """PROMPT_CATALOGUE must have exactly 6 entries."""
-    assert len(PROMPT_CATALOGUE) == 6
+    """PROMPT_CATALOGUE must have exactly 8 entries."""
+    assert len(PROMPT_CATALOGUE) == 8
 
 
 def test_prompt_names_are_correct() -> None:
-    """All 6 expected prompt names must be present."""
+    """All 8 expected prompt names must be present."""
     names = {p["name"] for p in PROMPT_CATALOGUE}
     assert "musehub/orientation" in names
     assert "musehub/contribute" in names
@@ -316,6 +324,8 @@ def test_prompt_names_are_correct() -> None:
     assert "musehub/review_pr" in names
     assert "musehub/issue_triage" in names
     assert "musehub/release_prep" in names
+    assert "musehub/onboard" in names
+    assert "musehub/release_to_world" in names
 
 
 @pytest.mark.asyncio
@@ -361,7 +371,7 @@ async def test_prompts_get_unknown_returns_method_not_found() -> None:
 
 
 def test_get_prompt_all_prompts_assemble() -> None:
-    """All 6 prompts should assemble without raising exceptions."""
+    """All 8 prompts should assemble without raising exceptions."""
     for prompt_def in PROMPT_CATALOGUE:
         name = prompt_def["name"]
         result = get_prompt(name, {"repo_id": "test-id", "pr_id": "pr-id", "owner": "user", "slug": "repo"})

@@ -182,7 +182,7 @@ async def _parse_label_create_body(request: Request) -> _LabelCreateBody:
         )
     except ValidationError as exc:
         raise HTTPException(
-            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
 
@@ -211,7 +211,7 @@ async def _parse_label_edit_body(request: Request) -> _LabelEditBody:
         )
     except ValidationError as exc:
         raise HTTPException(
-            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
 

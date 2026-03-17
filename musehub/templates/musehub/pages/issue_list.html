@@ -193,6 +193,16 @@ const base   = {{ base_url | tojson }};
   cursor: pointer; accent-color: var(--color-accent, #1f6feb);
 }
 
+/* ── Issue body preview ────────────────────────────────────────────────────── */
+.issue-preview {
+  margin: 2px 0 4px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #8b949e);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* ── Template selector ─────────────────────────────────────────────────────── */
 .template-grid {
   display: grid;
@@ -450,6 +460,13 @@ const base   = {{ base_url | tojson }};
 
 {% block page_script %}
 <script>
+// ── Body preview helper ──────────────────────────────────────────────────────
+function bodyPreview(text, maxLen = 120) {
+  if (!text) return '';
+  const stripped = text.replace(/[#*`>\-_]/g, '').trim();
+  return stripped.length > maxLen ? stripped.slice(0, maxLen) + '…' : stripped;
+}
+
 // ── Issue template definitions ──────────────────────────────────────────────
 const ISSUE_TEMPLATES = [
   {

@@ -61,6 +61,7 @@ _DIRECT_REGISTERED = {
     "ui_similarity",   # registered in main.py at root
     "ui_stash",        # registered in main.py at root
     "ui_topics",       # registered in main.py at root
+    "ui_mcp_elicitation", # registered in main.py at root (MCP elicitation UI pages)
     "ui_user_profile", # registered in main.py at root
     "users",           # registered in main.py at /api/v1/musehub (same path as auto-discovery)
     "oembed",          # registered in main.py at root

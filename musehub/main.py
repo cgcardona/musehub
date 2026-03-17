@@ -39,6 +39,7 @@ from musehub.api.routes.musehub import (
     ui_forks as musehub_ui_forks_routes,
     ui_emotion_diff as musehub_ui_emotion_diff_routes,
     ui_user_profile as musehub_ui_profile_routes,
+    ui_mcp_elicitation as musehub_ui_mcp_elicitation_routes,
     ui_new_repo as musehub_ui_new_repo_routes,
     discover as musehub_discover_routes,
     users as musehub_user_routes,
@@ -172,6 +173,7 @@ app.include_router(musehub_router_pkg.router, prefix="/api/v1")
 app.include_router(musehub_ui_notifications_routes.router, tags=["musehub-ui-notifications"])
 app.include_router(musehub_ui_topics_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_profile_routes.router, tags=["musehub-ui"])
+app.include_router(musehub_ui_mcp_elicitation_routes.router, tags=["musehub-ui-mcp"])
 app.include_router(musehub_ui_new_repo_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_routes.fixed_router, tags=["musehub-ui"])
 app.include_router(musehub_ui_milestones_routes.router, tags=["musehub-ui"])

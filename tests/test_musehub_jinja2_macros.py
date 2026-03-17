@@ -105,7 +105,7 @@ def test_fmtrelative_iso_string() -> None:
 
 def test_fmtrelative_naive_datetime_treated_as_utc() -> None:
     """Timezone-naive datetimes are assumed UTC per docstring contract."""
-    value = datetime.utcnow() - timedelta(minutes=30)
+    value = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=30)
     result = _fmtrelative(value)
     assert result == "30 minutes ago"
 
