@@ -1,0 +1,23 @@
+# Development overrides — bind-mount source code so changes take effect
+# without a full image rebuild. Loaded automatically by docker compose.
+services:
+  muse:
+    build:
+      context: .
+      target: builder
+    volumes:
+      - ./musehub:/app/musehub
+      - ./tests:/app/tests
+      - ./alembic:/app/alembic
+      - ./scripts:/app/scripts
+      - ./tourdeforce:/app/tourdeforce
+      - muse_data:/data
+    environment:
+      DEBUG: "true"
+      CORS_ORIGINS: '["http://localhost:10003", "muse://"]'
+    # Reload on code changes
+    command: >
+      uvicorn musehub.main:app
+      --host 0.0.0.0
+      --port 10003
+      --reload

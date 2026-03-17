@@ -1,0 +1,47 @@
+services:
+  muse:
+    build: .
+    container_name: muse
+    ports:
+      - "10003:10003"
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://musehub:${DB_PASSWORD:-musehub}@postgres:5432/musehub"
+      QDRANT_HOST: "qdrant"
+      QDRANT_PORT: "6333"
+    volumes:
+      - muse_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: muse_postgres
+    environment:
+      POSTGRES_DB: musehub
+      POSTGRES_USER: musehub
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-musehub}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U musehub -d musehub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: muse_qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+volumes:
+  muse_data:
+  postgres_data:
+  qdrant_data:
