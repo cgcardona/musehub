@@ -34,12 +34,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import AsyncIterator
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from musehub.contracts.json_types import JSONObject
+from musehub.contracts.json_types import JSONObject, JSONValue
 from musehub.mcp.dispatcher import handle_batch, handle_request
 from musehub.mcp.session import (
     MCPSession,
@@ -177,7 +178,8 @@ async def mcp_post(request: Request) -> Response:
     # For batches, use the method of the first request.
     def _first_method(r: object) -> str | None:
         if isinstance(r, dict):
-            return r.get("method")  # type: ignore[return-value]
+            m = r.get("method")
+            return m if isinstance(m, str) else None
         if isinstance(r, list) and r:
             return r[0].get("method") if isinstance(r[0], dict) else None
         return None
@@ -331,7 +333,7 @@ async def mcp_get(request: Request) -> Response:
 
     last_event_id = request.headers.get("Last-Event-ID")
 
-    async def event_generator() -> object:
+    async def event_generator() -> AsyncIterator[str]:
         async for event_text in heartbeat_stream(
             register_sse_queue(session, last_event_id),
             interval_seconds=15.0,
@@ -390,7 +392,7 @@ def _create_session_from_initialize(
 ) -> MCPSession:
     """Extract client capabilities from initialize params and create a session."""
     params = raw.get("params") or {}
-    client_caps: dict[str, object] = {}
+    client_caps: JSONObject = {}
     if isinstance(params, dict):
         caps = params.get("capabilities")
         if isinstance(caps, dict):
@@ -428,22 +430,23 @@ def _make_sse_tool_response(
     """Return a StreamingResponse that runs the tool and streams results via SSE."""
     from musehub.mcp.sse import sse_response, sse_notification
 
-    req_id = raw.get("id")
+    raw_id = raw.get("id")
+    req_id: str | int | None = raw_id if isinstance(raw_id, (str, int)) else None
 
-    async def generator() -> object:
+    async def generator() -> AsyncIterator[str]:
         try:
             result = await handle_request(raw, user_id=user_id, session=session)
             if result is not None:
                 yield sse_response(req_id, result)
         except Exception as exc:
             logger.exception("SSE tool call error: %s", exc)
-            error_resp: JSONObject = {
+            error_payload: dict[str, JSONValue] = {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "error": {"code": -32603, "message": str(exc)},
             }
             from musehub.mcp.sse import sse_event
-            yield sse_event(error_resp)
+            yield sse_event(error_payload)
 
     return StreamingResponse(
         generator(),

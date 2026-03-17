@@ -26,9 +26,8 @@ import asyncio
 import logging
 import secrets
 from dataclasses import dataclass, field
-from typing import Any
 
-from musehub.contracts.json_types import JSONObject
+from musehub.contracts.json_types import JSONObject, JSONValue
 from musehub.mcp.session import (
     MCPSession,
     cancel_elicitation,
@@ -70,7 +69,7 @@ class ToolCallContext:
         self,
         schema: JSONObject,
         message: str,
-    ) -> dict[str, Any] | None:
+    ) -> JSONObject | None:
         """Request structured data from the user via form-mode elicitation.
 
         Sends an ``elicitation/create`` request with ``mode: "form"`` to the
@@ -103,10 +102,10 @@ class ToolCallContext:
         req_id = self._next_elicitation_id()
         fut = create_pending_elicitation(self.session, req_id)
 
-        params: JSONObject = {
+        params: dict[str, JSONValue] = {
             "mode": "form",
             "message": message,
-            "requestedSchema": schema,  # type: ignore[assignment]
+            "requestedSchema": schema,
         }
         event_text = sse_request(req_id, "elicitation/create", params)
         push_to_session(self.session, event_text)
@@ -214,14 +213,14 @@ class ToolCallContext:
         if self.session is None:
             return
 
-        params: JSONObject = {
-            "progressToken": token,  # type: ignore[assignment]
+        params: dict[str, JSONValue] = {
+            "progressToken": token,
             "progress": value,
         }
         if total is not None:
-            params["total"] = total  # type: ignore[assignment]
+            params["total"] = total
         if label is not None:
-            params["message"] = label  # type: ignore[assignment]
+            params["message"] = label
 
         event_text = sse_notification("notifications/progress", params)
         push_to_session(self.session, event_text)

@@ -25,48 +25,48 @@ from __future__ import annotations
 import secrets
 from typing import Final
 
-from musehub.contracts.json_types import JSONObject
+from musehub.contracts.json_types import JSONObject, JSONValue
 
 # ── Musical key signatures ────────────────────────────────────────────────────
 
-_KEYS: list[str] = [
+_KEYS: list[JSONValue] = [
     "C major", "G major", "D major", "A major", "E major", "B major",
     "F# major", "Db major", "Ab major", "Eb major", "Bb major", "F major",
     "A minor", "E minor", "B minor", "F# minor", "C# minor", "G# minor",
     "D# minor", "Bb minor", "F minor", "C minor", "G minor", "D minor",
 ]
 
-_MOODS: list[str] = [
+_MOODS: list[JSONValue] = [
     "joyful", "melancholic", "tense", "peaceful", "energetic",
     "mysterious", "romantic", "triumphant", "nostalgic", "ethereal",
 ]
 
-_GENRES: list[str] = [
+_GENRES: list[JSONValue] = [
     "ambient", "jazz", "classical", "electronic", "hip-hop",
     "folk", "film score", "lo-fi", "neo-soul", "experimental",
 ]
 
-_DAWS: list[str] = [
+_DAWS: list[JSONValue] = [
     "Logic Pro", "Ableton Live", "FL Studio", "Pro Tools", "Bitwig Studio",
     "Reaper", "GarageBand", "Cubase", "Studio One", "Other",
 ]
 
-_PLATFORMS: list[str] = [
+_PLATFORMS: list[JSONValue] = [
     "Spotify", "SoundCloud", "Bandcamp", "YouTube Music", "Apple Music",
     "TIDAL", "Amazon Music", "Deezer",
 ]
 
-_DAW_CLOUDS: list[str] = [
+_DAW_CLOUDS: list[JSONValue] = [
     "LANDR", "Splice", "Soundtrap", "BandLab", "Audiotool",
 ]
 
-_REVIEW_DIMENSIONS: list[str] = [
+_REVIEW_DIMENSIONS: list[JSONValue] = [
     "all", "melodic", "harmonic", "rhythmic", "structural", "dynamic",
 ]
 
-_REVIEW_DEPTHS: list[str] = ["quick", "standard", "thorough"]
+_REVIEW_DEPTHS: list[JSONValue] = ["quick", "standard", "thorough"]
 
-_TIME_SIGNATURES: list[str] = [
+_TIME_SIGNATURES: list[JSONValue] = [
     "4/4", "3/4", "6/8", "5/4", "7/8", "12/8", "2/4",
 ]
 
@@ -296,13 +296,13 @@ SCHEMAS: Final[dict[str, JSONObject]] = {
 }
 
 # Expose key lists for use in tool definitions.
-AVAILABLE_KEYS: list[str] = _KEYS
-AVAILABLE_MOODS: list[str] = _MOODS
-AVAILABLE_GENRES: list[str] = _GENRES
-AVAILABLE_DAWS: list[str] = _DAWS
-AVAILABLE_PLATFORMS: list[str] = _PLATFORMS
-AVAILABLE_DAW_CLOUDS: list[str] = _DAW_CLOUDS
-AVAILABLE_REVIEW_DIMS: list[str] = _REVIEW_DIMENSIONS
+AVAILABLE_KEYS: list[JSONValue] = _KEYS
+AVAILABLE_MOODS: list[JSONValue] = _MOODS
+AVAILABLE_GENRES: list[JSONValue] = _GENRES
+AVAILABLE_DAWS: list[JSONValue] = _DAWS
+AVAILABLE_PLATFORMS: list[JSONValue] = _PLATFORMS
+AVAILABLE_DAW_CLOUDS: list[JSONValue] = _DAW_CLOUDS
+AVAILABLE_REVIEW_DIMS: list[JSONValue] = _REVIEW_DIMENSIONS
 
 
 # ── Builder helpers ───────────────────────────────────────────────────────────
@@ -332,7 +332,7 @@ def build_form_elicitation(
     return {
         "mode": "form",
         "message": message,
-        "requestedSchema": schema,  # type: ignore[assignment]
+        "requestedSchema": schema,
     }
 
 

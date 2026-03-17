@@ -21,7 +21,7 @@ import json
 import logging
 from typing import AsyncIterator
 
-from musehub.contracts.json_types import JSONObject
+from musehub.contracts.json_types import JSONObject, JSONValue
 
 logger = logging.getLogger(__name__)
 
@@ -92,10 +92,10 @@ def sse_notification(
     Returns:
         Formatted SSE event string.
     """
-    message: JSONObject = {"jsonrpc": "2.0", "method": method}
+    payload: dict[str, JSONValue] = {"jsonrpc": "2.0", "method": method}
     if params is not None:
-        message["params"] = params  # type: ignore[assignment]
-    return sse_event(message, event_id=event_id)
+        payload["params"] = params
+    return sse_event(payload, event_id=event_id)
 
 
 def sse_request(
@@ -118,14 +118,14 @@ def sse_request(
     Returns:
         Formatted SSE event string.
     """
-    message: JSONObject = {
+    payload: dict[str, JSONValue] = {
         "jsonrpc": "2.0",
-        "id": req_id,  # type: ignore[assignment]
+        "id": req_id,
         "method": method,
     }
     if params is not None:
-        message["params"] = params  # type: ignore[assignment]
-    return sse_event(message, event_id=event_id)
+        payload["params"] = params
+    return sse_event(payload, event_id=event_id)
 
 
 def sse_response(
@@ -147,8 +147,8 @@ def sse_response(
     Returns:
         Formatted SSE event string.
     """
-    message: JSONObject = {"jsonrpc": "2.0", "id": req_id, "result": result}  # type: ignore[assignment]
-    return sse_event(message, event_id=event_id)
+    payload: dict[str, JSONValue] = {"jsonrpc": "2.0", "id": req_id, "result": result}
+    return sse_event(payload, event_id=event_id)
 
 
 async def heartbeat_stream(

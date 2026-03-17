@@ -43,11 +43,11 @@ router = APIRouter(tags=["MCP Elicitation UI"])
 # ── Slug → display name lookup ────────────────────────────────────────────────
 
 _PLATFORM_BY_SLUG: dict[str, str] = {
-    p.lower().replace(" ", "-"): p for p in AVAILABLE_PLATFORMS
+    p.lower().replace(" ", "-"): p for p in AVAILABLE_PLATFORMS if isinstance(p, str)
 }
 
 _DAW_BY_SLUG: dict[str, str] = {
-    s.lower().replace(" ", "-"): s for s in AVAILABLE_DAW_CLOUDS
+    s.lower().replace(" ", "-"): s for s in AVAILABLE_DAW_CLOUDS if isinstance(s, str)
 }
 
 # Placeholder OAuth URLs — replace with real platform OAuth endpoints in production.
@@ -245,7 +245,7 @@ def _signal_elicitation_complete(elicitation_id: str, *, action: str = "accept")
     resolved = 0
     for sess in list(session_store._SESSIONS.values()):
         # Try resolving the elicitation_id as a pending key.
-        did_resolve = resolve_elicitation(sess, elicitation_id, {"action": action})  # type: ignore[arg-type]
+        did_resolve = resolve_elicitation(sess, elicitation_id, {"action": action})
         if did_resolve:
             resolved += 1
             # Also push a notification so any listening SSE stream sees it.

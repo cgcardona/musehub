@@ -600,7 +600,7 @@ def _handle_elicitation_complete(
         return
     # URL-mode elicitations use the elicitation_id as the pending key.
     from musehub.mcp.session import resolve_elicitation
-    resolved = resolve_elicitation(session, elicitation_id, {"action": "accept"})  # type: ignore[arg-type]
+    resolved = resolve_elicitation(session, elicitation_id, {"action": "accept"})
     if resolved:
         logger.info(
             "URL elicitation completed (session %.8s..., id=%s)",

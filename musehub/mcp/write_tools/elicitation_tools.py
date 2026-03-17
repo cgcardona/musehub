@@ -33,6 +33,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from musehub.contracts.json_types import JSONValue
 from musehub.mcp.elicitation import (
     SCHEMAS,
     AVAILABLE_PLATFORMS,
@@ -103,13 +104,15 @@ async def execute_compose_with_preferences(
 
     await ctx.progress("compose", 1, 4, "Generating harmonic framework…")
 
-    key = prefs.get("key", "C major")
-    tempo = int(prefs.get("tempo_bpm", 120))
-    time_sig = prefs.get("time_signature", "4/4")
-    mood = prefs.get("mood", "peaceful")
-    genre = prefs.get("genre", "ambient")
-    reference = prefs.get("reference_artist", "")
-    duration = int(prefs.get("duration_bars", 64))
+    key = str(prefs.get("key", "C major"))
+    _tempo = prefs.get("tempo_bpm", 120)
+    tempo = int(_tempo) if isinstance(_tempo, (int, float)) else 120
+    time_sig = str(prefs.get("time_signature", "4/4"))
+    mood = str(prefs.get("mood", "peaceful"))
+    genre = str(prefs.get("genre", "ambient"))
+    reference = str(prefs.get("reference_artist", ""))
+    _duration = prefs.get("duration_bars", 64)
+    duration = int(_duration) if isinstance(_duration, (int, float)) else 64
     modulate = bool(prefs.get("include_modulation", False))
 
     plan = _build_composition_plan(
@@ -148,10 +151,10 @@ def _build_composition_plan(
     reference: str,
     duration_bars: int,
     modulate: bool,
-) -> dict[str, object]:
+) -> dict[str, JSONValue]:
     """Generate a structured composition plan from user preferences."""
     # Key → relative minor / parallel minor / subdominant / dominant
-    _chords_by_key: dict[str, list[str]] = {
+    _chords_by_key: dict[str, list[JSONValue]] = {
         "C major": ["Cmaj7", "Am7", "Fmaj7", "G7"],
         "G major": ["Gmaj7", "Em7", "Cmaj7", "D7"],
         "D major": ["Dmaj7", "Bm7", "Gmaj7", "A7"],
@@ -165,7 +168,7 @@ def _build_composition_plan(
         "D minor": ["Dm7", "Bbmaj7", "C7", "Am7b5"],
         "G minor": ["Gm7", "Ebmaj7", "F7", "Dm7b5"],
     }
-    chords = _chords_by_key.get(key, ["Imaj7", "vim7", "IVmaj7", "V7"])
+    chords: list[JSONValue] = _chords_by_key.get(key, ["Imaj7", "vim7", "IVmaj7", "V7"])
 
     # Mood → harmonic tension profile
     tension_map: dict[str, str] = {
@@ -198,7 +201,7 @@ def _build_composition_plan(
     texture = texture_map.get(genre, "balanced — choose instrumentation freely")
 
     # Structure (bars allocation)
-    sections: list[dict[str, object]] = []
+    sections: list[JSONValue] = []
     remaining = duration_bars
     parts = [
         ("intro", max(4, duration_bars // 8)),
@@ -218,6 +221,7 @@ def _build_composition_plan(
         if remaining <= 0:
             break
 
+    intro_bars = parts[0][1]
     return {
         "composition_plan": {
             "key": key,
@@ -234,7 +238,7 @@ def _build_composition_plan(
             "sections": sections,
             "workflow": [
                 "1. Create a new Muse project with these settings.",
-                f"2. Start with a {sections[0]['bars']}-bar intro using {chords[0]} → {chords[2]}.",
+                f"2. Start with a {intro_bars}-bar intro using {chords[0]} → {chords[2]}.",
                 "3. Build each section in order; use musehub_create_issue per section.",
                 "4. Commit after each section: 'feat: add [section] in [key]'.",
                 "5. Open a PR for review once the full structure is in place.",
@@ -290,11 +294,11 @@ async def execute_review_pr_interactive(
             error_message="User declined the PR review focus form.",
         )
 
-    dimension = prefs.get("dimension_focus", "all")
-    depth = prefs.get("review_depth", "standard")
+    dimension = str(prefs.get("dimension_focus", "all"))
+    depth = str(prefs.get("review_depth", "standard"))
     check_harmonic = bool(prefs.get("check_harmonic_tension", True))
     check_rhythmic = bool(prefs.get("check_rhythmic_consistency", True))
-    note = prefs.get("reviewer_note", "")
+    note = str(prefs.get("reviewer_note", ""))
 
     await ctx.progress("review", 0, 3, f"Analysing PR {pr_id[:8]}… ({dimension} / {depth})")
 
@@ -303,8 +307,8 @@ async def execute_review_pr_interactive(
     from musehub.db.database import AsyncSessionLocal
     from musehub.services import musehub_pull_requests, musehub_divergence
 
-    db_ok = await _check_db_available()
-    if not db_ok:
+    db_ok = _check_db_available()
+    if db_ok is not None:
         return MusehubToolResult(
             ok=False,
             error_code="db_unavailable",
@@ -332,7 +336,7 @@ async def execute_review_pr_interactive(
 
     await ctx.progress("review", 2, 3, "Building review report…")
 
-    review: dict[str, object] = {
+    review: dict[str, JSONValue] = {
         "pr_id": pr_id,
         "repo_id": repo_id,
         "from_branch": pr.from_branch,
@@ -343,7 +347,7 @@ async def execute_review_pr_interactive(
     }
 
     if div_result:
-        dims = [
+        dims: list[JSONValue] = [
             {
                 "dimension": d.dimension,
                 "score": d.score,
@@ -379,7 +383,7 @@ async def execute_review_pr_interactive(
                     f"🥁 Rhythmic consistency: score {rhythmic.score:.0%} — "
                     "check for tempo drift or conflicting groove patterns."
                 )
-        review["findings"] = findings or ["No significant issues detected."]
+        review["findings"] = list(findings) if findings else ["No significant issues detected."]
         review["recommendation"] = (
             "APPROVE" if div_result.overall_score < 0.3
             else "REQUEST_CHANGES" if div_result.overall_score > 0.6
@@ -518,7 +522,7 @@ async def execute_connect_daw_cloud(
 
     if not service or service not in AVAILABLE_DAW_CLOUDS:
         # Elicit the service choice via a simple form.
-        schema: dict[str, object] = {
+        schema: dict[str, JSONValue] = {
             "type": "object",
             "properties": {
                 "service": {
@@ -593,8 +597,8 @@ async def execute_connect_daw_cloud(
     )
 
 
-def _daw_capabilities(service: str) -> list[str]:
-    caps: dict[str, list[str]] = {
+def _daw_capabilities(service: str) -> list[JSONValue]:
+    caps: dict[str, list[JSONValue]] = {
         "LANDR": ["AI mastering", "stems export", "distribution to 150+ platforms"],
         "Splice": ["sample sync", "project backup", "stem download"],
         "Soundtrap": ["browser-based DAW", "real-time collaboration", "podcast tools"],

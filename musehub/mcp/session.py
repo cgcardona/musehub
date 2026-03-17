@@ -19,6 +19,8 @@ import time
 from dataclasses import dataclass, field
 from typing import AsyncIterator
 
+from musehub.contracts.json_types import JSONObject
+
 logger = logging.getLogger(__name__)
 
 # Session TTL in seconds (1 hour); reset on each activity.
@@ -50,8 +52,8 @@ class MCPSession:
 
     session_id: str
     user_id: str | None
-    client_capabilities: dict[str, object]
-    pending: dict[str | int, asyncio.Future[dict[str, object]]] = field(
+    client_capabilities: JSONObject
+    pending: dict[str | int, asyncio.Future[JSONObject]] = field(
         default_factory=dict
     )
     sse_queues: list[asyncio.Queue[str | None]] = field(default_factory=list)
@@ -91,7 +93,7 @@ _cleanup_task: asyncio.Task[None] | None = None
 
 def create_session(
     user_id: str | None,
-    client_capabilities: dict[str, object],
+    client_capabilities: JSONObject,
 ) -> MCPSession:
     """Create a new MCP session and register it in the store.
 
@@ -227,7 +229,7 @@ async def register_sse_queue(
 def create_pending_elicitation(
     session: MCPSession,
     request_id: str | int,
-) -> asyncio.Future[dict[str, object]]:
+) -> asyncio.Future[JSONObject]:
     """Register a pending elicitation and return its Future.
 
     The Future is resolved by :func:`resolve_elicitation` when the client
@@ -241,7 +243,7 @@ def create_pending_elicitation(
         ``asyncio.Future`` that will be set to the client's response dict.
     """
     loop = asyncio.get_event_loop()
-    fut: asyncio.Future[dict[str, object]] = loop.create_future()
+    fut: asyncio.Future[JSONObject] = loop.create_future()
     session.pending[request_id] = fut
     return fut
 
@@ -249,7 +251,7 @@ def create_pending_elicitation(
 def resolve_elicitation(
     session: MCPSession,
     request_id: str | int,
-    result: dict[str, object],
+    result: JSONObject,
 ) -> bool:
     """Resolve a pending elicitation Future with the client's response.
 
