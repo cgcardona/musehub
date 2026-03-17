@@ -4,7 +4,6 @@ services:
   muse:
     build:
       context: .
-      target: builder
     volumes:
       - ./musehub:/app/musehub
       - ./tests:/app/tests
