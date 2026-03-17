@@ -22,7 +22,7 @@ Usage
 -----
 Run inside the container (bind mount makes this file available):
 
-    docker compose exec muse python3 /app/scripts/migrate_webhook_secrets.py
+    docker compose exec musehub python3 /app/scripts/migrate_webhook_secrets.py
 
 Requires MUSE_WEBHOOK_SECRET_KEY to be set; exits with an error if absent.
 """

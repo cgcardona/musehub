@@ -1,7 +1,7 @@
 # Development overrides — bind-mount source code so changes take effect
 # without a full image rebuild. Loaded automatically by docker compose.
 services:
-  muse:
+  musehub:
     build:
       context: .
     volumes:
@@ -10,7 +10,7 @@ services:
       - ./alembic:/app/alembic
       - ./scripts:/app/scripts
       - ./tourdeforce:/app/tourdeforce
-      - muse_data:/data
+      - musehub_data:/data
     environment:
       DEBUG: "true"
       CORS_ORIGINS: '["http://localhost:10003", "muse://"]'

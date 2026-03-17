@@ -16,7 +16,7 @@ Scale:
   - Commit objects (tracks) with real instrument roles for the breakdown bar
 
 Run inside the container:
-  docker compose exec muse python3 /app/scripts/seed_musehub.py
+  docker compose exec musehub python3 /app/scripts/seed_musehub.py
 
 Idempotent: pass --force to wipe and re-insert.
 """

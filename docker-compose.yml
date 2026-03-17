@@ -1,14 +1,14 @@
 services:
-  muse:
+  musehub:
     build: .
-    container_name: muse
+    container_name: musehub
     ports:
       - "10003:10003"
     env_file: .env
     environment:
       DATABASE_URL: "postgresql+asyncpg://musehub:${DB_PASSWORD:-musehub}@postgres:5432/musehub"
     volumes:
-      - muse_data:/data
+      - musehub_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -16,7 +16,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: muse_postgres
+    container_name: musehub_postgres
     environment:
       POSTGRES_DB: musehub
       POSTGRES_USER: musehub
@@ -31,5 +31,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  muse_data:
+  musehub_data:
   postgres_data:

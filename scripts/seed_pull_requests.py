@@ -24,8 +24,8 @@ Idempotent: checks existing PR count before inserting; pass --force to wipe
 and re-insert all PR seed data.
 
 Run inside the container:
-  docker compose exec muse python3 /app/scripts/seed_pull_requests.py
-  docker compose exec muse python3 /app/scripts/seed_pull_requests.py --force
+  docker compose exec musehub python3 /app/scripts/seed_pull_requests.py
+  docker compose exec musehub python3 /app/scripts/seed_pull_requests.py --force
 """
 from __future__ import annotations
 

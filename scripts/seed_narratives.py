@@ -19,7 +19,7 @@ Creates 5 interconnected stories that make demo data feel alive:
      25 debate (18 comments), Variation 29 PR with yuki requesting ornamentation.
 
 Run inside the container (after seed_musehub.py):
-  docker compose exec muse python3 /app/scripts/seed_narratives.py
+  docker compose exec musehub python3 /app/scripts/seed_narratives.py
 
 Idempotent: checks for the sentinel repo ID before inserting.
 Pass --force to wipe narrative data and re-insert.
