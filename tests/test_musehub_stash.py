@@ -294,7 +294,7 @@ async def test_stash_is_user_scoped(
     from musehub.auth.tokens import create_access_token
     from musehub.db.models import User
 
-    other_user = User(id=str(uuid.uuid4()), budget_cents=500, budget_limit_cents=500)
+    other_user = User(id=str(uuid.uuid4()))
     db_session.add(other_user)
     await db_session.commit()
     other_token = create_access_token(user_id=other_user.id, expires_hours=1)

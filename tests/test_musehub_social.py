@@ -269,7 +269,7 @@ async def test_delete_comment_forbidden_for_non_owner(
     from musehub.db.musehub_models import MusehubComment
 
     # Create a second user
-    other_user = User(id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", budget_cents=100, budget_limit_cents=100)
+    other_user = User(id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
     db_session.add(other_user)
     await db_session.commit()
     other_token = create_access_token(user_id=other_user.id, expires_hours=1)

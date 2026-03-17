@@ -11,7 +11,7 @@ from musehub.db.database import (
     close_db,
     AsyncSessionLocal,
 )
-from musehub.db.models import User, UsageLog, AccessToken
+from musehub.db.models import User, AccessToken
 from musehub.db import muse_cli_models as muse_cli_models  # noqa: F401 — register CLI commit tables with Base
 from musehub.db import musehub_models as musehub_models  # noqa: F401 — register with Base
 from musehub.db import musehub_label_models as musehub_label_models  # noqa: F401 — register with Base
@@ -24,6 +24,5 @@ __all__ = [
     "close_db",
     "AsyncSessionLocal",
     "User",
-    "UsageLog",
     "AccessToken",
 ]

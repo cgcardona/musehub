@@ -91,11 +91,9 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest_asyncio.fixture
 async def test_user(db_session: AsyncSession) -> User:
 
-    """Create a test user with budget (for authenticated route tests)."""
+    """Create a test user (for authenticated route tests)."""
     user = User(
         id="550e8400-e29b-41d4-a716-446655440000",
-        budget_cents=500,
-        budget_limit_cents=500,
     )
     db_session.add(user)
     await db_session.commit()

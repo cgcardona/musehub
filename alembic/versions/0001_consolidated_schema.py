@@ -8,18 +8,12 @@ THIS IS THE ONLY MIGRATION. All new tables are folded in here during
 development. Do NOT create new migration files — add tables directly to
 upgrade() and their drops (in reverse order) to the top of downgrade().
 
-Single source-of-truth migration for Muse. Creates:
+Creates:
 
-  Auth & usage
-  - muse_users, muse_usage_logs, muse_access_tokens
+  Auth
+  - muse_users, muse_access_tokens
 
-  Conversations
-  - muse_conversations, muse_conversation_messages, muse_message_actions
-
-  Muse — DAW-level variation history
-  - muse_variations, muse_phrases, muse_note_changes
-
-  Muse — filesystem commit history
+  Muse CLI — filesystem commit history
   - muse_objects, muse_snapshots, muse_commits
     (includes parent2_commit_id for merge commits; metadata JSON blob for
     commit-level annotations e.g. tempo_bpm set via ``muse tempo --set``)
@@ -49,7 +43,7 @@ Single source-of-truth migration for Muse. Creates:
   - musehub_repos.settings (nullable JSON column for feature-flag settings)
 
 Fresh install:
-  docker compose exec muse alembic upgrade head
+  docker compose exec musehub alembic upgrade head
 """
 from __future__ import annotations
 
@@ -68,28 +62,10 @@ def upgrade() -> None:
     op.create_table(
         "muse_users",
         sa.Column("id", sa.String(36), nullable=False),
-        sa.Column("budget_cents", sa.Integer(), nullable=False, server_default="500"),
-        sa.Column("budget_limit_cents", sa.Integer(), nullable=False, server_default="500"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.PrimaryKeyConstraint("id"),
     )
-
-    op.create_table(
-        "muse_usage_logs",
-        sa.Column("id", sa.String(36), nullable=False),
-        sa.Column("user_id", sa.String(36), nullable=False),
-        sa.Column("prompt", sa.Text(), nullable=True),
-        sa.Column("model", sa.String(100), nullable=False),
-        sa.Column("prompt_tokens", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("completion_tokens", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("cost_cents", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["user_id"], ["muse_users.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index("ix_muse_usage_logs_user_id", "muse_usage_logs", ["user_id"])
-    op.create_index("ix_muse_usage_logs_created_at", "muse_usage_logs", ["created_at"])
 
     op.create_table(
         "muse_access_tokens",
@@ -104,119 +80,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_muse_access_tokens_user_id", "muse_access_tokens", ["user_id"])
     op.create_index("ix_muse_access_tokens_token_hash", "muse_access_tokens", ["token_hash"], unique=True)
-
-    # ── Conversations ─────────────────────────────────────────────────────
-    op.create_table(
-        "muse_conversations",
-        sa.Column("id", sa.String(36), nullable=False),
-        sa.Column("user_id", sa.String(36), nullable=False),
-        sa.Column("project_id", sa.String(36), nullable=True),
-        sa.Column("title", sa.String(255), nullable=False, server_default="New Conversation"),
-        sa.Column("is_archived", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("project_context", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["user_id"], ["muse_users.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index("ix_muse_conversations_user_id", "muse_conversations", ["user_id"])
-    op.create_index("ix_muse_conversations_project_id", "muse_conversations", ["project_id"])
-    op.create_index("ix_muse_conversations_is_archived", "muse_conversations", ["is_archived"])
-    op.create_index("ix_muse_conversations_updated_at", "muse_conversations", ["updated_at"])
-
-    op.create_table(
-        "muse_conversation_messages",
-        sa.Column("id", sa.String(36), nullable=False),
-        sa.Column("conversation_id", sa.String(36), nullable=False),
-        sa.Column("role", sa.String(20), nullable=False),
-        sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("model_used", sa.String(100), nullable=True),
-        sa.Column("tokens_used", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("cost_cents", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("tool_calls", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("sse_events", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("extra_metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["conversation_id"], ["muse_conversations.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index("ix_muse_conversation_messages_conversation_id", "muse_conversation_messages", ["conversation_id"])
-    op.create_index("ix_muse_conversation_messages_timestamp", "muse_conversation_messages", ["timestamp"])
-
-    op.create_table(
-        "muse_message_actions",
-        sa.Column("id", sa.String(36), nullable=False),
-        sa.Column("message_id", sa.String(36), nullable=False),
-        sa.Column("action_type", sa.String(50), nullable=False),
-        sa.Column("description", sa.Text(), nullable=False),
-        sa.Column("success", sa.Boolean(), nullable=False),
-        sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("extra_metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.ForeignKeyConstraint(["message_id"], ["muse_conversation_messages.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index("ix_muse_message_actions_message_id", "muse_message_actions", ["message_id"])
-
-    # ── Muse VCS — DAW-level variation history ────────────────────────────
-    op.create_table(
-        "muse_variations",
-        sa.Column("variation_id", sa.String(36), nullable=False),
-        sa.Column("project_id", sa.String(36), nullable=False),
-        sa.Column("base_state_id", sa.String(36), nullable=False),
-        sa.Column("conversation_id", sa.String(36), nullable=False, server_default=""),
-        sa.Column("intent", sa.Text(), nullable=False),
-        sa.Column("explanation", sa.Text(), nullable=True),
-        sa.Column("status", sa.String(20), nullable=False, server_default="created"),
-        sa.Column("affected_tracks", sa.JSON(), nullable=True),
-        sa.Column("affected_regions", sa.JSON(), nullable=True),
-        sa.Column("beat_range_start", sa.Float(), nullable=False, server_default="0"),
-        sa.Column("beat_range_end", sa.Float(), nullable=False, server_default="0"),
-        sa.Column("parent_variation_id", sa.String(36), sa.ForeignKey("muse_variations.variation_id", ondelete="SET NULL"), nullable=True),
-        sa.Column("parent2_variation_id", sa.String(36), sa.ForeignKey("muse_variations.variation_id", ondelete="SET NULL"), nullable=True),
-        sa.Column("commit_state_id", sa.String(36), nullable=True),
-        sa.Column("is_head", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.PrimaryKeyConstraint("variation_id"),
-    )
-    op.create_index("ix_muse_variations_project_id", "muse_variations", ["project_id"])
-    op.create_index("ix_muse_variations_parent_variation_id", "muse_variations", ["parent_variation_id"])
-
-    op.create_table(
-        "muse_phrases",
-        sa.Column("phrase_id", sa.String(36), nullable=False),
-        sa.Column("variation_id", sa.String(36), nullable=False),
-        sa.Column("sequence", sa.Integer(), nullable=False),
-        sa.Column("track_id", sa.String(36), nullable=False),
-        sa.Column("region_id", sa.String(36), nullable=False),
-        sa.Column("start_beat", sa.Float(), nullable=False),
-        sa.Column("end_beat", sa.Float(), nullable=False),
-        sa.Column("label", sa.String(255), nullable=False),
-        sa.Column("tags", sa.JSON(), nullable=True),
-        sa.Column("explanation", sa.Text(), nullable=True),
-        sa.Column("cc_events", sa.JSON(), nullable=True),
-        sa.Column("pitch_bends", sa.JSON(), nullable=True),
-        sa.Column("aftertouch", sa.JSON(), nullable=True),
-        sa.Column("region_start_beat", sa.Float(), nullable=True),
-        sa.Column("region_duration_beats", sa.Float(), nullable=True),
-        sa.Column("region_name", sa.String(255), nullable=True),
-        sa.ForeignKeyConstraint(["variation_id"], ["muse_variations.variation_id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("phrase_id"),
-    )
-    op.create_index("ix_muse_phrases_variation_id", "muse_phrases", ["variation_id"])
-
-    op.create_table(
-        "muse_note_changes",
-        sa.Column("id", sa.String(36), nullable=False),
-        sa.Column("phrase_id", sa.String(36), nullable=False),
-        sa.Column("change_type", sa.String(20), nullable=False),
-        sa.Column("before_json", sa.JSON(), nullable=True),
-        sa.Column("after_json", sa.JSON(), nullable=True),
-        sa.ForeignKeyConstraint(["phrase_id"], ["muse_phrases.phrase_id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index("ix_muse_note_changes_phrase_id", "muse_note_changes", ["phrase_id"])
 
     # ── Muse CLI — filesystem commit history ──────────────────────────────
     op.create_table(
@@ -287,6 +150,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         # Soft-delete timestamp; non-null means the repo is logically deleted
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("settings", sa.JSON(), nullable=True),
         sa.PrimaryKeyConstraint("repo_id"),
         sa.UniqueConstraint("owner", "slug", name="uq_musehub_repos_owner_slug"),
     )
@@ -419,6 +283,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_issue_comments_issue_id", "musehub_issue_comments", ["issue_id"])
     op.create_index("ix_musehub_issue_comments_repo_id", "musehub_issue_comments", ["repo_id"])
     op.create_index("ix_musehub_issue_comments_parent_id", "musehub_issue_comments", ["parent_id"])
+    op.create_index("ix_musehub_issue_comments_created_at", "musehub_issue_comments", ["created_at"])
 
     # ── Muse Hub — issue-milestone join table ─────────────────────────────
     op.create_table(
@@ -442,7 +307,6 @@ def upgrade() -> None:
         "musehub_issue_milestones",
         ["milestone_id"],
     )
-    op.create_index("ix_musehub_issue_comments_created_at", "musehub_issue_comments", ["created_at"])
 
     # ── Muse Hub — pull requests ──────────────────────────────────────────
     op.create_table(
@@ -463,7 +327,6 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         # Set by merge_pr() at the exact moment of merge; NULL for open/unmerged PRs.
-        # Used by the timeline overlay to position PR markers at merge time, not open time.
         sa.Column("merged_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["repo_id"], ["musehub_repos.repo_id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("pr_id"),
@@ -572,17 +435,13 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(36), nullable=False),
         # URL-friendly handle, e.g. "gabriel" → /musehub/ui/users/gabriel
         sa.Column("username", sa.String(64), nullable=False),
-        # Human-readable display name shown in profile header (e.g. "Johann Sebastian Bach")
+        # Human-readable display name shown in profile header
         sa.Column("display_name", sa.String(255), nullable=True),
         sa.Column("bio", sa.Text(), nullable=True),
         sa.Column("avatar_url", sa.String(2048), nullable=True),
-        # Physical or virtual location shown on profile card
         sa.Column("location", sa.String(255), nullable=True),
-        # Personal website or project homepage URL
         sa.Column("website_url", sa.String(2048), nullable=True),
-        # Twitter/X handle without the leading @
         sa.Column("twitter_handle", sa.String(64), nullable=True),
-        # True for Public Domain and Creative Commons licensed archive artists
         sa.Column("is_verified", sa.Boolean(), nullable=False, server_default="false"),
         # CC attribution string, e.g. "Public Domain", "CC BY 4.0"; null = all rights reserved
         sa.Column("cc_license", sa.String(50), nullable=True),
@@ -659,7 +518,6 @@ def upgrade() -> None:
         ["event_type"],
     )
 
-
     # ── Muse Hub — releases ───────────────────────────────────────────────
     op.create_table(
         "musehub_releases",
@@ -717,8 +575,7 @@ def upgrade() -> None:
         "ix_musehub_release_assets_repo_id", "musehub_release_assets", ["repo_id"]
     )
 
-    # ── Muse Hub — social layer (Phase 4) ────────────────────────────────
-
+    # ── Muse Hub — social layer ────────────────────────────────────────────
     op.create_table(
         "musehub_comments",
         sa.Column("comment_id", sa.String(36), nullable=False),
@@ -839,7 +696,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_download_events_repo_id", "musehub_download_events", ["repo_id"])
     op.create_index("ix_musehub_download_events_created_at", "musehub_download_events", ["created_at"])
 
-    # ── MuseHub — render pipeline (Phase 5) ──────────────────────────────
+    # ── Muse Hub — render pipeline ─────────────────────────────────────────
     op.create_table(
         "musehub_render_jobs",
         sa.Column("render_job_id", sa.String(36), nullable=False),
@@ -870,7 +727,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_render_jobs_commit_id", "musehub_render_jobs", ["commit_id"])
     op.create_index("ix_musehub_render_jobs_status", "musehub_render_jobs", ["status"])
 
-    # ── MuseHub — activity event stream (Phase 6) ─────────────────────────
+    # ── Muse Hub — activity event stream ──────────────────────────────────
     op.create_table(
         "musehub_events",
         sa.Column("event_id", sa.String(36), nullable=False),
@@ -892,7 +749,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_events_event_type", "musehub_events", ["event_type"])
     op.create_index("ix_musehub_events_created_at", "musehub_events", ["created_at"])
 
-    # Muse Hub — labels (folded from 0003_labels)
+    # ── Muse Hub — labels ─────────────────────────────────────────────────
     op.create_table(
         "musehub_labels",
         sa.Column("id", sa.String(36), nullable=False),
@@ -932,7 +789,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_musehub_pr_labels_label_id", "musehub_pr_labels", ["label_id"])
 
-    # Muse Hub — collaborators (folded from 0004_collaborators)
+    # ── Muse Hub — collaborators ──────────────────────────────────────────
     op.create_table(
         "musehub_collaborators",
         sa.Column("id", sa.String(36), nullable=False),
@@ -956,7 +813,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_collaborators_repo_id", "musehub_collaborators", ["repo_id"])
     op.create_index("ix_musehub_collaborators_user_id", "musehub_collaborators", ["user_id"])
 
-    # Muse Hub — stash (folded from 0005_stash)
+    # ── Muse Hub — stash ──────────────────────────────────────────────────
     op.create_table(
         "musehub_stash",
         sa.Column("id", sa.String(36), nullable=False),
@@ -991,7 +848,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_musehub_stash_entries_stash_id", "musehub_stash_entries", ["stash_id"])
 
-    # Muse Hub — PR reviews (folded from 0006_pr_reviews)
+    # ── Muse Hub — PR reviews ─────────────────────────────────────────────
     op.create_table(
         "musehub_pr_reviews",
         sa.Column("id", sa.String(36), nullable=False),
@@ -1021,40 +878,25 @@ def upgrade() -> None:
     )
     op.create_index("ix_musehub_pr_reviews_state", "musehub_pr_reviews", ["state"])
 
-    # Muse Hub — repo settings (folded from 0006_repo_settings)
-    op.add_column(
-        "musehub_repos",
-        sa.Column("settings", sa.JSON(), nullable=True),
-    )
-
 
 def downgrade() -> None:
     # Drop in reverse creation order, respecting foreign-key dependencies.
 
-    # Muse Hub — PR reviews (folded from 0006_pr_reviews)
     op.drop_index("ix_musehub_pr_reviews_state", table_name="musehub_pr_reviews")
-    op.drop_index(
-        "ix_musehub_pr_reviews_reviewer_username", table_name="musehub_pr_reviews"
-    )
+    op.drop_index("ix_musehub_pr_reviews_reviewer_username", table_name="musehub_pr_reviews")
     op.drop_index("ix_musehub_pr_reviews_pr_id", table_name="musehub_pr_reviews")
     op.drop_table("musehub_pr_reviews")
 
-    # Muse Hub — repo settings (folded from 0006_repo_settings)
-    op.drop_column("musehub_repos", "settings")
-
-    # Muse Hub — stash (folded from 0005_stash)
     op.drop_index("ix_musehub_stash_entries_stash_id", table_name="musehub_stash_entries")
     op.drop_table("musehub_stash_entries")
     op.drop_index("ix_musehub_stash_user_id", table_name="musehub_stash")
     op.drop_index("ix_musehub_stash_repo_id", table_name="musehub_stash")
     op.drop_table("musehub_stash")
 
-    # Muse Hub — collaborators (folded from 0004_collaborators)
     op.drop_index("ix_musehub_collaborators_user_id", table_name="musehub_collaborators")
     op.drop_index("ix_musehub_collaborators_repo_id", table_name="musehub_collaborators")
     op.drop_table("musehub_collaborators")
 
-    # Muse Hub — labels (folded from 0003_labels)
     op.drop_index("ix_musehub_pr_labels_label_id", table_name="musehub_pr_labels")
     op.drop_table("musehub_pr_labels")
     op.drop_index("ix_musehub_issue_labels_label_id", table_name="musehub_issue_labels")
@@ -1062,19 +904,16 @@ def downgrade() -> None:
     op.drop_index("ix_musehub_labels_repo_id", table_name="musehub_labels")
     op.drop_table("musehub_labels")
 
-    # MuseHub — activity event stream (Phase 6)
     op.drop_index("ix_musehub_events_created_at", table_name="musehub_events")
     op.drop_index("ix_musehub_events_event_type", table_name="musehub_events")
     op.drop_index("ix_musehub_events_repo_id", table_name="musehub_events")
     op.drop_table("musehub_events")
 
-    # MuseHub — render pipeline (Phase 5)
     op.drop_index("ix_musehub_render_jobs_status", table_name="musehub_render_jobs")
     op.drop_index("ix_musehub_render_jobs_commit_id", table_name="musehub_render_jobs")
     op.drop_index("ix_musehub_render_jobs_repo_id", table_name="musehub_render_jobs")
     op.drop_table("musehub_render_jobs")
 
-    # Muse Hub — social layer (Phase 4)
     op.drop_index("ix_musehub_download_events_created_at", table_name="musehub_download_events")
     op.drop_index("ix_musehub_download_events_repo_id", table_name="musehub_download_events")
     op.drop_table("musehub_download_events")
@@ -1105,111 +944,83 @@ def downgrade() -> None:
     op.drop_index("ix_musehub_comments_repo_id", table_name="musehub_comments")
     op.drop_table("musehub_comments")
 
-    # Muse Hub — profiles (no FK deps from other tables)
     op.drop_index("ix_musehub_profiles_is_verified", table_name="musehub_profiles")
     op.drop_index("ix_musehub_profiles_username", table_name="musehub_profiles")
     op.drop_table("musehub_profiles")
 
-    # Muse Hub — webhook deliveries (depends on webhooks)
     op.drop_index("ix_musehub_webhook_deliveries_event_type", table_name="musehub_webhook_deliveries")
     op.drop_index("ix_musehub_webhook_deliveries_webhook_id", table_name="musehub_webhook_deliveries")
     op.drop_table("musehub_webhook_deliveries")
-
-    # Muse Hub — webhooks (depends on repos)
     op.drop_index("ix_musehub_webhooks_repo_id", table_name="musehub_webhooks")
     op.drop_table("musehub_webhooks")
 
-    # Muse Hub — release assets (depends on musehub_releases)
-    op.drop_index(
-        "ix_musehub_release_assets_repo_id", table_name="musehub_release_assets"
-    )
-    op.drop_index(
-        "ix_musehub_release_assets_release_id", table_name="musehub_release_assets"
-    )
+    op.drop_index("ix_musehub_release_assets_repo_id", table_name="musehub_release_assets")
+    op.drop_index("ix_musehub_release_assets_release_id", table_name="musehub_release_assets")
     op.drop_table("musehub_release_assets")
-
-    # Muse Hub — releases (depends on repos)
     op.drop_index("ix_musehub_releases_tag", table_name="musehub_releases")
     op.drop_index("ix_musehub_releases_repo_id", table_name="musehub_releases")
     op.drop_table("musehub_releases")
 
-    # Muse Hub — sessions (depends on repos)
     op.drop_index("ix_musehub_sessions_is_active", table_name="musehub_sessions")
     op.drop_index("ix_musehub_sessions_started_at", table_name="musehub_sessions")
     op.drop_index("ix_musehub_sessions_repo_id", table_name="musehub_sessions")
     op.drop_table("musehub_sessions")
 
-    # Muse Hub — stars (depends on repos)
     op.drop_index("ix_musehub_stars_user_id", table_name="musehub_stars")
     op.drop_index("ix_musehub_stars_repo_id", table_name="musehub_stars")
     op.drop_table("musehub_stars")
 
-    # Muse Hub — binary artifact storage (depends on repos)
     op.drop_index("ix_musehub_objects_repo_id", table_name="musehub_objects")
     op.drop_table("musehub_objects")
 
-    # Muse Hub — PR review comments (depends on pull_requests)
     op.drop_index("ix_musehub_pr_comments_created_at", table_name="musehub_pr_comments")
     op.drop_index("ix_musehub_pr_comments_parent_comment_id", table_name="musehub_pr_comments")
     op.drop_index("ix_musehub_pr_comments_repo_id", table_name="musehub_pr_comments")
     op.drop_index("ix_musehub_pr_comments_pr_id", table_name="musehub_pr_comments")
     op.drop_table("musehub_pr_comments")
 
-    # Muse Hub — pull requests (depends on repos; merged_at included in table creation)
     op.drop_index("ix_musehub_pull_requests_state", table_name="musehub_pull_requests")
     op.drop_index("ix_musehub_pull_requests_repo_id", table_name="musehub_pull_requests")
     op.drop_table("musehub_pull_requests")
 
-    # Muse Hub — issue comments (depends on issues and repos)
     op.drop_index("ix_musehub_issue_comments_created_at", table_name="musehub_issue_comments")
     op.drop_index("ix_musehub_issue_comments_parent_id", table_name="musehub_issue_comments")
     op.drop_index("ix_musehub_issue_comments_repo_id", table_name="musehub_issue_comments")
     op.drop_index("ix_musehub_issue_comments_issue_id", table_name="musehub_issue_comments")
     op.drop_table("musehub_issue_comments")
 
-    # Muse Hub — issue-milestone join table (depends on issues and milestones)
-    op.drop_index(
-        "ix_musehub_issue_milestones_milestone_id",
-        table_name="musehub_issue_milestones",
-    )
+    op.drop_index("ix_musehub_issue_milestones_milestone_id", table_name="musehub_issue_milestones")
     op.drop_table("musehub_issue_milestones")
 
-    # Muse Hub — issues (depends on repos and milestones)
     op.drop_index("ix_musehub_issues_milestone_id", table_name="musehub_issues")
     op.drop_index("ix_musehub_issues_state", table_name="musehub_issues")
     op.drop_index("ix_musehub_issues_number", table_name="musehub_issues")
     op.drop_index("ix_musehub_issues_repo_id", table_name="musehub_issues")
     op.drop_table("musehub_issues")
 
-    # Muse Hub — milestones (depends on repos)
     op.drop_index("ix_musehub_milestones_state", table_name="musehub_milestones")
     op.drop_index("ix_musehub_milestones_number", table_name="musehub_milestones")
     op.drop_index("ix_musehub_milestones_repo_id", table_name="musehub_milestones")
     op.drop_table("musehub_milestones")
 
-    # Muse Hub — commits (depends on repos)
     op.drop_index("ix_musehub_commits_timestamp", table_name="musehub_commits")
     op.drop_index("ix_musehub_commits_branch", table_name="musehub_commits")
     op.drop_index("ix_musehub_commits_repo_id", table_name="musehub_commits")
     op.drop_table("musehub_commits")
 
-    # Muse Hub — branches (depends on repos)
     op.drop_index("ix_musehub_branches_repo_id", table_name="musehub_branches")
     op.drop_table("musehub_branches")
 
-    # Muse Hub — repos (root)
     op.drop_index("ix_musehub_repos_owner_user_id", table_name="musehub_repos")
     op.drop_index("ix_musehub_repos_slug", table_name="musehub_repos")
     op.drop_index("ix_musehub_repos_owner", table_name="musehub_repos")
     op.drop_table("musehub_repos")
 
-    # Muse CLI — tags (depends on commits)
     op.drop_index("ix_muse_tags_tag", table_name="muse_tags")
     op.drop_index("ix_muse_tags_commit_id", table_name="muse_tags")
     op.drop_index("ix_muse_tags_repo_id", table_name="muse_tags")
     op.drop_table("muse_tags")
 
-    # Muse CLI — commits (depends on snapshots)
     op.drop_index("ix_muse_commits_parent2_commit_id", table_name="muse_commits")
     op.drop_index("ix_muse_commits_parent_commit_id", table_name="muse_commits")
     op.drop_index("ix_muse_commits_repo_id", table_name="muse_commits")
@@ -1218,32 +1029,7 @@ def downgrade() -> None:
     op.drop_table("muse_snapshots")
     op.drop_table("muse_objects")
 
-    # Muse VCS
-    op.drop_index("ix_muse_note_changes_phrase_id", table_name="muse_note_changes")
-    op.drop_table("muse_note_changes")
-    op.drop_index("ix_muse_phrases_variation_id", table_name="muse_phrases")
-    op.drop_table("muse_phrases")
-    op.drop_index("ix_muse_variations_parent_variation_id", table_name="muse_variations")
-    op.drop_index("ix_muse_variations_project_id", table_name="muse_variations")
-    op.drop_table("muse_variations")
-
-    # Conversations
-    op.drop_index("ix_muse_message_actions_message_id", table_name="muse_message_actions")
-    op.drop_table("muse_message_actions")
-    op.drop_index("ix_muse_conversation_messages_timestamp", table_name="muse_conversation_messages")
-    op.drop_index("ix_muse_conversation_messages_conversation_id", table_name="muse_conversation_messages")
-    op.drop_table("muse_conversation_messages")
-    op.drop_index("ix_muse_conversations_updated_at", table_name="muse_conversations")
-    op.drop_index("ix_muse_conversations_is_archived", table_name="muse_conversations")
-    op.drop_index("ix_muse_conversations_project_id", table_name="muse_conversations")
-    op.drop_index("ix_muse_conversations_user_id", table_name="muse_conversations")
-    op.drop_table("muse_conversations")
-
-    # Auth & usage
     op.drop_index("ix_muse_access_tokens_token_hash", table_name="muse_access_tokens")
     op.drop_index("ix_muse_access_tokens_user_id", table_name="muse_access_tokens")
     op.drop_table("muse_access_tokens")
-    op.drop_index("ix_muse_usage_logs_created_at", table_name="muse_usage_logs")
-    op.drop_index("ix_muse_usage_logs_user_id", table_name="muse_usage_logs")
-    op.drop_table("muse_usage_logs")
     op.drop_table("muse_users")
