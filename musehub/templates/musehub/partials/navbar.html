@@ -1,61 +1,67 @@
 {#
-  Global navigation bar — included in base.html on every MuseHub page.
+  Global navigation bar.
 
-  Provides:
-    - MuseHub logo / home link
-    - Search bar (GET /musehub/ui/search?q={query})
-    - Explore link
-    - Notifications bell (badge populated client-side)
-    - Sign-out button (shown client-side when a JWT is stored)
-    - Hamburger collapse on mobile (CSS :target / checkbox trick, no JS required)
-
-  No template variables required — this partial is fully self-contained.
-  JS hooks: #nav-notif-badge, #signout-btn (same IDs as the previous inline header).
+  - MuseHub logo / home link (SVG logomark + wordmark)
+  - Search bar
+  - Explore link
+  - Notifications bell (Lucide icon, badge populated client-side)
+  - Sign-out button (shown client-side when a JWT is stored)
+  - Hamburger collapse on mobile (CSS :target / checkbox trick, no JS required)
 #}
 <header class="musehub-navbar" role="banner" aria-label="MuseHub global navigation">
   <div class="navbar-inner">
 
     {# ── Logo ── #}
     <a href="/musehub/ui/explore" class="navbar-logo" aria-label="MuseHub home">
-      &#127925; Muse Hub
+      <svg class="navbar-logo-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 18V5l12-2v13"/>
+        <circle cx="6" cy="18" r="3"/>
+        <circle cx="18" cy="16" r="3"/>
+      </svg>
+      <span class="navbar-logo-text">Muse Hub</span>
     </a>
 
-    {# ── Search (no-JS: plain GET form) ── #}
+    {# ── Search ── #}
     <form class="navbar-search-form"
           action="/musehub/ui/search"
           method="get"
           role="search"
           aria-label="Search MuseHub">
+      <svg class="navbar-search-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+      </svg>
       <input  type="search"
               name="q"
               class="navbar-search-input"
-              placeholder="Search repositories, commits, sessions&#8230;"
+              placeholder="Search repositories, commits, sessions…"
               aria-label="Search query"
               autocomplete="off"
               spellcheck="false">
-      <button type="submit" class="navbar-search-btn" aria-label="Submit search">&#128269;</button>
     </form>
 
     {# ── Hamburger toggle (CSS-only, no JS required for collapse) ── #}
     <label class="navbar-hamburger" for="navbar-toggle" aria-label="Toggle navigation menu">
-      <span></span>
-      <span></span>
-      <span></span>
+      <span></span><span></span><span></span>
     </label>
     <input type="checkbox" id="navbar-toggle" class="navbar-toggle-input" aria-hidden="true">
 
     {# ── Action links ── #}
     <nav class="navbar-actions" aria-label="Site navigation">
       <a href="/musehub/ui/explore" class="navbar-link">Explore</a>
+
       <a href="/musehub/ui/feed"
-         class="navbar-link nav-notif-bell"
+         class="navbar-link navbar-icon-btn"
          title="Notifications"
          aria-label="Notifications">
-        &#128276;
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+        </svg>
         <span id="nav-notif-badge" class="nav-notif-badge" aria-live="polite">0</span>
       </a>
+
       <button id="signout-btn"
-              class="btn btn-secondary btn-sm navbar-signout"
+              class="btn btn-ghost btn-sm navbar-signout"
               style="display:none"
               onclick="clearToken();location.reload()"
               type="button">

@@ -1,39 +1,28 @@
 {#
-  Repo-level tab strip — standalone partial.
+  Repo-level tab strip.
 
-  Tabs: Commits | Graph | Pull Requests | Issues | Releases | Sessions |
-        Analysis | Credits | Insights | Search | Arrange | Activity
-
-  Required Jinja2 variables (passed from ui.py → page template):
-    base_url     str  — canonical UI base URL (/musehub/ui/{owner}/{repo_slug})
-    current_page str  — active tab key:
-                        commits | graph | pulls | issues | releases |
-                        sessions | analysis | credits | insights | search | arrange | activity
-
-  Count badges (open PRs, open issues) are loaded client-side by
-  ``loadNavCounts()`` in musehub.js so route handlers stay unauthenticated.
-
-  This partial contains only the tab strip.  The repo identity card (owner /
-  repo name, star button, metadata pills) lives in repo_nav.html, which
-  includes this partial after the identity card.
+  Required variables: base_url, current_page
 #}
 <nav class="repo-tabs" id="repo-tabs" hx-boost="true" aria-label="Repository navigation">
 
   <a href="{{ base_url }}"
      class="repo-tab{% if current_page == 'commits' %} active{% endif %}"
      {% if current_page == 'commits' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
     Commits
   </a>
 
   <a href="{{ base_url }}/graph"
      class="repo-tab{% if current_page == 'graph' %} active{% endif %}"
      {% if current_page == 'graph' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     Graph
   </a>
 
   <a href="{{ base_url }}/pulls"
      class="repo-tab{% if current_page == 'pulls' %} active{% endif %}"
      {% if current_page == 'pulls' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
     Pull Requests
     <span class="tab-count" id="nav-pr-count" style="display:none"></span>
   </a>
@@ -41,6 +30,7 @@
   <a href="{{ base_url }}/issues"
      class="repo-tab{% if current_page == 'issues' %} active{% endif %}"
      {% if current_page == 'issues' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     Issues
     <span class="tab-count" id="nav-issue-count" style="display:none"></span>
   </a>
@@ -48,73 +38,85 @@
   <a href="{{ base_url }}/branches"
      class="repo-tab{% if current_page == 'branches' %} active{% endif %}"
      {% if current_page == 'branches' %}aria-current="page"{% endif %}>
-    &#127807; Branches
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+    Branches
   </a>
 
   <a href="{{ base_url }}/tags"
      class="repo-tab{% if current_page == 'tags' %} active{% endif %}"
      {% if current_page == 'tags' %}aria-current="page"{% endif %}>
-    &#127991; Tags
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>
+    Tags
   </a>
 
   <a href="{{ base_url }}/releases"
      class="repo-tab{% if current_page == 'releases' %} active{% endif %}"
      {% if current_page == 'releases' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     Releases
   </a>
 
   <a href="{{ base_url }}/sessions"
      class="repo-tab{% if current_page == 'sessions' %} active{% endif %}"
      {% if current_page == 'sessions' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     Sessions
   </a>
 
   <a href="{{ base_url }}/timeline"
      class="repo-tab{% if current_page == 'timeline' %} active{% endif %}"
      {% if current_page == 'timeline' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     Timeline
   </a>
 
   <a href="{{ base_url }}/divergence"
      class="repo-tab{% if current_page == 'analysis' %} active{% endif %}"
      {% if current_page == 'analysis' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
     Analysis
   </a>
 
   <a href="{{ base_url }}/credits"
      class="repo-tab{% if current_page == 'credits' %} active{% endif %}"
      {% if current_page == 'credits' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     Credits
   </a>
 
   <a href="{{ base_url }}/groove-check"
      class="repo-tab{% if current_page == 'groove-check' %} active{% endif %}"
      {% if current_page == 'groove-check' %}aria-current="page"{% endif %}>
-    &#127941; Groove Check
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    Groove Check
   </a>
 
   <a href="{{ base_url }}/insights"
      class="repo-tab{% if current_page == 'insights' %} active{% endif %}"
      {% if current_page == 'insights' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
     Insights
   </a>
 
   <a href="{{ base_url }}/search"
      class="repo-tab{% if current_page == 'search' %} active{% endif %}"
      {% if current_page == 'search' %}aria-current="page"{% endif %}>
-    &#128269; Search
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    Search
   </a>
 
   <a href="{{ base_url }}/arrange/HEAD"
      class="repo-tab{% if current_page == 'arrange' %} active{% endif %}"
      {% if current_page == 'arrange' %}aria-current="page"{% endif %}>
-    &#127906; Arrange
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Arrange
   </a>
 
   <a href="{{ base_url }}/activity"
      class="repo-tab{% if current_page == 'activity' %} active{% endif %}"
      {% if current_page == 'activity' %}aria-current="page"{% endif %}>
-    &#128337; Activity
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Activity
   </a>
 
 </nav>

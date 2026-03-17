@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/musehub/static/app.css">
   <title>{% block title %}Muse Hub{% endblock %} — Muse Hub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
-  {# oEmbed discovery — lets CMS/blog platforms auto-embed MuseHub pages.
-     Emits a <link> tag pointing to the oEmbed endpoint for the current URL.
-     Individual pages may override this block to supply a more specific ref. #}
   {% block oembed_link %}<link rel="alternate" type="application/json+oembed"
        href="https://musehub.app/musehub/oembed?url={{ request.url | urlencode }}"
        title="MuseHub oEmbed">{% endblock %}
@@ -18,52 +18,18 @@
   <script src="/musehub/static/htmx.min.js"></script>
   <script src="/musehub/static/vendor/json-enc.js"></script>
   <script src="/musehub/static/vendor/response-targets.js"></script>
-  <style>
-    .nav-notif-bell {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      text-decoration: none;
-      font-size: 16px;
-      padding: 4px 6px;
-      border-radius: 6px;
-      color: inherit;
-      transition: background 0.15s;
-    }
-    .nav-notif-bell:hover { background: rgba(255,255,255,0.08); }
-    .nav-notif-badge {
-      position: absolute;
-      top: -6px;
-      right: -8px;
-      background: #e53e3e;
-      color: #fff;
-      border-radius: 50%;
-      font-size: 10px;
-      font-weight: 700;
-      min-width: 16px;
-      height: 16px;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 0 3px;
-      line-height: 1;
-      pointer-events: none;
-    }
-  </style>
 </head>
 <body>
-  {# HTMX top-of-page loading bar — shown via .htmx-request CSS class #}
-  <div id="htmx-loading" class="htmx-indicator" aria-hidden="true" style="position:fixed;top:0;left:0;right:0;height:2px;background:var(--color-accent,#1f6feb);z-index:9999;display:none"></div>
-  {# Global navigation bar — logo, search, user menu #}
+  {# HTMX top-of-page loading bar #}
+  <div id="htmx-loading" class="htmx-indicator" aria-hidden="true"></div>
+
   {% include "musehub/partials/navbar.html" %}
 
-  {# Contextual breadcrumb row — populated by each page via {% block breadcrumb %} #}
   <div class="breadcrumb-bar">
     <span class="breadcrumb">{% block breadcrumb %}{% endblock %}</span>
     {% include "musehub/partials/breadcrumbs.html" %}
   </div>
 
-  {# Repo-scoped pages fill this with the repo identity card + tab strip #}
   {% block repo_nav %}{% endblock %}
 
   <div class="container{% block container_extra_class %}{% endblock %}" hx-boost="true" hx-ext="response-targets"{% block container_attrs %}{% endblock %}>
@@ -72,7 +38,6 @@
       <p id="token-msg">Enter your Muse JWT to browse this repo.</p>
       <input type="password" id="token-input" placeholder="eyJ..." />
       <button class="btn btn-primary" onclick="saveToken()">Save &amp; Load</button>
-      &nbsp;
       <button class="btn btn-secondary" onclick="clearToken();location.reload()">Clear</button>
     </div>
     {% endblock %}
@@ -81,9 +46,11 @@
 
   {% block body_extra %}{% endblock %}
 
-  {# Persistent floating audio player — hidden until audio is queued #}
+  {# Persistent floating audio player #}
   <div class="audio-player" id="audio-player" style="display:none">
-    <button class="player-btn" id="player-toggle" onclick="togglePlay()">&#9654;</button>
+    <button class="player-btn" id="player-toggle" onclick="togglePlay()" aria-label="Play/pause">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,3 19,12 5,21"/></svg>
+    </button>
     <div class="player-info">
       <span class="player-title" id="player-title">Now Playing</span>
       <span class="player-repo" id="player-repo"></span>
@@ -96,11 +63,16 @@
     </div>
     <audio id="player-audio" onended="onAudioEnded()" ontimeupdate="onTimeUpdate()"
            onloadedmetadata="onMetadata()"></audio>
-    <button class="player-btn" onclick="closePlayer()" title="Close">&#10005;</button>
+    <button class="player-btn" onclick="closePlayer()" aria-label="Close player">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
 
   <script src="/musehub/static/app.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>
+    lucide.createIcons();
+
     async function loadNotifBadge() {
       if (!getToken()) return;
       try {
@@ -115,7 +87,6 @@
     }
 
     window.addEventListener('DOMContentLoaded', function() {
-      // Show Sign out only when a token is stored.
       if (getToken()) {
         var btn = document.getElementById('signout-btn');
         if (btn) btn.style.display = '';

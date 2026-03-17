@@ -46,34 +46,55 @@
 }
 
 .navbar-logo {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   white-space: nowrap;
   text-decoration: none;
   flex-shrink: 0;
+  letter-spacing: -0.01em;
 }
 
 .navbar-logo:hover {
   text-decoration: none;
+  color: var(--text-primary);
   opacity: 0.85;
+}
+
+.navbar-logo-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.navbar-logo-text {
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Search form */
 .navbar-search-form {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
   flex: 1;
-  max-width: 480px;
+  max-width: 400px;
   background: var(--bg-base);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-base);
-  overflow: hidden;
-  transition: border-color var(--transition-fast);
+  padding: 0 var(--space-3);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .navbar-search-form:focus-within {
   border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+.navbar-search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .navbar-search-input {
@@ -81,8 +102,9 @@
   background: transparent;
   border: none;
   outline: none;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
   font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
   color: var(--text-primary);
   min-width: 0;
 }
@@ -91,26 +113,11 @@
   color: var(--text-muted);
 }
 
-.navbar-search-btn {
-  background: transparent;
-  border: none;
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: var(--font-size-base);
-  line-height: 1;
-  transition: color var(--transition-fast);
-}
-
-.navbar-search-btn:hover {
-  color: var(--text-primary);
-}
-
 /* Action links */
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -131,42 +138,38 @@
   text-decoration: none;
 }
 
-/* Notification bell (reuses existing nav-notif-bell classes) */
-.navbar-link.nav-notif-bell {
+/* Icon-only nav button (bell, etc.) */
+.navbar-icon-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
-  font-size: 16px;
-}
-
-.nav-notif-bell {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-base);
+  color: var(--text-muted);
   text-decoration: none;
-  font-size: 16px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  color: inherit;
-  transition: background 0.15s;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.nav-notif-bell:hover {
-  background: rgba(255, 255, 255, 0.08);
+.navbar-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
   text-decoration: none;
 }
 
 .nav-notif-badge {
   position: absolute;
-  top: -6px;
-  right: -8px;
-  background: #e53e3e;
+  top: 2px;
+  right: 2px;
+  background: var(--color-danger);
   color: #fff;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 700;
-  min-width: 16px;
-  height: 16px;
+  border-radius: var(--radius-full);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  min-width: 14px;
+  height: 14px;
   display: none;
   align-items: center;
   justify-content: center;
@@ -423,7 +426,7 @@ header .header-actions {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-3);
   font-size: var(--font-size-sm);
   color: var(--text-muted);
   border-bottom: 2px solid transparent;
@@ -431,17 +434,26 @@ header .header-actions {
   text-decoration: none;
   transition: color var(--transition-fast), border-color var(--transition-fast);
   flex-shrink: 0;
+
+  svg {
+    opacity: 0.6;
+    transition: opacity var(--transition-fast);
+  }
 }
 
 .repo-tab:hover {
   color: var(--text-primary);
   text-decoration: none;
   background: var(--bg-hover);
+
+  svg { opacity: 1; }
 }
 
 .repo-tab.active {
   color: var(--text-primary);
   border-bottom-color: var(--color-accent);
+
+  svg { opacity: 1; }
 }
 
 .tab-count {

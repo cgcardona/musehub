@@ -100,7 +100,7 @@
   /* -------------------------------------------------------------------------
    * Typography
    * ------------------------------------------------------------------------- */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 
   --font-size-xs:   11px;
@@ -155,7 +155,25 @@
   --z-tooltip: 400;
 }
 
-/* ── HTMX loading indicator ────────────────────────────────────────────────── */
-/* Show the #htmx-loading progress bar while any HTMX request is in flight.    */
-.htmx-request #htmx-loading { display: block !important; }
+/* ── HTMX loading indicator ─────────────────────────────────────────────────
+   Top-of-page progress bar shown while any HTMX request is in flight.
+   Positioned in base.html as #htmx-loading. */
+#htmx-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-accent);
+  z-index: 9999;
+  display: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.htmx-request #htmx-loading {
+  display: block !important;
+  opacity: 1;
+}
+
 .htmx-request.htmx-indicator { display: block !important; }
