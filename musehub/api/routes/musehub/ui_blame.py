@@ -26,24 +26,19 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response
 
-from pathlib import Path
 
-from fastapi.templating import Jinja2Templates
 
 from musehub.api.routes.musehub.blame import _build_blame_entries
-from musehub.api.routes.musehub.jinja2_filters import register_musehub_filters
 from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.db import get_db
 from musehub.models.musehub import BlameResponse
 from musehub.services import musehub_repository
+from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
-_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
-register_musehub_filters(templates.env)
 
 
 async def _resolve_repo(owner: str, repo_slug: str, db: AsyncSession) -> tuple[str, str]:

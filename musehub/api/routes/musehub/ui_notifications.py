@@ -33,12 +33,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import status as http_status
 from fastapi.requests import Request
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 from sqlalchemy import func, select
@@ -50,13 +48,12 @@ from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.auth.dependencies import TokenClaims, optional_token
 from musehub.db import get_db
 from musehub.db.musehub_models import MusehubNotification
+from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui-notifications"])
 
-_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
 
 # Register a relative-time filter so templates can render ``created_at``
 # strings as human-readable durations without a client-side JavaScript call.

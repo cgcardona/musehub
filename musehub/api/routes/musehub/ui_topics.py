@@ -23,10 +23,8 @@ Agent use case:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.templating import Jinja2Templates
 from pydantic import Field
 from sqlalchemy import Text, desc, func, outerjoin, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,13 +37,12 @@ from musehub.db import get_db
 from musehub.db import musehub_models as db
 from musehub.models.base import CamelModel
 from musehub.models.musehub import ExploreRepoResult
+from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
-_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
 
 # ---------------------------------------------------------------------------
 # Curated topic groups — surfaced on the index page for quick navigation.

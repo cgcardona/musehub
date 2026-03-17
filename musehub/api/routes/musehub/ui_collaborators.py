@@ -33,30 +33,25 @@ Endpoint summary:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response as StarletteResponse
 
 from musehub.api.routes.musehub.collaborators import CollaboratorListResponse, _orm_to_response
-from musehub.api.routes.musehub.jinja2_filters import register_musehub_filters
 from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.db import get_db
 from musehub.db.musehub_collaborator_models import MusehubCollaborator
 from musehub.services import musehub_repository
+from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
-_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "templates"
 
 # Instantiate locally rather than importing from ui.py to avoid a circular dep.
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
-register_musehub_filters(templates.env)
 
 
 def _base_url(owner: str, repo_slug: str) -> str:

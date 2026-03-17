@@ -69,18 +69,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select as sa_select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response as StarletteResponse
 
 from musehub.api.routes.musehub.htmx_helpers import htmx_fragment_or_full, htmx_trigger, is_htmx
-from musehub.api.routes.musehub.jinja2_filters import register_musehub_filters
 from musehub.api.routes.musehub.json_alternate import json_or_html
 from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.api.routes.musehub.ui_jsonld import jsonld_release, jsonld_repo, render_jsonld_script
@@ -101,6 +98,7 @@ from musehub.muse_cli.models import MuseCliTag
 from musehub.db import musehub_label_models as label_db
 from musehub.services import musehub_analysis, musehub_credits, musehub_divergence, musehub_events, musehub_issues, musehub_listen, musehub_pull_requests, musehub_releases
 from musehub.services import musehub_discover, musehub_repository, musehub_search
+from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
@@ -110,9 +108,6 @@ router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 # prevent /explore, /trending, and /users/* from being shadowed.
 fixed_router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
-_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
-register_musehub_filters(templates.env)
 
 
 # ---------------------------------------------------------------------------

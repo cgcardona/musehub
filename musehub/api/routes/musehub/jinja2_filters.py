@@ -9,9 +9,14 @@ can call them without duplicating JavaScript utility functions:
     {{ label.color | label_text_color }}    → "#000" or "#fff"
     {{ issue.body | markdown }}             → safe HTML (bold, italic, code, links)
 
-Call ``register_musehub_filters(templates.env)`` once, immediately after the
-``Jinja2Templates`` instance is created, to make these filters available in
-every template rendered by that instance.
+Filters are registered exactly once via the shared ``_templates`` module:
+
+    # musehub/api/routes/musehub/_templates.py — do not call this directly
+    register_musehub_filters(templates.env)
+
+Route handlers import the ready-to-use instance:
+
+    from musehub.api.routes.musehub._templates import templates
 """
 from __future__ import annotations
 
@@ -254,14 +259,11 @@ def _markdown(value: str | None) -> str:
 def register_musehub_filters(env: Environment) -> None:
     """Register all MuseHub custom Jinja2 filters on *env*.
 
-    Call this once after constructing a ``Jinja2Templates`` instance:
+    Called exactly once by ``musehub.api.routes.musehub._templates`` on the
+    shared ``Jinja2Templates`` instance. Do not call this directly.
 
-        templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
-        register_musehub_filters(templates.env)
-
-    Every template rendered by that instance can then use ``fmtdate``,
-    ``fmtrelative``, ``shortsha``, ``label_text_color``, ``filesizeformat``,
-    ``markdown``, and ``e`` as filters.
+    Available filters in every template: ``fmtdate``, ``fmtrelative``,
+    ``shortsha``, ``label_text_color``, ``filesizeformat``, ``markdown``.
     """
     env.filters["fmtdate"] = _fmtdate
     env.filters["fmtrelative"] = _fmtrelative

@@ -20,6 +20,8 @@
   {% block jsonld %}{% endblock %}
   <script src="/musehub/static/alpinejs.min.js" defer></script>
   <script src="/musehub/static/htmx.min.js"></script>
+  <script src="/musehub/static/vendor/json-enc.js"></script>
+  <script src="/musehub/static/vendor/response-targets.js"></script>
   <style>
     .nav-notif-bell {
       position: relative;
@@ -68,7 +70,7 @@
   {# Repo-scoped pages fill this with the repo identity card + tab strip #}
   {% block repo_nav %}{% endblock %}
 
-  <div class="container{% block container_extra_class %}{% endblock %}" hx-boost="true"{% block container_attrs %}{% endblock %}>
+  <div class="container{% block container_extra_class %}{% endblock %}" hx-boost="true" hx-ext="response-targets"{% block container_attrs %}{% endblock %}>
     {% block token_form %}
     <div class="token-form" id="token-form" style="display:none">
       <p id="token-msg">Enter your Muse JWT to browse this repo.</p>

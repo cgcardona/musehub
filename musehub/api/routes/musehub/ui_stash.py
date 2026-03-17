@@ -34,32 +34,27 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response as StarletteResponse
 
-from musehub.api.routes.musehub.jinja2_filters import register_musehub_filters
 from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.auth.dependencies import TokenClaims, require_valid_token
 from musehub.db import get_db
 from musehub.services import musehub_repository
+from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui-stash"])
 
-_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
-register_musehub_filters(templates.env)
 
 
 # ---------------------------------------------------------------------------

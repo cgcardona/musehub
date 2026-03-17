@@ -30,11 +30,9 @@ from __future__ import annotations
 
 import logging
 import math
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response as StarletteResponse
 
@@ -42,13 +40,12 @@ from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.db import get_db
 from musehub.models.musehub_analysis import EmotionVector8D
 from musehub.services import musehub_analysis, musehub_repository
+from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
-_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
 
 # 8 emotional dimensions in radar order — (model_attr, display_label, description)
 _EMOTION_DIMENSIONS: list[tuple[str, str, str]] = [
