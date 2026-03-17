@@ -8,23 +8,28 @@ DOCKER  ?= docker compose
 help:           ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-18s\033[0m %s\n",$$1,$$2}'
 
+# Local Postgres exposed by docker-compose on a non-default port (5433)
+# to avoid clashing with any locally-installed Postgres instance.
+# Set DATABASE_URL in your shell or .env to override.
+LOCAL_PG_URL ?= postgresql+asyncpg://musehub:musehub@localhost:5434/musehub
+
 # ── Testing ──────────────────────────────────────────────────────────────────
 
-test:           ## Run full parallel test suite with coverage
-	$(PYTEST) -n auto --cov=musehub --cov-report=term-missing --tb=short -q
+test:           ## Run full parallel test suite with coverage (uses Docker Postgres on :5433)
+	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -n auto --cov=musehub --cov-report=term-missing --tb=short -q
 
 test-fast:      ## Run tests without coverage (faster feedback loop)
-	$(PYTEST) -n auto --tb=short -q
+	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -n auto --tb=short -q
 
 test-cov:       ## Run tests and open HTML coverage report
-	$(PYTEST) -n auto --cov=musehub --cov-report=html --tb=short -q
+	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -n auto --cov=musehub --cov-report=html --tb=short -q
 	open htmlcov/index.html 2>/dev/null || xdg-open htmlcov/index.html 2>/dev/null || true
 
 test-single:    ## Run a single test file: make test-single FILE=tests/test_musehub_repos.py
-	$(PYTEST) $(FILE) -v --tb=short
+	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) $(FILE) -v --tb=short
 
 test-k:         ## Run tests matching a keyword: make test-k K=harmony
-	$(PYTEST) -k "$(K)" -v --tb=short
+	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -k "$(K)" -v --tb=short
 
 # ── Type checking ─────────────────────────────────────────────────────────────
 
