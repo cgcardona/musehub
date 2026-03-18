@@ -810,10 +810,11 @@ async def commit_page(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Commit not found")
 
     short_id = commit_id[:8]
+    api_base = f"/api/v1/repos/{repo_id}"
 
-    # Fetch commit comments server-side (target_type="commit" in musehub_comments).
-    comment_rows = (
-        await db.execute(
+    # ── Parallel: comments + sibling commits on same branch ──────────────
+    async def _q_comments() -> list[dict[str, Any]]:
+        rows = (await db.execute(
             sa_select(musehub_db.MusehubComment)
             .where(
                 musehub_db.MusehubComment.repo_id == repo_id,
@@ -822,32 +823,65 @@ async def commit_page(
                 musehub_db.MusehubComment.is_deleted.is_(False),
             )
             .order_by(musehub_db.MusehubComment.created_at)
+        )).scalars().all()
+        return [
+            {
+                "comment_id": r.comment_id,
+                "author": r.author,
+                "body": r.body,
+                "parent_id": r.parent_id,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
+
+    async def _q_branch_commits() -> list[Any]:
+        commits, _ = await musehub_repository.list_commits(
+            db, repo_id, branch=commit.branch, limit=100
         )
-    ).scalars().all()
-    comments = [
-        {
-            "comment_id": r.comment_id,
-            "author": r.author,
-            "body": r.body,
-            "parent_id": r.parent_id,
-            "created_at": r.created_at,
-        }
-        for r in comment_rows
+        return commits
+
+    comments, branch_commits = await asyncio.gather(_q_comments(), _q_branch_commits())
+
+    # ── Find prev (older) / next (newer) siblings on branch ──────────────
+    # list_commits returns newest-first; pos+1 = older, pos-1 = newer
+    cur_pos = next((i for i, c in enumerate(branch_commits) if c.commit_id == commit_id), None)
+    older_commit: Any = branch_commits[cur_pos + 1] if (cur_pos is not None and cur_pos + 1 < len(branch_commits)) else None
+    newer_commit: Any = branch_commits[cur_pos - 1] if (cur_pos is not None and cur_pos > 0) else None
+
+    # ── Compute musical dimension change scores from commit message ───────
+    _DIM_KWS: list[tuple[str, frozenset[str]]] = [
+        ("melodic",    frozenset(["melody", "melodic", "lead", "motif", "phrase", "contour", "scale", "mode"])),
+        ("harmonic",   frozenset(["key", "chord", "harmony", "harmonic", "tonal", "modulation", "progression", "pitch"])),
+        ("rhythmic",   frozenset(["bpm", "tempo", "beat", "rhythm", "rhythmic", "groove", "swing", "meter", "time"])),
+        ("structural", frozenset(["section", "structural", "intro", "verse", "chorus", "bridge", "outro", "form", "arrangement", "structure"])),
+        ("dynamic",    frozenset(["dynamic", "volume", "velocity", "loud", "soft", "crescendo", "decrescendo", "fade", "mute", "swell"])),
     ]
 
-    # Derive audio URL from snapshot_id when available.  WaveSurfer picks this
-    # up from the data-url attribute; no JS API call needed when present.
-    api_base = f"/api/v1/repos/{repo_id}"
+    def _dim_score(msg: str, kws: frozenset[str], is_root: bool) -> dict[str, Any]:
+        score = 1.0 if is_root else (0.0 if not any(kw in msg for kw in kws) else min(0.35 + (sum(1 for kw in kws if kw in msg) - 1) * 0.15, 0.95))
+        label = "none" if score < 0.15 else ("low" if score < 0.40 else ("medium" if score < 0.70 else "high"))
+        return {"dimension": name, "score": round(score, 3), "label": label}
+
+    is_root = not commit.parent_ids
+    msg_lower = commit.message.lower()
+    dimensions: list[dict[str, Any]] = []
+    for name, kws in _DIM_KWS:
+        score = 1.0 if is_root else (0.0 if not any(kw in msg_lower for kw in kws) else min(0.35 + (sum(1 for kw in kws if kw in msg_lower) - 1) * 0.15, 0.95))
+        label = "none" if score < 0.15 else ("low" if score < 0.40 else ("medium" if score < 0.70 else "high"))
+        dimensions.append({"dimension": name, "score": round(score, 3), "label": label})
+
+    overall_change = round(sum(d["score"] for d in dimensions) / len(dimensions), 3) if dimensions else 0.0
+
+    # ── Audio / render status ─────────────────────────────────────────────
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
         if commit.snapshot_id is not None
         else None
     )
-    # Score (abcjs) support is reserved for future data-model enrichment.
-    has_score = False
-    abc_url: str | None = None
+    render_status = "ready" if audio_url else "none"
 
-    ctx: dict[str, object] = {
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
@@ -857,11 +891,16 @@ async def commit_page(
         "listen_url": f"{base_url}/listen/{commit_id}",
         "embed_url": f"{base_url}/embed/{commit_id}",
         "current_page": "commits",
-        "commit": commit.model_dump(),
+        "commit": commit.model_dump(mode="json"),
         "comments": comments,
         "audio_url": audio_url,
-        "has_score": has_score,
-        "abc_url": abc_url,
+        "render_status": render_status,
+        "dimensions": dimensions,
+        "overall_change": overall_change,
+        "older_commit": older_commit.model_dump(mode="json") if older_commit else None,
+        "newer_commit": newer_commit.model_dump(mode="json") if newer_commit else None,
+        "branch_commit_count": len(branch_commits),
+        "branch_position": (cur_pos + 1) if cur_pos is not None else None,
         "breadcrumb_data": _breadcrumbs(
             (owner, f"/{owner}"),
             (repo_slug, base_url),

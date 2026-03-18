@@ -38,7 +38,7 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'new-repo':      (d) => initNewRepo(d),
   'piano-roll':    (d) => void initPianoRollPage(d),
   'listen':        (d) => void initListen(d),
-  'commit-detail': (d) => initCommitDetail(d),
+  'commit-detail': () => initCommitDetail(),
   'commit':        (d) => initCommit(d),
   'user-profile':  (d) => void initUserProfile(d),
   'timeline':      () => initTimeline(),
