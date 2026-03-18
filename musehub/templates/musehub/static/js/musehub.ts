@@ -15,7 +15,7 @@
  * 1. Auth helpers
  * ═══════════════════════════════════════════════════════════════ */
 
-const API = '/api/v1/musehub';
+const API = '/api/v1';
 
 export function getToken(): string {
   return localStorage.getItem('musehub_token') ?? '';

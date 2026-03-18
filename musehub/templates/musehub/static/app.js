@@ -1,45 +1,1080 @@
-"use strict";(()=>{var W="/api/v1/musehub";function P(){return localStorage.getItem("musehub_token")??""}function fe(e){localStorage.setItem("musehub_token",e)}function ze(){localStorage.removeItem("musehub_token")}function j(){let e=P();return e?{Authorization:"Bearer "+e,"Content-Type":"application/json"}:{}}async function G(e,t={}){let n=await fetch(W+e,{...t,headers:{...j(),...t.headers??{}}});if(n.status===401||n.status===403)throw oe("Session expired or invalid token \u2014 please re-enter your JWT."),new Error("auth");if(!n.ok){let i=await n.text();throw new Error(n.status+": "+i)}return n.json()}function oe(e){let t=document.getElementById("token-form"),n=document.getElementById("content");if(t&&(t.style.display="block"),n&&(n.innerHTML=""),e){let i=document.getElementById("token-msg");i&&(i.textContent=e)}}function Oe(){let t=document.getElementById("token-input")?.value.trim()??"";t&&(fe(t),location.reload())}function ye(e){return e?new Date(e).toLocaleString(void 0,{dateStyle:"medium",timeStyle:"short"}):"--"}function qe(e){if(!e)return"--";let t=(Date.now()-new Date(e).getTime())/1e3;return t<60?"just now":t<3600?Math.floor(t/60)+"m ago":t<86400?Math.floor(t/3600)+"h ago":t<604800?Math.floor(t/86400)+"d ago":ye(e)}function We(e){return e?e.substring(0,8):"--"}function Ge(e){if(!e||isNaN(e))return"--";let t=Math.floor(e/3600),n=Math.floor(e%3600/60),i=Math.floor(e%60);return t>0?`${t}h ${n}m`:n>0?`${n}m ${i}s`:`${i}s`}function ie(e){if(isNaN(e))return"0:00";let t=Math.floor(e/60),n=Math.floor(e%60);return`${t}:${n.toString().padStart(2,"0")}`}function X(e){return e?String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"):""}async function ve(e){try{let t=await fetch(W+"/repos/"+e,{headers:j()}).then(n=>n.ok?n.json():null).catch(()=>null);if(t){let n=document.getElementById("nav-visibility-badge");n&&(n.textContent=t.visibility,n.className="badge repo-visibility-badge badge-"+(t.visibility==="public"?"clean":"neutral"));let i=document.getElementById("nav-key");i&&t.keySignature&&(i.textContent="\u2669 "+t.keySignature,i.style.display="");let o=document.getElementById("nav-bpm");o&&t.tempoBpm&&(o.textContent=t.tempoBpm+" BPM",o.style.display="");let a=document.getElementById("nav-tags");a&&t.tags&&t.tags.length>0&&(a.innerHTML=t.tags.map(r=>'<span class="nav-meta-tag">'+X(r)+"</span>").join(""))}if(P()){let n=document.getElementById("nav-star-btn");n&&(n.style.display="")}Promise.all([fetch(W+"/repos/"+e+"/pull-requests?state=open",{headers:j()}).then(n=>n.ok?n.json():{pull_requests:[]}).catch(()=>({pull_requests:[]})),fetch(W+"/repos/"+e+"/issues?state=open",{headers:j()}).then(n=>n.ok?n.json():{issues:[]}).catch(()=>({issues:[]}))]).then(([n,i])=>{let o=(n.pull_requests??[]).length,a=(i.issues??[]).length,r=document.getElementById("nav-pr-count");r&&o>0&&(r.textContent=String(o),r.style.display="");let s=document.getElementById("nav-issue-count");s&&a>0&&(s.textContent=String(a),s.style.display="")})}catch{}}async function Xe(){let e=document.getElementById("nav-star-icon");e&&(e.textContent=e.textContent==="\u2606"?"\u2605":"\u2606")}var S={playing:!1};function $(){return document.getElementById("player-audio")}function be(){return document.getElementById("audio-player")}async function Ye(e){let t=await fetch(e,{headers:{Authorization:"Bearer "+P()}});if(!t.ok)throw new Error(String(t.status));let n=await t.blob();return URL.createObjectURL(n)}async function Ke(e,t,n){let i=be(),o=$();if(!i||!o)return;i.style.display="flex",document.body.classList.add("player-open");let a=document.getElementById("player-title"),r=document.getElementById("player-repo");a&&(a.textContent=t||"Now Playing"),r&&(r.textContent=n||"");try{let s=await Ye(e),l=o;l._blobUrl&&URL.revokeObjectURL(l._blobUrl),l._blobUrl=s,o.src=s}catch{o.src=e}o.load(),o.play().catch(()=>{}),S.playing=!0,Y()}function Je(){let e=$();e?.src&&(S.playing?(e.pause(),S.playing=!1):(e.play().catch(()=>{}),S.playing=!0),Y())}function Ve(e){let t=$();!t||!t.duration||(t.currentTime=e/100*t.duration)}function Ze(){let e=be(),t=$();if(e&&(e.style.display="none"),document.body.classList.remove("player-open"),t){t.pause();let n=t;n._blobUrl&&(URL.revokeObjectURL(n._blobUrl),n._blobUrl=void 0),t.src=""}S.playing=!1,Y()}async function Qe(e,t){let n=await fetch(e,{headers:{Authorization:"Bearer "+P()}});if(!n.ok)return;let i=await n.blob(),o=URL.createObjectURL(i),a=document.createElement("a");a.href=o,a.download=t,a.click(),URL.revokeObjectURL(o)}function et(){let e=$();if(!e?.duration)return;let t=e.currentTime/e.duration*100,n=document.getElementById("player-seek"),i=document.getElementById("player-current");n&&(n.value=String(t)),i&&(i.textContent=ie(e.currentTime))}function tt(){let e=$(),t=document.getElementById("player-duration");e&&t&&(t.textContent=ie(e.duration))}function nt(){S.playing=!1,Y();let e=document.getElementById("player-seek");e&&(e.value="0");let t=document.getElementById("player-current");t&&(t.textContent="0:00")}function Y(){let e=document.getElementById("player-toggle");e&&(e.innerHTML=S.playing?"&#9646;&#9646;":"&#9654;")}var ot={feat:{label:"feat",color:"var(--color-success)"},fix:{label:"fix",color:"var(--color-danger)"},refactor:{label:"refactor",color:"var(--color-accent)"},style:{label:"style",color:"var(--color-purple)"},docs:{label:"docs",color:"var(--text-muted)"},chore:{label:"chore",color:"var(--color-neutral)"},init:{label:"init",color:"var(--color-warning)"},perf:{label:"perf",color:"var(--color-orange)"}};function it(e){if(!e)return{type:null,scope:null,subject:e??""};let t=e.match(/^(\w+)(?:\(([^)]+)\))?:\s*(.*)/s);return t?{type:t[1].toLowerCase(),scope:t[2]??null,subject:t[3]}:{type:null,scope:null,subject:e}}function at(e){if(!e)return"";let t=ot[e]??{label:e,color:"var(--text-muted)"};return`<span class="badge" style="background:${t.color}20;color:${t.color};border:1px solid ${t.color}40">${X(t.label)}</span>`}function rt(e){return e?`<span class="badge" style="background:var(--bg-overlay);color:var(--color-purple);border:1px solid var(--color-purple-bg)">${X(e)}</span>`:""}function st(e){let t={},n=[/section:([\w-]+)/i,/track:([\w-]+)/i,/key:([\w#b]+\s*(?:major|minor|maj|min)?)/i,/tempo:(\d+)/i,/bpm:(\d+)/i],i=["section","track","key","tempo","bpm"];return n.forEach((o,a)=>{let r=e.match(o);r&&(t[i[a]]=r[1])}),t}var lt=["\u{1F525}","\u2764\uFE0F","\u{1F44F}","\u2728","\u{1F3B5}","\u{1F3B8}","\u{1F3B9}","\u{1F941}"];async function we(e,t,n){let i=document.getElementById(n);if(!i)return;let o=window.__repoId,a=[];try{a=await G("/repos/"+o+"/reactions?target_type="+encodeURIComponent(e)+"&target_id="+encodeURIComponent(t))}catch{a=[]}let r={},s={};(Array.isArray(a)?a:[]).forEach(b=>{r[b.emoji]=b.count,s[b.emoji]=b.reacted_by_me});let l=e.replace(/'/g,""),m=String(t).replace(/'/g,""),h=n.replace(/'/g,"");i.innerHTML='<div class="reaction-bar">'+lt.map(b=>{let A=r[b]??0,N=s[b]?" reaction-btn--active":"",E=A>0?'<span class="reaction-count">'+A+"</span>":"";return'<button class="reaction-btn'+N+`" onclick="toggleReaction('`+l+"','"+m+"','"+b+"','"+h+`')" title="`+b+'">'+b+E+"</button>"}).join("")+"</div>"}async function ct(e,t,n,i){if(!P()){oe("Sign in to react");return}let o=window.__repoId;try{await G("/repos/"+o+"/reactions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target_type:e,target_id:String(t),emoji:n})}),await we(e,t,i)}catch{}}document.addEventListener("htmx:configRequest",e=>{let t=P();t&&(e.detail.headers.Authorization="Bearer "+t)});document.addEventListener("htmx:afterSwap",()=>{let e=window.__repoId;e&&ve(e)});async function dt(){if(P())try{let e=await G("/notifications"),t=Array.isArray(e)?e.filter(i=>!i.is_read).length:0,n=document.getElementById("nav-notif-badge");n&&(n.textContent=t>99?"99+":String(t),n.style.display=t>0?"flex":"none")}catch{}}function he(){if(P()){let t=document.getElementById("signout-btn");t&&(t.style.display="")}dt(),typeof window.lucide=="object"&&window.lucide.createIcons();let e=document.getElementById("page-data");if(e)try{let t=JSON.parse(e.textContent??"{}");ut(t)}catch{}}function ut(e){let t=e.page;if(!t)return;let n=window.MusePages;n&&typeof n[t]=="function"&&n[t](e)}document.addEventListener("DOMContentLoaded",he);document.addEventListener("htmx:afterSettle",he);window.getToken=P;window.setToken=fe;window.clearToken=ze;window.saveToken=Oe;window.showTokenForm=oe;window.apiFetch=G;window.authHeaders=j;window.fmtDate=ye;window.fmtRelative=qe;window.shortSha=We;window.fmtDuration=Ge;window.fmtSeconds=ie;window.escHtml=X;window.initRepoNav=ve;window.toggleStar=Xe;window.queueAudio=Ke;window.togglePlay=Je;window.seekAudio=Ve;window.closePlayer=Ze;window.downloadArtifact=Qe;window.onTimeUpdate=et;window.onMetadata=tt;window.onAudioEnded=nt;window.parseCommitMessage=it;window.commitTypeBadge=at;window.commitScopeBadge=rt;window.parseCommitMeta=st;window.loadReactions=we;window.toggleReaction=ct;var pt=[.5,.75,1,1.25,1.5,2];function K(e){if(!isFinite(e)||e<0)return"0:00";let t=Math.floor(e/60),n=Math.floor(e%60);return t+":"+(n<10?"0":"")+n}var ae=class e{_ws=null;_opts;_autoPlay=!1;constructor(t){this._opts=t}static init(t){let n=new e(t);return n._setup(),n}_setup(){let t=this,n=this._opts;this._ws=WaveSurfer.create({container:n.waveformEl,waveColor:"#4a5568",progressColor:"#1f6feb",cursorColor:"#58a6ff",height:80,barWidth:2,barGap:1}),this._ws.on("ready",()=>{let i=t._ws.getDuration();n.timeDurEl&&(n.timeDurEl.textContent=K(i)),n.playBtnEl&&(n.playBtnEl.disabled=!1),t._autoPlay&&(t._autoPlay=!1,t._ws.play())}),this._ws.on("play",()=>{n.playBtnEl&&(n.playBtnEl.innerHTML="&#9646;&#9646;")}),this._ws.on("pause",()=>{n.playBtnEl&&(n.playBtnEl.innerHTML="&#9654;")}),this._ws.on("finish",()=>{n.playBtnEl&&(n.playBtnEl.innerHTML="&#9654;")}),this._ws.on("timeupdate",i=>{n.timeCurEl&&(n.timeCurEl.textContent=K(i))}),this._ws.on("region-update",i=>{let o=i;n.loopInfoEl&&(n.loopInfoEl.textContent="Loop: "+K(o.start)+" \u2013 "+K(o.end),n.loopInfoEl.style.display=""),n.loopBtnEl&&(n.loopBtnEl.style.display="")}),this._ws.on("region-clear",()=>{n.loopInfoEl&&(n.loopInfoEl.style.display="none"),n.loopBtnEl&&(n.loopBtnEl.style.display="none")}),this._ws.on("error",i=>{if(n.waveformEl){let o=document.createElement("p");o.style.cssText="color:#f85149;padding:16px;margin:0;",o.textContent="\u274C Audio unavailable: "+String(i),n.waveformEl.appendChild(o)}}),n.playBtnEl&&(n.playBtnEl.disabled=!0,n.playBtnEl.addEventListener("click",()=>t._ws.playPause())),n.speedSelEl&&(pt.forEach((i,o)=>{let a=document.createElement("option");a.value=String(i),a.textContent=i+"x",o===2&&(a.selected=!0),n.speedSelEl.appendChild(a)}),n.speedSelEl.addEventListener("change",function(){t._ws.setPlaybackRate(parseFloat(this.value))})),n.loopBtnEl&&(n.loopBtnEl.style.display="none",n.loopBtnEl.addEventListener("click",()=>t._ws.clearRegion())),n.loopInfoEl&&(n.loopInfoEl.style.display="none"),n.volSliderEl&&n.volSliderEl.addEventListener("input",function(){t._ws.setVolume(parseFloat(this.value))}),document.addEventListener("keydown",i=>{let o=i.target?.tagName??"";if(!(o==="INPUT"||o==="TEXTAREA"||o==="SELECT")){if(i.code==="Space")i.preventDefault(),t._ws.playPause();else if(i.code==="KeyL")t._ws.clearRegion();else if(i.code==="ArrowLeft"){let a=Math.max(0,t._ws.getCurrentTime()-5),r=t._ws.getDuration();r>0&&t._ws.seekTo(a/r)}else if(i.code==="ArrowRight"){let a=t._ws.getCurrentTime()+5,r=t._ws.getDuration();r>0&&t._ws.seekTo(Math.min(1,a/r))}}})}load(t,n=!1){this._autoPlay=n,this._opts.playBtnEl&&(this._opts.playBtnEl.disabled=!0),this._opts.timeCurEl&&(this._opts.timeCurEl.textContent="0:00"),this._opts.timeDurEl&&(this._opts.timeDurEl.textContent="0:00"),this._ws.load(t)}destroy(){this._ws&&(this._ws.destroy(),this._ws=null)}};window.AudioPlayer=ae;var J=["#58a6ff","#3fb950","#f0883e","#bc8cff","#ff7b72","#79c0ff","#56d364","#ffa657","#d2a8ff","#ffa198"],mt=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];function Ee(e){let t=Math.floor(e/12)-1;return mt[e%12]+t}function ke(e){let t=e%12;return t===1||t===3||t===6||t===8||t===10}var v=36,xe=21,Te=108;function re(e){return e==null?"":String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}function gt(e,t,n={}){let i=e.tracks??[],o=e.tempo_bpm??120,a=e.time_signature??"4/4",r=e.total_beats??0,s=n.selectedTrack??-1,l=[];if(i.forEach(d=>{(s===-1||d.track_id===s)&&(d.notes??[]).forEach(p=>l.push(p))}),l.length===0){t.innerHTML='<p style="color:var(--text-muted);padding:16px;">No MIDI notes found.</p>';return}let m=Math.max(xe,l.reduce((d,p)=>Math.min(d,p.pitch),127)-2),h=Math.min(Te,l.reduce((d,p)=>Math.max(d,p.pitch),0)+2),b=h-m+1;t.innerHTML=ft(e,i,s,r,o,a);let A=t.querySelector("#piano-roll-outer"),N=t.querySelector("#piano-canvas"),E=document.querySelector(".piano-roll-tooltip");if(!A||!N)return;let F=A,R=N,I=60,L=14,B=0,z=0,V=!1,Z=0,Q=0,O=window.devicePixelRatio||1;function de(){return F.clientWidth||800}function ue(){return Math.min(Math.max(b*L+40,200),600)}function D(){let d=de(),p=ue();F.style.height=p+"px",R.width=d*O,R.height=p*O,R.style.width=d+"px",R.style.height=p+"px"}function ee(d,p){return 20+(h-d-z)*L}function te(d,p){return v+(d-B)*I}function C(){let d=de(),p=ue(),c=R.getContext("2d");if(!c)return;c.setTransform(O,0,0,O,0,0),c.clearRect(0,0,d,p);let k=d-v;c.fillStyle="#0d1117",c.fillRect(0,0,d,p);for(let g=m;g<=h;g++){let y=ee(g,p);c.fillStyle=ke(g)?"#131820":"#0d1117",c.fillRect(v,y,k,L),g%12===0&&(c.fillStyle="#1f2937",c.fillRect(v,y,k,1))}let q=k/I,ne=Math.floor(B),x=Math.ceil(B+q+1),H=I<8?8:I<20?4:I<40?2:1;for(let g=ne;g<=x;g+=H){let y=te(g,k),T=g%4===0;c.strokeStyle=T?"#30363d":"#1a2030",c.lineWidth=T?1:.5,c.beginPath(),c.moveTo(y,20),c.lineTo(y,p),c.stroke(),T&&y>=v&&(c.fillStyle="#8b949e",c.font="9px monospace",c.fillText(String(g),y+2,14))}l.forEach(g=>{let y=te(g.start_beat,k),T=te(g.start_beat+g.duration_beats,k),pe=ee(g.pitch,p),me=Math.max(T-y-1,2),Ne=Math.max(L-1,3);if(T<v||y>d)return;let Fe=J[g.track_id%J.length],ge=.4+g.velocity/127*.6;c.globalAlpha=ge,c.fillStyle=Fe,c.fillRect(Math.max(y,v),pe+1,me,Ne),c.globalAlpha=ge*.8,c.fillStyle="#ffffff",c.fillRect(Math.max(y,v),pe+1,me,1),c.globalAlpha=1});for(let g=m;g<=h;g++){let y=ee(g,p),T=ke(g);c.fillStyle=T?"#1a1a1a":"#e6edf3",c.fillRect(0,y+1,T?v*.65:v-1,Math.max(L-1,2)),!T&&g%12===0&&(c.fillStyle="#58a6ff",c.font="9px monospace",c.fillText(Ee(g),2,y+L-2))}c.fillStyle="#161b22",c.fillRect(v,0,k,20),c.fillStyle="#0d1117",c.fillRect(0,0,v,20),c.fillStyle="#8b949e",c.font="10px monospace",c.fillText(o.toFixed(1)+" BPM  "+a,v+6,13)}let Ae=t.querySelector("#zoom-x"),De=t.querySelector("#zoom-y"),je=t.querySelector("#track-sel");Ae?.addEventListener("input",function(){I=parseInt(this.value,10),D(),C()}),De?.addEventListener("input",function(){L=parseInt(this.value,10),D(),C()}),je?.addEventListener("change",function(){s=parseInt(this.value,10),l=[],i.forEach(d=>{(s===-1||d.track_id===s)&&(d.notes??[]).forEach(p=>l.push(p))}),l.length>0&&(m=Math.max(xe,l.reduce((d,p)=>Math.min(d,p.pitch),127)-2),h=Math.min(Te,l.reduce((d,p)=>Math.max(d,p.pitch),0)+2),b=h-m+1),D(),C()}),R.addEventListener("mousedown",d=>{V=!0,Z=d.clientX,Q=d.clientY,F.classList.add("panning")}),window.addEventListener("mousemove",d=>{if(V){let p=d.clientX-Z,c=d.clientY-Q;B=Math.max(0,B-p/I),z=Math.max(0,z-c/L),Z=d.clientX,Q=d.clientY,C()}else Ue(d)}),window.addEventListener("mouseup",()=>{V=!1,F.classList.remove("panning")}),R.addEventListener("mouseleave",()=>{E&&(E.style.display="none")});function Ue(d){if(!E)return;let p=R.getBoundingClientRect(),c=d.clientX-p.left,k=d.clientY-p.top;if(c<v||k<20){E.style.display="none";return}let q=B+(c-v)/I,ne=h-Math.floor((k-20)/L)-Math.round(z),x=l.find(H=>H.pitch===ne&&H.start_beat<=q&&H.start_beat+H.duration_beats>=q);if(!x){E.style.display="none";return}E.innerHTML="<strong>"+Ee(x.pitch)+"</strong> (MIDI "+x.pitch+")<br>Beat: "+x.start_beat.toFixed(2)+"<br>Duration: "+x.duration_beats.toFixed(2)+" beats<br>Velocity: "+x.velocity+"<br>Track: "+x.track_id+" / Ch "+x.channel,E.style.display="block",E.style.left=d.clientX+14+"px",E.style.top=d.clientY-10+"px"}window.addEventListener("resize",()=>{D(),C()}),D(),C()}function ft(e,t,n,i,o,a){let r='<option value="-1">All tracks</option>'+t.map(l=>{let m=l.track_id===n?" selected":"";return'<option value="'+l.track_id+'"'+m+">"+re(l.name??"Track "+l.track_id)+" ("+(l.notes??[]).length+" notes)</option>"}).join(""),s=t.map(l=>'<div class="track-legend-item"><div class="track-legend-swatch" style="background:'+J[l.track_id%J.length]+'"></div>'+re(l.name??"Track "+l.track_id)+"</div>").join("");return'<div class="piano-roll-wrapper"><div class="piano-roll-controls"><label>Track: <select id="track-sel">'+r+'</select></label><label>H-Zoom: <input type="range" id="zoom-x" min="4" max="200" value="60" style="width:80px"></label><label>V-Zoom: <input type="range" id="zoom-y" min="4" max="40" value="14" style="width:60px"></label><span style="font-size:12px;color:#8b949e;margin-left:auto">'+i.toFixed(1)+" beats &bull; "+o.toFixed(1)+" BPM &bull; "+re(a)+'</span></div><div id="piano-roll-outer"><canvas id="piano-canvas"></canvas></div><div class="track-legend">'+s+"</div></div>"}var yt={render:gt};window.PianoRoll=yt;function w(e){let t=e.repo_id;t&&typeof window.initRepoNav=="function"&&window.initRepoNav(String(t))}function vt(e,t=120){if(!e)return"";let n=e.replace(/[#*`>\-_]/g,"").trim();return n.length>t?n.slice(0,t)+"\u2026":n}var bt=[{id:"blank",icon:"\u{1F4DD}",title:"Blank Issue",description:"Start with a clean slate.",body:""},{id:"bug",icon:"\u{1F41B}",title:"Bug Report",description:"Something isn't working as expected.",body:`## What happened?
+"use strict";
+(() => {
+  // musehub/templates/musehub/static/js/musehub.ts
+  var API = "/api/v1";
+  function getToken() {
+    return localStorage.getItem("musehub_token") ?? "";
+  }
+  function setToken(t) {
+    localStorage.setItem("musehub_token", t);
+  }
+  function clearToken() {
+    localStorage.removeItem("musehub_token");
+  }
+  function authHeaders() {
+    const t = getToken();
+    return t ? { Authorization: "Bearer " + t, "Content-Type": "application/json" } : {};
+  }
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(API + path, {
+      ...opts,
+      headers: { ...authHeaders(), ...opts.headers ?? {} }
+    });
+    if (res.status === 401 || res.status === 403) {
+      showTokenForm("Session expired or invalid token \u2014 please re-enter your JWT.");
+      throw new Error("auth");
+    }
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(res.status + ": " + body);
+    }
+    return res.json();
+  }
+  function showTokenForm(msg) {
+    const tf = document.getElementById("token-form");
+    const content = document.getElementById("content");
+    if (tf) tf.style.display = "block";
+    if (content) content.innerHTML = "";
+    if (msg) {
+      const msgEl = document.getElementById("token-msg");
+      if (msgEl) msgEl.textContent = msg;
+    }
+  }
+  function saveToken() {
+    const input = document.getElementById("token-input");
+    const t = input?.value.trim() ?? "";
+    if (t) {
+      setToken(t);
+      location.reload();
+    }
+  }
+  function fmtDate(iso) {
+    if (!iso) return "--";
+    const d = new Date(iso);
+    return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function fmtRelative(iso) {
+    if (!iso) return "--";
+    const diff = (Date.now() - new Date(iso).getTime()) / 1e3;
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    if (diff < 604800) return Math.floor(diff / 86400) + "d ago";
+    return fmtDate(iso);
+  }
+  function shortSha(sha) {
+    return sha ? sha.substring(0, 8) : "--";
+  }
+  function fmtDuration(seconds) {
+    if (!seconds || isNaN(seconds)) return "--";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor(seconds % 3600 / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+  function fmtSeconds(t) {
+    if (isNaN(t)) return "0:00";
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+  function escHtml(s) {
+    if (!s) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  async function initRepoNav(repoId) {
+    try {
+      const repo = await fetch(API + "/repos/" + repoId, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).catch(() => null);
+      if (repo) {
+        const badge = document.getElementById("nav-visibility-badge");
+        if (badge) {
+          badge.textContent = repo.visibility;
+          badge.className = "badge repo-visibility-badge badge-" + (repo.visibility === "public" ? "clean" : "neutral");
+        }
+        const keyEl = document.getElementById("nav-key");
+        if (keyEl && repo.keySignature) {
+          keyEl.textContent = "\u2669 " + repo.keySignature;
+          keyEl.style.display = "";
+        }
+        const bpmEl = document.getElementById("nav-bpm");
+        if (bpmEl && repo.tempoBpm) {
+          bpmEl.textContent = repo.tempoBpm + " BPM";
+          bpmEl.style.display = "";
+        }
+        const tagsEl = document.getElementById("nav-tags");
+        if (tagsEl && repo.tags && repo.tags.length > 0) {
+          tagsEl.innerHTML = repo.tags.map((t) => '<span class="nav-meta-tag">' + escHtml(t) + "</span>").join("");
+        }
+      }
+      if (getToken()) {
+        const starBtn = document.getElementById("nav-star-btn");
+        if (starBtn) starBtn.style.display = "";
+      }
+      void Promise.all([
+        fetch(API + "/repos/" + repoId + "/pull-requests?state=open", { headers: authHeaders() }).then((r) => r.ok ? r.json() : { pull_requests: [] }).catch(() => ({ pull_requests: [] })),
+        fetch(API + "/repos/" + repoId + "/issues?state=open", { headers: authHeaders() }).then((r) => r.ok ? r.json() : { issues: [] }).catch(() => ({ issues: [] }))
+      ]).then(([prData, issueData]) => {
+        const prCount = (prData.pull_requests ?? []).length;
+        const issueCount = (issueData.issues ?? []).length;
+        const prBadge = document.getElementById("nav-pr-count");
+        if (prBadge && prCount > 0) {
+          prBadge.textContent = String(prCount);
+          prBadge.style.display = "";
+        }
+        const issueBadge = document.getElementById("nav-issue-count");
+        if (issueBadge && issueCount > 0) {
+          issueBadge.textContent = String(issueCount);
+          issueBadge.style.display = "";
+        }
+      });
+    } catch {
+    }
+  }
+  async function toggleStar() {
+    const icon = document.getElementById("nav-star-icon");
+    if (icon) icon.textContent = icon.textContent === "\u2606" ? "\u2605" : "\u2606";
+  }
+  var _player = { playing: false };
+  function _audioEl() {
+    return document.getElementById("player-audio");
+  }
+  function _playerBar() {
+    return document.getElementById("audio-player");
+  }
+  async function _fetchBlobUrl(url) {
+    const res = await fetch(url, {
+      headers: { Authorization: "Bearer " + getToken() }
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
+  async function queueAudio(url, title, repoName) {
+    const bar = _playerBar();
+    const audio = _audioEl();
+    if (!bar || !audio) return;
+    bar.style.display = "flex";
+    document.body.classList.add("player-open");
+    const t = document.getElementById("player-title");
+    const r = document.getElementById("player-repo");
+    if (t) t.textContent = title || "Now Playing";
+    if (r) r.textContent = repoName || "";
+    try {
+      const blobUrl = await _fetchBlobUrl(url);
+      const extAudio = audio;
+      if (extAudio._blobUrl) URL.revokeObjectURL(extAudio._blobUrl);
+      extAudio._blobUrl = blobUrl;
+      audio.src = blobUrl;
+    } catch {
+      audio.src = url;
+    }
+    audio.load();
+    void audio.play().catch(() => {
+    });
+    _player.playing = true;
+    _updatePlayBtn();
+  }
+  function togglePlay() {
+    const audio = _audioEl();
+    if (!audio?.src) return;
+    if (_player.playing) {
+      audio.pause();
+      _player.playing = false;
+    } else {
+      void audio.play().catch(() => {
+      });
+      _player.playing = true;
+    }
+    _updatePlayBtn();
+  }
+  function seekAudio(value) {
+    const audio = _audioEl();
+    if (!audio || !audio.duration) return;
+    audio.currentTime = value / 100 * audio.duration;
+  }
+  function closePlayer() {
+    const bar = _playerBar();
+    const audio = _audioEl();
+    if (bar) bar.style.display = "none";
+    document.body.classList.remove("player-open");
+    if (audio) {
+      audio.pause();
+      const extAudio = audio;
+      if (extAudio._blobUrl) {
+        URL.revokeObjectURL(extAudio._blobUrl);
+        extAudio._blobUrl = void 0;
+      }
+      audio.src = "";
+    }
+    _player.playing = false;
+    _updatePlayBtn();
+  }
+  async function downloadArtifact(url, filename) {
+    const res = await fetch(url, {
+      headers: { Authorization: "Bearer " + getToken() }
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+  function onTimeUpdate() {
+    const audio = _audioEl();
+    if (!audio?.duration) return;
+    const pct = audio.currentTime / audio.duration * 100;
+    const seek = document.getElementById("player-seek");
+    const cur = document.getElementById("player-current");
+    if (seek) seek.value = String(pct);
+    if (cur) cur.textContent = fmtSeconds(audio.currentTime);
+  }
+  function onMetadata() {
+    const audio = _audioEl();
+    const dur = document.getElementById("player-duration");
+    if (audio && dur) dur.textContent = fmtSeconds(audio.duration);
+  }
+  function onAudioEnded() {
+    _player.playing = false;
+    _updatePlayBtn();
+    const seek = document.getElementById("player-seek");
+    if (seek) seek.value = "0";
+    const cur = document.getElementById("player-current");
+    if (cur) cur.textContent = "0:00";
+  }
+  function _updatePlayBtn() {
+    const btn = document.getElementById("player-toggle");
+    if (btn) btn.innerHTML = _player.playing ? "&#9646;&#9646;" : "&#9654;";
+  }
+  var _COMMIT_TYPES = {
+    feat: { label: "feat", color: "var(--color-success)" },
+    fix: { label: "fix", color: "var(--color-danger)" },
+    refactor: { label: "refactor", color: "var(--color-accent)" },
+    style: { label: "style", color: "var(--color-purple)" },
+    docs: { label: "docs", color: "var(--text-muted)" },
+    chore: { label: "chore", color: "var(--color-neutral)" },
+    init: { label: "init", color: "var(--color-warning)" },
+    perf: { label: "perf", color: "var(--color-orange)" }
+  };
+  function parseCommitMessage(msg) {
+    if (!msg) return { type: null, scope: null, subject: msg ?? "" };
+    const m = msg.match(/^(\w+)(?:\(([^)]+)\))?:\s*(.*)/s);
+    if (!m) return { type: null, scope: null, subject: msg };
+    return { type: m[1].toLowerCase(), scope: m[2] ?? null, subject: m[3] };
+  }
+  function commitTypeBadge(type) {
+    if (!type) return "";
+    const t = _COMMIT_TYPES[type] ?? { label: type, color: "var(--text-muted)" };
+    return `<span class="badge" style="background:${t.color}20;color:${t.color};border:1px solid ${t.color}40">${escHtml(t.label)}</span>`;
+  }
+  function commitScopeBadge(scope) {
+    if (!scope) return "";
+    return `<span class="badge" style="background:var(--bg-overlay);color:var(--color-purple);border:1px solid var(--color-purple-bg)">${escHtml(scope)}</span>`;
+  }
+  function parseCommitMeta(message) {
+    const meta = {};
+    const patterns = [
+      /section:([\w-]+)/i,
+      /track:([\w-]+)/i,
+      /key:([\w#b]+\s*(?:major|minor|maj|min)?)/i,
+      /tempo:(\d+)/i,
+      /bpm:(\d+)/i
+    ];
+    const keys = ["section", "track", "key", "tempo", "bpm"];
+    patterns.forEach((re, i) => {
+      const m = message.match(re);
+      if (m) meta[keys[i]] = m[1];
+    });
+    return meta;
+  }
+  var REACTION_BAR_EMOJIS = ["\u{1F525}", "\u2764\uFE0F", "\u{1F44F}", "\u2728", "\u{1F3B5}", "\u{1F3B8}", "\u{1F3B9}", "\u{1F941}"];
+  async function loadReactions(targetType, targetId, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const repoId = window.__repoId;
+    let reactions = [];
+    try {
+      reactions = await apiFetch(
+        "/repos/" + repoId + "/reactions?target_type=" + encodeURIComponent(targetType) + "&target_id=" + encodeURIComponent(targetId)
+      );
+    } catch {
+      reactions = [];
+    }
+    const countMap = {};
+    const reactedMap = {};
+    (Array.isArray(reactions) ? reactions : []).forEach((r) => {
+      countMap[r.emoji] = r.count;
+      reactedMap[r.emoji] = r.reacted_by_me;
+    });
+    const safeTT = targetType.replace(/'/g, "");
+    const safeTI = String(targetId).replace(/'/g, "");
+    const safeCID = containerId.replace(/'/g, "");
+    container.innerHTML = '<div class="reaction-bar">' + REACTION_BAR_EMOJIS.map((emoji) => {
+      const count = countMap[emoji] ?? 0;
+      const active = reactedMap[emoji] ? " reaction-btn--active" : "";
+      const countHtml = count > 0 ? '<span class="reaction-count">' + count + "</span>" : "";
+      return '<button class="reaction-btn' + active + `" onclick="toggleReaction('` + safeTT + "','" + safeTI + "','" + emoji + "','" + safeCID + `')" title="` + emoji + '">' + emoji + countHtml + "</button>";
+    }).join("") + "</div>";
+  }
+  async function toggleReaction(targetType, targetId, emoji, containerId) {
+    if (!getToken()) {
+      showTokenForm("Sign in to react");
+      return;
+    }
+    const repoId = window.__repoId;
+    try {
+      await apiFetch("/repos/" + repoId + "/reactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_type: targetType, target_id: String(targetId), emoji })
+      });
+      await loadReactions(targetType, targetId, containerId);
+    } catch {
+    }
+  }
+  document.addEventListener("htmx:configRequest", (evt) => {
+    const token = getToken();
+    if (token) evt.detail.headers["Authorization"] = "Bearer " + token;
+  });
+  document.addEventListener("htmx:afterSwap", () => {
+    const repoId = window.__repoId;
+    if (repoId) void initRepoNav(repoId);
+  });
+  async function loadNotifBadge() {
+    if (!getToken()) return;
+    try {
+      const data = await apiFetch("/notifications");
+      const unread = Array.isArray(data) ? data.filter((n) => !n.is_read).length : 0;
+      const badge = document.getElementById("nav-notif-badge");
+      if (badge) {
+        badge.textContent = unread > 99 ? "99+" : String(unread);
+        badge.style.display = unread > 0 ? "flex" : "none";
+      }
+    } catch (_) {
+    }
+  }
+  function initPageGlobals() {
+    if (getToken()) {
+      const btn = document.getElementById("signout-btn");
+      if (btn) btn.style.display = "";
+    }
+    loadNotifBadge();
+    if (typeof window.lucide === "object") {
+      window.lucide.createIcons();
+    }
+    const pageDataEl = document.getElementById("page-data");
+    if (pageDataEl) {
+      try {
+        const pageData = JSON.parse(pageDataEl.textContent ?? "{}");
+        dispatchPageModule(pageData);
+      } catch (_) {
+      }
+    }
+  }
+  function dispatchPageModule(data) {
+    const page = data["page"];
+    if (!page) return;
+    const pages = window.MusePages;
+    if (pages && typeof pages[page] === "function") {
+      pages[page](data);
+    }
+  }
+  document.addEventListener("DOMContentLoaded", initPageGlobals);
+  document.addEventListener("htmx:afterSettle", initPageGlobals);
+  window.getToken = getToken;
+  window.setToken = setToken;
+  window.clearToken = clearToken;
+  window.saveToken = saveToken;
+  window.showTokenForm = showTokenForm;
+  window.apiFetch = apiFetch;
+  window.authHeaders = authHeaders;
+  window.fmtDate = fmtDate;
+  window.fmtRelative = fmtRelative;
+  window.shortSha = shortSha;
+  window.fmtDuration = fmtDuration;
+  window.fmtSeconds = fmtSeconds;
+  window.escHtml = escHtml;
+  window.initRepoNav = initRepoNav;
+  window.toggleStar = toggleStar;
+  window.queueAudio = queueAudio;
+  window.togglePlay = togglePlay;
+  window.seekAudio = seekAudio;
+  window.closePlayer = closePlayer;
+  window.downloadArtifact = downloadArtifact;
+  window.onTimeUpdate = onTimeUpdate;
+  window.onMetadata = onMetadata;
+  window.onAudioEnded = onAudioEnded;
+  window.parseCommitMessage = parseCommitMessage;
+  window.commitTypeBadge = commitTypeBadge;
+  window.commitScopeBadge = commitScopeBadge;
+  window.parseCommitMeta = parseCommitMeta;
+  window.loadReactions = loadReactions;
+  window.toggleReaction = toggleReaction;
 
+  // musehub/templates/musehub/static/js/audio-player.ts
+  var SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+  function fmtTime(secs) {
+    if (!isFinite(secs) || secs < 0) return "0:00";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+  var AudioPlayer = class _AudioPlayer {
+    _ws = null;
+    _opts;
+    _autoPlay = false;
+    constructor(opts) {
+      this._opts = opts;
+    }
+    static init(opts) {
+      const player = new _AudioPlayer(opts);
+      player._setup();
+      return player;
+    }
+    _setup() {
+      const self = this;
+      const opts = this._opts;
+      this._ws = WaveSurfer.create({
+        container: opts.waveformEl,
+        waveColor: "#4a5568",
+        progressColor: "#1f6feb",
+        cursorColor: "#58a6ff",
+        height: 80,
+        barWidth: 2,
+        barGap: 1
+      });
+      this._ws.on("ready", () => {
+        const dur = self._ws.getDuration();
+        if (opts.timeDurEl) opts.timeDurEl.textContent = fmtTime(dur);
+        if (opts.playBtnEl) opts.playBtnEl.disabled = false;
+        if (self._autoPlay) {
+          self._autoPlay = false;
+          self._ws.play();
+        }
+      });
+      this._ws.on("play", () => {
+        if (opts.playBtnEl) opts.playBtnEl.innerHTML = "&#9646;&#9646;";
+      });
+      this._ws.on("pause", () => {
+        if (opts.playBtnEl) opts.playBtnEl.innerHTML = "&#9654;";
+      });
+      this._ws.on("finish", () => {
+        if (opts.playBtnEl) opts.playBtnEl.innerHTML = "&#9654;";
+      });
+      this._ws.on("timeupdate", (t) => {
+        if (opts.timeCurEl) opts.timeCurEl.textContent = fmtTime(t);
+      });
+      this._ws.on("region-update", (region) => {
+        const r = region;
+        if (opts.loopInfoEl) {
+          opts.loopInfoEl.textContent = "Loop: " + fmtTime(r.start) + " \u2013 " + fmtTime(r.end);
+          opts.loopInfoEl.style.display = "";
+        }
+        if (opts.loopBtnEl) opts.loopBtnEl.style.display = "";
+      });
+      this._ws.on("region-clear", () => {
+        if (opts.loopInfoEl) opts.loopInfoEl.style.display = "none";
+        if (opts.loopBtnEl) opts.loopBtnEl.style.display = "none";
+      });
+      this._ws.on("error", (msg) => {
+        if (opts.waveformEl) {
+          const errEl = document.createElement("p");
+          errEl.style.cssText = "color:#f85149;padding:16px;margin:0;";
+          errEl.textContent = "\u274C Audio unavailable: " + String(msg);
+          opts.waveformEl.appendChild(errEl);
+        }
+      });
+      if (opts.playBtnEl) {
+        opts.playBtnEl.disabled = true;
+        opts.playBtnEl.addEventListener("click", () => self._ws.playPause());
+      }
+      if (opts.speedSelEl) {
+        SPEEDS.forEach((s, idx) => {
+          const opt = document.createElement("option");
+          opt.value = String(s);
+          opt.textContent = s + "x";
+          if (idx === 2) opt.selected = true;
+          opts.speedSelEl.appendChild(opt);
+        });
+        opts.speedSelEl.addEventListener("change", function() {
+          self._ws.setPlaybackRate(parseFloat(this.value));
+        });
+      }
+      if (opts.loopBtnEl) {
+        opts.loopBtnEl.style.display = "none";
+        opts.loopBtnEl.addEventListener("click", () => self._ws.clearRegion());
+      }
+      if (opts.loopInfoEl) opts.loopInfoEl.style.display = "none";
+      if (opts.volSliderEl) {
+        opts.volSliderEl.addEventListener("input", function() {
+          self._ws.setVolume(parseFloat(this.value));
+        });
+      }
+      document.addEventListener("keydown", (e) => {
+        const tag = e.target?.tagName ?? "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        if (e.code === "Space") {
+          e.preventDefault();
+          self._ws.playPause();
+        } else if (e.code === "KeyL") {
+          self._ws.clearRegion();
+        } else if (e.code === "ArrowLeft") {
+          const t = Math.max(0, self._ws.getCurrentTime() - 5);
+          const d = self._ws.getDuration();
+          if (d > 0) self._ws.seekTo(t / d);
+        } else if (e.code === "ArrowRight") {
+          const tc = self._ws.getCurrentTime() + 5;
+          const dc = self._ws.getDuration();
+          if (dc > 0) self._ws.seekTo(Math.min(1, tc / dc));
+        }
+      });
+    }
+    load(url, autoPlay = false) {
+      this._autoPlay = autoPlay;
+      if (this._opts.playBtnEl) this._opts.playBtnEl.disabled = true;
+      if (this._opts.timeCurEl) this._opts.timeCurEl.textContent = "0:00";
+      if (this._opts.timeDurEl) this._opts.timeDurEl.textContent = "0:00";
+      this._ws.load(url);
+    }
+    destroy() {
+      if (this._ws) {
+        this._ws.destroy();
+        this._ws = null;
+      }
+    }
+  };
+  window.AudioPlayer = AudioPlayer;
 
-## Steps to reproduce
+  // musehub/templates/musehub/static/js/piano-roll.ts
+  var TRACK_COLORS = [
+    "#58a6ff",
+    // blue
+    "#3fb950",
+    // green
+    "#f0883e",
+    // orange
+    "#bc8cff",
+    // purple
+    "#ff7b72",
+    // red
+    "#79c0ff",
+    // light blue
+    "#56d364",
+    // light green
+    "#ffa657",
+    // light orange
+    "#d2a8ff",
+    // light purple
+    "#ffa198"
+    // light red
+  ];
+  var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  function pitchToName(pitch) {
+    const octave = Math.floor(pitch / 12) - 1;
+    return NOTE_NAMES[pitch % 12] + octave;
+  }
+  function isBlackKey(pitch) {
+    const pc = pitch % 12;
+    return pc === 1 || pc === 3 || pc === 6 || pc === 8 || pc === 10;
+  }
+  var KEY_WIDTH = 36;
+  var MIN_PITCH = 21;
+  var MAX_PITCH = 108;
+  function escHtml2(s) {
+    if (s === null || s === void 0) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function render(midi, container, opts = {}) {
+    const tracks = midi.tracks ?? [];
+    const tempoBpm = midi.tempo_bpm ?? 120;
+    const timeSig = midi.time_signature ?? "4/4";
+    const totalBeats = midi.total_beats ?? 0;
+    let selectedTrack = opts.selectedTrack ?? -1;
+    let allNotes = [];
+    tracks.forEach((t) => {
+      if (selectedTrack === -1 || t.track_id === selectedTrack) {
+        (t.notes ?? []).forEach((n) => allNotes.push(n));
+      }
+    });
+    if (allNotes.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">No MIDI notes found.</p>';
+      return;
+    }
+    let pitchMin = Math.max(
+      MIN_PITCH,
+      allNotes.reduce((m, n) => Math.min(m, n.pitch), 127) - 2
+    );
+    let pitchMax = Math.min(
+      MAX_PITCH,
+      allNotes.reduce((m, n) => Math.max(m, n.pitch), 0) + 2
+    );
+    let pitchRange = pitchMax - pitchMin + 1;
+    container.innerHTML = pianoRollHtml(midi, tracks, selectedTrack, totalBeats, tempoBpm, timeSig);
+    const outerEl = container.querySelector("#piano-roll-outer");
+    const canvasEl = container.querySelector("#piano-canvas");
+    const tooltip = document.querySelector(".piano-roll-tooltip");
+    if (!outerEl || !canvasEl) return;
+    const outer = outerEl;
+    const canvas = canvasEl;
+    let zoomX = 60;
+    let zoomY = 14;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    const dpr = window.devicePixelRatio || 1;
+    function outerW() {
+      return outer.clientWidth || 800;
+    }
+    function outerH() {
+      return Math.min(Math.max(pitchRange * zoomY + 40, 200), 600);
+    }
+    function resize() {
+      const w = outerW();
+      const h = outerH();
+      outer.style.height = h + "px";
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+    }
+    function pitchToY(pitch, h) {
+      const row = pitchMax - pitch - panY;
+      return 20 + row * zoomY;
+    }
+    function beatToX(beat, rollW) {
+      return KEY_WIDTH + (beat - panX) * zoomX;
+    }
+    function draw() {
+      const w = outerW();
+      const h = outerH();
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const rollW = w - KEY_WIDTH;
+      ctx.fillStyle = "#0d1117";
+      ctx.fillRect(0, 0, w, h);
+      for (let p = pitchMin; p <= pitchMax; p++) {
+        const y = pitchToY(p, h);
+        ctx.fillStyle = isBlackKey(p) ? "#131820" : "#0d1117";
+        ctx.fillRect(KEY_WIDTH, y, rollW, zoomY);
+        if (p % 12 === 0) {
+          ctx.fillStyle = "#1f2937";
+          ctx.fillRect(KEY_WIDTH, y, rollW, 1);
+        }
+      }
+      const beatsPerScreen = rollW / zoomX;
+      const beatStart = Math.floor(panX);
+      const beatEnd = Math.ceil(panX + beatsPerScreen + 1);
+      const beatStep = zoomX < 8 ? 8 : zoomX < 20 ? 4 : zoomX < 40 ? 2 : 1;
+      for (let b = beatStart; b <= beatEnd; b += beatStep) {
+        const bx = beatToX(b, rollW);
+        const isMeasure = b % 4 === 0;
+        ctx.strokeStyle = isMeasure ? "#30363d" : "#1a2030";
+        ctx.lineWidth = isMeasure ? 1 : 0.5;
+        ctx.beginPath();
+        ctx.moveTo(bx, 20);
+        ctx.lineTo(bx, h);
+        ctx.stroke();
+        if (isMeasure && bx >= KEY_WIDTH) {
+          ctx.fillStyle = "#8b949e";
+          ctx.font = "9px monospace";
+          ctx.fillText(String(b), bx + 2, 14);
+        }
+      }
+      allNotes.forEach((n) => {
+        const x1 = beatToX(n.start_beat, rollW);
+        const x2 = beatToX(n.start_beat + n.duration_beats, rollW);
+        const ny = pitchToY(n.pitch, h);
+        const nw = Math.max(x2 - x1 - 1, 2);
+        const nh = Math.max(zoomY - 1, 3);
+        if (x2 < KEY_WIDTH || x1 > w) return;
+        const trackColor = TRACK_COLORS[n.track_id % TRACK_COLORS.length];
+        const alpha = 0.4 + n.velocity / 127 * 0.6;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = trackColor;
+        ctx.fillRect(Math.max(x1, KEY_WIDTH), ny + 1, nw, nh);
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(Math.max(x1, KEY_WIDTH), ny + 1, nw, 1);
+        ctx.globalAlpha = 1;
+      });
+      for (let pk = pitchMin; pk <= pitchMax; pk++) {
+        const pky = pitchToY(pk, h);
+        const black = isBlackKey(pk);
+        ctx.fillStyle = black ? "#1a1a1a" : "#e6edf3";
+        ctx.fillRect(0, pky + 1, black ? KEY_WIDTH * 0.65 : KEY_WIDTH - 1, Math.max(zoomY - 1, 2));
+        if (!black && pk % 12 === 0) {
+          ctx.fillStyle = "#58a6ff";
+          ctx.font = "9px monospace";
+          ctx.fillText(pitchToName(pk), 2, pky + zoomY - 2);
+        }
+      }
+      ctx.fillStyle = "#161b22";
+      ctx.fillRect(KEY_WIDTH, 0, rollW, 20);
+      ctx.fillStyle = "#0d1117";
+      ctx.fillRect(0, 0, KEY_WIDTH, 20);
+      ctx.fillStyle = "#8b949e";
+      ctx.font = "10px monospace";
+      ctx.fillText(tempoBpm.toFixed(1) + " BPM  " + timeSig, KEY_WIDTH + 6, 13);
+    }
+    const zoomXInput = container.querySelector("#zoom-x");
+    const zoomYInput = container.querySelector("#zoom-y");
+    const trackSel = container.querySelector("#track-sel");
+    zoomXInput?.addEventListener("input", function() {
+      zoomX = parseInt(this.value, 10);
+      resize();
+      draw();
+    });
+    zoomYInput?.addEventListener("input", function() {
+      zoomY = parseInt(this.value, 10);
+      resize();
+      draw();
+    });
+    trackSel?.addEventListener("change", function() {
+      selectedTrack = parseInt(this.value, 10);
+      allNotes = [];
+      tracks.forEach((t) => {
+        if (selectedTrack === -1 || t.track_id === selectedTrack) {
+          (t.notes ?? []).forEach((n) => allNotes.push(n));
+        }
+      });
+      if (allNotes.length > 0) {
+        pitchMin = Math.max(MIN_PITCH, allNotes.reduce((m, n) => Math.min(m, n.pitch), 127) - 2);
+        pitchMax = Math.min(MAX_PITCH, allNotes.reduce((m, n) => Math.max(m, n.pitch), 0) + 2);
+        pitchRange = pitchMax - pitchMin + 1;
+      }
+      resize();
+      draw();
+    });
+    canvas.addEventListener("mousedown", (e) => {
+      isPanning = true;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+      outer.classList.add("panning");
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (isPanning) {
+        const dx = e.clientX - lastMouseX;
+        const dy = e.clientY - lastMouseY;
+        panX = Math.max(0, panX - dx / zoomX);
+        panY = Math.max(0, panY - dy / zoomY);
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        draw();
+      } else {
+        showTooltip(e);
+      }
+    });
+    window.addEventListener("mouseup", () => {
+      isPanning = false;
+      outer.classList.remove("panning");
+    });
+    canvas.addEventListener("mouseleave", () => {
+      if (tooltip) tooltip.style.display = "none";
+    });
+    function showTooltip(e) {
+      if (!tooltip) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      if (mx < KEY_WIDTH || my < 20) {
+        tooltip.style.display = "none";
+        return;
+      }
+      const beat = panX + (mx - KEY_WIDTH) / zoomX;
+      const pitch = pitchMax - Math.floor((my - 20) / zoomY) - Math.round(panY);
+      const hit = allNotes.find(
+        (n) => n.pitch === pitch && n.start_beat <= beat && n.start_beat + n.duration_beats >= beat
+      );
+      if (!hit) {
+        tooltip.style.display = "none";
+        return;
+      }
+      tooltip.innerHTML = "<strong>" + pitchToName(hit.pitch) + "</strong> (MIDI " + hit.pitch + ")<br>Beat: " + hit.start_beat.toFixed(2) + "<br>Duration: " + hit.duration_beats.toFixed(2) + " beats<br>Velocity: " + hit.velocity + "<br>Track: " + hit.track_id + " / Ch " + hit.channel;
+      tooltip.style.display = "block";
+      tooltip.style.left = e.clientX + 14 + "px";
+      tooltip.style.top = e.clientY - 10 + "px";
+    }
+    window.addEventListener("resize", () => {
+      resize();
+      draw();
+    });
+    resize();
+    draw();
+  }
+  function pianoRollHtml(_midi, tracks, selectedTrack, totalBeats, tempoBpm, timeSig) {
+    const trackOpts = '<option value="-1">All tracks</option>' + tracks.map((t) => {
+      const sel = t.track_id === selectedTrack ? " selected" : "";
+      return '<option value="' + t.track_id + '"' + sel + ">" + escHtml2(t.name ?? "Track " + t.track_id) + " (" + (t.notes ?? []).length + " notes)</option>";
+    }).join("");
+    const legendItems = tracks.map((t) => {
+      const color = TRACK_COLORS[t.track_id % TRACK_COLORS.length];
+      return '<div class="track-legend-item"><div class="track-legend-swatch" style="background:' + color + '"></div>' + escHtml2(t.name ?? "Track " + t.track_id) + "</div>";
+    }).join("");
+    return '<div class="piano-roll-wrapper"><div class="piano-roll-controls"><label>Track: <select id="track-sel">' + trackOpts + '</select></label><label>H-Zoom: <input type="range" id="zoom-x" min="4" max="200" value="60" style="width:80px"></label><label>V-Zoom: <input type="range" id="zoom-y" min="4" max="40" value="14" style="width:60px"></label><span style="font-size:12px;color:#8b949e;margin-left:auto">' + totalBeats.toFixed(1) + " beats &bull; " + tempoBpm.toFixed(1) + " BPM &bull; " + escHtml2(timeSig) + '</span></div><div id="piano-roll-outer"><canvas id="piano-canvas"></canvas></div><div class="track-legend">' + legendItems + "</div></div>";
+  }
+  var PianoRoll = { render };
+  window.PianoRoll = PianoRoll;
 
-1. 
-2. 
-3. 
+  // musehub/templates/musehub/static/js/pages/repo-page.ts
+  function initRepoPage(data) {
+    const repoId = data.repo_id;
+    if (repoId && typeof window.initRepoNav === "function") {
+      window.initRepoNav(String(repoId));
+    }
+  }
 
-## Expected behaviour
+  // musehub/templates/musehub/static/js/pages/issue-list.ts
+  function bodyPreview(text, maxLen = 120) {
+    if (!text) return "";
+    const stripped = text.replace(/[#*`>\-_]/g, "").trim();
+    return stripped.length > maxLen ? stripped.slice(0, maxLen) + "\u2026" : stripped;
+  }
+  var ISSUE_TEMPLATES = [
+    { id: "blank", icon: "\u{1F4DD}", title: "Blank Issue", description: "Start with a clean slate.", body: "" },
+    { id: "bug", icon: "\u{1F41B}", title: "Bug Report", description: "Something isn't working as expected.", body: "## What happened?\n\n\n## Steps to reproduce\n\n1. \n2. \n3. \n\n## Expected behaviour\n\n\n## Actual behaviour\n\n" },
+    { id: "feature", icon: "\u2728", title: "Feature Request", description: "Suggest a new musical idea or capability.", body: "## Summary\n\n\n## Motivation\n\n\n## Proposed approach\n\n" },
+    { id: "arrangement", icon: "\u{1F3B5}", title: "Arrangement Issue", description: "Track needs musical arrangement work.", body: "## Track / Section\n\n\n## Current arrangement\n\n\n## Desired arrangement\n\n\n## Musical context\n\n" },
+    { id: "theory", icon: "\u{1F3BC}", title: "Music Theory", description: "Related to harmony, rhythm, or theory decisions.", body: "## Theory concern\n\n\n## Affected section / instrument\n\n\n## Suggested resolution\n\n" }
+  ];
+  var selectedIssues = /* @__PURE__ */ new Set();
+  function showTemplatePicker() {
+    const panel = document.getElementById("create-issue-panel");
+    const picker = document.getElementById("template-picker");
+    if (!panel || !picker) return;
+    picker.style.display = "";
+    panel.style.display = "none";
+  }
+  function selectTemplate(tplId) {
+    const tpl = ISSUE_TEMPLATES.find((t) => t.id === tplId);
+    if (!tpl) return;
+    const bodyEl = document.getElementById("issue-body");
+    if (bodyEl) bodyEl.value = tpl.body;
+    const picker = document.getElementById("template-picker");
+    if (picker) picker.style.display = "none";
+    const panel = document.getElementById("create-issue-panel");
+    if (panel) panel.style.display = "";
+    const titleEl = document.getElementById("issue-title");
+    if (titleEl) titleEl.focus();
+  }
+  function toggleIssueSelect(issueId, checked) {
+    if (checked) {
+      selectedIssues.add(issueId);
+    } else {
+      selectedIssues.delete(issueId);
+    }
+    updateBulkToolbar();
+  }
+  function updateBulkToolbar() {
+    const toolbar = document.getElementById("bulk-toolbar");
+    const countEl = document.getElementById("bulk-count");
+    if (!toolbar || !countEl) return;
+    const n = selectedIssues.size;
+    if (n > 0) {
+      toolbar.classList.add("visible");
+      countEl.textContent = n === 1 ? "1 issue selected" : `${n} issues selected`;
+    } else {
+      toolbar.classList.remove("visible");
+    }
+  }
+  function deselectAll() {
+    selectedIssues.clear();
+    document.querySelectorAll(".issue-row-check").forEach((c) => {
+      c.checked = false;
+    });
+    updateBulkToolbar();
+  }
+  function bulkClose() {
+    if (selectedIssues.size > 0 && confirm(`Close ${selectedIssues.size} issue(s)?`)) location.reload();
+  }
+  function bulkReopen() {
+    if (selectedIssues.size > 0 && confirm(`Reopen ${selectedIssues.size} issue(s)?`)) location.reload();
+  }
+  function bulkAssignLabel() {
+    const s = document.getElementById("bulk-label-select");
+    if (!s?.value) {
+      alert("Please select a label first.");
+      return;
+    }
+    if (selectedIssues.size > 0) location.reload();
+  }
+  function bulkAssignMilestone() {
+    const s = document.getElementById("bulk-milestone-select");
+    if (!s?.value) {
+      alert("Please select a milestone first.");
+      return;
+    }
+    if (selectedIssues.size > 0) location.reload();
+  }
+  function initIssueList(data) {
+    initRepoPage(data);
+    window.showTemplatePicker = showTemplatePicker;
+    window.selectTemplate = selectTemplate;
+    window.toggleIssueSelect = toggleIssueSelect;
+    window.deselectAll = deselectAll;
+    window.bulkClose = bulkClose;
+    window.bulkReopen = bulkReopen;
+    window.bulkAssignLabel = bulkAssignLabel;
+    window.bulkAssignMilestone = bulkAssignMilestone;
+    window.bodyPreview = bodyPreview;
+  }
 
+  // musehub/templates/musehub/static/js/pages/new-repo.ts
+  function initTagInput(containerId, hiddenInputId) {
+    const container = document.getElementById(containerId);
+    const hidden = document.getElementById(hiddenInputId);
+    if (!container || !hidden) return;
+    const textInput = container.querySelector(".tag-text-input");
+    if (!textInput) return;
+    let tags = hidden.value ? hidden.value.split(",").filter(Boolean) : [];
+    function render2() {
+      container.querySelectorAll(".tag-pill").forEach((p) => p.remove());
+      tags.forEach((tag) => {
+        const pill = document.createElement("span");
+        pill.className = "tag-pill";
+        pill.textContent = tag + " ";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tag-pill-remove";
+        btn.textContent = "\xD7";
+        btn.addEventListener("click", () => {
+          tags = tags.filter((t) => t !== tag);
+          render2();
+        });
+        pill.appendChild(btn);
+        container.insertBefore(pill, textInput);
+      });
+      hidden.value = tags.join(",");
+    }
+    textInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        const val = textInput.value.trim().replace(/,/g, "");
+        if (val && !tags.includes(val)) {
+          tags.push(val);
+          render2();
+        }
+        textInput.value = "";
+      } else if (e.key === "Backspace" && textInput.value === "" && tags.length > 0) {
+        tags.pop();
+        render2();
+      }
+    });
+    container.addEventListener("click", () => textInput.focus());
+    render2();
+  }
+  function initVisibilityCards() {
+    document.querySelectorAll(".visibility-card").forEach((card) => {
+      const el = card;
+      el.addEventListener("click", () => {
+        document.querySelectorAll(".visibility-card").forEach((c) => {
+          c.setAttribute("aria-checked", "false");
+          c.classList.remove("selected");
+        });
+        el.setAttribute("aria-checked", "true");
+        el.classList.add("selected");
+        const radio = el.querySelector("input[type=radio]");
+        if (radio) radio.checked = true;
+      });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") el.click();
+      });
+    });
+  }
+  function initNewRepo(_data) {
+    initTagInput("tag-input-container", "tags-hidden");
+    initVisibilityCards();
+  }
 
-## Actual behaviour
+  // musehub/templates/musehub/static/js/pages/piano-roll-page.ts
+  function attachTransportControls() {
+    const playBtn = document.getElementById("play-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    if (playBtn) {
+      playBtn.addEventListener("click", () => {
+        const pr = window.PianoRoll;
+        if (pr?.play) pr.play();
+      });
+    }
+    if (stopBtn) {
+      stopBtn.addEventListener("click", () => {
+        const pr = window.PianoRoll;
+        if (pr?.stop) pr.stop();
+      });
+    }
+  }
+  async function legacyLoad(repoId) {
+    const canvas = document.getElementById("piano-canvas");
+    if (!canvas) return;
+    const pr = window.PianoRoll;
+    if (pr?.init) return;
+    const midiUrl = canvas.dataset.midiUrl;
+    const rollPath = canvas.dataset.path ?? null;
+    const apiFetch2 = window.apiFetch;
+    if (!apiFetch2) return;
+    try {
+      const outer = document.getElementById("piano-roll-outer");
+      if (rollPath) {
+        const objData = await apiFetch2("/repos/" + encodeURIComponent(repoId) + "/objects?limit=500");
+        const obj = (objData.objects ?? []).find((o) => o.path === rollPath);
+        if (obj && typeof window.renderFromObjectId === "function") {
+          window.renderFromObjectId(repoId, obj.objectId, outer);
+        }
+      } else if (midiUrl) {
+        if (typeof window.renderFromUrl === "function") {
+          window.renderFromUrl(midiUrl, outer);
+        }
+      }
+    } catch (_) {
+    }
+  }
+  async function initPianoRollPage(data) {
+    initRepoPage(data);
+    attachTransportControls();
+    if (data.repo_id) await legacyLoad(String(data.repo_id));
+  }
 
-`},{id:"feature",icon:"\u2728",title:"Feature Request",description:"Suggest a new musical idea or capability.",body:`## Summary
-
-
-## Motivation
-
-
-## Proposed approach
-
-`},{id:"arrangement",icon:"\u{1F3B5}",title:"Arrangement Issue",description:"Track needs musical arrangement work.",body:`## Track / Section
-
-
-## Current arrangement
-
-
-## Desired arrangement
-
-
-## Musical context
-
-`},{id:"theory",icon:"\u{1F3BC}",title:"Music Theory",description:"Related to harmony, rhythm, or theory decisions.",body:`## Theory concern
-
-
-## Affected section / instrument
-
-
-## Suggested resolution
-
-`}],M=new Set;function wt(){let e=document.getElementById("create-issue-panel"),t=document.getElementById("template-picker");!e||!t||(t.style.display="",e.style.display="none")}function ht(e){let t=bt.find(r=>r.id===e);if(!t)return;let n=document.getElementById("issue-body");n&&(n.value=t.body);let i=document.getElementById("template-picker");i&&(i.style.display="none");let o=document.getElementById("create-issue-panel");o&&(o.style.display="");let a=document.getElementById("issue-title");a&&a.focus()}function Et(e,t){t?M.add(e):M.delete(e),Me()}function Me(){let e=document.getElementById("bulk-toolbar"),t=document.getElementById("bulk-count");if(!e||!t)return;let n=M.size;n>0?(e.classList.add("visible"),t.textContent=n===1?"1 issue selected":`${n} issues selected`):e.classList.remove("visible")}function kt(){M.clear(),document.querySelectorAll(".issue-row-check").forEach(e=>{e.checked=!1}),Me()}function xt(){M.size>0&&confirm(`Close ${M.size} issue(s)?`)&&location.reload()}function Tt(){M.size>0&&confirm(`Reopen ${M.size} issue(s)?`)&&location.reload()}function Mt(){if(!document.getElementById("bulk-label-select")?.value){alert("Please select a label first.");return}M.size>0&&location.reload()}function Lt(){if(!document.getElementById("bulk-milestone-select")?.value){alert("Please select a milestone first.");return}M.size>0&&location.reload()}function Le(e){w(e),window.showTemplatePicker=wt,window.selectTemplate=ht,window.toggleIssueSelect=Et,window.deselectAll=kt,window.bulkClose=xt,window.bulkReopen=Tt,window.bulkAssignLabel=Mt,window.bulkAssignMilestone=Lt,window.bodyPreview=vt}function Pt(e,t){let n=document.getElementById(e),i=document.getElementById(t);if(!n||!i)return;let o=n.querySelector(".tag-text-input");if(!o)return;let a=i.value?i.value.split(",").filter(Boolean):[];function r(){n.querySelectorAll(".tag-pill").forEach(s=>s.remove()),a.forEach(s=>{let l=document.createElement("span");l.className="tag-pill",l.textContent=s+" ";let m=document.createElement("button");m.type="button",m.className="tag-pill-remove",m.textContent="\xD7",m.addEventListener("click",()=>{a=a.filter(h=>h!==s),r()}),l.appendChild(m),n.insertBefore(l,o)}),i.value=a.join(",")}o.addEventListener("keydown",s=>{if(s.key==="Enter"||s.key===","){s.preventDefault();let l=o.value.trim().replace(/,/g,"");l&&!a.includes(l)&&(a.push(l),r()),o.value=""}else s.key==="Backspace"&&o.value===""&&a.length>0&&(a.pop(),r())}),n.addEventListener("click",()=>o.focus()),r()}function Rt(){document.querySelectorAll(".visibility-card").forEach(e=>{let t=e;t.addEventListener("click",()=>{document.querySelectorAll(".visibility-card").forEach(i=>{i.setAttribute("aria-checked","false"),i.classList.remove("selected")}),t.setAttribute("aria-checked","true"),t.classList.add("selected");let n=t.querySelector("input[type=radio]");n&&(n.checked=!0)}),t.addEventListener("keydown",n=>{(n.key==="Enter"||n.key===" ")&&t.click()})})}function Pe(e){Pt("tag-input-container","tags-hidden"),Rt()}function It(){let e=document.getElementById("play-btn"),t=document.getElementById("stop-btn");e&&e.addEventListener("click",()=>{let n=window.PianoRoll;n?.play&&n.play()}),t&&t.addEventListener("click",()=>{let n=window.PianoRoll;n?.stop&&n.stop()})}async function _t(e){let t=document.getElementById("piano-canvas");if(!t||window.PianoRoll?.init)return;let i=t.dataset.midiUrl,o=t.dataset.path??null,a=window.apiFetch;if(a)try{let r=document.getElementById("piano-roll-outer");if(o){let l=((await a("/repos/"+encodeURIComponent(e)+"/objects?limit=500")).objects??[]).find(m=>m.path===o);l&&typeof window.renderFromObjectId=="function"&&window.renderFromObjectId(e,l.objectId,r)}else i&&typeof window.renderFromUrl=="function"&&window.renderFromUrl(i,r)}catch{}}async function Re(e){w(e),It(),e.repo_id&&await _t(String(e.repo_id))}var f=null,_={};function se(e){if(!isFinite(e)||e<0)return"0:00";let t=Math.floor(e/60),n=Math.floor(e%60);return t+":"+(n<10?"0":"")+n}function St(e){return e<1024?e+" B":e<1048576?(e/1024).toFixed(0)+" KB":(e/1048576).toFixed(1)+" MB"}function Bt(e,t){let n=e?e.charCodeAt(e.length-1):0,i=[];for(let o=0;o<16;o++)i.push(Math.round(20+Math.abs(Math.sin((n+o*7)*.8))*45));return i.map(o=>`<div class="track-waveform-bar" style="height:${o}%"></div>`).join("")}function Ct(){Object.values(_).forEach(e=>{e.paused||e.pause()}),document.querySelectorAll(".track-play-btn").forEach(e=>{e.innerHTML="&#9654;",e.classList.remove("is-playing")}),document.querySelectorAll(".track-row").forEach(e=>e.classList.remove("is-playing"))}function Ht(e,t){return`
+  // musehub/templates/musehub/static/js/pages/listen.ts
+  var mixAudio = null;
+  var trackAudios = {};
+  function fmtTime2(s) {
+    if (!isFinite(s) || s < 0) return "0:00";
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(0) + " KB";
+    return (n / 1048576).toFixed(1) + " MB";
+  }
+  function miniWaveform(objectId, _isPlaying) {
+    const seed = objectId ? objectId.charCodeAt(objectId.length - 1) : 0;
+    const heights = [];
+    for (let i = 0; i < 16; i++) {
+      heights.push(Math.round(20 + Math.abs(Math.sin((seed + i * 7) * 0.8)) * 45));
+    }
+    return heights.map((h) => `<div class="track-waveform-bar" style="height:${h}%"></div>`).join("");
+  }
+  function pauseAllTracks() {
+    Object.values(trackAudios).forEach((a) => {
+      if (!a.paused) a.pause();
+    });
+    document.querySelectorAll(".track-play-btn").forEach((b) => {
+      b.innerHTML = "&#9654;";
+      b.classList.remove("is-playing");
+    });
+    document.querySelectorAll(".track-row").forEach((r) => r.classList.remove("is-playing"));
+  }
+  function renderMixPlayer(url, _title) {
+    return `
   <div class="listen-player-card">
     <div class="listen-player-title">Full Mix</div>
     <div class="listen-player-sub">Master render \u2014 all tracks combined</div>
@@ -56,87 +1091,445 @@
       </div>
     </div>
     <div class="listen-actions">
-      <a href="${e}" download class="btn btn-secondary btn-sm">&#8595; Download</a>
+      <a href="${url}" download class="btn btn-secondary btn-sm">&#8595; Download</a>
     </div>
-  </div>`}function $t(e){f=new Audio,f.preload="metadata";let t=document.getElementById("mix-play-btn"),n=document.getElementById("mix-progress-fill"),i=document.getElementById("mix-progress-bar"),o=document.getElementById("mix-time-cur"),a=document.getElementById("mix-time-dur");t&&(f.addEventListener("canplay",()=>{t.disabled=!1}),f.addEventListener("timeupdate",()=>{let r=f.duration?f.currentTime/f.duration*100:0;n&&(n.style.width=r+"%"),o&&(o.textContent=se(f.currentTime))}),f.addEventListener("durationchange",()=>{a&&(a.textContent=se(f.duration))}),f.addEventListener("ended",()=>{t.innerHTML="&#9654;",n&&(n.style.width="0%"),f.currentTime=0}),f.addEventListener("error",()=>{t.disabled=!0,t.title="Audio unavailable"}),t.addEventListener("click",()=>{Ct(),f.paused?(f.src=e,f.play(),t.innerHTML="&#9646;&#9646;"):(f.pause(),t.innerHTML="&#9654;")}),i&&i.addEventListener("click",r=>{if(!f.duration)return;let s=i.getBoundingClientRect();f.currentTime=(r.clientX-s.left)/s.width*f.duration}))}function At(e){return e.map(t=>{let n=CSS.escape(t.path),i=t.durationSec?se(t.durationSec):"\u2014",o=t.size?St(t.size):"",a=Bt(t.objectId??t.path,!1);return`
-    <div class="track-row" id="track-row-${n}">
-      <button class="track-play-btn" id="track-btn-${n}"
-              onclick="window._listenPlayTrack(${JSON.stringify(t.path)}, ${JSON.stringify(t.url)}, 'track-btn-${n}', 'track-row-${n}')">&#9654;</button>
+  </div>`;
+  }
+  function initMixPlayer(url) {
+    mixAudio = new Audio();
+    mixAudio.preload = "metadata";
+    const playBtn = document.getElementById("mix-play-btn");
+    const fill = document.getElementById("mix-progress-fill");
+    const bar = document.getElementById("mix-progress-bar");
+    const timeCur = document.getElementById("mix-time-cur");
+    const timeDur = document.getElementById("mix-time-dur");
+    if (!playBtn) return;
+    mixAudio.addEventListener("canplay", () => {
+      playBtn.disabled = false;
+    });
+    mixAudio.addEventListener("timeupdate", () => {
+      const pct = mixAudio.duration ? mixAudio.currentTime / mixAudio.duration * 100 : 0;
+      if (fill) fill.style.width = pct + "%";
+      if (timeCur) timeCur.textContent = fmtTime2(mixAudio.currentTime);
+    });
+    mixAudio.addEventListener("durationchange", () => {
+      if (timeDur) timeDur.textContent = fmtTime2(mixAudio.duration);
+    });
+    mixAudio.addEventListener("ended", () => {
+      playBtn.innerHTML = "&#9654;";
+      if (fill) fill.style.width = "0%";
+      mixAudio.currentTime = 0;
+    });
+    mixAudio.addEventListener("error", () => {
+      playBtn.disabled = true;
+      playBtn.title = "Audio unavailable";
+    });
+    playBtn.addEventListener("click", () => {
+      pauseAllTracks();
+      if (mixAudio.paused) {
+        mixAudio.src = url;
+        mixAudio.play();
+        playBtn.innerHTML = "&#9646;&#9646;";
+      } else {
+        mixAudio.pause();
+        playBtn.innerHTML = "&#9654;";
+      }
+    });
+    if (bar) {
+      bar.addEventListener("click", (e) => {
+        if (!mixAudio.duration) return;
+        const rect = bar.getBoundingClientRect();
+        mixAudio.currentTime = (e.clientX - rect.left) / rect.width * mixAudio.duration;
+      });
+    }
+  }
+  function renderTrackList(tracks) {
+    return tracks.map((t) => {
+      const safeId = CSS.escape(t.path);
+      const dur = t.durationSec ? fmtTime2(t.durationSec) : "\u2014";
+      const size = t.size ? fmtBytes(t.size) : "";
+      const waveHtml = miniWaveform(t.objectId ?? t.path, false);
+      return `
+    <div class="track-row" id="track-row-${safeId}">
+      <button class="track-play-btn" id="track-btn-${safeId}"
+              onclick="window._listenPlayTrack(${JSON.stringify(t.path)}, ${JSON.stringify(t.url)}, 'track-btn-${safeId}', 'track-row-${safeId}')">&#9654;</button>
       <div class="track-info">
-        <div class="track-name">${window.escHtml?window.escHtml(t.name):t.name}</div>
-        <div class="track-path">${window.escHtml?window.escHtml(t.path):t.path}</div>
+        <div class="track-name">${window.escHtml ? window.escHtml(t.name) : t.name}</div>
+        <div class="track-path">${window.escHtml ? window.escHtml(t.path) : t.path}</div>
       </div>
-      <div class="track-waveform">${a}</div>
-      <div class="track-meta">${i}${o?" \xB7 "+o:""}</div>
+      <div class="track-waveform">${waveHtml}</div>
+      <div class="track-meta">${dur}${size ? " \xB7 " + size : ""}</div>
       <div class="track-row-actions">
         <a class="btn btn-secondary btn-sm" href="${t.url}" download title="Download">&#8595;</a>
       </div>
-    </div>`}).join("")}function Dt(e,t,n,i){if(f&&!f.paused){f.pause();let s=document.getElementById("mix-play-btn");s&&(s.innerHTML="&#9654;")}Object.keys(_).forEach(s=>{if(s!==e&&!_[s].paused){_[s].pause();let l=document.getElementById("track-row-"+CSS.escape(s));l&&l.classList.remove("is-playing");let m=document.getElementById("track-btn-"+CSS.escape(s));m&&(m.innerHTML="&#9654;",m.classList.remove("is-playing"))}}),_[e]||(_[e]=new Audio,_[e].preload="metadata");let o=_[e],a=document.getElementById(n),r=document.getElementById(i);o.paused?(o.src=t,o.play(),a&&(a.innerHTML="&#9646;&#9646;",a.classList.add("is-playing")),r&&r.classList.add("is-playing"),o.addEventListener("ended",()=>{a&&(a.innerHTML="&#9654;",a.classList.remove("is-playing")),r&&r.classList.remove("is-playing")},{once:!0})):(o.pause(),a&&(a.innerHTML="&#9654;",a.classList.remove("is-playing")),r&&r.classList.remove("is-playing"))}async function Ie(e){w(e);let t=String(e.repo_id??""),n=e.ref??"main",i=e.api_base??`/api/v1/musehub/repos/${encodeURIComponent(t)}`;window._listenPlayTrack=Dt;let o=document.getElementById("content");if(o){o.innerHTML='<p class="loading">Loading audio tracks\u2026</p>';try{let a=window.apiFetch;if(!a)return;let r;try{r=await a(i.replace("/api/v1/musehub","")+"/listen/"+encodeURIComponent(n)+"/tracks")}catch{r={hasRenders:!1,tracks:[],fullMixUrl:null,ref:n,repoId:t}}if(!r.hasRenders||r.tracks.length===0){o.innerHTML=`
+    </div>`;
+    }).join("");
+  }
+  function playTrack(path, url, playBtnId, rowId) {
+    if (mixAudio && !mixAudio.paused) {
+      mixAudio.pause();
+      const btn2 = document.getElementById("mix-play-btn");
+      if (btn2) btn2.innerHTML = "&#9654;";
+    }
+    Object.keys(trackAudios).forEach((p) => {
+      if (p !== path && !trackAudios[p].paused) {
+        trackAudios[p].pause();
+        const oldRow = document.getElementById("track-row-" + CSS.escape(p));
+        if (oldRow) oldRow.classList.remove("is-playing");
+        const oldBtn = document.getElementById("track-btn-" + CSS.escape(p));
+        if (oldBtn) {
+          oldBtn.innerHTML = "&#9654;";
+          oldBtn.classList.remove("is-playing");
+        }
+      }
+    });
+    if (!trackAudios[path]) {
+      trackAudios[path] = new Audio();
+      trackAudios[path].preload = "metadata";
+    }
+    const audio = trackAudios[path];
+    const btn = document.getElementById(playBtnId);
+    const row = document.getElementById(rowId);
+    if (audio.paused) {
+      audio.src = url;
+      audio.play();
+      if (btn) {
+        btn.innerHTML = "&#9646;&#9646;";
+        btn.classList.add("is-playing");
+      }
+      if (row) row.classList.add("is-playing");
+      audio.addEventListener("ended", () => {
+        if (btn) {
+          btn.innerHTML = "&#9654;";
+          btn.classList.remove("is-playing");
+        }
+        if (row) row.classList.remove("is-playing");
+      }, { once: true });
+    } else {
+      audio.pause();
+      if (btn) {
+        btn.innerHTML = "&#9654;";
+        btn.classList.remove("is-playing");
+      }
+      if (row) row.classList.remove("is-playing");
+    }
+  }
+  async function initListen(data) {
+    initRepoPage(data);
+    const repoId = String(data.repo_id ?? "");
+    const ref = data.ref ?? "main";
+    const apiBase = data.api_base ?? `/api/v1/musehub/repos/${encodeURIComponent(repoId)}`;
+    window["_listenPlayTrack"] = playTrack;
+    const content = document.getElementById("content");
+    if (!content) return;
+    content.innerHTML = '<p class="loading">Loading audio tracks\u2026</p>';
+    try {
+      const apiFetch2 = window.apiFetch;
+      if (!apiFetch2) return;
+      let listing;
+      try {
+        listing = await apiFetch2(apiBase.replace("/api/v1/musehub", "") + "/listen/" + encodeURIComponent(ref) + "/tracks");
+      } catch (_) {
+        listing = { hasRenders: false, tracks: [], fullMixUrl: null, ref, repoId };
+      }
+      if (!listing.hasRenders || listing.tracks.length === 0) {
+        content.innerHTML = `
       <div class="no-renders-card">
         <span class="no-renders-icon">\u{1F3B5}</span>
         <div class="no-renders-title">No audio renders yet</div>
         <div class="no-renders-sub">Push a commit with .wav, .mp3, .flac, or .ogg files to see them here.</div>
-      </div>`;return}let s="";r.fullMixUrl&&(s+=Ht(r.fullMixUrl,"Full Mix")),s+=`<div class="card"><div class="track-list">${At(r.tracks)}</div></div>`,o.innerHTML=s,r.fullMixUrl&&$t(r.fullMixUrl)}catch(a){o.innerHTML=`<p class="error">Failed to load: ${a instanceof Error?a.message:String(a)}</p>`}}}function _e(e){w(e),e.repo_id&&e.commit_sha&&typeof window.loadReactions=="function"&&window.loadReactions("commit",String(e.commit_sha),"commit-reactions")}function Se(e){w(e),e.repo_id&&e.commit_id&&typeof window.loadReactions=="function"&&window.loadReactions("commit",String(e.commit_id),"commit-reactions")}function u(e){return e?String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):""}function He(e){if(!e)return"";let t=new Date(e),n=Math.floor((Date.now()-t.getTime())/1e3);return n<60?"just now":n<3600?Math.floor(n/60)+"m ago":n<86400?Math.floor(n/3600)+"h ago":Math.floor(n/86400)+"d ago"}function jt(e){let t=e.days??[],n=[],i=[];for(let s of t)i.push(s),i.length===7&&(n.push(i),i=[]);i.length&&n.push(i);let o=n.map(s=>`<div class="heatmap-col">${s.map(m=>`<div class="heatmap-cell" data-intensity="${m.intensity}" title="${u(m.date)}: ${m.count} commit${m.count!==1?"s":""}"></div>`).join("")}</div>`).join(""),a=[0,1,2,3].map(s=>`<div class="heatmap-cell" data-intensity="${s}" style="display:inline-block"></div>`).join(""),r=document.getElementById("heatmap-section");r&&(r.innerHTML=`
+      </div>`;
+        return;
+      }
+      let html = "";
+      if (listing.fullMixUrl) {
+        html += renderMixPlayer(listing.fullMixUrl, "Full Mix");
+      }
+      html += `<div class="card"><div class="track-list">${renderTrackList(listing.tracks)}</div></div>`;
+      content.innerHTML = html;
+      if (listing.fullMixUrl) initMixPlayer(listing.fullMixUrl);
+    } catch (e) {
+      content.innerHTML = `<p class="error">Failed to load: ${e instanceof Error ? e.message : String(e)}</p>`;
+    }
+  }
+
+  // musehub/templates/musehub/static/js/pages/commit-detail.ts
+  function initCommitDetail(data) {
+    initRepoPage(data);
+    if (data.repo_id && data.commit_sha && typeof window.loadReactions === "function") {
+      window.loadReactions("commit", String(data.commit_sha), "commit-reactions");
+    }
+  }
+
+  // musehub/templates/musehub/static/js/pages/commit.ts
+  function initCommit(data) {
+    initRepoPage(data);
+    if (data.repo_id && data.commit_id && typeof window.loadReactions === "function") {
+      window.loadReactions("commit", String(data.commit_id), "commit-reactions");
+    }
+  }
+
+  // musehub/templates/musehub/static/js/pages/user-profile.ts
+  function esc(s) {
+    if (!s) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function fmtRelative2(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    const diff = Math.floor((Date.now() - d.getTime()) / 1e3);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  }
+  function renderHeatmap(stats) {
+    const days = stats.days ?? [];
+    const cols = [];
+    let col = [];
+    for (const day of days) {
+      col.push(day);
+      if (col.length === 7) {
+        cols.push(col);
+        col = [];
+      }
+    }
+    if (col.length) cols.push(col);
+    const colsHtml = cols.map((c) => {
+      const cells = c.map(
+        (d) => `<div class="heatmap-cell" data-intensity="${d.intensity}" title="${esc(d.date)}: ${d.count} commit${d.count !== 1 ? "s" : ""}"></div>`
+      ).join("");
+      return `<div class="heatmap-col">${cells}</div>`;
+    }).join("");
+    const legend = [0, 1, 2, 3].map((n) => `<div class="heatmap-cell" data-intensity="${n}" style="display:inline-block"></div>`).join("");
+    const el = document.getElementById("heatmap-section");
+    if (el) el.innerHTML = `
     <div class="card">
       <h2 style="margin-bottom:12px">\u{1F4C8} Contribution Activity</h2>
-      <div class="heatmap-grid">${o}</div>
+      <div class="heatmap-grid">${colsHtml}</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text-muted)">
-        Less ${a} More &nbsp;\xB7&nbsp; ${e.totalContributions??0} contributions in the last year
-        &nbsp;\xB7&nbsp; Longest streak: ${e.longestStreak??0} days
-        &nbsp;\xB7&nbsp; Current streak: ${e.currentStreak??0} days
+        Less ${legend} More &nbsp;\xB7&nbsp; ${stats.totalContributions ?? 0} contributions in the last year
+        &nbsp;\xB7&nbsp; Longest streak: ${stats.longestStreak ?? 0} days
+        &nbsp;\xB7&nbsp; Current streak: ${stats.currentStreak ?? 0} days
       </div>
-    </div>`)}function Ut(e){let t=e.map(o=>`<div class="badge-card ${o.earned?"earned":"unearned"}" title="${u(o.description)}">
-      <div class="badge-icon">${u(o.icon)}</div>
+    </div>`;
+  }
+  function renderBadges(badges) {
+    const cards = badges.map((b) => {
+      const cls = b.earned ? "earned" : "unearned";
+      return `<div class="badge-card ${cls}" title="${esc(b.description)}">
+      <div class="badge-icon">${esc(b.icon)}</div>
       <div class="badge-info">
-        <div class="badge-name">${u(o.name)}</div>
-        <div class="badge-desc">${u(o.description)}</div>
+        <div class="badge-name">${esc(b.name)}</div>
+        <div class="badge-desc">${esc(b.description)}</div>
       </div>
-    </div>`).join(""),n=e.filter(o=>o.earned).length,i=document.getElementById("badges-section");i&&(i.innerHTML=`<div class="card"><h2 style="margin-bottom:12px">\u{1F3C6} Achievements (${n}/${e.length})</h2><div class="badge-grid">${t}</div></div>`)}function Nt(e,t){if(!e?.length)return;let n=e.map(o=>{let a=o.primaryGenre?`<span>\u{1F3B5} ${u(o.primaryGenre)}</span>`:"",r=o.language?`<span>\u{1F524} ${u(o.language)}</span>`:"";return`<div class="pinned-card">
-      <h3><a href="/${u(o.owner)}/${u(o.slug)}">${u(o.name)}</a></h3>
-      ${o.description?`<p class="pinned-desc">${u(o.description)}</p>`:""}
-      <div class="pinned-meta">${a}${r}<span>\u2B50 ${o.starsCount??0}</span><span>\u{1F374} ${o.forksCount??0}</span></div>
-    </div>`}).join(""),i=document.getElementById("pinned-section");i&&(i.innerHTML=`<div class="card"><h2 style="margin-bottom:12px">\u{1F4CC} Pinned</h2><div class="pinned-grid">${n}</div></div>`)}var U="",Ft="repos",le=[];function zt(e){let t=(e.displayName??e.username??"?")[0].toUpperCase(),n=e.avatarUrl?`<div class="avatar-lg"><img src="${u(e.avatarUrl)}" alt="${u(e.username)}" /></div>`:`<div class="avatar-lg" style="background:${u(e.avatarColor??"#1f6feb")}">${u(t)}</div>`,i=window.getToken?!!window.getToken():!1,o=document.getElementById("profile-hdr");return o&&(o.innerHTML=`
+    </div>`;
+    }).join("");
+    const earned = badges.filter((b) => b.earned).length;
+    const el = document.getElementById("badges-section");
+    if (el) el.innerHTML = `<div class="card"><h2 style="margin-bottom:12px">\u{1F3C6} Achievements (${earned}/${badges.length})</h2><div class="badge-grid">${cards}</div></div>`;
+  }
+  function renderPinned(pinnedRepos, _isOwner) {
+    if (!pinnedRepos?.length) return;
+    const cards = pinnedRepos.map((r) => {
+      const genre = r.primaryGenre ? `<span>\u{1F3B5} ${esc(r.primaryGenre)}</span>` : "";
+      const lang = r.language ? `<span>\u{1F524} ${esc(r.language)}</span>` : "";
+      return `<div class="pinned-card">
+      <h3><a href="/${esc(r.owner)}/${esc(r.slug)}">${esc(r.name)}</a></h3>
+      ${r.description ? `<p class="pinned-desc">${esc(r.description)}</p>` : ""}
+      <div class="pinned-meta">${genre}${lang}<span>\u2B50 ${r.starsCount ?? 0}</span><span>\u{1F374} ${r.forksCount ?? 0}</span></div>
+    </div>`;
+    }).join("");
+    const el = document.getElementById("pinned-section");
+    if (el) el.innerHTML = `<div class="card"><h2 style="margin-bottom:12px">\u{1F4CC} Pinned</h2><div class="pinned-grid">${cards}</div></div>`;
+  }
+  var currentUsername = "";
+  var currentTab = "repos";
+  var cachedRepos = [];
+  function renderProfileHeader(profile) {
+    const initial = (profile.displayName ?? profile.username ?? "?")[0].toUpperCase();
+    const avatarHtml = profile.avatarUrl ? `<div class="avatar-lg"><img src="${esc(profile.avatarUrl)}" alt="${esc(profile.username)}" /></div>` : `<div class="avatar-lg" style="background:${esc(profile.avatarColor ?? "#1f6feb")}">${esc(initial)}</div>`;
+    const isOwner = window.getToken ? !!window.getToken() : false;
+    const el = document.getElementById("profile-hdr");
+    if (el) el.innerHTML = `
     <div class="profile-hdr">
-      ${n}
+      ${avatarHtml}
       <div>
-        <h1 style="margin:0 0 4px">${u(e.displayName??e.username)}</h1>
-        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px">@${u(e.username)}</div>
-        ${e.bio?`<p style="font-size:14px;margin-bottom:8px">${u(e.bio)}</p>`:""}
+        <h1 style="margin:0 0 4px">${esc(profile.displayName ?? profile.username)}</h1>
+        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px">@${esc(profile.username)}</div>
+        ${profile.bio ? `<p style="font-size:14px;margin-bottom:8px">${esc(profile.bio)}</p>` : ""}
         <div style="display:flex;gap:16px;font-size:13px;color:var(--text-muted);flex-wrap:wrap">
-          ${e.location?`<span>\u{1F4CD} ${u(e.location)}</span>`:""}
-          ${e.website?`<a href="${u(e.website)}" target="_blank" rel="noopener noreferrer">\u{1F517} ${u(e.website)}</a>`:""}
-          <span>\u{1F465} <strong>${e.followersCount??0}</strong> followers \xB7 <strong>${e.followingCount??0}</strong> following</span>
-          <span>\u2B50 ${e.starsCount??0} stars</span>
+          ${profile.location ? `<span>\u{1F4CD} ${esc(profile.location)}</span>` : ""}
+          ${profile.website ? `<a href="${esc(profile.website)}" target="_blank" rel="noopener noreferrer">\u{1F517} ${esc(profile.website)}</a>` : ""}
+          <span>\u{1F465} <strong>${profile.followersCount ?? 0}</strong> followers \xB7 <strong>${profile.followingCount ?? 0}</strong> following</span>
+          <span>\u2B50 ${profile.starsCount ?? 0} stars</span>
         </div>
       </div>
-    </div>`),i}function ce(e){let t=document.getElementById("tab-content");if(t){if(!e.length){t.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:24px">No repositories yet.</p>';return}t.innerHTML=e.map(n=>`
+    </div>`;
+    return isOwner;
+  }
+  function renderReposTab(repos) {
+    const tabContent = document.getElementById("tab-content");
+    if (!tabContent) return;
+    if (!repos.length) {
+      tabContent.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px">No repositories yet.</p>';
+      return;
+    }
+    tabContent.innerHTML = repos.map((r) => `
     <div class="repo-card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <a href="/${u(n.owner)}/${u(n.slug)}" style="font-weight:600;font-size:14px">${u(n.name)}</a>
-        ${n.isPrivate?'<span class="badge badge-secondary">Private</span>':""}
+        <a href="/${esc(r.owner)}/${esc(r.slug)}" style="font-weight:600;font-size:14px">${esc(r.name)}</a>
+        ${r.isPrivate ? '<span class="badge badge-secondary">Private</span>' : ""}
       </div>
-      ${n.description?`<p style="font-size:13px;color:var(--text-muted);margin:4px 0 0">${u(n.description)}</p>`:""}
+      ${r.description ? `<p style="font-size:13px;color:var(--text-muted);margin:4px 0 0">${esc(r.description)}</p>` : ""}
       <div style="display:flex;gap:12px;font-size:12px;color:var(--text-muted);margin-top:8px;flex-wrap:wrap">
-        ${n.primaryGenre?`<span>\u{1F3B5} ${u(n.primaryGenre)}</span>`:""}
-        ${n.language?`<span>\u{1F524} ${u(n.language)}</span>`:""}
-        <span>\u2B50 ${n.starsCount??0}</span>
-        <span>\u{1F374} ${n.forksCount??0}</span>
-        ${n.updatedAt?`<span>Updated ${He(n.updatedAt)}</span>`:""}
+        ${r.primaryGenre ? `<span>\u{1F3B5} ${esc(r.primaryGenre)}</span>` : ""}
+        ${r.language ? `<span>\u{1F524} ${esc(r.language)}</span>` : ""}
+        <span>\u2B50 ${r.starsCount ?? 0}</span>
+        <span>\u{1F374} ${r.forksCount ?? 0}</span>
+        ${r.updatedAt ? `<span>Updated ${fmtRelative2(r.updatedAt)}</span>` : ""}
       </div>
-    </div>`).join("")}}async function Ot(){let e=document.getElementById("tab-content");if(e){e.innerHTML='<p class="loading">Loading starred repos\u2026</p>';try{let t=await fetch("/api/v1/users/"+U+"/starred").then(n=>n.json());if(!t.length){e.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:24px">No starred repos yet.</p>';return}ce(t)}catch{e.innerHTML='<p class="error">Failed to load starred repos.</p>'}}}async function Be(e){let t=document.getElementById("tab-content");if(t){t.innerHTML=`<p class="loading">Loading ${e}\u2026</p>`;try{let n=e==="followers"?"/api/v1/users/"+U+"/followers-list":"/api/v1/users/"+U+"/following-list",i=await fetch(n).then(o=>o.json());if(!i.length){t.innerHTML=`<p style="color:var(--text-muted);text-align:center;padding:24px">No ${e} yet.</p>`;return}t.innerHTML=i.map(o=>{let a=(o.displayName??o.username??"?")[0].toUpperCase();return`<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-default)">
-        <div style="width:36px;height:36px;border-radius:50%;background:${u(o.avatarColor??"#1f6feb")};display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;flex-shrink:0">${u(a)}</div>
-        <div><a href="/${u(o.username)}" style="font-weight:600">${u(o.displayName??o.username)}</a>
-          ${o.bio?`<p style="font-size:12px;color:var(--text-muted);margin:2px 0 0">${u(o.bio)}</p>`:""}</div>
-      </div>`}).join("")}catch{t.innerHTML=`<p class="error">Failed to load ${e}.</p>`}}}async function qt(e,t){let n=document.getElementById("tab-content");if(n){n.innerHTML='<p class="loading">Loading activity\u2026</p>';try{let i=await fetch(`/api/v1/users/${U}/activity?filter=${e}&page=${t}&limit=20`).then(l=>l.json()),o=i.events??[];if(!o.length){n.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:24px">No activity yet.</p>';return}let a=o.map(l=>`
+    </div>`).join("");
+  }
+  async function loadStarsTab() {
+    const tabContent = document.getElementById("tab-content");
+    if (!tabContent) return;
+    tabContent.innerHTML = '<p class="loading">Loading starred repos\u2026</p>';
+    try {
+      const data = await fetch("/api/v1/users/" + currentUsername + "/starred").then((r) => r.json());
+      if (!data.length) {
+        tabContent.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px">No starred repos yet.</p>';
+        return;
+      }
+      renderReposTab(data);
+    } catch (_) {
+      tabContent.innerHTML = '<p class="error">Failed to load starred repos.</p>';
+    }
+  }
+  async function loadSocialTab(type) {
+    const tabContent = document.getElementById("tab-content");
+    if (!tabContent) return;
+    tabContent.innerHTML = `<p class="loading">Loading ${type}\u2026</p>`;
+    try {
+      const url = type === "followers" ? "/api/v1/users/" + currentUsername + "/followers-list" : "/api/v1/users/" + currentUsername + "/following-list";
+      const data = await fetch(url).then((r) => r.json());
+      if (!data.length) {
+        tabContent.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px">No ${type} yet.</p>`;
+        return;
+      }
+      tabContent.innerHTML = data.map((u) => {
+        const init = (u.displayName ?? u.username ?? "?")[0].toUpperCase();
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-default)">
+        <div style="width:36px;height:36px;border-radius:50%;background:${esc(u.avatarColor ?? "#1f6feb")};display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;flex-shrink:0">${esc(init)}</div>
+        <div><a href="/${esc(u.username)}" style="font-weight:600">${esc(u.displayName ?? u.username)}</a>
+          ${u.bio ? `<p style="font-size:12px;color:var(--text-muted);margin:2px 0 0">${esc(u.bio)}</p>` : ""}</div>
+      </div>`;
+      }).join("");
+    } catch (_) {
+      tabContent.innerHTML = `<p class="error">Failed to load ${type}.</p>`;
+    }
+  }
+  async function loadActivityTab(filter, page) {
+    const tabContent = document.getElementById("tab-content");
+    if (!tabContent) return;
+    tabContent.innerHTML = '<p class="loading">Loading activity\u2026</p>';
+    try {
+      const data = await fetch(`/api/v1/users/${currentUsername}/activity?filter=${filter}&page=${page}&limit=20`).then((r) => r.json());
+      const events = data.events ?? [];
+      if (!events.length) {
+        tabContent.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px">No activity yet.</p>';
+        return;
+      }
+      const rows = events.map((e) => `
       <div class="activity-row">
         <span class="activity-icon">\u{1F4DD}</span>
         <div class="activity-body">
-          <div class="activity-description">${u(l.description??l.type)}</div>
-          <div class="activity-meta">${He(l.timestamp)}${l.repo?` \xB7 <a href="/${u(l.repo)}">${u(l.repo)}</a>`:""}</div>
+          <div class="activity-description">${esc(e.description ?? e.type)}</div>
+          <div class="activity-meta">${fmtRelative2(e.timestamp)}${e.repo ? ` \xB7 <a href="/${esc(e.repo)}">${esc(e.repo)}</a>` : ""}</div>
         </div>
-      </div>`).join(""),r=Math.ceil((i.total??0)/20),s=r>1?`
+      </div>`).join("");
+      const totalPages = Math.ceil((data.total ?? 0) / 20);
+      const pageBtns = totalPages > 1 ? `
       <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-top:16px">
-        ${t>1?`<button class="btn btn-secondary" onclick="window._switchProfileTab('activity', '${e}', ${t-1})">&larr; Prev</button>`:""}
-        <span style="font-size:13px;color:var(--text-muted)">Page ${t} of ${r}</span>
-        ${t<r?`<button class="btn btn-secondary" onclick="window._switchProfileTab('activity', '${e}', ${t+1})">Next &rarr;</button>`:""}
-      </div>`:"";n.innerHTML=a+s}catch{n.innerHTML='<p class="error">Failed to load activity.</p>'}}}function Ce(e,t="all",n=1){switch(Ft=e,document.querySelectorAll(".tab-btn").forEach(i=>{i.classList.toggle("active",i.dataset.tab===e)}),e){case"repos":ce(le);break;case"stars":Ot();break;case"followers":Be("followers");break;case"following":Be("following");break;case"activity":qt(t,n);break}}async function $e(e){let t=e.username??"";if(!t)return;U=t,window.switchTab=Ce,window._switchProfileTab=Ce;let n=document.getElementById("profile-hdr"),i=document.getElementById("tabs-section");n&&(n.innerHTML='<p class="loading">Loading profile\u2026</p>');try{let[o,a]=await Promise.all([fetch("/api/v1/users/"+t).then(s=>{if(!s.ok)throw new Error(String(s.status));return s.json()}),fetch("/"+t+"?format=json").then(s=>{if(!s.ok)throw new Error(String(s.status));return s.json()})]),r=zt(o);jt(a.heatmap??{days:(o.contributionGraph??[]).map(s=>({...s,intensity:s.count===0?0:s.count<=3?1:s.count<=6?2:3})),totalContributions:0,longestStreak:0,currentStreak:0}),Ut(a.badges??[]),Nt(a.pinnedRepos??[],r),le=o.repos??[],i&&(i.style.display=""),ce(le)}catch(o){n&&(n.innerHTML=`<p class="error">\u2715 Could not load profile for @${u(t)}: ${u(o instanceof Error?o.message:String(o))}</p>`)}}var Wt={repo:e=>w(e),"issue-list":e=>Le(e),"new-repo":e=>Pe(e),"piano-roll":e=>{Re(e)},listen:e=>{Ie(e)},"commit-detail":e=>_e(e),commit:e=>Se(e),"user-profile":e=>{$e(e)}};window.MusePages=Wt;})();
+        ${page > 1 ? `<button class="btn btn-secondary" onclick="window._switchProfileTab('activity', '${filter}', ${page - 1})">&larr; Prev</button>` : ""}
+        <span style="font-size:13px;color:var(--text-muted)">Page ${page} of ${totalPages}</span>
+        ${page < totalPages ? `<button class="btn btn-secondary" onclick="window._switchProfileTab('activity', '${filter}', ${page + 1})">Next &rarr;</button>` : ""}
+      </div>` : "";
+      tabContent.innerHTML = rows + pageBtns;
+    } catch (_) {
+      tabContent.innerHTML = '<p class="error">Failed to load activity.</p>';
+    }
+  }
+  function switchTab(tab, filter = "all", page = 1) {
+    currentTab = tab;
+    document.querySelectorAll(".tab-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.tab === tab);
+    });
+    switch (tab) {
+      case "repos":
+        renderReposTab(cachedRepos);
+        break;
+      case "stars":
+        void loadStarsTab();
+        break;
+      case "followers":
+        void loadSocialTab("followers");
+        break;
+      case "following":
+        void loadSocialTab("following");
+        break;
+      case "activity":
+        void loadActivityTab(filter, page);
+        break;
+    }
+  }
+  async function initUserProfile(data) {
+    const username = data.username ?? "";
+    if (!username) return;
+    currentUsername = username;
+    window.switchTab = switchTab;
+    window["_switchProfileTab"] = switchTab;
+    const profileHdr = document.getElementById("profile-hdr");
+    const tabsSection = document.getElementById("tabs-section");
+    if (profileHdr) profileHdr.innerHTML = '<p class="loading">Loading profile\u2026</p>';
+    try {
+      const [profileData, enhancedData] = await Promise.all([
+        fetch("/api/v1/users/" + username).then((r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        }),
+        fetch("/" + username + "?format=json").then((r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        })
+      ]);
+      const isOwner = renderProfileHeader(profileData);
+      renderHeatmap(enhancedData.heatmap ?? {
+        days: (profileData.contributionGraph ?? []).map((d) => ({ ...d, intensity: d.count === 0 ? 0 : d.count <= 3 ? 1 : d.count <= 6 ? 2 : 3 })),
+        totalContributions: 0,
+        longestStreak: 0,
+        currentStreak: 0
+      });
+      renderBadges(enhancedData.badges ?? []);
+      renderPinned(enhancedData.pinnedRepos ?? [], isOwner);
+      cachedRepos = profileData.repos ?? [];
+      if (tabsSection) tabsSection.style.display = "";
+      renderReposTab(cachedRepos);
+    } catch (e) {
+      if (profileHdr) profileHdr.innerHTML = `<p class="error">\u2715 Could not load profile for @${esc(username)}: ${esc(e instanceof Error ? e.message : String(e))}</p>`;
+    }
+  }
+
+  // musehub/templates/musehub/static/js/app.ts
+  var MusePages = {
+    "repo": (d) => initRepoPage(d),
+    "issue-list": (d) => initIssueList(d),
+    "new-repo": (d) => initNewRepo(d),
+    "piano-roll": (d) => void initPianoRollPage(d),
+    "listen": (d) => void initListen(d),
+    "commit-detail": (d) => initCommitDetail(d),
+    "commit": (d) => initCommit(d),
+    "user-profile": (d) => void initUserProfile(d)
+  };
+  window.MusePages = MusePages;
+})();
