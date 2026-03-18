@@ -3,26 +3,227 @@
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
 {% block title %}Releases · {{ owner }}/{{ repo_slug }}{% endblock %}
-
 {% block breadcrumb %}
   <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / releases
 {% endblock %}
-
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
+{# ── Body-preview macro (skips markdown headers / bullets) ────────────────── #}
+{% macro body_preview(body, length=200) %}
+  {%- set ns = namespace(found="") -%}
+  {%- for line in body.split("\n") -%}
+    {%- if ns.found == "" and line.strip() and not line.strip().startswith("#") and not line.strip().startswith("-") and not line.strip().startswith("*") -%}
+      {%- set ns.found = line.strip() -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if ns.found -%}{{ ns.found[:length] }}{% if ns.found|length > length %}…{% endif %}
+  {%- elif body -%}{{ body[:length] }}{% if body|length > length %}…{% endif %}
+  {%- endif -%}
+{% endmacro %}
+
+{# ── Author avatar bg color ───────────────────────────────────────────────── #}
+{% macro author_bg(name) -%}
+  {%- set colors = ["#58a6ff","#3fb950","#a371f7","#fb8500","#2dd4bf","#d29922","#f85149"] -%}
+  {{ colors[(name|length) % (colors|length)] }}
+{%- endmacro %}
+
 {% block content %}
-<div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
-    <h1 style="margin:0">Releases <span class="badge">{{ total }}</span></h1>
-    <a href="{{ base_url }}/releases/new" class="btn btn-secondary btn-sm">+ New Release</a>
+
+{# ── Stats bar ────────────────────────────────────────────────────────────── #}
+<div class="rel-stats-bar">
+  <div class="rel-stat-card">
+    <div class="rel-stat-icon rel-stat-icon-total">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+        <line x1="7" y1="7" x2="7.01" y2="7"/>
+      </svg>
+    </div>
+    <div>
+      <div class="rel-stat-value">{{ total }}</div>
+      <div class="rel-stat-label">Total Releases</div>
+    </div>
   </div>
 
-  <div id="release-rows"
-       hx-get="{{ base_url }}/releases?page={{ page }}"
-       hx-trigger="none"
-       hx-target="#release-rows"
-       hx-swap="innerHTML">
-    {% include "musehub/fragments/release_rows.html" %}
+  <div class="rel-stat-card">
+    <div class="rel-stat-icon rel-stat-icon-stable">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="rel-stat-value">{{ stable_count }}</div>
+      <div class="rel-stat-label">Stable</div>
+    </div>
+  </div>
+
+  <div class="rel-stat-card">
+    <div class="rel-stat-icon rel-stat-icon-pre">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </div>
+    <div>
+      <div class="rel-stat-value">{{ prerelease_count + draft_count }}</div>
+      <div class="rel-stat-label">Pre-release / Draft</div>
+    </div>
+  </div>
+
+  <div class="rel-stat-card">
+    <div class="rel-stat-icon rel-stat-icon-formats">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+    </div>
+    <div>
+      <div class="rel-stat-value">{{ formats_available | length }}</div>
+      <div class="rel-stat-label">Download Formats</div>
+    </div>
   </div>
 </div>
+
+{# ── Latest release hero ──────────────────────────────────────────────────── #}
+{% if latest_release %}
+{% set lr = latest_release %}
+{% set lr_urls = lr.download_urls %}
+{% set lr_status = "prerelease" if lr.is_prerelease else ("draft" if lr.is_draft else "stable") %}
+<div class="rel-hero">
+  <div class="rel-hero-label">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    Latest Release
+  </div>
+
+  <div class="rel-hero-top">
+    <div class="rel-hero-title-block">
+      <span class="rel-hero-tag">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        {{ lr.tag }}
+      </span>
+      <a href="{{ base_url }}/releases/{{ lr.tag | urlencode }}" class="rel-hero-title">
+        {{ lr.title or lr.tag }}
+      </a>
+      <div class="rel-hero-meta">
+        {% if lr.author %}
+        <span class="rel-hero-author">
+          <span class="rel-hero-avatar" style="background:{{ author_bg(lr.author) }}">{{ lr.author[0] | upper }}</span>
+          {{ lr.author }}
+        </span>
+        <span>·</span>
+        {% endif %}
+        <span>{{ lr.created_at | fmtrelative }}</span>
+        {% if lr.commit_id %}
+          <span>·</span>
+          <a href="{{ base_url }}/commits/{{ lr.commit_id }}" style="font-family:var(--font-mono);font-size:11px;color:var(--color-accent)">{{ lr.commit_id | shortsha }}</a>
+        {% endif %}
+        {% if lr.is_prerelease %}
+          <span class="rel-card-status-pill rel-pill-prerelease">Pre-release</span>
+        {% elif lr.is_draft %}
+          <span class="rel-card-status-pill rel-pill-draft">Draft</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="rel-hero-actions">
+      <a href="{{ base_url }}/releases/{{ lr.tag | urlencode }}" class="btn btn-primary btn-sm">
+        Full Release Notes
+      </a>
+      <a href="{{ base_url }}/releases" class="btn btn-secondary btn-sm rss-btn"
+         style="color:var(--color-warning,#f0a500)">⊞ RSS</a>
+    </div>
+  </div>
+
+  {% if lr.body %}
+  <div class="rel-hero-body">{{ body_preview(lr.body, 240) }}</div>
+  {% endif %}
+
+  {# Download chips #}
+  <div class="rel-hero-downloads">
+    <a {% if lr_urls.midi_bundle %}href="{{ lr_urls.midi_bundle }}" class="rel-hero-dl rel-dl-midi avail"{% else %}class="rel-hero-dl rel-dl-midi"{% endif %}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      MIDI Bundle
+    </a>
+    <a {% if lr_urls.mp3 %}href="{{ lr_urls.mp3 }}" class="rel-hero-dl rel-dl-mp3 avail"{% else %}class="rel-hero-dl rel-dl-mp3"{% endif %}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      MP3 Mix
+    </a>
+    <a {% if lr_urls.stems %}href="{{ lr_urls.stems }}" class="rel-hero-dl rel-dl-stems avail"{% else %}class="rel-hero-dl rel-dl-stems"{% endif %}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Stems
+    </a>
+    <a {% if lr_urls.musicxml %}href="{{ lr_urls.musicxml }}" class="rel-hero-dl rel-dl-xml avail"{% else %}class="rel-hero-dl rel-dl-xml"{% endif %}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      MusicXML
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Previous releases section ────────────────────────────────────────────── #}
+{% if releases or (not latest_release) %}
+<div class="rel-section-header">
+  <div class="rel-section-title">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+    Previous Releases
+    {% if other_count > 0 %}<span class="badge">{{ other_count }}</span>{% endif %}
+  </div>
+  <a href="{{ base_url }}/releases/new" class="btn btn-secondary btn-sm">+ New Release</a>
+</div>
+
+{# Filter bar #}
+<div class="rel-filter-bar">
+  <a href="#" class="rel-filter-tab active" data-filter="all">All</a>
+  <a href="#" class="rel-filter-tab" data-filter="stable">
+    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    Stable
+  </a>
+  <a href="#" class="rel-filter-tab" data-filter="prerelease">Pre-release</a>
+  <a href="#" class="rel-filter-tab" data-filter="draft">Draft</a>
+  <label class="rel-search-wrap" for="rel-search" style="margin-left:auto">
+    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="rel-search" type="text" placeholder="Search releases…" autocomplete="off">
+  </label>
+</div>
+
+<div id="release-rows">
+  {% include "musehub/fragments/release_rows.html" %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block page_script %}
+<script>
+(function () {
+  const filterTabs = document.querySelectorAll('.rel-filter-tab');
+  const searchInput = document.getElementById('rel-search');
+  const list = document.getElementById('release-rows');
+  let activeFilter = 'all';
+
+  function applyFilters() {
+    const q = searchInput ? searchInput.value.toLowerCase() : '';
+    const cards = list ? list.querySelectorAll('.rel-card') : [];
+    cards.forEach(function (card) {
+      const status = (card.dataset.status || '').toLowerCase();
+      const text   = (card.dataset.title  || '').toLowerCase();
+      const statusMatch = activeFilter === 'all' || status === activeFilter;
+      const searchMatch = !q || text.includes(q);
+      card.style.display = (statusMatch && searchMatch) ? '' : 'none';
+    });
+  }
+
+  filterTabs.forEach(function (tab) {
+    tab.addEventListener('click', function (e) {
+      e.preventDefault();
+      filterTabs.forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      activeFilter = tab.dataset.filter || 'all';
+      applyFilters();
+    });
+  });
+
+  if (searchInput) { searchInput.addEventListener('input', applyFilters); }
+})();
+</script>
 {% endblock %}

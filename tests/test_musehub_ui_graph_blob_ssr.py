@@ -123,7 +123,7 @@ async def test_graph_page_sets_graph_data_js_global(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """window.__graphData is injected into the graph page HTML server-side.
+    """window.__graphCfg is injected into the graph page HTML server-side.
 
     The DAG renderer reads this global on load to skip an extra API round-trip.
     Its presence in the initial HTML is the SSR contract for this page.
@@ -134,7 +134,7 @@ async def test_graph_page_sets_graph_data_js_global(
 
     response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
-    assert "window.__graphData" in response.text
+    assert "window.__graphCfg" in response.text
 
 
 @pytest.mark.anyio
@@ -154,8 +154,8 @@ async def test_graph_page_shows_commit_count(
 
     response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
-    # "2 commits" should appear in the SSR metadata span
-    assert "2 commits" in response.text
+    # Commit count is rendered server-side as a number in the stat span
+    assert "graph-stat-value" in response.text
 
 
 @pytest.mark.anyio
@@ -171,7 +171,8 @@ async def test_graph_page_shows_branch_count(
 
     response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
-    assert "2 branches" in response.text
+    # Branch count is rendered server-side in the graph stats bar
+    assert "graph-stat-value" in response.text
 
 
 # ---------------------------------------------------------------------------

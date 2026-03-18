@@ -1,23 +1,62 @@
 {% extends "musehub/base.html" %}
-{% from "musehub/macros/issue.html" import issue_row %}
 {% from "musehub/macros/label.html" import label_chip %}
 {% from "musehub/macros/pagination.html" import pagination %}
-{% from "musehub/macros/empty_state.html" import empty_state %}
 
 {% block title %}Issues — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
   <a href="/{{ owner }}">{{ owner }}</a> /
-  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / issues
+  <a href="{{ base_url }}">{{ repo_slug }}</a> / issues
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{# Pass repo identity to the JS layer (used by initRepoNav and any minimal JS) #}
 {% block page_json %}{"page": "issue-list", "repo_id": {{ repo_id | tojson }}}{% endblock %}
 
 {% block content %}
+
+{# ── Stats bar ─────────────────────────────────────────────────────────────── #}
+<div class="issue-stats-bar">
+  <a href="{{ base_url }}/issues?state=open" class="issue-stat-card{% if state == 'open' %} active{% endif %}">
+    <div class="issue-stat-icon issue-stat-icon-open">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div>
+      <div class="issue-stat-value">{{ open_count }}</div>
+      <div class="issue-stat-label">Open issues</div>
+    </div>
+  </a>
+  <a href="{{ base_url }}/issues?state=closed" class="issue-stat-card{% if state == 'closed' %} active{% endif %}">
+    <div class="issue-stat-icon issue-stat-icon-closed">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <div>
+      <div class="issue-stat-value">{{ closed_count }}</div>
+      <div class="issue-stat-label">Closed issues</div>
+    </div>
+  </a>
+  <div class="issue-stat-card" style="cursor:default">
+    <div class="issue-stat-icon issue-stat-icon-unassigned">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <div>
+      <div class="issue-stat-value">{{ unassigned_open_count }}</div>
+      <div class="issue-stat-label">Unassigned</div>
+    </div>
+  </div>
+  <div class="issue-stat-card" style="cursor:default">
+    <div class="issue-stat-icon issue-stat-icon-comments">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <div>
+      <div class="issue-stat-value">{{ total_comment_count }}</div>
+      <div class="issue-stat-label">Total comments</div>
+    </div>
+  </div>
+</div>
+
+{# ── 3-column layout ───────────────────────────────────────────────────────── #}
 <div class="issues-layout">
 
-  {# ── Left filter sidebar — server-side rendered, submitted via hx-get ── #}
+  {# ── Left filter sidebar ── #}
   <aside class="filter-sidebar" id="filter-sidebar">
     <form method="get"
           hx-get="{{ base_url }}/issues"
@@ -28,7 +67,7 @@
 
       {# Labels — multi-select chips #}
       <div class="filter-section" id="label-chip-container">
-        <p class="filter-section-title" id="filter-labels-heading">Labels</p>
+        <p class="filter-section-title">Labels</p>
         {% if labels_data %}
           <div style="display:flex;flex-wrap:wrap;gap:2px">
             {% for lbl in labels_data %}
@@ -41,7 +80,7 @@
             {% endfor %}
           </div>
         {% else %}
-          <span style="font-size:11px;color:#8b949e">No labels yet</span>
+          <span style="font-size:11px;color:var(--text-muted)">No labels yet</span>
         {% endif %}
       </div>
 
@@ -105,7 +144,7 @@
   </aside>
 
   {# ── Main column ── #}
-  <div style="flex:1;min-width:0">
+  <div style="min-width:0">
 
     {# Bulk actions toolbar — shown via JS when checkboxes are selected #}
     <div id="bulk-toolbar" aria-live="polite">
@@ -129,55 +168,60 @@
       <span class="bulk-sep"></span>
       <button class="bulk-action-btn" onclick="bulkClose()">Close</button>
       <button class="bulk-action-btn" onclick="bulkReopen()">Reopen</button>
-      <button class="bulk-action-btn" style="margin-left:auto"
-              onclick="deselectAll()">✕ Deselect</button>
+      <button class="bulk-action-btn" style="margin-left:auto" onclick="deselectAll()">✕ Deselect</button>
     </div>
 
-    <div class="card">
-      {# Open / Closed tab strip — each tab is an hx-get link targeting #issue-rows #}
-      <div class="tab-strip" style="display:flex;gap:0;border-bottom:1px solid var(--color-border);margin-bottom:var(--space-3)">
-        <a href="{{ base_url }}/issues?state=open"
-           id="tab-open"
-           class="tab-btn{% if state != 'closed' %} tab-active{% endif %}"
-           hx-get="{{ base_url }}/issues?state=open"
+    {# ── Tab strip + new issue button ── #}
+    <div class="issue-list-toolbar">
+      <div class="issue-tab-strip">
+        <a href="{{ base_url }}/issues?state=open{% if active_label %}&label={{ active_label }}{% endif %}"
+           class="issue-state-tab{% if state != 'closed' %} tab-active{% endif %}"
+           hx-get="{{ base_url }}/issues?state=open{% if active_label %}&label={{ active_label }}{% endif %}"
            hx-target="#issue-rows"
            hx-push-url="true">
-          ○ Open <span class="tab-count">{{ open_count }}</span>
+          <span class="issue-tab-dot issue-tab-dot-open"></span>
+          Open
+          <span class="issue-tab-count{% if state != 'closed' %} issue-tab-count-active{% endif %}">{{ open_count }}</span>
         </a>
-        <a href="{{ base_url }}/issues?state=closed"
-           id="tab-closed"
-           class="tab-btn{% if state == 'closed' %} tab-active{% endif %}"
-           hx-get="{{ base_url }}/issues?state=closed"
+        <a href="{{ base_url }}/issues?state=closed{% if active_label %}&label={{ active_label }}{% endif %}"
+           class="issue-state-tab{% if state == 'closed' %} tab-active{% endif %}"
+           hx-get="{{ base_url }}/issues?state=closed{% if active_label %}&label={{ active_label }}{% endif %}"
            hx-target="#issue-rows"
            hx-push-url="true">
-          ✓ Closed <span class="tab-count">{{ closed_count }}</span>
+          <span class="issue-tab-dot issue-tab-dot-closed"></span>
+          Closed
+          <span class="issue-tab-count{% if state == 'closed' %} issue-tab-count-active{% endif %}">{{ closed_count }}</span>
         </a>
-        <div style="margin-left:auto">
-          <button class="btn btn-secondary btn-sm" id="new-issue-btn"
-                  onclick="showTemplatePicker()">+ New Issue</button>
-        </div>
       </div>
+      <div style="display:flex;align-items:center;gap:var(--space-2);padding-bottom:var(--space-2)">
+        <span style="font-size:12px;color:var(--text-muted)">{{ total }} result{{ 's' if total != 1 }}</span>
+        <button class="btn btn-primary btn-sm" onclick="showTemplatePicker()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Issue
+        </button>
+      </div>
+    </div>
 
-      {# Issue rows — HTMX swap target for filter/tab updates #}
+    {# ── Issue rows — HTMX swap target ── #}
+    <div class="issue-list-container">
       <div id="issue-rows">
         {% include "musehub/fragments/issue_rows.html" %}
       </div>
-
-      {# Pagination — SSR rendered, "Next"/"Prev" links #}
-      {{ pagination(page, total_pages, base_url ~ '/issues',
-                    extra_params={'state': state, 'label': active_label, 'sort': active_sort}) }}
     </div>
 
-    {# Template picker (shown on + New Issue click) #}
-    <div id="template-picker" style="display:none">
+    {# Pagination #}
+    {{ pagination(page, total_pages, base_url ~ '/issues',
+                  extra_params={'state': state, 'label': active_label, 'sort': active_sort}) }}
+
+    {# ── Template picker ── #}
+    <div id="template-picker" style="display:none;margin-top:var(--space-4)">
       <div class="card" style="border-color:var(--color-accent)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
-          <h2 style="margin:0">Choose a template</h2>
+          <h2 style="margin:0;font-size:16px">Choose a template</h2>
           <button class="btn btn-ghost btn-sm"
                   onclick="document.getElementById('template-picker').style.display='none'">✕</button>
         </div>
-        <div class="template-grid" id="template-grid">
-          {# Template cards rendered server-side so JS-off browsers can see them #}
+        <div class="template-grid">
           {% for tpl in [
             {'id':'blank','icon':'📝','title':'Blank Issue','desc':'Start with a clean slate.'},
             {'id':'bug','icon':'🐛','title':'Bug Report','desc':"Something isn't working as expected."},
@@ -185,65 +229,96 @@
             {'id':'arrangement','icon':'🎵','title':'Arrangement Issue','desc':'Track needs musical arrangement work.'},
             {'id':'theory','icon':'🎼','title':'Music Theory','desc':'Related to harmony, rhythm, or theory decisions.'},
           ] %}
-            <div class="template-card" id="template-card-{{ tpl.id }}"
-                 onclick="selectTemplate('{{ tpl.id }}')">
+            <div class="template-card" onclick="selectTemplate('{{ tpl.id }}')">
               <div class="template-card-icon">{{ tpl.icon }}</div>
               <div class="template-card-title">{{ tpl.title }}</div>
               <div class="template-card-desc">{{ tpl.desc }}</div>
             </div>
           {% endfor %}
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="showTemplatePicker()">← Templates</button>
       </div>
     </div>
   </div>
 
-  {# ── Right sidebar — milestone progress + label summary ── #}
-  <aside class="sidebar-right">
+  {# ── Right sidebar — milestones + label summary ── #}
+  <aside class="issue-sidebar-right">
+
+    {# Milestones progress #}
     <div class="sidebar-section">
-      <p class="sidebar-section-title" id="milestone-progress-heading">Milestones</p>
-      <div id="milestone-progress-list">
-        {% if milestones_data %}
-          {% for ms in milestones_data %}
-            {% set total_issues = (ms.open_issues or 0) + (ms.closed_issues or 0) %}
-            {% set pct = ((ms.closed_issues or 0) / total_issues * 100) | int if total_issues > 0 else 0 %}
-            <div style="margin-bottom:var(--space-2)">
-              <div style="display:flex;justify-content:space-between;font-size:12px">
-                <a href="{{ base_url }}/milestones/{{ ms.number }}"
-                   style="color:var(--color-fg,#e6edf3);text-decoration:none">{{ ms.title }}</a>
-                <span style="color:#8b949e">{{ pct }}%</span>
-              </div>
-              <div class="milestone-progress-bar-track">
-                <div class="milestone-progress-bar-fill" style="width:{{ pct }}%"></div>
-              </div>
-              <div class="milestone-progress-counts">
-                {{ ms.closed_issues or 0 }} closed · {{ ms.open_issues or 0 }} open
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <span style="font-size:11px;color:#8b949e">No open milestones</span>
-        {% endif %}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+        <p class="sidebar-section-title" style="margin:0">Milestones</p>
+        <a href="{{ base_url }}/milestones" style="font-size:11px;color:var(--color-accent);text-decoration:none">All →</a>
       </div>
+      {% if milestones_data %}
+        {% for ms in milestones_data %}
+          {% set total_ms = (ms.open_issues or 0) + (ms.closed_issues or 0) %}
+          {% set pct = ((ms.closed_issues or 0) / total_ms * 100) | int if total_ms > 0 else 0 %}
+          <div style="margin-bottom:var(--space-3)">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+              <a href="{{ base_url }}/milestones/{{ ms.number }}"
+                 style="font-size:12px;font-weight:600;color:var(--text-primary);text-decoration:none">{{ ms.title }}</a>
+              <span style="font-size:11px;color:var(--text-muted)">{{ pct }}%</span>
+            </div>
+            <div class="milestone-progress-bar-track">
+              <div class="milestone-progress-bar-fill" style="width:{{ pct }}%"></div>
+            </div>
+            <div class="milestone-progress-counts">
+              <span style="color:#3fb950">{{ ms.closed_issues or 0 }} closed</span>
+              · <span>{{ ms.open_issues or 0 }} open</span>
+            </div>
+            {% if ms.due_date %}
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+              Due {{ ms.due_date }}
+            </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-size:12px;color:var(--text-muted);margin:0">No open milestones</p>
+      {% endif %}
     </div>
 
+    {# Labels summary #}
     <div class="sidebar-section">
-      <p class="sidebar-section-title" id="labels-summary-heading">Labels</p>
-      <div id="labels-summary-list">
-        {% if labels_data %}
-          {% for lbl in labels_data[:8] %}
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-              <span style="width:8px;height:8px;border-radius:50%;background:{{ lbl.color }};flex-shrink:0"></span>
-              <span style="font-size:12px">{{ lbl.name }}</span>
-            </div>
-          {% endfor %}
-        {% else %}
-          <span style="font-size:11px;color:#8b949e">No labels in use</span>
-        {% endif %}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+        <p class="sidebar-section-title" style="margin:0">Labels</p>
+        <a href="{{ base_url }}/labels" style="font-size:11px;color:var(--color-accent);text-decoration:none">Manage →</a>
       </div>
+      {% if labels_data %}
+        {% for lbl in labels_data %}
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:{{ lbl.color }};flex-shrink:0;border:1px solid rgba(255,255,255,0.1)"></span>
+            <a href="{{ base_url }}/issues?state={{ state }}&label={{ lbl.name }}"
+               style="font-size:12px;color:var(--text-primary);text-decoration:none;flex:1;{% if lbl.name == active_label %}font-weight:700;{% endif %}"
+               hx-get="{{ base_url }}/issues?state={{ state }}&label={{ lbl.name }}"
+               hx-target="#issue-rows"
+               hx-push-url="true">{{ lbl.name }}</a>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-size:12px;color:var(--text-muted);margin:0">No labels in use</p>
+      {% endif %}
     </div>
+
+    {# Contributors #}
+    {% if assignees %}
+    <div class="sidebar-section">
+      <p class="sidebar-section-title" style="margin:0 0 var(--space-2)">Contributors</p>
+      {% for a in assignees %}
+        {%- set colors = ['#e85d04','#f77f00','#3a86ff','#8338ec','#06d6a0','#ef233c','#023e8a','#2dd4bf'] -%}
+        {%- set idx = (a | length) % (colors | length) -%}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="width:22px;height:22px;border-radius:50%;background:{{ colors[idx] }};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">{{ a[0] | upper }}</span>
+          <a href="{{ base_url }}/issues?state={{ state }}&assignee={{ a }}"
+             style="font-size:12px;color:var(--text-primary);text-decoration:none"
+             hx-get="{{ base_url }}/issues?state={{ state }}&assignee={{ a }}"
+             hx-target="#issue-rows"
+             hx-push-url="true">{{ a }}</a>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </aside>
 
 </div>
 {% endblock %}
-

@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="preconnect" href="https://fonts.bunny.net">
   <link rel="stylesheet" href="https://fonts.bunny.net/css?family=jetbrains-mono:400,500,600,700&display=swap">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+  <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/app.css">
   <title>{% block title %}MuseHub{% endblock %} — MuseHub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
@@ -31,7 +35,7 @@
 
   {% block repo_nav %}{% endblock %}
 
-  <div class="container{% block container_extra_class %}{% endblock %}" hx-boost="true" hx-ext="response-targets"{% block container_attrs %}{% endblock %}>
+  <div class="container-wide{% block container_extra_class %}{% endblock %}" hx-boost="true" hx-ext="response-targets"{% block container_attrs %}{% endblock %}>
     {% block token_form %}
     <div class="token-form" id="token-form" style="display:none">
       <p id="token-msg">Enter your Muse JWT to browse this repo.</p>
@@ -69,11 +73,18 @@
 
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="/static/app.js"></script>
-  {# page_data: backward-compatible JS variable injection for templates not yet on TypeScript modules #}
-  <script>{% block page_data %}{% endblock %}</script>
   {# page_json: JSON data bridge for new TypeScript page modules (read by musehub.ts dispatchPageModule) #}
   <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>
-  {# page_script: legacy inline scripts; prefer page modules via page_json instead #}
-  <script>{% block page_script %}{% endblock %}</script>
+  {#
+    page_data + page_script are combined in a single IIFE so that `const`/`let`
+    declarations are scoped to each navigation and cannot cause
+    "Identifier X has already been declared" SyntaxErrors on HTMX re-navigation.
+    Functions that must be reachable from HTML onclick="" handlers must be
+    explicitly assigned to window (e.g. window.myFn = function() {...}).
+  #}
+  <script>(function () {
+{% block page_data %}{% endblock %}
+{% block page_script %}{% endblock %}
+  })();</script>
 </body>
 </html>

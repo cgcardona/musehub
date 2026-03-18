@@ -1,75 +1,145 @@
-{#  fragments/session_rows.html — bare HTMX fragment: session list rows.
-
-    Rendered in two contexts:
-
-    1. Full-page load: included inline by musehub/pages/sessions.html inside
-       the ``<div id="session-rows">`` target container.
-
-    2. HTMX partial swap: returned directly when the handler detects
-       ``HX-Request: true``, replacing only the ``#session-rows`` container.
-
-    Required context variables
-    --------------------------
-    sessions      : list[dict]  — current page of sessions (camelCase keys from model_dump)
-    total         : int         — total number of sessions
-    page          : int         — current page (1-based)
-    total_pages   : int         — total number of pages
-    base_url      : str         — repo base URL, e.g. /owner/slug
+{#  fragments/session_rows.html — HTMX fragment: supercharged session cards.
+    Context:
+      sessions   : list[dict]  — paginated sessions (camelCase keys)
+      total      : int
+      page       : int
+      total_pages: int
+      base_url   : str
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
+{# ── Helpers ──────────────────────────────────────────────────────────────── #}
+{% macro pcolor(name) -%}
+  {%- set colors = ["#58a6ff","#3fb950","#a371f7","#fb8500","#2dd4bf","#d29922","#f85149","#e879f9"] -%}
+  {{ colors[(name|length) % (colors|length)] }}
+{%- endmacro %}
+
+{# Human-readable duration from seconds #}
+{% macro fmt_duration(sec) -%}
+  {%- if sec is none or sec == 0 -%}—
+  {%- elif sec < 60 -%}< 1m
+  {%- elif sec < 3600 -%}{{ (sec / 60) | int }}m
+  {%- else -%}{{ (sec / 3600) | int }}h {{ ((sec % 3600) / 60) | int }}m
+  {%- endif -%}
+{%- endmacro %}
+
 {% if sessions %}
+<div class="sess-card-list">
   {% for s in sessions %}
-  <div class="session-row{% if s.isActive %} session-row-active{% endif %}">
-    <div>
-      {% if s.isActive %}
-        <span class="badge badge-active"><span class="session-live-dot"></span> live</span>
-      {% else %}
-        <span class="badge badge-closed">ended</span>
-      {% endif %}
-    </div>
-    <div class="session-meta">
-      <div class="session-header">
-        <a href="{{ base_url }}/sessions/{{ s.sessionId }}" style="font-weight:600;color:var(--text-primary)">
-          {{ s.sessionId[:8] }}
-        </a>
-        <span class="session-time">
-          Started {{ s.startedAt | fmtrelative }}
-          {% if s.endedAt %} · Ended {{ s.endedAt | fmtrelative }}{% endif %}
-        </span>
-        {% if s.commits %}
-        <span class="badge" title="{{ s.commits | length }} commit{{ 's' if s.commits | length != 1 else '' }} in this session">
-          🎵 {{ s.commits | length }}
+    {% set is_live   = s.isActive %}
+    {% set dur       = s.durationSeconds %}
+    {% set n_commits = s.commits | length %}
+
+    {# Age-based card colour: live=green, < 14d=blue, older=gray #}
+    {% if is_live %}
+      {% set card_cls = "sess-card-live" %}
+    {% elif s.startedAt and (s.startedAt | fmtrelative).endswith("d ago") and (s.startedAt | fmtrelative).split("d ago")[0].split(" ")[-1] | int < 15 %}
+      {% set card_cls = "sess-card-recent" %}
+    {% else %}
+      {% set card_cls = "sess-card-older" %}
+    {% endif %}
+
+    <div class="sess-card {{ card_cls }}"
+         data-status="{% if is_live %}live{% else %}ended{% endif %}"
+         data-intent="{{ s.intent | lower }}"
+         data-location="{{ s.location | lower }}"
+         id="session-{{ s.sessionId }}">
+
+      {# ── Left: status + duration ────────────────────────────────────────── #}
+      <div class="sess-card-left">
+        {% if is_live %}
+          <span class="sess-status-pill sess-pill-live">
+            <span class="session-live-dot" style="width:6px;height:6px"></span>
+            Live
+          </span>
+          <div class="sess-duration">∞</div>
+          <div class="sess-duration-label">ongoing</div>
+        {% else %}
+          <span class="sess-status-pill sess-pill-ended">Ended</span>
+          <div class="sess-duration">{{ fmt_duration(dur) }}</div>
+          <div class="sess-duration-label">duration</div>
+        {% endif %}
+        {% if n_commits > 0 %}
+        <span class="sess-commit-chip" style="margin-top:4px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+          {{ n_commits }}
         </span>
         {% endif %}
       </div>
-      {% if s.intent %}
-      <div class="session-intent">
-        <strong>Intent:</strong> {{ s.intent }}
+
+      {# ── Body ───────────────────────────────────────────────────────────── #}
+      <div class="sess-card-body">
+        {# Title row: ID + seq label #}
+        <div class="sess-card-title-row">
+          <a href="{{ base_url }}/sessions/{{ s.sessionId }}" class="sess-id-link">
+            {{ s.sessionId[:8] }}
+          </a>
+          <span style="font-size:10px;color:var(--text-muted)">
+            {{ s.startedAt | fmtrelative }}
+            {% if s.endedAt %} · ended {{ s.endedAt | fmtrelative }}{% endif %}
+          </span>
+        </div>
+
+        {# Intent / goal #}
+        {% if s.intent %}
+        <div class="sess-intent">{{ s.intent }}</div>
+        {% endif %}
+
+        {# Notes preview #}
+        {% if s.notes %}
+        <div class="sess-notes-preview">{{ s.notes }}</div>
+        {% endif %}
+
+        {# Location + commit count meta #}
+        <div class="sess-meta-row">
+          {% if s.location %}
+          <span class="sess-location">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {{ s.location }}
+          </span>
+          {% endif %}
+          {% if n_commits > 0 %}
+          <span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+            {{ n_commits }} commit{{ 's' if n_commits != 1 else '' }}
+          </span>
+          {% endif %}
+        </div>
+
+        {# Participants #}
+        {% if s.participants %}
+        <div class="sess-participants-row">
+          {% for p in s.participants %}
+          <a href="/{{ p | urlencode }}" class="sess-participant">
+            <span class="sess-participant-dot" style="background:{{ pcolor(p) }}">{{ p[0] | upper }}</span>
+            {{ p }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
-      {% if s.notes %}
-      <div class="session-notes">{{ s.notes | truncate(80) }}</div>
-      {% endif %}
-      {% if s.participants %}
-      <div class="session-participants">
-        {% for p in s.participants %}
-        <a href="/{{ p | urlencode }}" class="participant-chip">{{ p }}</a>
-        {% endfor %}
+
+      {# ── Right: actions ─────────────────────────────────────────────────── #}
+      <div class="sess-card-right">
+        <a href="{{ base_url }}/sessions/{{ s.sessionId }}" class="btn btn-secondary btn-sm">
+          {% if is_live %}Join{% else %}View{% endif %}
+        </a>
+        {% if not is_live and n_commits > 0 %}
+        <a href="{{ base_url }}/commits?session={{ s.sessionId }}" class="btn btn-secondary btn-sm">
+          Commits
+        </a>
+        {% endif %}
       </div>
-      {% endif %}
     </div>
-    {% if s.location %}
-    <span style="font-size:11px;color:var(--text-muted)">📍 {{ s.location }}</span>
-    {% endif %}
-  </div>
   {% endfor %}
-  {{ pagination(page, total_pages, base_url ~ '/sessions') }}
+</div>
+{{ pagination(page, total_pages, base_url ~ '/sessions') }}
+
 {% else %}
   {{ empty_state(
       "🎹",
       "No sessions yet",
-      "Start a collaboration session in the Muse DAW to record collaborative changes.",
+      "Start a collaboration session in the Muse DAW to capture creative sessions, record collaborative changes, and track studio time.",
   ) }}
 {% endif %}

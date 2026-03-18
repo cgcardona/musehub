@@ -9,26 +9,184 @@
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-4)">
-    <h1 style="margin:0">🌿 Branches <span class="badge">{{ branches | length }}</span></h1>
+
+{# ── Stats bar ────────────────────────────────────────────────────────────── #}
+<div class="branch-stats-bar">
+  <div class="branch-stat-card">
+    <div class="branch-stat-icon branch-stat-icon-total">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+        <path d="M18 9a9 9 0 0 1-9 9"/>
+      </svg>
+    </div>
+    <div>
+      <div class="branch-stat-value">{{ total_branch_count }}</div>
+      <div class="branch-stat-label">Total Branches</div>
+    </div>
   </div>
 
-  {% if default_branch %}
-  <div style="margin-bottom:var(--space-3);padding:var(--space-3);background:var(--color-canvas-subtle);border-radius:var(--radius-md);border:1px solid var(--color-border)">
-    <strong>Default branch:</strong>
-    <code>{{ default_branch.name }}</code>
-    {% if default_branch.head_commit_id %}
-    <a href="{{ base_url }}/commits/{{ default_branch.head_commit_id }}"
-       style="font-family:monospace;font-size:12px;color:var(--color-accent);margin-left:var(--space-2)">
-      {{ default_branch.head_commit_id | shortsha }}
-    </a>
-    {% endif %}
+  <div class="branch-stat-card">
+    <div class="branch-stat-icon branch-stat-icon-active">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="branch-stat-value">{{ active_branch_count }}</div>
+      <div class="branch-stat-label">Active Branches</div>
+    </div>
   </div>
-  {% endif %}
 
-  <div id="branch-rows">
-    {% include "musehub/fragments/branch_rows.html" %}
+  <div class="branch-stat-card">
+    <div class="branch-stat-icon branch-stat-icon-diverged">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>
+      </svg>
+    </div>
+    <div>
+      <div class="branch-stat-value">{{ ahead_branch_count }}</div>
+      <div class="branch-stat-label">Ahead of Main</div>
+    </div>
+  </div>
+
+  <div class="branch-stat-card">
+    <div class="branch-stat-icon branch-stat-icon-authors">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    </div>
+    <div>
+      <div class="branch-stat-value">{{ unique_author_count }}</div>
+      <div class="branch-stat-label">Contributors</div>
+    </div>
   </div>
 </div>
+
+{# ── Default branch hero ─────────────────────────────────────────────────── #}
+{% if default_branch %}
+{% set def_meta = commit_meta.get(default_branch.head_commit_id, {}) %}
+<div class="branch-default-card">
+  <div>
+    <div class="branch-default-label">Default Branch</div>
+    <div class="branch-default-name">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+        <path d="M18 9a9 9 0 0 1-9 9"/>
+      </svg>
+      {{ default_branch.name }}
+    </div>
+    <div class="branch-default-commit">
+      {% if default_branch.head_commit_id %}
+        <a href="{{ base_url }}/commits/{{ default_branch.head_commit_id }}" class="branch-sha">
+          {{ default_branch.head_commit_id | shortsha }}
+        </a>
+        {% if def_meta.message %}
+          <span style="color:var(--text-secondary);font-size:12px">{{ def_meta.message }}</span>
+        {% endif %}
+        {% if def_meta.timestamp %}
+          <span class="branch-date">· {{ def_meta.timestamp | fmtrelative }}</span>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+  <div style="display:flex;gap:var(--space-2)">
+    <a href="{{ base_url }}/tree/{{ default_branch.name }}" class="btn btn-secondary btn-sm">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Browse Files
+    </a>
+    <a href="{{ base_url }}/commits" class="btn btn-secondary btn-sm">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+      History
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Toolbar: type tabs + search ─────────────────────────────────────────── #}
+{% set non_default_count = branches | selectattr("is_default", "false") | list | length %}
+
+{# Tab definitions: label, filter key, symbol #}
+{% set tab_defs = [
+  ("✦ Feature",    "feature",    type_counts.get("feature",    0)),
+  ("⬡ Experiment", "experiment", type_counts.get("experiment", 0)),
+  ("♩ Structure",  "structure",  type_counts.get("structure",  0)),
+  ("↬ Collab",     "collab",     type_counts.get("collab",     0)),
+  ("◎ Source",     "source",     type_counts.get("source",     0)),
+  ("⊕ Version",    "version",    type_counts.get("version",    0)),
+] %}
+
+<div class="branch-toolbar">
+  <div class="branch-type-tabs">
+    <a href="#" class="branch-type-tab active" data-filter="all">
+      All
+      <span class="branch-type-tab-count">{{ non_default_count }}</span>
+    </a>
+    {% for label, key, count in tab_defs %}
+      {% if count > 0 %}
+      <a href="#" class="branch-type-tab" data-filter="{{ key }}">
+        {{ label }}
+        <span class="branch-type-tab-count">{{ count }}</span>
+      </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <label class="branch-search-wrap" for="branch-search">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="branch-search" type="text" placeholder="Search branches…" autocomplete="off">
+  </label>
+</div>
+
+{# ── Branch list ─────────────────────────────────────────────────────────── #}
+{% if non_default_count > 0 %}
+<div class="branch-list" id="branch-list">
+  <div class="branch-list-header">
+    <span>Branch</span>
+    <span>Activity</span>
+  </div>
+  {% include "musehub/fragments/branch_rows.html" %}
+</div>
+{% else %}
+  {{ empty_state("🌿", "No branches yet", "Create a branch to start developing a new musical idea or experiment.") }}
+{% endif %}
+
+{% endblock %}
+
+{% block page_script %}
+<script>
+(function () {
+  // ── Branch search & type filter ──────────────────────────────────────────
+  const searchInput = document.getElementById('branch-search');
+  const branchList  = document.getElementById('branch-list');
+  const typeTabs    = document.querySelectorAll('.branch-type-tab');
+  let activeFilter  = 'all';
+
+  function applyFilters() {
+    const q = (searchInput ? searchInput.value : '').toLowerCase();
+    const cards = branchList ? branchList.querySelectorAll('.branch-card') : [];
+    cards.forEach(card => {
+      const name = (card.dataset.branchName || '').toLowerCase();
+      const type = (card.dataset.branchType || '').toLowerCase();
+      const nameMatch = !q || name.includes(q);
+      const typeMatch = activeFilter === 'all' || type === activeFilter;
+      card.style.display = (nameMatch && typeMatch) ? '' : 'none';
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', applyFilters);
+  }
+
+  typeTabs.forEach(tab => {
+    tab.addEventListener('click', e => {
+      e.preventDefault();
+      typeTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeFilter = tab.dataset.filter || 'all';
+      applyFilters();
+    });
+  });
+})();
+</script>
 {% endblock %}

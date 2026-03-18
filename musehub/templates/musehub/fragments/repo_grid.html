@@ -10,6 +10,9 @@
 {% from "musehub/macros/pagination.html" import pagination %}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
+{# Out-of-band swap: updates the repo count badge without it being inside #repo-grid #}
+<span id="repo-count" hx-swap-oob="true" style="color:#8b949e">{{ total }} repositories</span>
+
 {% set dim_colors = ['--dim-harmonic', '--dim-rhythmic', '--dim-melodic', '--dim-structural', '--dim-dynamic'] %}
 {% if repos %}
 <div class="repo-card-grid">

@@ -1,56 +1,152 @@
-{#  fragments/pr_rows.html — bare HTMX fragment: pull request list rows.
+{#  fragments/pr_rows.html — HTMX fragment: pull request list rows.
+    Rendered inline by pr_list.html and returned as a bare fragment on tab/sort HTMX requests.
 
-    Rendered in two contexts:
-
-    1. Full-page load: included inline by musehub/pages/pr_list.html inside
-       the ``<div id="pr-rows">`` target container.
-
-    2. HTMX partial swap: returned directly when the handler detects
-       ``HX-Request: true``, replacing only the ``#pr-rows`` container on
-       tab/sort switches.
-
-    Required context variables
-    --------------------------
-    prs         : list[dict]  — PRResponse.model_dump() for active state/sort
-    base_url    : str         — repo UI prefix, e.g. /owner/slug
-    state       : str         — active state tab: 'open' | 'merged' | 'closed' | 'all'
+    Required context: prs (list[dict]), base_url (str), state (str)
 #}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
-{% if prs %}
-  {% for pr in prs %}
-    <div class="pr-row">
-      {# State badge #}
-      {% if pr.state == 'merged' %}
-        <span class="badge badge-merged">Merged</span>
-      {% elif pr.state == 'closed' %}
-        <span class="badge badge-closed">Closed</span>
-      {% else %}
-        <span class="badge badge-open">Open</span>
-      {% endif %}
+{# ── Jinja2 helper macro: extract branch type prefix ── #}
+{% macro branch_type(branch) %}
+  {%- set parts = branch.split('/') -%}
+  {%- if parts | length > 1 -%}{{ parts[0] }}{%- endif -%}
+{% endmacro %}
 
-      <div style="flex:1;min-width:0">
-        <a href="{{ base_url }}/pulls/{{ pr.pr_id }}">{{ pr.title }}</a>
-        <div class="pr-meta">
-          <span class="branch-pill">{{ pr.from_branch }}</span>
-          <span>→</span>
-          <span class="branch-pill">{{ pr.to_branch }}</span>
-          <span>{{ pr.created_at | fmtdate }}</span>
-          {% if pr.author %}<span>by {{ pr.author }}</span>{% endif %}
-          {% if pr.state == 'merged' and pr.merge_commit_id %}
-            <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}"
-               style="font-family:monospace;font-size:11px;color:#8b49da">
+{# ── Jinja2 helper macro: type badge class ── #}
+{% macro type_class(btype) %}
+  {%- if btype == 'feat' %}pr-type-feat
+  {%- elif btype == 'fix' %}pr-type-fix
+  {%- elif btype == 'experiment' or btype == 'exp' %}pr-type-experiment
+  {%- elif btype == 'refactor' %}pr-type-refactor
+  {%- else %}pr-type-chore
+  {%- endif %}
+{% endmacro %}
+
+{# ── Jinja2 macro: author color (simple hash) ── #}
+{% macro author_bg(name) %}
+  {%- set colors = ['#1d4ed8','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c'] -%}
+  {%- set idx = (name | length) % (colors | length) -%}
+  {{ colors[idx] }}
+{% endmacro %}
+
+{# ── Body preview: strip markdown headers and get first meaningful line ── #}
+{% macro body_preview(body) %}
+  {%- set lines = body.split('\n') -%}
+  {%- set preview = namespace(text='') -%}
+  {%- for line in lines -%}
+    {%- set stripped = line.strip() -%}
+    {%- if stripped and not stripped.startswith('#') and not stripped.startswith('---') and preview.text == '' -%}
+      {%- set preview.text = stripped -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{ preview.text[:160] }}{% if preview.text | length > 160 %}…{% endif %}
+{% endmacro %}
+
+{% if prs %}
+<div class="pr-list">
+  {% for pr in prs %}
+    {%- set btype = branch_type(pr.from_branch) -%}
+    {%- set preview = body_preview(pr.body or '') -%}
+    <div class="pr-card pr-card-{{ pr.state }}">
+
+      {# ── Status pill ── #}
+      <div class="pr-card-status">
+        {% if pr.state == 'merged' %}
+          <span class="pr-status-pill pr-status-merged">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Merged
+          </span>
+        {% elif pr.state == 'closed' %}
+          <span class="pr-status-pill pr-status-closed">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Closed
+          </span>
+        {% else %}
+          <span class="pr-status-pill pr-status-open">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+            Open
+          </span>
+        {% endif %}
+      </div>
+
+      {# ── Body ── #}
+      <div class="pr-card-body">
+
+        {# Title row #}
+        <a href="{{ base_url }}/pulls/{{ pr.pr_id }}" class="pr-card-title">
+          {%- if btype %}
+            <span class="pr-type-badge {{ type_class(btype) | trim }}">{{ btype }}</span>
+          {%- endif %}
+          {{ pr.title }}
+        </a>
+
+        {# Branch path #}
+        <div class="pr-branch-path">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);flex-shrink:0"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+          <span class="pr-branch-pill pr-branch-pill-from">{{ pr.from_branch }}</span>
+          <span class="pr-branch-arrow">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+          <span class="pr-branch-pill">{{ pr.to_branch }}</span>
+          {%- if pr.state == 'merged' and pr.merge_commit_id %}
+            <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}" class="pr-merge-sha">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
               {{ pr.merge_commit_id[:8] }}
             </a>
-          {% endif %}
+          {%- endif %}
+        </div>
+
+        {# Body preview #}
+        {%- if preview | trim %}
+          <div class="pr-body-preview">{{ preview | trim }}</div>
+        {%- endif %}
+
+        {# Meta row #}
+        <div class="pr-card-meta">
+          {# Author chip #}
+          <span class="pr-author-chip">
+            <span class="pr-author-avatar" style="background:{{ author_bg(pr.author or '?') }}">{{ (pr.author or '?')[0] | upper }}</span>
+            <span class="pr-author-name">{{ pr.author or 'unknown' }}</span>
+          </span>
+
+          {# Date #}
+          <span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            {{ pr.created_at | fmtdate }}
+          </span>
+
+          {# Merged-at #}
+          {%- if pr.state == 'merged' and pr.merged_at %}
+            <span style="color:#a78bfa">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="20 6 9 17 4 12"/></svg>
+              Merged {{ pr.merged_at | fmtdate }}
+            </span>
+          {%- endif %}
         </div>
       </div>
+
+      {# ── Action ── #}
+      <div class="pr-card-action">
+        <a href="{{ base_url }}/pulls/{{ pr.pr_id }}" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:11px">
+          View
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+
     </div>
   {% endfor %}
+</div>
+
 {% else %}
-  {{ empty_state(
-      "🔀",
-      "No pull requests",
-      "No pull requests match the current filter. Try switching tabs.",
-  ) }}
+<div class="pr-empty">
+  <div class="pr-empty-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted)"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+  </div>
+  <div class="pr-empty-title">No pull requests</div>
+  <div class="pr-empty-desc">
+    {% if state == 'open' %}There are no open pull requests. Create one to propose changes.
+    {% elif state == 'merged' %}No pull requests have been merged yet.
+    {% elif state == 'closed' %}No pull requests have been closed.
+    {% else %}No pull requests found.{% endif %}
+  </div>
+</div>
 {% endif %}

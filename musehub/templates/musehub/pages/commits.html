@@ -160,11 +160,10 @@ function upgradeTimestamps() {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function () {
-  if (typeof initRepoNav === 'function') initRepoNav(repoId);
-  renderBadges();
-  upgradeTimestamps();
-});
+// initRepoNav is called by initPageGlobals() in musehub.ts via htmx:afterSettle /
+// DOMContentLoaded — no need to call it here.
+renderBadges();
+upgradeTimestamps();
 {% endraw %}
 {% endblock %}
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark rounded-square background -->
+  <rect width="32" height="32" rx="7" ry="7" fill="#0d1117"/>
+  <!-- White eighth note (♪): note head + stem + flag -->
+  <!-- Note head: rotated filled ellipse approximated as polygon -->
+  <ellipse cx="12" cy="22" rx="6.5" ry="4.5"
+           transform="rotate(-22 12 22)" fill="white"/>
+  <!-- Stem -->
+  <rect x="17.5" y="5" width="2.5" height="17.5" fill="white"/>
+  <!-- Flag: cubic bezier filled stroke -->
+  <path d="M18.7 5 C27 8 25 18 18.7 16.5" fill="none"
+        stroke="white" stroke-width="3" stroke-linecap="round"/>
+</svg>

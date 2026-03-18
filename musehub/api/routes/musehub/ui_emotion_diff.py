@@ -30,14 +30,17 @@ from __future__ import annotations
 
 import logging
 import math
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
+from sqlalchemy import func, select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response as StarletteResponse
 
 from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.db import get_db
+from musehub.db import musehub_models as musehub_db
 from musehub.models.musehub_analysis import EmotionVector8D
 from musehub.services import musehub_analysis, musehub_repository
 from musehub.api.routes.musehub._templates import templates
@@ -141,15 +144,36 @@ def _build_emotion_radar_svg(vec: EmotionVector8D, color: str, ref_label: str) -
 
 async def _resolve_repo(
     owner: str, repo_slug: str, db: AsyncSession
-) -> tuple[str, str]:
-    """Resolve owner+slug to (repo_id, base_url); raise 404 if not found."""
+) -> tuple[str, str, dict[str, Any]]:
+    """Resolve owner+slug to (repo_id, base_url, nav_ctx); raise 404 if not found."""
     row = await musehub_repository.get_repo_orm_by_owner_slug(db, owner, repo_slug)
     if row is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), f"/{owner}/{repo_slug}"
+    repo_id = str(row.repo_id)
+    pr_count = await db.scalar(
+        sa_select(func.count()).select_from(musehub_db.MusehubPullRequest).where(
+            musehub_db.MusehubPullRequest.repo_id == repo_id,
+            musehub_db.MusehubPullRequest.state == "open",
+        )
+    ) or 0
+    issue_count = await db.scalar(
+        sa_select(func.count()).select_from(musehub_db.MusehubIssue).where(
+            musehub_db.MusehubIssue.repo_id == repo_id,
+            musehub_db.MusehubIssue.state == "open",
+        )
+    ) or 0
+    nav_ctx: dict[str, Any] = {
+        "repo_key": row.key_signature or "",
+        "repo_bpm": row.tempo_bpm,
+        "repo_tags": row.tags or [],
+        "repo_visibility": row.visibility or "private",
+        "nav_open_pr_count": pr_count,
+        "nav_open_issue_count": issue_count,
+    }
+    return repo_id, f"/{owner}/{repo_slug}", nav_ctx
 
 
 @router.get(
@@ -200,7 +224,7 @@ async def emotion_diff_page(
             detail="Both base and head refs must be non-empty",
         )
 
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     diff = musehub_analysis.compute_emotion_diff(
         repo_id=repo_id,
@@ -275,6 +299,7 @@ async def emotion_diff_page(
         "listen_head_url": listen_head_url,
         "compare_url": compare_url,
     }
+    context.update(nav_ctx)
 
     return await negotiate_response(
         request=request,

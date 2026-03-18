@@ -104,7 +104,7 @@ function eventCard(item) {
  * Mark a single notification as read via POST /notifications/{notif_id}/read.
  * Updates the card styling and nav badge count in-place on success.
  */
-async function markOneRead(btn) {
+window.markOneRead = async function(btn) {
   const notifId = btn.dataset.notifId;
   if (!notifId) return;
   try {
@@ -127,7 +127,7 @@ async function markOneRead(btn) {
  * Mark all notifications as read via POST /notifications/read-all.
  * Applies read styling to every card and resets the nav badge to 0.
  */
-async function markAllRead() {
+window.markAllRead = async function() {
   const markAllBtn = document.getElementById('mark-all-read-btn');
   if (markAllBtn) markAllBtn.disabled = true;
   try {

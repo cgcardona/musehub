@@ -25,10 +25,11 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from sqlalchemy import Text, desc, func, outerjoin, select
+from sqlalchemy import Text, desc, func, or_, outerjoin, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.db import musehub_models as db
+from musehub.db import muse_cli_models as cli_db
 from musehub.models.musehub import (
     ExploreRepoResult,
     ExploreResponse,
@@ -37,7 +38,7 @@ from musehub.models.musehub import (
 
 logger = logging.getLogger(__name__)
 
-SortField = Literal["stars", "activity", "commits", "created"]
+SortField = Literal["stars", "activity", "commits", "created", "trending"]
 
 _PAGE_SIZE_MAX = 100
 
@@ -50,6 +51,9 @@ async def list_public_repos(
     tempo_min: int | None = None,
     tempo_max: int | None = None,
     instrumentation: str | None = None,
+    langs: list[str] | None = None,
+    topics: list[str] | None = None,
+    license: str | None = None,
     sort: SortField = "created",
     page: int = 1,
     page_size: int = 24,
@@ -68,6 +72,11 @@ async def list_public_repos(
         tempo_max: Include only repos with ``tempo_bpm <= tempo_max``.
         instrumentation: Case-insensitive substring match against tags — used to
                          filter by instrument presence (e.g. "bass", "drums").
+        langs: Multi-select language/instrument chips — repo must have at least one
+               matching tag in the muse_tags table (OR across selections).
+        topics: Multi-select topic chips — repo.tags JSON must contain at least one
+                of the selected values (OR across selections).
+        license: Exact match against ``settings['license']`` (e.g. "CC BY").
         sort: One of "stars", "activity", "commits", "created".
         page: 1-based page number.
         page_size: Number of results per page (clamped to _PAGE_SIZE_MAX).
@@ -127,6 +136,30 @@ async def list_public_repos(
     if tempo_max is not None:
         base_q = base_q.where(db.MusehubRepo.tempo_bpm <= tempo_max)
 
+    # Multi-select language/instrument chips — filter by musehub_repos.tags JSON (OR across values).
+    # Tags may be prefixed (emotion:melancholic) or bare (jazz); ilike with the raw value
+    # matches both since "melancholic" is a substring of "emotion:melancholic".
+    if langs:
+        lang_conditions = [
+            func.cast(db.MusehubRepo.tags, Text).ilike(f"%{v.lower()}%")
+            for v in langs
+        ]
+        base_q = base_q.where(or_(*lang_conditions))
+
+    # Multi-select topic chips — filter on repo.tags JSON (OR across values).
+    if topics:
+        topic_conditions = [
+            func.cast(db.MusehubRepo.tags, Text).ilike(f"%{t.lower()}%")
+            for t in topics
+        ]
+        base_q = base_q.where(or_(*topic_conditions))
+
+    # License filter — matches settings['license'] key in the repo settings JSON.
+    if license:
+        base_q = base_q.where(
+            func.cast(db.MusehubRepo.settings, Text).ilike(f"%{license}%")
+        )
+
     # Count total results before pagination ──────────────────────────────────
     count_q = select(func.count()).select_from(base_q.subquery())
     total: int = (await session.execute(count_q)).scalar_one()
@@ -138,7 +171,16 @@ async def list_public_repos(
         base_q = base_q.order_by(desc("latest_commit"), desc(db.MusehubRepo.created_at))
     elif sort == "commits":
         base_q = base_q.order_by(desc("commit_count"), desc(db.MusehubRepo.created_at))
-    else: # "created"
+    elif sort == "trending":
+        # Composite score: stars carry more weight than raw commit volume,
+        # so a repo with 10 stars + 5 commits outranks one with 0 stars + 100 commits.
+        # star_count_col and commit_count_col are already in the grouped SELECT.
+        base_q = base_q.order_by(
+            desc(star_count_col * 3 + commit_count_col),
+            desc("latest_commit"),
+            desc(db.MusehubRepo.created_at),
+        )
+    else:  # "created"
         base_q = base_q.order_by(desc(db.MusehubRepo.created_at))
 
     rows = (await session.execute(base_q.offset(offset).limit(page_size))).all()

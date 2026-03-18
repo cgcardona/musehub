@@ -5,8 +5,6 @@
 {% block title %}Explore{% endblock %}
 {% block breadcrumb %}Explore{% endblock %}
 
-{% block container_extra_class %}-wide{% endblock %}
-
 {% block token_form %}
   <button class="btn btn-secondary btn-sm mobile-filter-toggle"
           onclick="document.querySelector('.explore-sidebar').classList.toggle('open')">
@@ -49,10 +47,7 @@
                  onclick="toggleChip(event,'lang','{{ tag | e }}')">{{ tag }}</a>
               {% endfor %}
             </div>
-            {# Hidden inputs carry selected values when the form submits #}
-            {% for tag in selected_langs %}
-            <input type="hidden" name="lang" value="{{ tag | e }}" class="lang-hidden">
-            {% endfor %}
+            {# Chip selections are tracked via URL params by toggleChip(), not hidden inputs #}
           {% else %}
             <p style="font-size:12px;color:var(--text-muted)">No tags yet</p>
           {% endif %}
@@ -83,9 +78,7 @@
                  onclick="toggleChip(event,'topic','{{ t | e }}')">{{ t }}</a>
               {% endfor %}
             </div>
-            {% for t in selected_topics %}
-            <input type="hidden" name="topic" value="{{ t | e }}" class="topic-hidden">
-            {% endfor %}
+            {# Topic selections are tracked via URL params by toggleChip(), not hidden inputs #}
           {% else %}
             <p style="font-size:12px;color:var(--text-muted)">No topics yet</p>
           {% endif %}
@@ -100,7 +93,7 @@
           <p class="eyebrow" style="margin-bottom:4px">Music</p>
           <h2 style="margin:0">Explore Repositories</h2>
         </div>
-        <span style="color:#8b949e">{{ total }} repositories</span>
+        <span id="repo-count" style="color:#8b949e">{{ total }} repositories</span>
       </div>
 
       <div id="repo-grid">
@@ -112,25 +105,44 @@
 
 {% block page_script %}
 {% raw %}
-// ── Chip toggle helper (progressive enhancement — GET form works without JS) ─
+// ── Strip empty fields before GET form submits so URLs stay clean ────────────
+document.getElementById('filter-form').addEventListener('submit', function() {
+  Array.from(this.elements).forEach(function(el) {
+    if ((el.tagName === 'SELECT' || el.tagName === 'INPUT') && el.value === '') {
+      el.disabled = true;
+    }
+  });
+});
+
+// ── Chip toggle — reads/writes the URL directly so multi-select is reliable ──
+// pushURL is not supported in htmx.ajax() context, so we call history.pushState()
+// manually first. This ensures window.location.search is correct for every
+// subsequent click — each chip always sees the full accumulated filter state.
 window.toggleChip = function(evt, filterName, value) {
   evt.preventDefault();
-  const form    = document.getElementById('filter-form');
-  const cls     = filterName + '-hidden';
-  const hiddens = Array.from(form.querySelectorAll('input.' + cls));
-  const exists  = hiddens.find(h => h.value === value);
-  if (exists) {
-    exists.remove();
+
+  var params  = new URLSearchParams(window.location.search);
+  var current = params.getAll(filterName);
+
+  if (current.indexOf(value) !== -1) {
+    // Deselect: rebuild the list without this value
+    params.delete(filterName);
+    current.filter(function(v) { return v !== value; })
+           .forEach(function(v) { params.append(filterName, v); });
+    evt.currentTarget.classList.remove('active');
   } else {
-    const inp = document.createElement('input');
-    inp.type  = 'hidden';
-    inp.name  = filterName;
-    inp.value = value;
-    inp.classList.add(cls);
-    form.appendChild(inp);
+    // Select: add this value
+    params.append(filterName, value);
+    evt.currentTarget.classList.add('active');
   }
-  evt.currentTarget.classList.toggle('active');
-  form.requestSubmit();
+
+  var url = '/explore?' + params.toString();
+
+  // Push URL first so the next chip click reads the correct accumulated state
+  history.pushState({}, '', url);
+
+  // Fetch only the repo grid fragment
+  htmx.ajax('GET', url, { target: '#repo-grid', swap: 'innerHTML' });
 };
 {% endraw %}
 {% endblock %}

@@ -2516,8 +2516,38 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
     print(f"  ✅ Profiles: {len(all_user_profiles)} ({len(USERS)} community + {len(COMPOSER_USERS)} composers: {pd_count} public domain, {cc_count} CC BY 4.0)")
 
     # ── 2. Repos ──────────────────────────────────────────────────
+    # Build owner → cc_license lookup from PROFILE_DATA so repos inherit their
+    # owner's Creative Commons licence for the sidebar filter.
+    # Normalize to match UI filter option values (CC0, CC BY, etc.).
+    def _normalize_license(raw: str) -> str:
+        if not raw:
+            return ""
+        if "public domain" in raw.lower():
+            return "CC0"
+        if raw.upper().startswith("CC BY-SA"):
+            return "CC BY-SA"
+        if raw.upper().startswith("CC BY-NC"):
+            return "CC BY-NC"
+        if raw.upper().startswith("CC BY"):
+            return "CC BY"
+        if raw.upper().startswith("CC0"):
+            return "CC0"
+        return raw
+
+    owner_license_map: dict[str, str] = {
+        uid: _normalize_license(pd.get("cc_license") or "")
+        for uid, pd in PROFILE_DATA.items()
+    }
+    # Also map by username → license for convenience.
+    username_license_map: dict[str, str] = {}
+    for uid, uname, _ in COMPOSER_USERS:
+        lic = owner_license_map.get(uid, "")
+        if lic:
+            username_license_map[uname] = lic
+
     all_repos = list(REPOS) + list(GENRE_REPOS)
     for r in all_repos:
+        repo_license = r.get("license") or username_license_map.get(r["owner"], "")
         db.add(MusehubRepo(
             repo_id=r["repo_id"],
             name=r["name"],
@@ -2530,6 +2560,7 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
             key_signature=r["key_signature"],
             tempo_bpm=r["tempo_bpm"],
             created_at=_now(days=r["days_ago"]),
+            settings={"license": repo_license} if repo_license else None,
         ))
     print(f"  ✅ Repos: {len(all_repos)} ({len(REPOS)} original community + {len(GENRE_REPOS)} genre/archive/remix)")
 

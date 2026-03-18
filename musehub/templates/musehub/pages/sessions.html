@@ -9,23 +9,199 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const base   = {{ base_url | tojson }};
-{% endblock %}
+{# ── Participant color ────────────────────────────────────────────────────── #}
+{% macro pcolor(name) -%}
+  {%- set colors = ["#58a6ff","#3fb950","#a371f7","#fb8500","#2dd4bf","#d29922","#f85149","#e879f9"] -%}
+  {{ colors[(name|length) % (colors|length)] }}
+{%- endmacro %}
 
 {% block content %}
-<div class="card">
-  <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4)">
-    <h1 style="margin:0">Sessions</h1>
-    <span class="badge">{{ total }}</span>
-  </div>
-  <div id="session-rows"
-       hx-get="{{ base_url }}/sessions?page={{ page }}&per_page={{ per_page }}"
-       hx-trigger="none"
-       hx-target="#session-rows"
-       hx-swap="innerHTML">
-    {% include "musehub/fragments/session_rows.html" %}
-  </div>
-</div>
+<div class="sessions-layout">
+
+  {# ── Main column ────────────────────────────────────────────────────────── #}
+  <div>
+
+    {# Stats bar #}
+    <div class="sess-stats-bar">
+      <div class="sess-stat-card">
+        <div class="sess-stat-icon sess-stat-icon-total">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div>
+          <div class="sess-stat-value">{{ total }}</div>
+          <div class="sess-stat-label">Total Sessions{% if active_count > 0 %} · <span style="color:#3fb950">{{ active_count }} live</span>{% endif %}</div>
+        </div>
+      </div>
+
+      <div class="sess-stat-card">
+        <div class="sess-stat-icon sess-stat-icon-hours">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="sess-stat-value">{{ total_hours }}h</div>
+          <div class="sess-stat-label">Studio Time</div>
+        </div>
+      </div>
+
+      <div class="sess-stat-card">
+        <div class="sess-stat-icon sess-stat-icon-commits">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/>
+          </svg>
+        </div>
+        <div>
+          <div class="sess-stat-value">{{ total_commits_in_sessions }}</div>
+          <div class="sess-stat-label">Commits Captured</div>
+        </div>
+      </div>
+
+      <div class="sess-stat-card">
+        <div class="sess-stat-icon sess-stat-icon-collabs">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div>
+          <div class="sess-stat-value">{{ unique_collaborators | length }}</div>
+          <div class="sess-stat-label">Collaborators</div>
+        </div>
+      </div>
+    </div>
+
+    {# Live session hero #}
+    {% if live_session %}
+    {% set ls = live_session %}
+    <div class="sess-hero">
+      <div class="sess-hero-label">
+        <span class="session-live-dot"></span>
+        Live Session in Progress
+      </div>
+      <div class="sess-hero-row">
+        <div class="sess-hero-body">
+          <div class="sess-hero-intent">{{ ls.intent or "Recording session" }}</div>
+          <div class="sess-hero-meta">
+            <a href="{{ base_url }}/sessions/{{ ls.sessionId }}" class="sess-hero-id">{{ ls.sessionId[:8] }}</a>
+            <span>·</span>
+            <span>Started {{ ls.startedAt | fmtrelative }}</span>
+            {% if ls.location %}
+              <span>·</span>
+              <span class="sess-hero-location">
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {{ ls.location }}
+              </span>
+            {% endif %}
+          </div>
+          {% if ls.participants %}
+          <div class="sess-hero-participants">
+            {% for p in ls.participants %}
+            <a href="/{{ p | urlencode }}" class="sess-participant">
+              <span class="sess-participant-dot" style="background:{{ pcolor(p) }}">{{ p[0] | upper }}</span>
+              {{ p }}
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="sess-hero-actions">
+          <a href="{{ base_url }}/sessions/{{ ls.sessionId }}" class="btn btn-primary btn-sm">View Live Session</a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Filter bar #}
+    <div class="sess-filter-bar">
+      <a href="#" class="sess-filter-tab active" data-filter="all">All</a>
+      {% if active_count > 0 %}
+      <a href="#" class="sess-filter-tab" data-filter="live">
+        <span class="session-live-dot" style="width:6px;height:6px"></span>
+        Live
+      </a>
+      {% endif %}
+      <a href="#" class="sess-filter-tab" data-filter="ended">Ended</a>
+      <label class="sess-search-wrap" for="sess-search">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="sess-search" type="text" placeholder="Search sessions…" autocomplete="off">
+      </label>
+    </div>
+
+    {# Session card list #}
+    <div id="session-rows">
+      {% include "musehub/fragments/session_rows.html" %}
+    </div>
+
+  </div>{# /main column #}
+
+  {# ── Sidebar ────────────────────────────────────────────────────────────── #}
+  <aside class="sess-sidebar">
+
+    {# Collaborators #}
+    {% if unique_collaborators %}
+    <div class="sess-sidebar-card">
+      <div class="sess-sidebar-header">Collaborators</div>
+      {% for name in unique_collaborators %}
+      <a href="/{{ name | urlencode }}" class="sess-collab-row">
+        <span class="sess-collab-avatar" style="background:{{ pcolor(name) }}">{{ name[0] | upper }}</span>
+        {{ name }}
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Locations #}
+    {% if top_locations %}
+    <div class="sess-sidebar-card">
+      <div class="sess-sidebar-header">Studios & Locations</div>
+      {% for loc in top_locations %}
+      <div class="sess-location-chip">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        {{ loc }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </aside>
+
+</div>{# /sessions-layout #}
+{% endblock %}
+
+{% block page_script %}
+<script>
+(function () {
+  const filterTabs = document.querySelectorAll('.sess-filter-tab');
+  const searchInput = document.getElementById('sess-search');
+  const list = document.getElementById('session-rows');
+  let activeFilter = 'all';
+
+  function applyFilters() {
+    const q = searchInput ? searchInput.value.toLowerCase() : '';
+    const cards = list ? list.querySelectorAll('.sess-card') : [];
+    cards.forEach(function (card) {
+      const status = (card.dataset.status || '').toLowerCase();
+      const text   = (card.dataset.intent || '').toLowerCase() + ' ' + (card.dataset.location || '').toLowerCase();
+      const statusMatch = activeFilter === 'all' || status === activeFilter;
+      const searchMatch = !q || text.includes(q);
+      card.style.display = (statusMatch && searchMatch) ? '' : 'none';
+    });
+  }
+
+  filterTabs.forEach(function (tab) {
+    tab.addEventListener('click', function (e) {
+      e.preventDefault();
+      filterTabs.forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      activeFilter = tab.dataset.filter || 'all';
+      applyFilters();
+    });
+  });
+
+  if (searchInput) { searchInput.addEventListener('input', applyFilters); }
+})();
+</script>
 {% endblock %}

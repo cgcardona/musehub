@@ -4,7 +4,7 @@
  * Sections:
  *  1. Auth helpers (token storage, apiFetch, token form)
  *  2. Formatting helpers (dates, SHA, durations)
- *  3. Repo nav (header card population, tab count badges, star toggle)
+ *  3. Repo nav (tab count badges, star toggle — metadata is SSR'd)
  *  4. Audio player (persistent bottom bar, playback controls)
  *  5. Commit message parser (liner-notes display helpers)
  *  6. Reactions bar
@@ -15,7 +15,7 @@
  * 1. Auth helpers
  * ═══════════════════════════════════════════════════════════════ */
 
-const API = '/api/v1/musehub';
+const API = '/api/v1';
 
 export function getToken(): string {
   return localStorage.getItem('musehub_token') ?? '';
@@ -120,74 +120,20 @@ export function escHtml(s: unknown): string {
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 3. Repo nav — header card + tab count badges
+ * 3. Repo nav — tab count badges + star toggle
+ *    Visibility / key / BPM / tags are now SSR-rendered by repo_nav.html
+ *    so there is no client-side fetch for those fields.
  * ═══════════════════════════════════════════════════════════════ */
 
-interface RepoMeta {
-  visibility: string;
-  keySignature?: string;
-  tempoBpm?: number;
-  tags?: string[];
-}
-
-interface PrListResponse { pull_requests?: unknown[] }
-interface IssueListResponse { issues?: unknown[] }
-
 export async function initRepoNav(repoId: string): Promise<void> {
-  try {
-    const repo = await fetch(API + '/repos/' + repoId, { headers: authHeaders() })
-      .then(r => (r.ok ? r.json() : null) as Promise<RepoMeta | null>)
-      .catch(() => null);
-
-    if (repo) {
-      const badge = document.getElementById('nav-visibility-badge');
-      if (badge) {
-        badge.textContent = repo.visibility;
-        badge.className =
-          'badge repo-visibility-badge badge-' +
-          (repo.visibility === 'public' ? 'clean' : 'neutral');
-      }
-      const keyEl = document.getElementById('nav-key');
-      if (keyEl && repo.keySignature) {
-        keyEl.textContent = '♩ ' + repo.keySignature;
-        keyEl.style.display = '';
-      }
-      const bpmEl = document.getElementById('nav-bpm');
-      if (bpmEl && repo.tempoBpm) {
-        bpmEl.textContent = repo.tempoBpm + ' BPM';
-        bpmEl.style.display = '';
-      }
-      const tagsEl = document.getElementById('nav-tags');
-      if (tagsEl && repo.tags && repo.tags.length > 0) {
-        tagsEl.innerHTML = repo.tags
-          .map(t => '<span class="nav-meta-tag">' + escHtml(t) + '</span>')
-          .join('');
-      }
-    }
-
-    if (getToken()) {
-      const starBtn = document.getElementById('nav-star-btn');
-      if (starBtn) starBtn.style.display = '';
-    }
-
-    void Promise.all([
-      fetch(API + '/repos/' + repoId + '/pull-requests?state=open', { headers: authHeaders() })
-        .then(r => (r.ok ? r.json() : { pull_requests: [] }) as Promise<PrListResponse>)
-        .catch(() => ({ pull_requests: [] as unknown[] })),
-      fetch(API + '/repos/' + repoId + '/issues?state=open', { headers: authHeaders() })
-        .then(r => (r.ok ? r.json() : { issues: [] }) as Promise<IssueListResponse>)
-        .catch(() => ({ issues: [] as unknown[] })),
-    ]).then(([prData, issueData]) => {
-      const prCount = (prData.pull_requests ?? []).length;
-      const issueCount = (issueData.issues ?? []).length;
-      const prBadge = document.getElementById('nav-pr-count');
-      if (prBadge && prCount > 0) { prBadge.textContent = String(prCount); prBadge.style.display = ''; }
-      const issueBadge = document.getElementById('nav-issue-count');
-      if (issueBadge && issueCount > 0) { issueBadge.textContent = String(issueCount); issueBadge.style.display = ''; }
-    });
-  } catch {
-    // Nav enrichment is non-critical — page still works without it
+  // Tab counts (PRs, issues) and all header chips are now fully SSR-rendered
+  // by repo_tabs.html / repo_nav.html — no client-side fetches needed.
+  // Only the star button still requires client-side auth state.
+  if (getToken()) {
+    const starBtn = document.getElementById('nav-star-btn');
+    if (starBtn) starBtn.style.display = '';
   }
+  void repoId; // consumed by caller for potential future use
 }
 
 export async function toggleStar(): Promise<void> {
@@ -474,10 +420,10 @@ document.addEventListener('htmx:configRequest', (evt: Event) => {
   if (token) (evt as CustomEvent).detail.headers['Authorization'] = 'Bearer ' + token;
 });
 
-document.addEventListener('htmx:afterSwap', () => {
-  const repoId = (window as Window & { __repoId?: string }).__repoId;
-  if (repoId) void initRepoNav(repoId);
-});
+/** Read repo_id from the DOM — repo_nav.html embeds it as a data-repo-id attribute. */
+function _repoIdFromDom(): string | null {
+  return document.getElementById('repo-header')?.getAttribute('data-repo-id') ?? null;
+}
 
 /* ═══════════════════════════════════════════════════════════════
  * Global surface — attach exports to window for inline handlers
@@ -564,6 +510,9 @@ function initPageGlobals(): void {
   if (typeof (window as unknown as Record<string, unknown>).lucide === 'object') {
     (window as unknown as { lucide: { createIcons: () => void } }).lucide.createIcons();
   }
+  // Initialize repo nav if the repo header card is present on this page
+  const repoId = _repoIdFromDom();
+  if (repoId) void initRepoNav(repoId);
   // Dispatch to the active page module via the #page-data JSON element
   const pageDataEl = document.getElementById('page-data');
   if (pageDataEl) {
@@ -586,7 +535,8 @@ function dispatchPageModule(data: Record<string, unknown>): void {
 
 // Run on initial hard load
 document.addEventListener('DOMContentLoaded', initPageGlobals);
-// Re-run after every HTMX swap so page modules activate on navigation
+// Re-run after every HTMX navigation — htmx:afterSettle fires after scripts
+// in the swapped content have run, so page modules and DOM data are ready.
 document.addEventListener('htmx:afterSettle', initPageGlobals);
 
 window.getToken = getToken;

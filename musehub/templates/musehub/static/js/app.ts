@@ -21,6 +21,8 @@ import { initListen } from './pages/listen.ts';
 import { initCommitDetail } from './pages/commit-detail.ts';
 import { initCommit } from './pages/commit.ts';
 import { initUserProfile } from './pages/user-profile.ts';
+import { initTimeline } from './pages/timeline.ts';
+import { initAnalysis } from './pages/analysis.ts';
 
 // Register page modules — keyed by the "page" field in the #page-data JSON.
 type PageData = Record<string, unknown>;
@@ -34,6 +36,8 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'commit-detail': (d) => initCommitDetail(d),
   'commit':        (d) => initCommit(d),
   'user-profile':  (d) => void initUserProfile(d),
+  'timeline':      () => initTimeline(),
+  'analysis':      () => initAnalysis(),
 };
 
 // Attach to window so musehub.ts dispatchPageModule() can reach it.

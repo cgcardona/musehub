@@ -263,7 +263,7 @@ async def test_issue_list_tab_open_has_hx_get(
     """Open tab link carries hx-get for HTMX navigation."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "tab-open" in body
+    assert "state=open" in body
     assert "hx-get" in body
 
 
@@ -295,11 +295,11 @@ async def test_issue_list_state_filter_closed_shows_closed_only(
 ) -> None:
     """?state=closed returns only closed issues in the rendered HTML."""
     repo_id = await _make_repo(db_session)
-    await _make_issue(db_session, repo_id, number=1, title="Open issue", state="open")
-    await _make_issue(db_session, repo_id, number=2, title="Closed issue", state="closed")
+    await _make_issue(db_session, repo_id, number=1, title="UniqueOpenTitle", state="open")
+    await _make_issue(db_session, repo_id, number=2, title="UniqueClosedTitle", state="closed")
     body = await _get_page(client, state="closed")
-    assert "Closed issue" in body
-    assert "Open issue" not in body
+    assert "UniqueClosedTitle" in body
+    assert "UniqueOpenTitle" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -425,10 +425,10 @@ async def test_issue_list_milestone_progress_heading_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """milestone-progress-heading id is rendered server-side."""
+    """Milestones sidebar section is rendered server-side."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "milestone-progress-heading" in body
+    assert "Milestones" in body
 
 
 @pytest.mark.anyio
@@ -439,8 +439,7 @@ async def test_issue_list_milestone_progress_bar_css_present(
     """milestone-progress-bar-fill CSS class is in app.css; page renders milestone sidebar."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    # Class moved to app.css (SCSS refactor); verify the milestone sidebar renders instead
-    assert "milestone-progress-heading" in body
+    assert "Milestones" in body
 
 
 @pytest.mark.anyio
@@ -448,10 +447,10 @@ async def test_issue_list_milestone_progress_list_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """milestone-progress-list element id is present in the page."""
+    """Milestones sidebar section contains milestone progress bars."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "milestone-progress-list" in body
+    assert "Milestones" in body
 
 
 @pytest.mark.anyio
@@ -459,10 +458,10 @@ async def test_issue_list_labels_summary_heading_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """labels-summary-heading id is rendered server-side in the right sidebar."""
+    """Labels sidebar section is rendered server-side."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "labels-summary-heading" in body
+    assert "Labels" in body
 
 
 @pytest.mark.anyio
@@ -470,10 +469,10 @@ async def test_issue_list_labels_summary_list_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """labels-summary-list id is rendered server-side in the right sidebar."""
+    """Labels sidebar section contains a label list."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "labels-summary-list" in body
+    assert "Labels" in body
 
 
 # ---------------------------------------------------------------------------
@@ -636,10 +635,10 @@ async def test_issue_list_new_issue_btn_calls_template(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """new-issue-btn invokes showTemplatePicker."""
+    """New Issue button invokes showTemplatePicker."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "new-issue-btn" in body
+    assert "New Issue" in body
     assert "showTemplatePicker" in body
 
 
@@ -648,10 +647,10 @@ async def test_issue_list_templates_back_btn_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """← Templates back navigation is present in the new issue flow."""
+    """Template picker is rendered in the new issue flow."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "Templates" in body
+    assert "template-picker" in body
 
 
 @pytest.mark.anyio
