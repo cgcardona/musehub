@@ -136,15 +136,15 @@ async def list_public_repos(
     if tempo_max is not None:
         base_q = base_q.where(db.MusehubRepo.tempo_bpm <= tempo_max)
 
-    # Multi-select language/instrument chips — filter by muse_tags.tag (OR across values).
+    # Multi-select language/instrument chips — filter by musehub_repos.tags JSON (OR across values).
+    # Tags may be prefixed (emotion:melancholic) or bare (jazz); ilike with the raw value
+    # matches both since "melancholic" is a substring of "emotion:melancholic".
     if langs:
-        lang_subq = (
-            select(cli_db.MuseCliTag.repo_id)
-            .where(func.lower(cli_db.MuseCliTag.tag).in_([v.lower() for v in langs]))
-            .distinct()
-            .scalar_subquery()
-        )
-        base_q = base_q.where(db.MusehubRepo.repo_id.in_(lang_subq))
+        lang_conditions = [
+            func.cast(db.MusehubRepo.tags, Text).ilike(f"%{v.lower()}%")
+            for v in langs
+        ]
+        base_q = base_q.where(or_(*lang_conditions))
 
     # Multi-select topic chips — filter on repo.tags JSON (OR across values).
     if topics:

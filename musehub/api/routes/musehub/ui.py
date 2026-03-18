@@ -331,14 +331,28 @@ async def explore_page(
     - ``license``: fixed enum (CC0, CC BY, CC BY-SA, CC BY-NC, All Rights Reserved).
     - ``sort``: stars | updated | forks | trending.
     """
-    # Fetch top muse_tags for the language/instrument chip cloud.
-    tag_rows = await db.execute(
-        sa_select(MuseCliTag.tag, func.count(MuseCliTag.tag_id).label("cnt"))
-        .group_by(MuseCliTag.tag)
-        .order_by(func.count(MuseCliTag.tag_id).desc())
-        .limit(30)
+    # Build Language/Instrument chip cloud from musehub_repos.tags JSON.
+    # Tags may be prefixed (emotion:melancholic, genre:baroque, stage:released) or bare.
+    # We strip the prefix and count distinct values so chips cover all 39 public repos,
+    # not just the ~10 repos that happen to have muse_cli commit data.
+    lang_tag_rows = await db.execute(
+        sa_select(musehub_db.MusehubRepo.tags).where(
+            musehub_db.MusehubRepo.visibility == "public"
+        )
     )
-    muse_tag_chips: list[str] = [row.tag for row in tag_rows]
+    _lang_counts: dict[str, int] = {}
+    for (tags,) in lang_tag_rows:
+        for t in tags or []:
+            raw = str(t)
+            # Strip known prefixes so "emotion:melancholic" → "melancholic"
+            value = raw.split(":", 1)[-1].lower() if ":" in raw else raw.lower()
+            # Skip very short values (keys like "c", "f") and tempo strings
+            if len(value) >= 3 and not value.replace(".", "").isdigit():
+                _lang_counts[value] = _lang_counts.get(value, 0) + 1
+    muse_tag_chips: list[str] = [
+        name
+        for name, _ in sorted(_lang_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:30]
+    ]
 
     # Fetch top topics from public repo tag JSON arrays (same logic as topics API).
     topic_rows = await db.execute(
