@@ -176,11 +176,11 @@ function updateGauge(pct: number): void {
 // Load divergence
 // ---------------------------------------------------------------------------
 async function loadDivergence(branchA: string, branchB: string): Promise<void> {
-  // Show loading state
-  const radarEl  = document.getElementById('an-radar-svg');
-  const cardsEl  = document.getElementById('an-dim-cards');
+  const radarEl    = document.getElementById('an-radar-svg');
+  const cardsEl    = document.getElementById('an-dim-cards');
   const ancestorEl = document.getElementById('an-ancestor');
-  if (radarEl) radarEl.innerHTML = '<div class="an-loading-sm">Computing…</div>';
+
+  if (radarEl) radarEl.innerHTML = '<div class="an-loading-sm">Computing divergence…</div>';
   if (cardsEl) cardsEl.innerHTML = '<div class="an-loading-sm">Loading dimensions…</div>';
 
   try {
@@ -197,8 +197,25 @@ async function loadDivergence(branchA: string, branchB: string): Promise<void> {
       ancestorEl.textContent = `Common ancestor: ${sha}`;
     }
   } catch (e) {
-    const msg = (e as Error).message;
-    if (radarEl) radarEl.innerHTML = `<div class="an-loading-sm error">✕ ${escHtml(msg)}</div>`;
+    const raw = (e as Error).message ?? '';
+    // Parse friendly message from JSON error bodies (e.g. 422 {"detail":"..."})
+    let friendly = raw;
+    try {
+      const colonIdx = raw.indexOf(':');
+      if (colonIdx !== -1) {
+        const jsonPart = raw.slice(colonIdx + 1).trim();
+        const parsed = JSON.parse(jsonPart) as { detail?: string };
+        if (parsed.detail) friendly = parsed.detail;
+      }
+    } catch { /* leave friendly as raw */ }
+
+    const isNoCommits = friendly.toLowerCase().includes('no commits');
+    const msg = isNoCommits
+      ? `Branch <strong>${escHtml(branchA === cfg.defaultBranch ? branchB : branchA)}</strong> has no commits yet — push at least one commit to enable divergence analysis.`
+      : escHtml(friendly);
+
+    if (cardsEl) cardsEl.innerHTML = `<div class="an-loading-sm ${isNoCommits ? '' : 'error'}" style="text-align:left;padding:16px">${msg}</div>`;
+    if (radarEl && !isNoCommits) radarEl.innerHTML = `<div class="an-loading-sm error">✕ ${escHtml(friendly)}</div>`;
   }
 }
 
@@ -220,10 +237,10 @@ export function initAnalysis(): void {
     if (bA && bB) void loadDivergence(bA, bB);
   };
 
-  // Trigger initial fetch (may update the SSR'd initial render)
-  if (selA?.value && selB?.value) {
-    void loadDivergence(selA.value, selB.value);
-  }
+  // Do NOT auto-trigger on page load — the server already rendered the initial
+  // divergence state via SSR. Only fire when the user changes a selector or
+  // clicks Compare, to avoid clobbering the SSR'd content with a 422 error
+  // when one of the pre-selected branches has no commits yet.
 }
 
 declare global {
