@@ -740,35 +740,37 @@ async def commits_list_page(
     if tag_filter:
         active_filters["tag"] = tag_filter
 
+    ctx: dict[str, Any] = {
+        "owner": owner,
+        "repo_slug": repo_slug,
+        "repo_id": repo_id,
+        "base_url": base_url,
+        "current_page": "commits",
+        "commits": commits,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "branch": branch,
+        "branches": branches,
+        "all_authors": all_authors,
+        "filter_author": author or "",
+        "filter_q": q or "",
+        "filter_date_from": date_from or "",
+        "filter_date_to": date_to or "",
+        "filter_tag": tag_filter or "",
+        "active_filters": active_filters,
+        "breadcrumb_data": _breadcrumbs(
+            (owner, f"/{owner}"),
+            (repo_slug, base_url),
+            ("commits", ""),
+        ),
+    }
+    ctx.update(nav_ctx)
     return await negotiate_response(
         request=request,
         template_name="musehub/pages/commits.html",
-        context={
-            "owner": owner,
-            "repo_slug": repo_slug,
-            "repo_id": repo_id,
-            "base_url": base_url,
-            "current_page": "commits",
-            "commits": commits,
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "total_pages": total_pages,
-            "branch": branch,
-            "branches": branches,
-            "all_authors": all_authors,
-            "filter_author": author or "",
-            "filter_q": q or "",
-            "filter_date_from": date_from or "",
-            "filter_date_to": date_to or "",
-            "filter_tag": tag_filter or "",
-            "active_filters": active_filters,
-            "breadcrumb_data": _breadcrumbs(
-                (owner, f"/{owner}"),
-                (repo_slug, base_url),
-                ("commits", ""),
-            ),
-        },
+        context=ctx,
         templates=templates,
         json_data=CommitListResponse(commits=commits, total=total),
         format_param=format,
@@ -1450,21 +1452,23 @@ async def listen_page(
     ]
     first_track = json_data.tracks[0] if json_data.tracks else None
 
+    listen_ctx: dict[str, Any] = {
+        "owner": owner,
+        "repo_slug": repo_slug,
+        "repo_id": repo_id,
+        "ref": ref,
+        "base_url": base_url,
+        "current_page": "listen",
+        "tracks": json_data.tracks,
+        "playlist_json": playlist_data,
+        "first_track_url": first_track.audio_url if first_track else None,
+        "first_track_name": first_track.name if first_track else None,
+    }
+    listen_ctx.update(nav_ctx)
     return await negotiate_response(
         request=request,
         template_name="musehub/pages/listen.html",
-        context={
-            "owner": owner,
-            "repo_slug": repo_slug,
-            "repo_id": repo_id,
-            "ref": ref,
-            "base_url": base_url,
-            "current_page": "listen",
-            "tracks": json_data.tracks,
-            "playlist_json": playlist_data,
-            "first_track_url": first_track.audio_url if first_track else None,
-            "first_track_name": first_track.name if first_track else None,
-        },
+        context=listen_ctx,
         templates=templates,
         json_data=json_data,
         format_param=format,
@@ -1540,18 +1544,20 @@ async def listen_track_page(
         has_renders=has_renders,
     )
 
+    listen_track_ctx: dict[str, Any] = {
+        "owner": owner,
+        "repo_slug": repo_slug,
+        "repo_id": repo_id,
+        "ref": ref,
+        "track_path": path,
+        "base_url": base_url,
+        "current_page": "listen",
+    }
+    listen_track_ctx.update(nav_ctx)
     return await negotiate_response(
         request=request,
         template_name="musehub/pages/listen.html",
-        context={
-            "owner": owner,
-            "repo_slug": repo_slug,
-            "repo_id": repo_id,
-            "ref": ref,
-            "track_path": path,
-            "base_url": base_url,
-            "current_page": "listen",
-        },
+        context=listen_track_ctx,
         templates=templates,
         json_data=json_data,
         format_param=format,

@@ -1,0 +1,81 @@
+---
+description: Enforces strict separation of concerns — no inline CSS, JS, or template strings in Python, tests, or HTML
+alwaysApply: true
+---
+
+# Strict Separation of Concerns
+
+MuseHub uses a three-layer architecture. Each layer must stay in its own file type. Crossing boundaries is always an anti-pattern.
+
+| What | Where | Never in |
+|------|-------|----------|
+| Markup (structure) | Jinja2 `.html` templates | Python, TypeScript |
+| Styles | SCSS `_*.scss` partials → compiled `app.css` | `style=""` attributes, `<style>` tags, Python strings |
+| Behaviour | TypeScript `static/js/**/*.ts` → compiled `app.js` | `<script>` tags in templates, `onchange=` / `onclick=` attributes, Python strings |
+
+## ❌ Anti-patterns — never do these
+
+```python
+# Inline CSS in Python
+ctx["style"] = "color: red; font-size: 14px"
+
+# HTML/template strings in Python
+return HTMLResponse("<div class='card'>...</div>")
+
+# Script strings in Python
+ctx["init_js"] = "const cfg = " + json.dumps(data)
+```
+
+```html
+<!-- Inline styles in Jinja2 -->
+<div style="color:red;margin:8px">...</div>
+
+<!-- Inline event handlers in Jinja2 -->
+<button onclick="doThing()">click</button>
+<select onchange="this.form.submit()">
+
+<!-- <script> blocks with business logic in templates -->
+<script>
+  const data = {{ items | tojson }};
+  fetch('/api/...').then(r => r.json()).then(renderChart);
+</script>
+```
+
+```python
+# Tests asserting CSS class names or JS variable names
+assert "tab-btn" in response.text          # ❌ fragile — class name can change
+assert "let sessions" in response.text     # ❌ JS moved to .ts module
+assert "pr.mergedAt" in response.text      # ❌ JS implementation detail
+assert "badge-merged" in response.text     # ❌ CSS class, not semantic content
+```
+
+## ✅ Correct patterns
+
+```html
+<!-- Styles: use SCSS class names only -->
+<div class="cr-stat-card">...</div>
+
+<!-- Behaviour: attach in TypeScript via addEventListener -->
+<!-- In template: -->
+<select id="sort-select" name="sort">...</select>
+<!-- In .ts module: -->
+document.getElementById('sort-select')?.addEventListener('change', handler);
+
+<!-- Data from server → client: use a typed JSON block, never inline script -->
+<script id="page-data" type="application/json">{{ page_json | tojson }}</script>
+```
+
+```python
+# Tests: assert status codes and semantic text content, not CSS or JS strings
+assert response.status_code == 200
+assert "gabriel" in response.text          # ✅ actual user data
+assert "No pull requests" in response.text # ✅ visible UI text
+# For behaviour, test the JSON API endpoints instead:
+resp = await client.get("/api/v1/repos/{id}/credits")
+assert resp.json()["totalContributors"] == 3
+```
+
+## Allowed exceptions
+
+- `style=""` **only** for dynamic values that cannot be expressed as SCSS (e.g. `width: {{ pct }}%` for data-driven bars, `background: hsl({{ hue }}, ...)` for deterministic avatar colours). Keep it to a single property; never use it for layout or typography.
+- `onchange="this.form.submit()"` on a plain `<select>` inside a `<form method="get">` is acceptable as a progressive-enhancement pattern (no JS dependency).
