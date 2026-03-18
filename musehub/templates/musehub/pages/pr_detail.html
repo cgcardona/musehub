@@ -1,245 +1,442 @@
 {% extends "musehub/base.html" %}
 
-{% block title %}PR {{ pr.pr_id[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+{%- set state_cls = "pd-merged" if pr.state == "merged" else ("pd-closed" if pr.state == "closed" else "pd-open") %}
+{%- set dim_icons = {
+    "melodic":    "🎵",
+    "harmonic":   "🎼",
+    "rhythmic":   "🥁",
+    "structural": "🏗",
+    "dynamic":    "📊",
+} %}
+
+{% block title %}{{ pr.title }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+
 {% block breadcrumb %}
   <a href="/{{ owner }}">{{ owner }}</a> /
   <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
   <a href="{{ base_url }}/pulls">pulls</a> / {{ pr.pr_id[:8] }}
 {% endblock %}
+
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
+{% block page_json %}{"page": "pr-detail"}{% endblock %}
+
 {% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const prId   = {{ pr_id | tojson }};
-const base   = {{ base_url | tojson }};
-const apiBase = '/api/v1/repos/' + repoId;
+window.__prCfg = {
+  repoId:  {{ repo_id | tojson }},
+  prId:    {{ pr_id | tojson }},
+  base:    {{ base_url | tojson }},
+  state:   {{ pr.state | tojson }},
+  diff: {
+    overallScore: {{ (diff.overall_score * 100) | round(1) }},
+    dimensions: {{ diff.dimensions | tojson }},
+  },
+};
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:var(--space-3)">
-  <a href="{{ base_url }}/pulls">← Back to pull requests</a>
-</div>
+<div class="content-wide" style="padding-top: var(--space-4)">
 
-<div class="pr-detail-layout">
-  {# ── Main column ── #}
-  <div>
-
-    {# PR header card #}
-    <div class="card" style="margin-bottom:var(--space-4)">
-      <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap">
-        <h1 style="margin:0;font-size:20px;color:var(--color-fg,#e6edf3)">{{ pr.title }}</h1>
-        {% if pr.state == 'merged' %}
-          <span class="badge badge-merged">Merged</span>
-        {% elif pr.state == 'closed' %}
-          <span class="badge badge-closed">Closed</span>
-        {% else %}
-          <span class="badge badge-open">Open</span>
-        {% endif %}
+  {# ── Header ──────────────────────────────────────────────────────────── #}
+  <div class="pd-header">
+    <div class="pd-header-band {{ state_cls }}"></div>
+    <div class="pd-header-body">
+      <div class="pd-title-row">
+        <h1 class="pd-title">{{ pr.title }}</h1>
+        <span class="pd-state-badge {{ state_cls }}">
+          {%- if pr.state == "merged" %}🟣 Merged
+          {%- elif pr.state == "closed" %}✕ Closed
+          {%- else %}● Open
+          {%- endif %}
+        </span>
       </div>
 
-      <div class="meta-row" style="display:flex;flex-wrap:wrap;gap:var(--space-3);font-size:13px;color:#8b949e;margin-bottom:var(--space-3)">
-        {% if pr.author %}
-          <span><strong style="color:var(--color-fg,#e6edf3)">{{ pr.author }}</strong> opened this</span>
-        {% endif %}
-        <span class="branch-pill">{{ pr.from_branch }}</span>
-        <span>→</span>
-        <span class="branch-pill">{{ pr.to_branch }}</span>
-        <span>{{ pr.created_at | fmtdate }}</span>
-        {% if pr.state == 'merged' and pr.merge_commit_id %}
-          <span>merged as
-            <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}"
-               style="font-family:monospace;font-size:11px;color:#8b49da">{{ pr.merge_commit_id[:8] }}</a>
-          </span>
-        {% endif %}
+      <div class="pd-meta-row">
+        <a href="/{{ pr.author }}" class="pd-meta-actor">
+          <span class="pd-meta-avatar">{{ pr.author[0] | upper if pr.author else '?' }}</span>
+          {{ pr.author or "unknown" }}
+        </a>
+        <span>opened {{ pr.created_at | fmtrelative }}</span>
+        <span style="color:var(--border-default)">·</span>
+        <span class="pd-branch-flow">
+          <span class="pd-branch-pill">{{ pr.from_branch }}</span>
+          <span style="color:var(--text-muted)">→</span>
+          <span class="pd-branch-pill">{{ pr.to_branch }}</span>
+        </span>
+        {%- if pr.state == "merged" and pr.merge_commit_id %}
+        <span style="color:var(--border-default)">·</span>
+        <span>merged as
+          <a class="pd-merge-sha"
+             href="{{ base_url }}/commits/{{ pr.merge_commit_id }}">{{ pr.merge_commit_id[:8] }}</a>
+        </span>
+        {%- endif %}
       </div>
 
-      {% if pr.body %}
-        <div style="border-top:1px solid var(--color-border);padding-top:var(--space-3);
-             font-size:14px;color:var(--color-fg,#e6edf3);line-height:1.6;white-space:pre-wrap">
-          {{ pr.body }}
-        </div>
-      {% endif %}
+      {%- if pr.body %}
+      <div class="pd-description">{{ pr.body }}</div>
+      {%- endif %}
     </div>
-
-    {# Review summary #}
-    {% if reviews %}
-      <div class="card" style="margin-bottom:var(--space-4)">
-        <h2 style="margin:0 0 var(--space-3);font-size:16px">Reviewers</h2>
-        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3)">
-          {% for review in reviews %}
-            <div class="reviewer-chip reviewer-chip--{{ 'approved' if review.state == 'approved' else ('changes' if review.state == 'changes_requested' else 'pending') }}"
-                 title="{{ review.reviewer_username }} — {{ review.state }}">
-              <span style="display:inline-flex;align-items:center;justify-content:center;
-                width:22px;height:22px;border-radius:50%;
-                background:{{ '#3fb95033' if review.state == 'approved' else ('#f0883e33' if review.state == 'changes_requested' else '#8b949e33') }};
-                color:{{ '#3fb950' if review.state == 'approved' else ('#f0883e' if review.state == 'changes_requested' else '#8b949e') }};
-                font-size:12px;font-weight:700">
-                {{ review.reviewer_username[0].upper() if review.reviewer_username else '?' }}
-              </span>
-              <span>{{ review.reviewer_username }}</span>
-              <span style="font-size:10px;padding:1px 6px;border-radius:10px;
-                background:{{ '#3fb95022' if review.state == 'approved' else ('#f0883e22' if review.state == 'changes_requested' else '#8b949e22') }};
-                color:{{ '#3fb950' if review.state == 'approved' else ('#f0883e' if review.state == 'changes_requested' else '#8b949e') }}">
-                {{ review.state | replace('_', ' ') | title }}
-              </span>
-            </div>
-          {% endfor %}
-        </div>
-        {% if approved_count > 0 or changes_count > 0 %}
-          <div style="font-size:12px;color:#8b949e">
-            {% if approved_count > 0 %}
-              <span style="color:#3fb950">✓ {{ approved_count }} approved</span>
-            {% endif %}
-            {% if changes_count > 0 %}
-              <span style="color:#f0883e;margin-left:var(--space-2)">⚠ {{ changes_count }} changes requested</span>
-            {% endif %}
-          </div>
-        {% endif %}
-      </div>
-    {% endif %}
-
-    {# Merge controls — only for open PRs #}
-    {% if pr.state == 'open' %}
-      <div class="card" style="margin-bottom:var(--space-4)" id="merge-section">
-        <h2 style="margin:0 0 var(--space-3);font-size:16px">Merge Pull Request</h2>
-        <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3);flex-wrap:wrap">
-          <button class="btn btn-primary"
-                  hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
-                  hx-ext="json-enc"
-                  hx-vals='{"mergeStrategy":"merge_commit","deleteBranch":true}'
-                  hx-target="#merge-section"
-                  hx-swap="outerHTML"
-                  hx-confirm="Merge this pull request using 'merge commit' strategy?">
-            ✓ Merge pull request
-          </button>
-          <button class="btn btn-secondary"
-                  hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
-                  hx-ext="json-enc"
-                  hx-vals='{"mergeStrategy":"squash","deleteBranch":true}'
-                  hx-target="#merge-section"
-                  hx-swap="outerHTML"
-                  hx-confirm="Squash and merge this pull request?">
-            Squash &amp; merge
-          </button>
-          <button class="btn btn-secondary"
-                  hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
-                  hx-ext="json-enc"
-                  hx-vals='{"mergeStrategy":"rebase","deleteBranch":true}'
-                  hx-target="#merge-section"
-                  hx-swap="outerHTML"
-                  hx-confirm="Rebase and merge this pull request?">
-            Rebase &amp; merge
-          </button>
-        </div>
-        <div style="font-size:12px;color:#8b949e">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-            <input type="checkbox" id="cb-delete-branch" checked
-                   style="width:14px;height:14px;accent-color:var(--color-accent,#1f6feb)">
-            Delete branch after merge
-          </label>
-        </div>
-      </div>
-    {% elif pr.state == 'merged' %}
-      <div class="card" style="margin-bottom:var(--space-4);background:#0d2b00;border-color:#3fb95055">
-        <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:20px">✓</span>
-          <div>
-            <div style="font-size:14px;font-weight:600;color:#3fb950">Pull request merged</div>
-            {% if pr.merge_commit_id %}
-              <div style="font-size:12px;color:#8b949e">
-                Merge commit:
-                <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}"
-                   style="font-family:monospace;color:#58a6ff">{{ pr.merge_commit_id[:8] }}</a>
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    {% endif %}
-
-    {# Comment thread — HTMX fragment target #}
-    <div id="pr-comments">
-      {% include "musehub/fragments/pr_comments.html" %}
-    </div>
-
-    {# New comment form — HTMX POST #}
-    <div class="card" style="margin-top:var(--space-4)">
-      <h3 style="margin:0 0 var(--space-3);font-size:15px">Leave a review comment</h3>
-      <form hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/comments"
-            hx-target="#pr-comments"
-            hx-swap="innerHTML"
-            hx-ext="json-enc">
-        <textarea name="body" id="new-comment-body" rows="4"
-                  placeholder="Write a review comment (Markdown supported)…"
-                  style="width:100%;background:var(--color-surface-2,#21262d);
-                    color:var(--color-fg,#e6edf3);border:1px solid var(--color-border);
-                    border-radius:6px;padding:8px;resize:vertical;font-size:13px;
-                    box-sizing:border-box"></textarea>
-        <input type="hidden" name="target_type" value="general">
-        <div style="margin-top:var(--space-2)">
-          <button type="submit" class="btn btn-primary">Comment</button>
-        </div>
-      </form>
-    </div>
-
   </div>
 
-  {# ── Sidebar ── #}
-  <aside class="pr-sidebar">
+  {# ── Stats ribbon ─────────────────────────────────────────────────────── #}
+  <div class="pd-stats">
+    <div class="pd-stat">
+      <span class="pd-stat-val">{{ pr_commits | length }}</span>
+      <span class="pd-stat-label">Commits</span>
+    </div>
+    <div class="pd-stat">
+      <span class="pd-stat-val">{{ diff.affected_sections | length }}</span>
+      <span class="pd-stat-label">Sections</span>
+    </div>
+    <div class="pd-stat">
+      <span class="pd-stat-val" style="color:{% if approved_count > 0 %}var(--color-success){% elif changes_count > 0 %}var(--color-warning){% else %}var(--text-muted){% endif %}">
+        {%- if approved_count > 0 %}✓ {{ approved_count }}
+        {%- elif changes_count > 0 %}⚠ {{ changes_count }}
+        {%- else %}{{ reviews | length }}
+        {%- endif %}
+      </span>
+      <span class="pd-stat-label">Reviews</span>
+    </div>
+    <div class="pd-stat">
+      <span class="pd-stat-val">{{ comment_count }}</span>
+      <span class="pd-stat-label">Comments</span>
+    </div>
+    <div class="pd-stat">
+      {%- set div_pct = (diff.overall_score * 100) | round(0) | int %}
+      <span class="pd-stat-val" style="color:{%- if div_pct < 30 %}var(--color-success){%- elif div_pct < 60 %}var(--color-warning){%- else %}var(--color-danger){%- endif %}">{{ div_pct }}%</span>
+      <span class="pd-stat-label">Divergence</span>
+    </div>
+  </div>
 
-    {# PR timeline #}
-    <div class="card" style="margin-bottom:var(--space-3)">
-      <p style="font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;
-           letter-spacing:.05em;margin:0 0 var(--space-2)">Timeline</p>
-      <div style="font-size:12px;color:#8b949e;display:flex;flex-direction:column;gap:6px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span>🟢</span>
-          <span>Opened by <strong style="color:var(--color-fg,#e6edf3)">{{ pr.author or 'unknown' }}</strong></span>
+  {# ── Two-column layout ───────────────────────────────────────────────── #}
+  <div class="pd-layout">
+
+    {# ═══ Main column ═══════════════════════════════════════════════════ #}
+    <div class="pd-main">
+
+      {# Merged / closed banner #}
+      {%- if pr.state == "merged" %}
+      <div class="pd-merged-banner">
+        <span class="pd-banner-icon">🟣</span>
+        <div>
+          <div class="pd-banner-title">Pull request merged</div>
+          {%- if pr.merge_commit_id %}
+          <div class="pd-banner-sub">Merge commit:
+            <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}">{{ pr.merge_commit_id[:8] }}</a>
+          </div>
+          {%- endif %}
         </div>
-        {% if pr.state == 'merged' and pr.merge_commit_id %}
-          <div style="display:flex;align-items:center;gap:8px">
-            <span>🟣</span>
-            <span>Merged —
-              <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}"
-                 style="font-family:monospace;font-size:11px;color:#58a6ff">{{ pr.merge_commit_id[:8] }}</a>
+      </div>
+      {%- elif pr.state == "closed" %}
+      <div class="pd-closed-banner">
+        <span class="pd-banner-icon">✕</span>
+        <div>
+          <div class="pd-banner-title">Pull request closed</div>
+          <div class="pd-banner-sub">Closed without merging</div>
+        </div>
+      </div>
+      {%- endif %}
+
+      {# ── Musical Divergence panel ───────────────────────────────────── #}
+      <div class="pd-section">
+        <div class="pd-section-header">
+          <span>🎵</span>
+          <h2 class="pd-section-title">Musical Analysis</h2>
+          {%- set div_pct = (diff.overall_score * 100) | round(0) | int %}
+          <span class="pd-section-count">{{ diff.from_branch }} → {{ diff.to_branch }}</span>
+        </div>
+        <div class="pd-section-body">
+
+          {# Overall score ring + summary #}
+          <div class="pd-divergence-score">
+            {%- set r = 28 %}
+            {%- set circ = (2 * 3.14159 * r) | round(1) %}
+            {%- set offset = circ - (diff.overall_score * circ) | round(1) %}
+            <div class="pd-div-ring" data-score="{{ diff.overall_score }}">
+              <svg width="64" height="64" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="{{ r }}"
+                        fill="none" stroke="var(--bg-overlay)" stroke-width="6"/>
+                <circle cx="32" cy="32" r="{{ r }}"
+                        fill="none"
+                        stroke="{%- if div_pct < 30 %}var(--color-success){%- elif div_pct < 60 %}var(--color-warning){%- else %}var(--color-danger){%- endif %}"
+                        stroke-width="6"
+                        stroke-linecap="round"
+                        stroke-dasharray="{{ circ }}"
+                        stroke-dashoffset="{{ offset }}"/>
+              </svg>
+              <div class="pd-div-ring-label">
+                <span>{{ div_pct }}%</span>
+              </div>
+            </div>
+            <div class="pd-div-summary">
+              <div class="pd-div-pct">{{ div_pct }}% divergence</div>
+              <div class="pd-div-desc">
+                {%- if div_pct < 20 %}Very compatible — minimal musical differences
+                {%- elif div_pct < 40 %}Mostly compatible — small targeted changes
+                {%- elif div_pct < 60 %}Moderate changes — some dimensions significantly altered
+                {%- elif div_pct < 80 %}Significant divergence — multiple dimensions changed
+                {%- else %}Major divergence — broad musical restructuring
+                {%- endif %}
+              </div>
+              {%- if diff.common_ancestor %}
+              <div class="pd-div-ancestor">
+                Common ancestor:
+                <a href="{{ base_url }}/commits/{{ diff.common_ancestor }}">{{ diff.common_ancestor[:8] }}</a>
+              </div>
+              {%- endif %}
+            </div>
+          </div>
+
+          {# Per-dimension bars #}
+          {%- for dim in diff.dimensions %}
+          {%- set dim_pct = (dim.score * 100) | round(0) | int %}
+          <div class="pd-dim-row" data-target="{{ dim_pct }}" data-level="{{ dim.level }}">
+            <span class="pd-dim-icon">{{ dim_icons.get(dim.dimension, "♩") }}</span>
+            <span class="pd-dim-name">{{ dim.dimension | title }}</span>
+            <div class="pd-dim-track">
+              <div class="pd-dim-fill level-{{ dim.level }}" style="width: {{ dim_pct }}%"></div>
+            </div>
+            <span class="pd-dim-pct">{{ dim_pct }}%</span>
+            <span class="pd-dim-level level-{{ dim.level }}">{{ dim.level }}</span>
+          </div>
+          {%- endfor %}
+
+          {# Affected sections #}
+          {%- if diff.affected_sections %}
+          <div class="pd-sections-chips">
+            <span style="font-size:var(--font-size-xs);color:var(--text-muted);margin-right:var(--space-1)">Sections:</span>
+            {%- for section in diff.affected_sections %}
+            <span class="pd-section-chip">♩ {{ section }}</span>
+            {%- endfor %}
+          </div>
+          {%- endif %}
+
+        </div>
+      </div>
+
+      {# ── Commits panel ─────────────────────────────────────────────── #}
+      {%- if pr_commits %}
+      <div class="pd-section">
+        <div class="pd-section-header">
+          <span>📝</span>
+          <h2 class="pd-section-title">Commits</h2>
+          <span class="pd-section-count">{{ pr_commits | length }}</span>
+        </div>
+        {%- for commit in pr_commits %}
+        <div class="pd-commit-row">
+          <div class="pd-commit-icon">📝</div>
+          <div style="min-width:0">
+            <div class="pd-commit-message">{{ commit.message | truncate(90) }}</div>
+            <div class="pd-commit-meta">
+              <span>{{ commit.author_name }}</span>
+              <span>·</span>
+              <span>{{ commit.created_at | fmtrelative }}</span>
+            </div>
+          </div>
+          <a class="pd-commit-sha"
+             href="{{ base_url }}/commits/{{ commit.commit_id }}"
+             title="{{ commit.commit_id }}">
+            {{ commit.commit_id[:7] }}
+            <span class="pd-sha-copy" data-sha="{{ commit.commit_id }}" title="Copy SHA">⎘</span>
+          </a>
+        </div>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+
+      {# ── Merge controls ────────────────────────────────────────────── #}
+      {%- if pr.state == "open" %}
+      <div class="pd-section" id="merge-section">
+        <div class="pd-section-header">
+          <span>🔀</span>
+          <h2 class="pd-section-title">Merge pull request</h2>
+        </div>
+        <div class="pd-merge-body">
+          <div class="pd-merge-strategies">
+
+            <label class="pd-strategy active" data-strategy="merge_commit">
+              <span class="pd-strategy-icon">🔗</span>
+              <div>
+                <div class="pd-strategy-label">Merge commit</div>
+                <div class="pd-strategy-desc">All commits from the feature branch are added to the base branch via a merge commit.</div>
+              </div>
+            </label>
+
+            <label class="pd-strategy" data-strategy="squash">
+              <span class="pd-strategy-icon">⬜</span>
+              <div>
+                <div class="pd-strategy-label">Squash and merge</div>
+                <div class="pd-strategy-desc">Combine all commits into one, then merge. Great for clean history.</div>
+              </div>
+            </label>
+
+            <label class="pd-strategy" data-strategy="rebase">
+              <span class="pd-strategy-icon">🔄</span>
+              <div>
+                <div class="pd-strategy-label">Rebase and merge</div>
+                <div class="pd-strategy-desc">Replay individual commits onto the base branch. Requires a linear history.</div>
+              </div>
+            </label>
+
+          </div>
+
+          <div class="pd-merge-actions">
+            <button id="merge-btn"
+                    class="btn btn-primary"
+                    hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
+                    hx-ext="json-enc"
+                    hx-vals='{"mergeStrategy":"merge_commit","deleteBranch":true}'
+                    hx-target="#merge-section"
+                    hx-swap="outerHTML"
+                    hx-confirm="Merge this pull request?">
+              ✓ Merge pull request
+            </button>
+            <label class="pd-delete-label">
+              <input type="checkbox" id="cb-delete-branch" checked>
+              Delete branch after merge
+            </label>
+          </div>
+        </div>
+      </div>
+      {%- endif %}
+
+      {# ── Comment thread ────────────────────────────────────────────── #}
+      <div class="pd-section" id="pr-comment-section">
+        <div class="pd-section-header">
+          <span>💬</span>
+          <h2 class="pd-section-title">Review comments</h2>
+          <span class="pd-section-count">{{ comment_count }}</span>
+        </div>
+        <div id="pr-comments">
+          {% include "musehub/fragments/pr_comments.html" %}
+        </div>
+        <div class="pd-comment-form">
+          <form hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/comments"
+                hx-target="#pr-comments"
+                hx-swap="innerHTML"
+                hx-ext="json-enc">
+            <textarea name="body" class="pd-textarea" rows="4"
+                      placeholder="Leave a review comment…"></textarea>
+            <input type="hidden" name="target_type" value="general">
+            <div style="margin-top:var(--space-2)">
+              <button type="submit" class="btn btn-primary">Comment</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>{# /pd-main #}
+
+    {# ═══ Sidebar ════════════════════════════════════════════════════════ #}
+    <aside class="pd-sidebar">
+
+      {# Status #}
+      <div class="pd-sidebar-card">
+        <div class="pd-sidebar-header">Status</div>
+        <div class="pd-sidebar-body">
+          <span class="pd-state-badge {{ state_cls }}" style="width:100%;justify-content:center;display:flex">
+            {%- if pr.state == "merged" %}🟣 Merged
+            {%- elif pr.state == "closed" %}✕ Closed
+            {%- else %}● Open for review
+            {%- endif %}
+          </span>
+        </div>
+      </div>
+
+      {# Branches #}
+      <div class="pd-sidebar-card">
+        <div class="pd-sidebar-header">Branches</div>
+        <div class="pd-sidebar-body" style="display:flex;flex-direction:column;gap:var(--space-2)">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted)">From</div>
+          <span class="pd-branch-pill" style="display:inline-block">{{ pr.from_branch }}</span>
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted)">Into</div>
+          <span class="pd-branch-pill" style="display:inline-block">{{ pr.to_branch }}</span>
+        </div>
+      </div>
+
+      {# Reviewers #}
+      <div class="pd-sidebar-card">
+        <div class="pd-sidebar-header">Reviewers</div>
+        <div class="pd-sidebar-body">
+          {%- if reviews %}
+          {%- for review in reviews %}
+          {%- set rv_state = "approved" if review.state == "approved" else ("changes" if review.state == "changes_requested" else "pending") %}
+          <div class="pd-reviewer-chip {{ rv_state }}">
+            <div class="pd-reviewer-avatar {{ rv_state }}">
+              {{ review.reviewer_username[0] | upper if review.reviewer_username else '?' }}
+            </div>
+            <span class="pd-reviewer-name">{{ review.reviewer_username }}</span>
+            <span class="pd-reviewer-state {{ rv_state }}">
+              {%- if review.state == "approved" %}✓ approved
+              {%- elif review.state == "changes_requested" %}⚠ changes
+              {%- else %}pending
+              {%- endif %}
             </span>
           </div>
-        {% elif pr.state == 'closed' %}
-          <div style="display:flex;align-items:center;gap:8px">
-            <span>🔴</span>
-            <span>Closed without merging</span>
-          </div>
-        {% else %}
-          <div style="display:flex;align-items:center;gap:8px">
-            <span>⏳</span>
-            <span>Awaiting review</span>
-          </div>
-        {% endif %}
+          {%- endfor %}
+          {%- else %}
+          <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin:0">No reviewers assigned</p>
+          {%- endif %}
+        </div>
       </div>
-    </div>
 
-    {# Review summary in sidebar #}
-    <div class="card" style="margin-bottom:var(--space-3)">
-      <p style="font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;
-           letter-spacing:.05em;margin:0 0 var(--space-2)">Reviews</p>
-      {% if approved_count > 0 %}
-        <div style="font-size:12px;color:#3fb950;margin-bottom:4px">✓ {{ approved_count }} approved</div>
-      {% endif %}
-      {% if changes_count > 0 %}
-        <div style="font-size:12px;color:#f0883e;margin-bottom:4px">⚠ {{ changes_count }} changes requested</div>
-      {% endif %}
-      {% if approved_count == 0 and changes_count == 0 %}
-        <div style="font-size:12px;color:#8b949e">No reviews yet</div>
-      {% endif %}
-    </div>
+      {# Timeline #}
+      <div class="pd-sidebar-card">
+        <div class="pd-sidebar-header">Timeline</div>
+        <div class="pd-sidebar-body">
+          <div class="pd-timeline-item">
+            <div class="pd-timeline-dot dot-open"></div>
+            <div>
+              <span style="font-size:var(--font-size-xs);color:var(--text-primary);font-weight:600">{{ pr.author }}</span>
+              <span style="font-size:var(--font-size-xs);color:var(--text-muted)"> opened</span>
+              <div style="font-size:0.65rem;color:var(--text-muted)">{{ pr.created_at | fmtdate }}</div>
+            </div>
+          </div>
 
-    {# Comment count #}
-    <div class="card">
-      <p style="font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;
-           letter-spacing:.05em;margin:0 0 var(--space-2)">Comments</p>
-      <div style="font-size:13px;color:var(--color-fg,#e6edf3)">{{ comment_count }} comment{{ '' if comment_count == 1 else 's' }}</div>
-    </div>
+          {%- if reviews %}
+          {%- for review in reviews %}
+          <div class="pd-timeline-item">
+            <div class="pd-timeline-dot {{ 'dot-open' if review.state == 'approved' else 'dot-wait' }}"></div>
+            <div>
+              <span style="font-size:var(--font-size-xs);color:var(--text-primary);font-weight:600">{{ review.reviewer_username }}</span>
+              <span style="font-size:var(--font-size-xs);color:var(--text-muted)">
+                {%- if review.state == "approved" %} approved
+                {%- elif review.state == "changes_requested" %} requested changes
+                {%- else %} reviewed
+                {%- endif %}
+              </span>
+            </div>
+          </div>
+          {%- endfor %}
+          {%- endif %}
 
-  </aside>
-</div>
+          {%- if pr.state == "merged" %}
+          <div class="pd-timeline-item">
+            <div class="pd-timeline-dot dot-merged"></div>
+            <div>
+              <span style="font-size:var(--font-size-xs);color:var(--text-primary);font-weight:600">Merged</span>
+              {%- if pr.merged_at %}
+              <div style="font-size:0.65rem;color:var(--text-muted)">{{ pr.merged_at | fmtdate }}</div>
+              {%- endif %}
+            </div>
+          </div>
+          {%- elif pr.state == "closed" %}
+          <div class="pd-timeline-item">
+            <div class="pd-timeline-dot dot-closed"></div>
+            <span style="font-size:var(--font-size-xs);color:var(--text-muted)">Closed without merging</span>
+          </div>
+          {%- else %}
+          <div class="pd-timeline-item">
+            <div class="pd-timeline-dot dot-wait"></div>
+            <span style="font-size:var(--font-size-xs);color:var(--text-muted)">Awaiting review</span>
+          </div>
+          {%- endif %}
+        </div>
+      </div>
+
+    </aside>
+
+  </div>{# /pd-layout #}
+
+</div>{# /content-wide #}
 {% endblock %}

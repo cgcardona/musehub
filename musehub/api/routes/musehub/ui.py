@@ -1092,31 +1092,77 @@ async def pr_detail_page(
             )
         return JSONResponse(diff_response.model_dump(by_alias=True, mode="json"))
 
-    reviews_resp = await musehub_pull_requests.list_reviews(
-        db, repo_id=repo_id, pr_id=pr_id
+    # ── Parallel queries ─────────────────────────────────────────────────
+    async def _q_reviews() -> Any:
+        return await musehub_pull_requests.list_reviews(db, repo_id=repo_id, pr_id=pr_id)
+
+    async def _q_comments() -> Any:
+        return await musehub_pull_requests.list_pr_comments(db, pr_id=pr_id, repo_id=repo_id)
+
+    async def _q_diff() -> Any:
+        try:
+            result = await musehub_divergence.compute_hub_divergence(
+                db, repo_id=repo_id, branch_a=pr.from_branch, branch_b=pr.to_branch,
+            )
+            return musehub_divergence.build_pr_diff_response(
+                pr_id=pr_id, from_branch=pr.from_branch,
+                to_branch=pr.to_branch, result=result,
+            )
+        except Exception:
+            return musehub_divergence.build_zero_diff_response(
+                pr_id=pr_id, repo_id=repo_id,
+                from_branch=pr.from_branch, to_branch=pr.to_branch,
+            )
+
+    reviews_resp, comments_resp, diff_resp = await asyncio.gather(
+        _q_reviews(), _q_comments(), _q_diff(),
     )
-    comments_resp = await musehub_pull_requests.list_pr_comments(
-        db, pr_id=pr_id, repo_id=repo_id
-    )
+
+    # ── Fetch commits on the from_branch ────────────────────────────────
+    commit_rows = (await db.execute(
+        sa_select(musehub_db.MusehubCommit)
+        .where(
+            musehub_db.MusehubCommit.repo_id == repo_id,
+            musehub_db.MusehubCommit.branch == pr.from_branch,
+        )
+        .order_by(musehub_db.MusehubCommit.created_at.desc())
+        .limit(25)
+    )).scalars().all()
+    pr_commits: list[dict[str, Any]] = [
+        {
+            "commit_id": c.commit_id,
+            "message": c.message,
+            "author_name": c.author,
+            "created_at": c.timestamp,
+        }
+        for c in commit_rows
+    ]
 
     approved_count = sum(1 for r in reviews_resp.reviews if r.state == "approved")
     changes_count = sum(
         1 for r in reviews_resp.reviews if r.state == "changes_requested"
     )
+    pending_count = sum(1 for r in reviews_resp.reviews if r.state == "pending")
 
-    ctx: dict[str, object] = {
+    # Diff summary data for template
+    diff_dict = diff_resp.model_dump(mode="json")
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "pr_id": pr_id,
         "base_url": base_url,
         "current_page": "pulls",
-        "pr": pr.model_dump(),
-        "reviews": [r.model_dump() for r in reviews_resp.reviews],
-        "comments": [c.model_dump() for c in comments_resp.comments],
+        "pr": pr.model_dump(mode="json"),
+        "reviews": [r.model_dump(mode="json") for r in reviews_resp.reviews],
+        "comments": [c.model_dump(mode="json") for c in comments_resp.comments],
         "comment_count": comments_resp.total,
         "approved_count": approved_count,
         "changes_count": changes_count,
+        "pending_count": pending_count,
+        "diff": diff_dict,
+        "pr_commits": pr_commits,
         "breadcrumb_data": _breadcrumbs(
             (owner, f"/{owner}"),
             (repo_slug, base_url),
