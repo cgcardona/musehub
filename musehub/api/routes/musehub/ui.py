@@ -1933,30 +1933,179 @@ async def arrange_page(
     ref: str,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the arrangement matrix page for a given commit ref.
+    """Render the fully server-side-rendered arrangement matrix page.
 
-    Fetches ``GET /api/v1/repos/{repo_id}/arrange/{ref}`` and renders
-    an interactive instrument × section grid where:
-
-    - Y-axis: instruments (bass, keys, guitar, drums, lead, pads)
-    - X-axis: sections (intro, verse_1, chorus, bridge, outro)
-    - Cell colour intensity encodes note density (0 = silent, max = densest)
-    - Cell click navigates to the piano roll for that instrument + section
-    - Hover tooltip shows note count, beat range, and pitch range
-    - Row summaries show per-instrument note totals and section activity counts
-    - Column summaries show per-section note totals and active instrument counts
-
-    Auth is handled client-side via localStorage JWT, matching all other UI
-    pages.  No JWT is required to render the HTML shell.
+    Pre-computes the instrument × section matrix, fetches commit metadata,
+    render-job status, and recent branch commits for navigation — all passed
+    to the Jinja2 template.  No client-side API calls needed for initial render.
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    ctx: dict[str, object] = {
+
+    # ── Resolve commit for this ref ─────────────────────────────────────────
+    commit_row: Any = None
+    render_job_row: Any = None
+    branch_commits: list[Any] = []
+
+    if ref == "HEAD":
+        result = await db.execute(
+            sa_select(
+                musehub_db.MusehubCommit.commit_id,
+                musehub_db.MusehubCommit.message,
+                musehub_db.MusehubCommit.author,
+                musehub_db.MusehubCommit.timestamp,
+                musehub_db.MusehubCommit.branch,
+            ).where(musehub_db.MusehubCommit.repo_id == repo_id)
+            .order_by(musehub_db.MusehubCommit.timestamp.desc())
+            .limit(1)
+        )
+        commit_row = result.first()
+    else:
+        result = await db.execute(
+            sa_select(
+                musehub_db.MusehubCommit.commit_id,
+                musehub_db.MusehubCommit.message,
+                musehub_db.MusehubCommit.author,
+                musehub_db.MusehubCommit.timestamp,
+                musehub_db.MusehubCommit.branch,
+            ).where(
+                musehub_db.MusehubCommit.repo_id == repo_id,
+                musehub_db.MusehubCommit.commit_id == ref,
+            ).limit(1)
+        )
+        commit_row = result.first()
+
+    actual_commit_id = commit_row.commit_id if commit_row else ref
+    commit_branch    = commit_row.branch if commit_row else "main"
+
+    # ── Render job status ───────────────────────────────────────────────────
+    rj_result = await db.execute(
+        sa_select(
+            musehub_db.MusehubRenderJob.status,
+            musehub_db.MusehubRenderJob.midi_count,
+            musehub_db.MusehubRenderJob.mp3_object_ids,
+            musehub_db.MusehubRenderJob.image_object_ids,
+        ).where(
+            musehub_db.MusehubRenderJob.repo_id == repo_id,
+            musehub_db.MusehubRenderJob.commit_id == actual_commit_id,
+        ).limit(1)
+    )
+    render_job_row = rj_result.first()
+
+    # ── Recent commits on the same branch for navigation ────────────────────
+    bc_result = await db.execute(
+        sa_select(
+            musehub_db.MusehubCommit.commit_id,
+            musehub_db.MusehubCommit.message,
+            musehub_db.MusehubCommit.timestamp,
+        ).where(
+            musehub_db.MusehubCommit.repo_id == repo_id,
+            musehub_db.MusehubCommit.branch == commit_branch,
+        ).order_by(musehub_db.MusehubCommit.timestamp.desc())
+        .limit(20)
+    )
+    branch_commits = list(bc_result.all())
+
+    # Determine prev/next commit in time order on this branch
+    commit_ids_asc = [c.commit_id for c in reversed(branch_commits)]
+    current_idx    = next((i for i, c in enumerate(commit_ids_asc) if c == actual_commit_id), None)
+    prev_commit_id = commit_ids_asc[current_idx - 1] if current_idx is not None and current_idx > 0 else None
+    next_commit_id = commit_ids_asc[current_idx + 1] if current_idx is not None and current_idx < len(commit_ids_asc) - 1 else None
+
+    # ── Arrangement matrix (computed server-side) ───────────────────────────
+    matrix = musehub_analysis.compute_arrangement_matrix(
+        repo_id=repo_id, ref=actual_commit_id
+    )
+
+    # Build cell_map[instrument][section] for easy template iteration
+    cell_map: dict[str, dict[str, Any]] = {}
+    for cell in matrix.cells:
+        cell_map.setdefault(cell.instrument, {})[cell.section] = cell
+
+    # Density → CSS level (0-4) for styling without inline CSS
+    def _density_level(d: float) -> int:
+        if d <= 0:
+            return 0
+        if d < 0.25:
+            return 1
+        if d < 0.5:
+            return 2
+        if d < 0.75:
+            return 3
+        return 4
+
+    # Flatten for template with precomputed level
+    cells_enriched: list[dict[str, Any]] = []
+    for cell in matrix.cells:
+        cells_enriched.append({
+            "instrument": cell.instrument,
+            "section": cell.section,
+            "note_count": cell.note_count,
+            "note_density": round(cell.note_density, 3),
+            "beat_start": cell.beat_start,
+            "beat_end": cell.beat_end,
+            "pitch_low": cell.pitch_low,
+            "pitch_high": cell.pitch_high,
+            "active": cell.active,
+            "level": _density_level(cell.note_density) if cell.active else 0,
+        })
+
+    # Rebuild cell_map with enriched data
+    cell_map_enriched: dict[str, dict[str, Any]] = {}
+    for c in cells_enriched:
+        cell_map_enriched.setdefault(c["instrument"], {})[c["section"]] = c
+
+    # Total beats across all sections
+    total_beats = matrix.total_beats
+
+    # Section beat widths as percentages (for the timeline bar)
+    section_pcts: list[dict[str, Any]] = []
+    for col in matrix.column_summaries:
+        beats_span = col.beat_end - col.beat_start
+        pct = round(beats_span / total_beats * 100, 1) if total_beats else 0
+        section_pcts.append({
+            "section": col.section,
+            "beat_start": col.beat_start,
+            "beat_end": col.beat_end,
+            "pct": pct,
+            "active_instruments": col.active_instruments,
+            "total_notes": col.total_notes,
+        })
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "ref": ref,
         "base_url": base_url,
         "current_page": "arrange",
+        # Commit context
+        "commit_id": actual_commit_id,
+        "commit_message": commit_row.message if commit_row else None,
+        "commit_author": commit_row.author if commit_row else None,
+        "commit_timestamp": commit_row.timestamp if commit_row else None,
+        "commit_branch": commit_branch,
+        # Navigation
+        "prev_commit_id": prev_commit_id,
+        "next_commit_id": next_commit_id,
+        "branch_commits": [
+            {"id": c.commit_id, "msg": c.message[:60], "ts": c.timestamp}
+            for c in branch_commits[:10]
+        ],
+        # Render job
+        "render_status": render_job_row.status if render_job_row else None,
+        "midi_count": render_job_row.midi_count if render_job_row else 0,
+        "mp3_count": len(render_job_row.mp3_object_ids or []) if render_job_row else 0,
+        # Matrix
+        "instruments": matrix.instruments,
+        "sections": matrix.sections,
+        "cell_map": cell_map_enriched,
+        "row_summaries": matrix.row_summaries,
+        "column_summaries": matrix.column_summaries,
+        "section_pcts": section_pcts,
+        "total_beats": total_beats,
+        "total_notes": sum(rs.total_notes for rs in matrix.row_summaries),
+        "active_cells": sum(1 for c in cells_enriched if c["active"]),
+        "total_cells": len(cells_enriched),
     }
     ctx.update(nav_ctx)
     return json_or_html(

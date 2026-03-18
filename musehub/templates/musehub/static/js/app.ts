@@ -25,6 +25,7 @@ import { initTimeline } from './pages/timeline.ts';
 import { initAnalysis } from './pages/analysis.ts';
 import { initInsights } from './pages/insights.ts';
 import { initSearch }   from './pages/search.ts';
+import { initArrange }  from './pages/arrange.ts';
 
 // Register page modules — keyed by the "page" field in the #page-data JSON.
 type PageData = Record<string, unknown>;
@@ -43,6 +44,7 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'insights':      () => initInsights(),
   'search':        () => initSearch(),
   'global-search': () => initSearch(),
+  'arrange':       () => initArrange(),
 };
 
 // Attach to window so musehub.ts dispatchPageModule() can reach it.
