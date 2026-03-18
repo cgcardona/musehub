@@ -2466,19 +2466,328 @@ async def insights_page(
     repo_slug: str,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the repo insights dashboard.
+    """Render the fully server-side-rendered repo insights dashboard.
 
-    Shows commit frequency heatmap, contributor breakdown, musical evolution
-    timeline (key/BPM/energy across commits), branch activity, and download
-    statistics.
+    All metrics — commit heatmap, branch activity, contributor leaderboard,
+    PR/issue health, musical evolution, session analytics, and release cadence
+    — are pre-computed in parallel here and passed to the Jinja2 template.
+    No client-side API calls needed for the initial render.
     """
+    import re as _re
+    from datetime import date as _date, timedelta as _td, timezone as _tz
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    ctx: dict[str, object] = {
+
+    # ── Parallel DB fetches ─────────────────────────────────────────────────
+    async def _q_commits() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubCommit.commit_id,
+                musehub_db.MusehubCommit.branch,
+                musehub_db.MusehubCommit.author,
+                musehub_db.MusehubCommit.timestamp,
+                musehub_db.MusehubCommit.message,
+            ).where(musehub_db.MusehubCommit.repo_id == repo_id)
+            .order_by(musehub_db.MusehubCommit.timestamp.asc())
+        )).all()
+        return list(rows)
+
+    async def _q_branches() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(musehub_db.MusehubBranch.name)
+            .where(musehub_db.MusehubBranch.repo_id == repo_id)
+        )).scalars().all()
+        return list(rows)
+
+    async def _q_issues() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubIssue.state,
+                musehub_db.MusehubIssue.created_at,
+                musehub_db.MusehubIssue.updated_at,
+            ).where(musehub_db.MusehubIssue.repo_id == repo_id)
+        )).all()
+        return list(rows)
+
+    async def _q_prs() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubPullRequest.state,
+                musehub_db.MusehubPullRequest.created_at,
+                musehub_db.MusehubPullRequest.merged_at,
+            ).where(musehub_db.MusehubPullRequest.repo_id == repo_id)
+        )).all()
+        return list(rows)
+
+    async def _q_releases() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubRelease.tag,
+                musehub_db.MusehubRelease.title,
+                musehub_db.MusehubRelease.is_prerelease,
+                musehub_db.MusehubRelease.is_draft,
+                musehub_db.MusehubRelease.created_at,
+            ).where(musehub_db.MusehubRelease.repo_id == repo_id)
+            .order_by(musehub_db.MusehubRelease.created_at.desc())
+        )).all()
+        return list(rows)
+
+    async def _q_sessions() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubSession.started_at,
+                musehub_db.MusehubSession.ended_at,
+                musehub_db.MusehubSession.participants,
+                musehub_db.MusehubSession.location,
+                musehub_db.MusehubSession.is_active,
+            ).where(musehub_db.MusehubSession.repo_id == repo_id)
+            .order_by(musehub_db.MusehubSession.started_at.desc())
+        )).all()
+        return list(rows)
+
+    async def _q_stars() -> int:
+        return await db.scalar(
+            sa_select(func.count()).select_from(musehub_db.MusehubStar)
+            .where(musehub_db.MusehubStar.repo_id == repo_id)
+        ) or 0
+
+    async def _q_forks() -> int:
+        return await db.scalar(
+            sa_select(func.count()).select_from(musehub_db.MusehubFork)
+            .where(musehub_db.MusehubFork.source_repo_id == repo_id)
+        ) or 0
+
+    (
+        commits_raw, branches_raw, issues_raw, prs_raw,
+        releases_raw, sessions_raw, star_count, fork_count,
+    ) = await asyncio.gather(
+        _q_commits(), _q_branches(), _q_issues(), _q_prs(),
+        _q_releases(), _q_sessions(), _q_stars(), _q_forks(),
+    )
+
+    # ── Heatmap: 52 weeks × 7 days ─────────────────────────────────────────
+    today = _date.today()
+    # Start on the nearest past Sunday covering 364 days
+    _start_offset = (today.weekday() + 1) % 7  # days since last Sunday
+    heatmap_start = today - _td(days=364 + _start_offset)
+    commit_by_date: dict[str, int] = {}
+    for c in commits_raw:
+        dk = c.timestamp.date().isoformat()
+        commit_by_date[dk] = commit_by_date.get(dk, 0) + 1
+
+    heatmap_weeks: list[list[dict[str, Any]]] = []
+    for w in range(53):
+        week: list[dict[str, Any]] = []
+        for d in range(7):
+            cell_date = heatmap_start + _td(days=w * 7 + d)
+            if cell_date > today:
+                week.append({"date": "", "count": -1})  # future: skip
+            else:
+                cnt = commit_by_date.get(cell_date.isoformat(), 0)
+                level = 0 if cnt == 0 else (1 if cnt == 1 else (2 if cnt <= 3 else (3 if cnt <= 6 else 4)))
+                week.append({"date": cell_date.isoformat(), "count": cnt, "level": level})
+        heatmap_weeks.append(week)
+
+    commits_last_year = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=365))
+    )
+
+    # ── Branch activity ─────────────────────────────────────────────────────
+    branch_commit_counts: dict[str, int] = {}
+    for c in commits_raw:
+        branch_commit_counts[c.branch] = branch_commit_counts.get(c.branch, 0) + 1
+    max_branch_commits = max(branch_commit_counts.values(), default=1)
+    top_branches = sorted(branch_commit_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    branch_bars: list[dict[str, Any]] = [
+        {
+            "name": name,
+            "count": cnt,
+            "pct": round(cnt / max_branch_commits * 100),
+        }
+        for name, cnt in top_branches
+    ]
+
+    # ── Contributor leaderboard ─────────────────────────────────────────────
+    author_commit_counts: dict[str, int] = {}
+    for c in commits_raw:
+        author_commit_counts[c.author] = author_commit_counts.get(c.author, 0) + 1
+    max_author_commits = max(author_commit_counts.values(), default=1)
+    top_authors = sorted(author_commit_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+    contributor_bars: list[dict[str, Any]] = [
+        {
+            "name": name,
+            "count": cnt,
+            "pct": round(cnt / max_author_commits * 100),
+            "avatar_letter": name[0].upper() if name else "?",
+        }
+        for name, cnt in top_authors
+    ]
+
+    # ── Issue & PR health ───────────────────────────────────────────────────
+    open_issues = sum(1 for i in issues_raw if i.state == "open")
+    closed_issues = sum(1 for i in issues_raw if i.state == "closed")
+    total_issues = len(issues_raw)
+    issue_close_rate = round(closed_issues / total_issues * 100) if total_issues else 0
+
+    open_prs = sum(1 for p in prs_raw if p.state == "open")
+    merged_prs = sum(1 for p in prs_raw if p.state == "merged")
+    closed_prs = sum(1 for p in prs_raw if p.state == "closed")
+    total_prs = len(prs_raw)
+    pr_merge_rate = round(merged_prs / total_prs * 100) if total_prs else 0
+
+    # Average time to merge (for merged PRs that have both created_at and merged_at)
+    merge_times_days: list[float] = [
+        (p.merged_at - p.created_at).total_seconds() / 86400
+        for p in prs_raw
+        if p.state == "merged" and p.merged_at and p.created_at
+    ]
+    avg_merge_days = round(sum(merge_times_days) / len(merge_times_days), 1) if merge_times_days else None
+
+    # ── Musical evolution: BPM timeline ────────────────────────────────────
+    _BPM_RE = _re.compile(r'\b(?:bpm|tempo)[:\s=](\d+)', _re.IGNORECASE)
+    bpm_points: list[dict[str, Any]] = []
+    for c in commits_raw:
+        m = _BPM_RE.search(c.message or "")
+        if m:
+            bpm_val = int(m.group(1))
+            if 20 <= bpm_val <= 300:
+                bpm_points.append({"ts": c.timestamp.isoformat(), "bpm": bpm_val})
+
+    # Build SVG polyline for BPM — 600×80 viewport
+    bpm_svg: str = ""
+    if len(bpm_points) >= 2:
+        bpms = [p["bpm"] for p in bpm_points]
+        bpm_min, bpm_max = min(bpms), max(bpms)
+        bpm_range = max(bpm_max - bpm_min, 10)
+        pts: list[str] = []
+        for i, p in enumerate(bpm_points):
+            x = round(i / (len(bpm_points) - 1) * 580 + 10, 1)
+            y = round((1 - (p["bpm"] - bpm_min) / bpm_range) * 60 + 10, 1)
+            pts.append(f"{x},{y}")
+        bpm_svg = " ".join(pts)
+
+    # Key signature changes timeline
+    _KEY_RE = _re.compile(r'\b(?:key|signature)[:\s=]([A-G][b#]?\s*(?:major|minor|maj|min)?)', _re.IGNORECASE)
+    key_changes: list[dict[str, str]] = []
+    for c in commits_raw:
+        m = _KEY_RE.search(c.message or "")
+        if m:
+            key_changes.append({"ts": c.timestamp.date().isoformat(), "key": m.group(1).strip()})
+
+    # ── Session analytics ───────────────────────────────────────────────────
+    total_sessions = len(sessions_raw)
+    active_sessions = sum(1 for s in sessions_raw if s.is_active)
+    session_durations_h: list[float] = [
+        (s.ended_at - s.started_at).total_seconds() / 3600
+        for s in sessions_raw
+        if s.ended_at and s.started_at and not s.is_active
+    ]
+    avg_session_h = round(sum(session_durations_h) / len(session_durations_h), 1) if session_durations_h else 0
+
+    location_counts: dict[str, int] = {}
+    for s in sessions_raw:
+        loc = (s.location or "").strip()
+        if loc:
+            location_counts[loc] = location_counts.get(loc, 0) + 1
+    top_locations = sorted(location_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    all_participants: set[str] = set()
+    for s in sessions_raw:
+        for p in (s.participants or []):
+            if p:
+                all_participants.add(p)
+
+    # ── Release cadence ─────────────────────────────────────────────────────
+    stable_releases = sum(1 for r in releases_raw if not r.is_prerelease and not r.is_draft)
+    prerelease_count = sum(1 for r in releases_raw if r.is_prerelease)
+    draft_count = sum(1 for r in releases_raw if r.is_draft)
+    recent_releases: list[dict[str, Any]] = [
+        {
+            "tag": r.tag,
+            "title": r.title or r.tag,
+            "is_prerelease": r.is_prerelease,
+            "is_draft": r.is_draft,
+            "date": r.created_at.date().isoformat() if r.created_at else "",
+        }
+        for r in releases_raw[:6]
+    ]
+
+    # ── Velocity metrics ────────────────────────────────────────────────────
+    commits_last_30 = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=30))
+    )
+    commits_last_7 = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=7))
+    )
+    # Average commits per week (using last 12 weeks)
+    commits_last_84 = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=84))
+    )
+    avg_commits_per_week = round(commits_last_84 / 12, 1)
+
+    # ── Top-level stats ─────────────────────────────────────────────────────
+    total_commits = len(commits_raw)
+    total_branches = len(branches_raw)
+    total_releases = len(releases_raw)
+    unique_contributors = len(author_commit_counts)
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "insights",
+        # Stats bar
+        "total_commits": total_commits,
+        "total_branches": total_branches,
+        "total_releases": total_releases,
+        "total_sessions": total_sessions,
+        "star_count": star_count,
+        "fork_count": fork_count,
+        "unique_contributors": unique_contributors,
+        # Velocity
+        "commits_last_7": commits_last_7,
+        "commits_last_30": commits_last_30,
+        "avg_commits_per_week": avg_commits_per_week,
+        "commits_last_year": commits_last_year,
+        # Heatmap
+        "heatmap_weeks": heatmap_weeks,
+        # Branch activity
+        "branch_bars": branch_bars,
+        # Contributor bars
+        "contributor_bars": contributor_bars,
+        # Issue health
+        "open_issues": open_issues,
+        "closed_issues": closed_issues,
+        "total_issues": total_issues,
+        "issue_close_rate": issue_close_rate,
+        # PR health
+        "open_prs": open_prs,
+        "merged_prs": merged_prs,
+        "closed_prs": closed_prs,
+        "total_prs": total_prs,
+        "pr_merge_rate": pr_merge_rate,
+        "avg_merge_days": avg_merge_days,
+        # Musical evolution
+        "bpm_points": bpm_points,
+        "bpm_svg": bpm_svg,
+        "bpm_min": min((p["bpm"] for p in bpm_points), default=0),
+        "bpm_max": max((p["bpm"] for p in bpm_points), default=0),
+        "key_changes": key_changes,
+        # Sessions
+        "active_sessions": active_sessions,
+        "avg_session_h": avg_session_h,
+        "top_locations": top_locations,
+        "unique_participants": len(all_participants),
+        # Releases
+        "stable_releases": stable_releases,
+        "prerelease_count": prerelease_count,
+        "draft_count": draft_count,
+        "recent_releases": recent_releases,
     }
     ctx.update(nav_ctx)
     return json_or_html(
