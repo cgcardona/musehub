@@ -1,73 +1,211 @@
-{#  fragments/branch_rows.html — bare HTMX fragment: branch list rows.
-
-    Rendered in two contexts:
-
-    1. Full-page load: included inline by musehub/pages/branches.html inside
-       ``#branch-rows`` so the initial render and subsequent HTMX swaps produce
-       identical markup.
-
-    2. HTMX partial swap: returned directly when the handler detects
-       ``HX-Request: true``, replacing only the ``#branch-rows`` div.
-
-    Required context variables
-    --------------------------
-    branches       : list[BranchDetailResponse]  — branches for this repo
-    default_branch : BranchDetailResponse | None — the default branch object (or None)
-    base_url       : str                         — repo UI base URL
+{#  fragments/branch_rows.html — HTMX fragment: supercharged branch cards.
+    Context:
+      branches       : list[BranchDetailResponse]
+      default_branch : BranchDetailResponse | None
+      base_url       : str
+      commit_meta    : dict[commit_id, {author, timestamp, message}]
 #}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
-{% if branches %}
-  {% for branch in branches %}
-  <div class="branch-row" id="branch-{{ branch.name }}"
-       style="padding:16px 0;border-bottom:1px solid var(--color-border,#30363d)">
-    <div style="display:flex;align-items:flex-start;gap:12px">
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <span style="font-weight:600;font-size:14px;color:var(--color-fg-default,#e6edf3)">
-            {{ branch.name }}
-          </span>
-          {% if branch.is_default %}
-            <span class="badge" style="font-size:10px">default</span>
-          {% endif %}
+{# ── Branch type classification macro ─────────────────────────────────────── #}
+{% macro branch_type(name) %}
+  {%- set n = name | lower -%}
+  {%- if "feat" in n or "feature" in n -%}feature
+  {%- elif "experiment" in n or "remix" in n or "fusion" in n -%}experiment
+  {%- elif "source-" in n -%}source
+  {%- elif "analysis" in n or "counterpoint" in n or "ornament" in n or "bassline" in n or "arrangement" in n -%}collab
+  {%- elif n.startswith("mvt") or n.startswith("op") or "prelude" in n or "fugue" in n or "aria" in n or "variation" in n or "nocturne" in n or "sonata" in n or "march" in n or "allegro" in n or "adagio" in n or "presto" in n or "theme" in n or "waltz" in n -%}structure
+  {%- elif n == "main" or n == "master" or n == "dev" or n == "develop" -%}default
+  {%- elif n.startswith("v") and n[1:2] | int > 0 -%}version
+  {%- elif "version" in n or "slow-" in n or "house-" in n or "trap-" in n or "swing-" in n or "electro-" in n -%}version
+  {%- else -%}feature
+  {%- endif %}
+{% endmacro %}
+
+{# ── Author avatar background color ──────────────────────────────────────── #}
+{% macro author_bg(name) -%}
+  {%- set colors = ["#58a6ff","#3fb950","#a371f7","#fb8500","#2dd4bf","#d29922","#f85149","#e879f9","#22d3ee","#86efac"] -%}
+  {%- set idx = (name | length) % (colors | length) -%}
+  {{ colors[idx] }}
+{%- endmacro %}
+
+{# ── Branch type icon SVG ─────────────────────────────────────────────────── #}
+{% macro type_icon(btype) %}
+  {% if btype == "feature" %}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+  {% elif btype == "experiment" %}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11l-5 5h16l-5-5V3"/></svg>
+  {% elif btype == "structure" %}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  {% elif btype == "collab" %}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  {% elif btype == "source" %}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+  {% elif btype == "version" %}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+  {% else %}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+  {% endif %}
+{% endmacro %}
+
+{# ── Divergence bar helper ────────────────────────────────────────────────── #}
+{% macro divergence_bar(ahead, behind) %}
+  {% set total = (ahead + behind) | int %}
+  {% if total > 0 %}
+    {% set max_seg = [total, 40] | min %}
+    {% set behind_pct = ((behind / total) * 100) | round | int %}
+    {% set ahead_pct  = ((ahead  / total) * 100) | round | int %}
+    <div class="branch-divergence-track" title="{{ behind }} behind · {{ ahead }} ahead">
+      {% if behind > 0 %}
+        <div class="branch-divergence-segment-behind" style="width:{{ behind_pct }}%"></div>
+      {% endif %}
+      {% if ahead > 0 %}
+        <div class="branch-divergence-segment-ahead"  style="width:{{ ahead_pct }}%"></div>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{# ── Musical divergence score bars ────────────────────────────────────────── #}
+{% macro musical_scores(branch) %}
+  {% set scores = [
+    ("Melodic",    branch.divergence.melodic,    "#58a6ff"),
+    ("Harmonic",   branch.divergence.harmonic,   "#3fb950"),
+    ("Rhythmic",   branch.divergence.rhythmic,   "#a371f7"),
+    ("Structural", branch.divergence.structural, "#fb8500"),
+    ("Dynamic",    branch.divergence.dynamic,    "#2dd4bf"),
+  ] %}
+  {% set has_scores = scores | selectattr(1) | list %}
+  <div class="branch-musical-scores">
+    {% if has_scores %}
+      {% for label, val, color in scores %}
+      <div class="branch-score-item">
+        <div class="branch-score-label">{{ label[:4] }}</div>
+        <div class="branch-score-bar-track">
+          <div class="branch-score-bar-fill" style="width:{{ (val * 100) | round | int }}%;background:{{ color }}"></div>
         </div>
-        <div style="font-size:12px;color:var(--color-fg-muted,#8b949e);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      </div>
+      {% endfor %}
+    {% else %}
+      <span style="font-size:10px;color:var(--text-muted);font-style:italic">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Musical divergence analysis pending
+      </span>
+      <div style="display:flex;gap:var(--space-2)">
+        {% for label, _, color in scores %}
+        <div class="branch-score-item">
+          <div class="branch-score-label">{{ label[:4] }}</div>
+          <div class="branch-score-bar-track" style="opacity:0.3">
+            <div class="branch-score-bar-fill" style="width:0%;background:{{ color }}"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{# ── Main render ──────────────────────────────────────────────────────────── #}
+{% set non_default = branches | selectattr("is_default", "false") | list %}
+
+{% if non_default %}
+  {% for branch in non_default %}
+    {# Use backend-computed type when available, fall back to macro #}
+    {% set btype = (branch_type_map.get(branch.name) if branch_type_map is defined else branch_type(branch.name)) | trim %}
+    {% set meta  = commit_meta.get(branch.head_commit_id, {}) if commit_meta is defined else {} %}
+    {% set author = meta.get("author", "") %}
+    {% set abbrev_type = btype %}
+
+    <div class="branch-card branch-card-{{ btype }}"
+         data-branch-name="{{ branch.name }}"
+         data-branch-type="{{ btype }}"
+         id="branch-{{ branch.name }}">
+
+      {# Type icon #}
+      <div class="branch-type-icon branch-icon-{{ btype }}">
+        {{ type_icon(btype) }}
+      </div>
+
+      {# Body #}
+      <div class="branch-card-body">
+        {# Title row: name + type badge #}
+        <div class="branch-card-title-row">
+          <span class="branch-name-text">{{ branch.name }}</span>
+          <span class="branch-type-badge branch-badge-{{ btype }}">{{ btype }}</span>
+        </div>
+
+        {# HEAD commit SHA + message preview #}
+        <div class="branch-commit-row">
           {% if branch.head_commit_id %}
-            <a href="{{ base_url }}/commits/{{ branch.head_commit_id }}"
-               style="font-family:monospace;color:var(--color-accent,#58a6ff)">
+            <a href="{{ base_url }}/commits/{{ branch.head_commit_id }}" class="branch-sha">
               {{ branch.head_commit_id | shortsha }}
             </a>
           {% else %}
-            <span style="font-family:monospace">—</span>
+            <span class="branch-sha" style="opacity:.5">—</span>
           {% endif %}
-          {% if not branch.is_default %}
-            {% if branch.ahead_count > 0 %}
-              <span style="color:var(--color-success,#3fb950)">↑{{ branch.ahead_count }} ahead</span>
-            {% endif %}
-            {% if branch.behind_count > 0 %}
-              <span style="color:var(--color-danger,#f85149)">↓{{ branch.behind_count }} behind</span>
-            {% endif %}
-            {% if branch.ahead_count == 0 and branch.behind_count == 0 %}
-              <span style="font-size:11px">up to date</span>
-            {% endif %}
+          {% if meta.message %}
+            <span class="branch-commit-msg" title="{{ meta.message }}">{{ meta.message }}</span>
           {% endif %}
         </div>
+
+        {# Author + date #}
+        <div class="branch-meta-row">
+          {% if author %}
+            <span class="branch-author-chip">
+              <span class="branch-author-avatar" style="background:{{ author_bg(author) }}">
+                {{ author[0] | upper }}
+              </span>
+              {{ author }}
+            </span>
+          {% endif %}
+          {% if meta.timestamp %}
+            <span class="branch-date">Updated {{ meta.timestamp | fmtrelative }}</span>
+          {% endif %}
+        </div>
+
+        {# Ahead/behind divergence #}
+        {% if not branch.is_default %}
+          <div class="branch-divergence-row">
+            <div class="branch-ahead-behind">
+              {% if branch.behind_count > 0 %}
+                <span class="branch-behind">↓{{ branch.behind_count }} behind</span>
+              {% endif %}
+              {% if branch.ahead_count > 0 %}
+                <span class="branch-ahead">↑{{ branch.ahead_count }} ahead</span>
+              {% endif %}
+              {% if branch.ahead_count == 0 and branch.behind_count == 0 %}
+                <span class="branch-uptodate">✓ up to date</span>
+              {% endif %}
+            </div>
+            {{ divergence_bar(branch.ahead_count, branch.behind_count) }}
+          </div>
+        {% endif %}
+
+        {# Musical divergence scores #}
+        {% if not branch.is_default %}
+          {{ musical_scores(branch) }}
+        {% endif %}
       </div>
-      {% if not branch.is_default and default_branch %}
-      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+
+      {# Right action column #}
+      {% if default_branch %}
+      <div class="branch-card-actions">
         <a href="{{ base_url }}/compare/{{ default_branch.name }}...{{ branch.name }}"
-           class="btn btn-secondary" style="font-size:12px;padding:4px 10px">
+           class="btn btn-secondary btn-sm">
           Compare
         </a>
         <a href="{{ base_url }}/pulls/new?head={{ branch.name }}"
-           class="btn btn-primary" style="font-size:12px;padding:4px 10px">
+           class="btn btn-primary btn-sm">
           New Pull Request
+        </a>
+        <a href="{{ base_url }}/tree/{{ branch.name }}"
+           class="btn btn-secondary btn-sm">
+          Browse
         </a>
       </div>
       {% endif %}
     </div>
-  </div>
   {% endfor %}
 {% else %}
-  {{ empty_state("🌿", "No branches", "Create a branch to start working on a new musical idea.") }}
+  {{ empty_state("🌿", "No branches yet", "Create a branch to start developing a new musical idea or experiment.") }}
 {% endif %}

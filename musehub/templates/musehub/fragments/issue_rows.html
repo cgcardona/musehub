@@ -1,41 +1,173 @@
-{#  fragments/issue_rows.html — bare HTMX fragment: issue list rows.
-
-    This template is intentionally minimal — no <html>, no <head>, no nav.
-    It is rendered in two contexts:
-
-    1. Full-page load: included inline by musehub/pages/issue_list.html inside
-       the ``<div id="issue-rows">`` target container.
-
-    2. HTMX partial swap: returned directly when the handler detects
-       ``HX-Request: true``, replacing only the ``#issue-rows`` container.
-
-    Required context variables
-    --------------------------
-    issues        : list[IssueResponse]  — current page of filtered issues
-    labels_data   : list[dict]           — all repo labels ({name, color}) for colour lookup
-    active_label  : str                  — currently active label filter ('' if none)
-    base_url      : str                  — repo base URL, e.g. /owner/slug
-
-    Pattern: copy this file for every other list-page fragment.  All context
-    variables are prepared server-side by the route handler — no JS fetches.
+{#  fragments/issue_rows.html — HTMX fragment: supercharged issue cards.
+    Rendered inline by issue_list.html and as a bare fragment for HTMX swaps.
 #}
-{% from "musehub/macros/issue.html" import issue_row %}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
+{# ── Jinja2 macros ──────────────────────────────────────────────────────────── #}
+
+{# Deterministic author avatar color from name hash #}
+{%- macro author_bg(name) -%}
+{%- set colors = ['#e85d04','#f77f00','#3a86ff','#8338ec','#06d6a0','#ef233c','#023e8a','#2dd4bf'] -%}
+{%- set idx = (name | length) % (colors | length) -%}{{ colors[idx] }}
+{%- endmacro -%}
+
+{# Map first label to a category type for the type badge #}
+{%- macro get_type(labels) -%}
+{%- if labels -%}
+  {%- set f = labels[0].lower() -%}
+  {%- if f in ['bug', 'midi', 'error', 'wontfix', 'blocked'] -%}bug
+  {%- elif f in ['arrangement', 'bridge', 'structure', 'form'] -%}arrangement
+  {%- elif f in ['harmony', 'chord', 'theory', 'melody', 'key'] -%}harmony
+  {%- elif f in ['mix', 'mixing', 'vocals', 'eq', 'compression', 'mastering', 'pad'] -%}mix
+  {%- elif f in ['groove', 'bass', 'drums', 'perc', 'timing', 'rhythm', 'tempo'] -%}rhythm
+  {%- elif f in ['strings', 'horns', 'guitar', 'piano', 'keys', 'synth', 'woodwinds'] -%}instrument
+  {%- elif f in ['generative', 'ambient', 'texture', 'enhancement', 'feature'] -%}feature
+  {%- elif f in ['documentation', 'question', 'good first issue', 'help wanted', 'in progress'] -%}meta
+  {%- else -%}other
+  {%- endif -%}
+{%- else -%}other{%- endif -%}
+{%- endmacro -%}
+
+{# Extract musical context refs from body text (track:x, section:x, beats:x, bar:x) #}
+{%- macro musical_refs(body) -%}
+{%- if body -%}
+  {%- for word in body.split()[:60] -%}
+    {%- if ':' in word and '://' not in word -%}
+      {%- set parts = word.split(':') -%}
+      {%- if parts | length == 2 -%}
+        {%- set rt = parts[0].lower().rstrip('.,;!?)') -%}
+        {%- set rv = parts[1].rstrip('.,;!?)') -%}
+        {%- if rt in ['track', 'section', 'beats', 'bar', 'bars', 'instrument'] and rv -%}
+<span class="issue-musical-chip issue-musical-chip-{{ rt }}">{{ rt }}:{{ rv }}</span>
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{# First meaningful non-markdown line from body #}
+{%- macro body_preview(body) -%}
+{%- if body -%}
+  {%- set ns = namespace(found=false, text='') -%}
+  {%- for line in body.split('\n') -%}
+    {%- if not ns.found -%}
+      {%- set stripped = line.lstrip('#- *>`\t').strip() -%}
+      {%- if stripped -%}
+        {%- set ns.found = true -%}
+        {%- set ns.text = stripped | truncate(150, True, '…') -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{ ns.text }}
+{%- endif -%}
+{%- endmacro -%}
+
+{# ── Issue cards ──────────────────────────────────────────────────────────── #}
 {% if issues %}
   {% for issue in issues %}
-    {{ issue_row(
-        issue,
-        base_url=base_url,
-        labels=labels_data,
-        active_labels=[active_label] if active_label else [],
-        show_checkbox=True,
-    ) }}
+    {%- set type_key = get_type(issue.labels) | trim -%}
+    {%- set preview = body_preview(issue.body) | trim -%}
+    {%- set refs_html = musical_refs(issue.body) | trim -%}
+    {%- set label_map = {} -%}
+    {%- for lbl in labels_data -%}
+      {%- set _ = label_map.update({lbl.name: lbl.color}) -%}
+    {%- endfor -%}
+    <div class="issue-card issue-card-{{ issue.state }}" data-issue-id="{{ issue.issue_id }}">
+
+      {# Checkbox #}
+      <input type="checkbox" class="issue-row-check" name="selected" value="{{ issue.issue_id }}"
+             onchange="toggleIssueSelect('{{ issue.issue_id }}', this.checked)"/>
+
+      {# State icon #}
+      <div class="issue-state-circle issue-state-circle-{{ issue.state }}">
+        {% if issue.state == 'closed' %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        {% else %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        {% endif %}
+      </div>
+
+      {# Content #}
+      <div class="issue-card-content">
+
+        {# Title row: type badge + title + number #}
+        <div class="issue-card-title-row">
+          {%- if type_key and type_key != 'other' -%}
+          <span class="issue-type-badge issue-type-{{ type_key }}">{{ type_key }}</span>
+          {%- endif -%}
+          <a class="issue-title-link" href="{{ base_url }}/issues/{{ issue.number }}">{{ issue.title }}</a>
+          <span class="issue-number-badge">#{{ issue.number }}</span>
+        </div>
+
+        {# Body preview #}
+        {%- if preview -%}
+        <p class="issue-body-preview">{{ preview }}</p>
+        {%- endif -%}
+
+        {# Musical context refs #}
+        {%- if refs_html -%}
+        <div class="issue-musical-refs">{{ refs_html }}</div>
+        {%- endif -%}
+
+        {# Labels #}
+        {%- if issue.labels -%}
+        <div class="issue-label-row">
+          {%- for lbl_name in issue.labels -%}
+            {%- set col = label_map.get(lbl_name, '#8b949e') -%}
+            <span class="issue-label-pill"
+                  style="color:{{ col }};border-color:{{ col }};background:color-mix(in srgb,{{ col }} 12%,transparent)">{{ lbl_name }}</span>
+          {%- endfor -%}
+        </div>
+        {%- endif -%}
+
+        {# Meta row: author · date · milestone · comments #}
+        <div class="issue-meta-row">
+          {%- if issue.author -%}
+          <span class="issue-author-chip">
+            <span class="issue-author-avatar" style="background:{{ author_bg(issue.author) }}">{{ issue.author[0] | upper }}</span>
+            {{ issue.author }}
+          </span>
+          {%- endif -%}
+          <span class="issue-date-chip">
+            {{ issue.created_at | fmtrelative }}
+          </span>
+          {%- if issue.milestone_title -%}
+          <a class="issue-milestone-chip" href="{{ base_url }}/issues?state={{ issue.state }}&milestone_id={{ issue.milestone_id }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
+            {{ issue.milestone_title }}
+          </a>
+          {%- endif -%}
+          {%- if issue.comment_count > 0 -%}
+          <span class="issue-comment-count">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            {{ issue.comment_count }}
+          </span>
+          {%- endif -%}
+        </div>
+
+      </div>{# /issue-card-content #}
+
+      {# Right column: assignee + view link #}
+      <div class="issue-card-right">
+        {%- if issue.assignee -%}
+          {%- set acolors = ['#e85d04','#f77f00','#3a86ff','#8338ec','#06d6a0','#ef233c','#023e8a','#2dd4bf'] -%}
+          {%- set aidx = (issue.assignee | length) % (acolors | length) -%}
+          <span class="issue-assignee-chip" title="Assigned to {{ issue.assignee }}">
+            <span class="issue-assignee-avatar" style="background:{{ acolors[aidx] }}">{{ issue.assignee[0] | upper }}</span>
+            <span style="font-size:11px;color:var(--text-muted)">{{ issue.assignee }}</span>
+          </span>
+        {%- endif -%}
+        <a href="{{ base_url }}/issues/{{ issue.number }}" class="btn btn-secondary btn-sm"
+           style="font-size:11px;padding:3px 10px;white-space:nowrap">View</a>
+      </div>
+
+    </div>
   {% endfor %}
 {% else %}
-  {{ empty_state(
-      "📭",
-      "No issues",
-      "No issues match the current filters. Try adjusting the state, label, or milestone.",
-  ) }}
+  <div class="issue-list-empty">
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;opacity:0.4"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <p style="margin:0 0 4px;font-weight:600;color:var(--text-primary)">No issues</p>
+    <p style="margin:0;font-size:13px">No issues match the current filters. Try adjusting the state, label, or milestone.</p>
+  </div>
 {% endif %}

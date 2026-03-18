@@ -2,17 +2,18 @@
   Repo navigation partial — persistent header card + tab strip.
 
   Required Jinja2 variables (passed from ui.py → page template):
-    owner       str  — repo owner username
-    repo_slug   str  — repo slug
-    base_url    str  — canonical UI base URL (/{owner}/{repo_slug})
-    current_page str — active tab key:
-                       commits | graph | pulls | issues | branches | tags | releases |
-                       sessions | timeline | analysis | credits | search | insights
+    owner          str       — repo owner username
+    repo_slug      str       — repo slug
+    base_url       str       — canonical UI base URL (/{owner}/{repo_slug})
+    current_page   str       — active tab key
+    repo_id        str       — repository UUID (for star button JS)
+    repo_key       str       — key signature (e.g. "C major"), may be ""
+    repo_bpm       int|None  — tempo in BPM, may be None
+    repo_tags      list[str] — tag list, may be empty
+    repo_visibility str      — "public" | "private" | "unlisted"
 
-  The repo_id is set as a JS global by each page's {% block page_data %}.
-  Nav count badges (open PRs, open issues) are loaded client-side via
-  loadNavCounts() defined in musehub.js so the HTML route handlers stay
-  unauthenticated.
+  All nav-header metadata is SSR-rendered from the variables above so
+  there is no client-side flash of unstyled content on HTMX navigation.
 #}
 
 <div class="repo-header" id="repo-header" data-repo-id="{{ repo_id }}" data-base-url="{{ base_url }}">
@@ -21,13 +22,31 @@
       <a href="/{{ owner }}" class="repo-header-owner">{{ owner }}</a>
       <span class="repo-header-sep">/</span>
       <a href="{{ base_url }}" class="repo-header-name">{{ repo_slug }}</a>
-      <span class="badge repo-visibility-badge" id="nav-visibility-badge">…</span>
+      <span class="badge repo-visibility-badge repo-visibility-{{ repo_visibility }}">{{ repo_visibility }}</span>
     </div>
+
     <div class="repo-header-meta" id="nav-meta">
-      <span class="nav-meta-pill" id="nav-key" style="display:none"></span>
-      <span class="nav-meta-pill" id="nav-bpm" style="display:none"></span>
-      <span class="nav-meta-tags" id="nav-tags"></span>
+      {%- if repo_key %}
+      <span class="nav-meta-pill" id="nav-key">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        {{ repo_key }}
+      </span>
+      {%- endif %}
+      {%- if repo_bpm %}
+      <span class="nav-meta-pill" id="nav-bpm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        {{ repo_bpm }} BPM
+      </span>
+      {%- endif %}
+      {%- if repo_tags %}
+      <span class="nav-meta-tags" id="nav-tags">
+        {%- for tag in repo_tags %}
+        <span class="nav-tag-chip">{{ tag }}</span>
+        {%- endfor %}
+      </span>
+      {%- endif %}
     </div>
+
     <div class="repo-header-actions">
       <button class="btn btn-secondary btn-sm" id="nav-star-btn"
               onclick="toggleStar()" style="display:none">

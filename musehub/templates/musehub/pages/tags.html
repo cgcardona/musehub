@@ -8,65 +8,266 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block content %}
-<div class="card">
-  <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);flex-wrap:wrap">
-    <h1 style="margin:0">🏷️ Tags <span class="badge">{{ tags | length }}</span></h1>
+{# ── Namespace metadata ──────────────────────────────────────────────────── #}
+{% set ns_meta = {
+  "version":    ("🔖", "#58a6ff"),
+  "genre":      ("🎼", "#6ea8fe"),
+  "emotion":    ("🎭", "#c084fc"),
+  "stage":      ("🎚️", "#fb8500"),
+  "key":        ("🎹", "#2dd4bf"),
+  "tempo":      ("🥁", "#3fb950"),
+  "instrument": ("🎸", "#f97316"),
+  "ref":        ("📎", "#86efac"),
+} %}
+{% macro ns_icon(ns) %}{{ (ns_meta.get(ns, ("🏷️", "#8b949e")))[0] }}{% endmacro %}
+{% macro ns_color(ns) %}{{ (ns_meta.get(ns, ("🏷️", "#8b949e")))[1] }}{% endmacro %}
 
-    {% if namespaces %}
-    <form method="get" action="" style="margin-left:auto;display:flex;align-items:center;gap:var(--space-2)">
-      <label for="ns-filter" style="font-size:13px;color:var(--color-muted)">Namespace:</label>
-      <select id="ns-filter" name="namespace" onchange="this.form.submit()"
-              style="font-size:13px">
-        <option value="">All namespaces</option>
-        {% for ns in namespaces %}
-        <option value="{{ ns }}"{% if ns == active_namespace %} selected{% endif %}>{{ ns }}</option>
-        {% endfor %}
-      </select>
-    </form>
-    {% endif %}
+{% block content %}
+
+{# ── Stats bar ────────────────────────────────────────────────────────────── #}
+<div class="tag-stats-bar">
+  <div class="tag-stat-card">
+    <div class="tag-stat-icon tag-stat-icon-total">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+        <line x1="7" y1="7" x2="7.01" y2="7"/>
+      </svg>
+    </div>
+    <div>
+      <div class="tag-stat-value">{{ total_tag_count }}</div>
+      <div class="tag-stat-label">Total Tags</div>
+    </div>
   </div>
 
-  {% if tags %}
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Tag</th>
-        <th>Namespace</th>
-        <th>Commit</th>
-        <th>Message</th>
-        <th>Created</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for tag in tags %}
-    <tr id="tag-{{ tag.tag | replace(':', '-') | replace('/', '-') }}">
-      <td><code>{{ tag.tag }}</code></td>
-      <td>
-        <span class="badge" style="font-size:11px">{{ tag.namespace }}</span>
-      </td>
-      <td>
-        {% if tag.commit_id %}
-        <a href="{{ base_url }}/commits/{{ tag.commit_id }}"
-           style="font-family:monospace;color:var(--color-accent)">
-          {{ tag.commit_id | shortsha }}
-        </a>
-        {% else %}
-        <span style="color:var(--color-muted);font-size:12px">—</span>
-        {% endif %}
-      </td>
-      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        {{ tag.message or '—' }}
-      </td>
-      <td style="font-size:12px;color:var(--color-muted);white-space:nowrap">
-        {{ tag.created_at | fmtrelative }}
-      </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-    {{ empty_state("🏷️", "No tags", "Create a tag to mark a significant musical milestone or release.") }}
-  {% endif %}
+  <div class="tag-stat-card">
+    <div class="tag-stat-icon tag-stat-icon-ns">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+    </div>
+    <div>
+      <div class="tag-stat-value">{{ namespace_count }}</div>
+      <div class="tag-stat-label">Namespaces</div>
+    </div>
+  </div>
+
+  <div class="tag-stat-card">
+    <div class="tag-stat-icon tag-stat-icon-stable">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="tag-stat-value">{{ stable_count }}</div>
+      <div class="tag-stat-label">Stable Releases</div>
+    </div>
+  </div>
+
+  <div class="tag-stat-card">
+    <div class="tag-stat-icon tag-stat-icon-prerelease">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </div>
+    <div>
+      <div class="tag-stat-value">{{ prerelease_count + draft_count }}</div>
+      <div class="tag-stat-label">Pre-releases / Drafts</div>
+    </div>
+  </div>
 </div>
+
+{# ── Repo semantic tag vocabulary ────────────────────────────────────────── #}
+{% if repo_tags %}
+<div class="tag-vocab-section">
+  <div class="tag-vocab-header">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    Repo Vocabulary — semantic tags describing this repository's musical identity
+  </div>
+  <div class="tag-vocab-body">
+    {% for t in repo_tags %}
+      {% set tns = t.split(":")[0] if ":" in t else "other" %}
+      <span class="tag-vocab-chip tag-vocab-{{ tns }}">
+        <span>{{ ns_icon(tns) }}</span>
+        {{ t }}
+      </span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Two-column layout: namespace sidebar + tag list ─────────────────────── #}
+<div class="tags-layout">
+
+  {# ── Namespace sidebar ──────────────────────────────────────────────────── #}
+  <aside class="tag-ns-sidebar">
+    <div class="tag-ns-sidebar-header">Namespaces</div>
+    <div class="tag-ns-list">
+      <a href="{{ base_url }}/tags{% if active_sort != 'newest' %}?sort={{ active_sort }}{% endif %}"
+         class="tag-ns-item{% if not active_namespace %} active{% endif %}">
+        <span class="tag-ns-dot" style="background:var(--text-muted)"></span>
+        All Tags
+        <span class="tag-ns-count">{{ total_tag_count }}</span>
+      </a>
+      {% for ns in namespaces %}
+        {% set dot_color = ns_color(ns) %}
+        <a href="{{ base_url }}/tags?namespace={{ ns }}{% if active_sort != 'newest' %}&sort={{ active_sort }}{% endif %}"
+           class="tag-ns-item{% if active_namespace == ns %} active{% endif %}">
+          <span class="tag-ns-dot" style="background:{{ dot_color }}"></span>
+          {{ ns }}
+          <span class="tag-ns-count">{{ ns_counts.get(ns, 0) }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </aside>
+
+  {# ── Tag list ──────────────────────────────────────────────────────────── #}
+  <div>
+    {# Toolbar: search + sort #}
+    <div class="tag-toolbar">
+      <label class="tag-search-wrap" for="tag-search">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="tag-search" type="text" placeholder="Search tags…" autocomplete="off">
+      </label>
+      <div class="tag-sort-bar">
+        <a href="{{ base_url }}/tags{% if active_namespace %}?namespace={{ active_namespace }}&{% else %}?{% endif %}sort=newest"
+           class="tag-sort-btn{% if active_sort == 'newest' %} active{% endif %}">Newest</a>
+        <a href="{{ base_url }}/tags{% if active_namespace %}?namespace={{ active_namespace }}&{% else %}?{% endif %}sort=alpha"
+           class="tag-sort-btn{% if active_sort == 'alpha' %} active{% endif %}">A–Z</a>
+        <a href="{{ base_url }}/tags{% if active_namespace %}?namespace={{ active_namespace }}&{% else %}?{% endif %}sort=namespace"
+           class="tag-sort-btn{% if active_sort == 'namespace' %} active{% endif %}">Namespace</a>
+      </div>
+    </div>
+
+    {# Tag cards #}
+    {% if tags %}
+    <div class="tag-card-list" id="tag-list">
+      <div class="tag-card-list-header">
+        <span>{{ tags | length }} tag{{ 's' if tags | length != 1 else '' }}{% if active_namespace %} in <em>{{ active_namespace }}</em>{% endif %}</span>
+      </div>
+
+      {% for tag in tags %}
+        {% set rel = release_by_tag.get(tag.tag) %}
+        {% set tns = tag.namespace %}
+      <div class="tag-card tag-card-{{ tns }}" data-tag-name="{{ tag.tag }}" id="tag-{{ tag.tag | replace(':', '-') | replace('/', '-') }}">
+
+        {# Namespace icon #}
+        <div class="tag-ns-icon tag-icon-{{ tns }}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+        </div>
+
+        {# Body #}
+        <div class="tag-card-body">
+          <div class="tag-card-title-row">
+            {% if rel %}
+              <a href="{{ base_url }}/releases/{{ tag.tag | urlencode }}" class="tag-name">{{ tag.tag }}</a>
+            {% else %}
+              <span class="tag-name">{{ tag.tag }}</span>
+            {% endif %}
+            <span class="tag-ns-badge tag-badge-{{ tns }}">{{ tns }}</span>
+            {% if rel %}
+              {% if rel.is_draft %}
+                <span class="tag-release-status tag-status-draft">Draft</span>
+              {% elif rel.is_prerelease %}
+                <span class="tag-release-status tag-status-prerelease">Pre-release</span>
+              {% else %}
+                <span class="tag-release-status tag-status-stable">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Stable
+                </span>
+              {% endif %}
+            {% endif %}
+          </div>
+
+          {% if tag.message %}
+          <div class="tag-release-title">{{ tag.message }}</div>
+          {% endif %}
+
+          <div class="tag-commit-meta">
+            {% if tag.commit_id %}
+              <a href="{{ base_url }}/commits/{{ tag.commit_id }}" class="tag-sha">
+                {{ tag.commit_id | shortsha }}
+              </a>
+              <span>·</span>
+            {% endif %}
+            {% if rel and rel.author %}
+              <span>by <strong>{{ rel.author }}</strong></span>
+              <span>·</span>
+            {% endif %}
+            <span>{{ tag.created_at | fmtrelative }}</span>
+          </div>
+
+          {# Download availability #}
+          {% if rel %}
+            {% set urls = rel.download_urls %}
+            {% set has_any = urls.midi_bundle or urls.stems or urls.mp3 or urls.musicxml %}
+            {% if has_any %}
+            <div class="tag-dl-row">
+              <a {% if urls.midi_bundle %}href="{{ urls.midi_bundle }}" class="tag-dl-chip available tag-dl-midi"{% else %}class="tag-dl-chip tag-dl-midi"{% endif %}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                MIDI
+              </a>
+              <a {% if urls.mp3 %}href="{{ urls.mp3 }}" class="tag-dl-chip available tag-dl-mp3"{% else %}class="tag-dl-chip tag-dl-mp3"{% endif %}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                MP3
+              </a>
+              <a {% if urls.stems %}href="{{ urls.stems }}" class="tag-dl-chip available tag-dl-stems"{% else %}class="tag-dl-chip tag-dl-stems"{% endif %}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Stems
+              </a>
+              <a {% if urls.musicxml %}href="{{ urls.musicxml }}" class="tag-dl-chip available tag-dl-xml"{% else %}class="tag-dl-chip tag-dl-xml"{% endif %}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                MusicXML
+              </a>
+            </div>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        {# Actions #}
+        <div class="tag-card-actions">
+          {% if rel %}
+          <a href="{{ base_url }}/releases/{{ tag.tag | urlencode }}" class="btn btn-secondary btn-sm">
+            Release Notes
+          </a>
+          {% endif %}
+          {% if tag.commit_id %}
+          <a href="{{ base_url }}/commits/{{ tag.commit_id }}" class="btn btn-secondary btn-sm">
+            View Commit
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+      {{ empty_state("🏷️", "No tags found", "Tags mark significant milestones in your repo's musical journey. Create a release to add a tag.") }}
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block page_script %}
+<script>
+(function () {
+  const input   = document.getElementById('tag-search');
+  const tagList = document.getElementById('tag-list');
+  if (!input || !tagList) return;
+
+  input.addEventListener('input', function () {
+    const q = input.value.toLowerCase();
+    tagList.querySelectorAll('.tag-card').forEach(function (card) {
+      const name = (card.dataset.tagName || '').toLowerCase();
+      card.style.display = !q || name.includes(q) ? '' : 'none';
+    });
+  });
+})();
+</script>
 {% endblock %}

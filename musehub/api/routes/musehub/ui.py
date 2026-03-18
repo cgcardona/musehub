@@ -168,11 +168,13 @@ def _breadcrumbs(*segments: tuple[str, str]) -> list[dict[str, str]]:
 
 async def _resolve_repo(
     owner: str, repo_slug: str, db: AsyncSession
-) -> tuple[str, str]:
+) -> tuple[str, str, dict]:
     """Resolve owner+slug to repo_id; raise 404 if not found.
 
-    Returns (repo_id, base_url) as a convenience so callers can unpack
-    both in one line.
+    Returns (repo_id, base_url, nav_ctx) where nav_ctx contains all
+    SSR-ready nav-header fields — repo metadata chips AND open PR/issue
+    counts for the tab strip — so every page renders fully on the server
+    with no client-side API round-trips that would cause FOUC.
     """
     row = await musehub_repository.get_repo_orm_by_owner_slug(db, owner, repo_slug)
     if row is None:
@@ -180,7 +182,35 @@ async def _resolve_repo(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), _base_url(owner, repo_slug)
+    repo_id = str(row.repo_id)
+
+    # Two fast indexed COUNT queries run concurrently — no full table scans.
+    pr_count_result, issue_count_result = await asyncio.gather(
+        db.execute(
+            sa_select(func.count()).select_from(musehub_db.MusehubPullRequest).where(
+                musehub_db.MusehubPullRequest.repo_id == repo_id,
+                musehub_db.MusehubPullRequest.state == "open",
+            )
+        ),
+        db.execute(
+            sa_select(func.count()).select_from(musehub_db.MusehubIssue).where(
+                musehub_db.MusehubIssue.repo_id == repo_id,
+                musehub_db.MusehubIssue.state == "open",
+            )
+        ),
+    )
+    open_pr_count: int = pr_count_result.scalar_one_or_none() or 0
+    open_issue_count: int = issue_count_result.scalar_one_or_none() or 0
+
+    nav_ctx: dict = {
+        "repo_key": row.key_signature or "",
+        "repo_bpm": row.tempo_bpm,
+        "repo_tags": row.tags or [],
+        "repo_visibility": row.visibility or "private",
+        "nav_open_pr_count": open_pr_count,
+        "nav_open_issue_count": open_issue_count,
+    }
+    return repo_id, _base_url(owner, repo_slug), nav_ctx
 
 
 async def _resolve_repo_full(
@@ -505,12 +535,41 @@ async def repo_page(
     if ref == "HEAD":
         ref = await musehub_repository.resolve_head_ref(db, repo_id)
 
-    # Fetch all SSR data in parallel.
-    tree_response = await musehub_repository.list_tree(db, repo_id, owner, repo_slug, ref, "")
-    (commits, _) = await musehub_repository.list_commits(db, repo_id, limit=5)
-    branches = await musehub_repository.list_branches(db, repo_id)
-    releases = await musehub_releases.list_releases(db, repo_id)
+    # Fetch all SSR data in parallel (including tab counts for nav).
+    (
+        tree_response,
+        (commits, _),
+        branches,
+        releases,
+        pr_count_result,
+        issue_count_result,
+    ) = await asyncio.gather(
+        musehub_repository.list_tree(db, repo_id, owner, repo_slug, ref, ""),
+        musehub_repository.list_commits(db, repo_id, limit=5),
+        musehub_repository.list_branches(db, repo_id),
+        musehub_releases.list_releases(db, repo_id),
+        db.execute(
+            sa_select(func.count()).select_from(musehub_db.MusehubPullRequest).where(
+                musehub_db.MusehubPullRequest.repo_id == repo_id,
+                musehub_db.MusehubPullRequest.state == "open",
+            )
+        ),
+        db.execute(
+            sa_select(func.count()).select_from(musehub_db.MusehubIssue).where(
+                musehub_db.MusehubIssue.repo_id == repo_id,
+                musehub_db.MusehubIssue.state == "open",
+            )
+        ),
+    )
     tags_count = len(releases)
+    nav_ctx: dict = {
+        "repo_key": repo.key_signature or "",
+        "repo_bpm": repo.tempo_bpm,
+        "repo_tags": repo.tags or [],
+        "repo_visibility": repo.visibility or "private",
+        "nav_open_pr_count": pr_count_result.scalar_one_or_none() or 0,
+        "nav_open_issue_count": issue_count_result.scalar_one_or_none() or 0,
+    }
 
     # Fetch settings from ORM (not on RepoResponse wire model) for license display.
     orm_repo = await db.get(musehub_db.MusehubRepo, repo_id)
@@ -543,6 +602,7 @@ async def repo_page(
         "clone_url_ssh": f"ssh://git@musehub.app/{owner}/{repo_slug}.git",
         "clone_url_https": f"https://musehub.app/{owner}/{repo_slug}.git",
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -591,7 +651,7 @@ async def commits_list_page(
 
     import sqlalchemy as _sa
 
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     # ── Build the filtered SQLAlchemy query ──────────────────────────────────
     base_stmt = sa_select(musehub_db.MusehubCommit).where(
@@ -741,7 +801,7 @@ async def commit_page(
 
     Returns 404 when ``commit_id`` is not found in this repo.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     commit = await musehub_repository.get_commit(db, repo_id, commit_id)
     if commit is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Commit not found")
@@ -811,6 +871,7 @@ async def commit_page(
             og_type="music.song",
         ),
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -837,7 +898,7 @@ async def diff_page(
     and side-by-side artifact comparison. Fetches commit and parent metadata
     from the API client-side.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -846,6 +907,7 @@ async def diff_page(
         "base_url": base_url,
         "current_page": "commits",
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/diff.html", ctx),
@@ -874,7 +936,7 @@ async def graph_page(
     popover hover) remains client-side — this is inherently visual and cannot
     be SSR'd in a meaningful way.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     commits, _total = await musehub_repository.list_commits(db, repo_id, limit=100)
     branches = await musehub_repository.list_branches(db, repo_id)
@@ -901,6 +963,7 @@ async def graph_page(
         "commit_count": len(commits),
         "branch_count": len(branches),
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/graph.html", ctx),
@@ -926,7 +989,7 @@ async def pr_list_page(
     active tab's rows. Returns a bare fragment when ``HX-Request: true`` so
     HTMX tab switches only swap the ``#pr-rows`` container.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     open_prs = await musehub_pull_requests.list_prs(db, repo_id, state="open")
     merged_prs = await musehub_pull_requests.list_prs(db, repo_id, state="merged")
@@ -964,6 +1027,7 @@ async def pr_list_page(
             ("Pull Requests", f"{base_url}/pulls"),
         ),
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -995,7 +1059,7 @@ async def pr_detail_page(
 
     Raises HTTP 404 when the PR does not exist in the given repository.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     pr = await musehub_pull_requests.get_pr(db, repo_id, pr_id)
     if pr is None:
@@ -1057,6 +1121,7 @@ async def pr_detail_page(
             (pr_id[:8], f"{base_url}/pulls/{pr_id}"),
         ),
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1092,7 +1157,7 @@ async def issue_list_page(
 
     No JWT required — issue data is publicly readable.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     # Fetch all open and closed issues for counts and assignee collection.
     all_open = await musehub_issues.list_issues(db, repo_id, state="open")
@@ -1144,6 +1209,11 @@ async def issue_list_page(
     all_issues_combined = all_open + all_closed
     assignees = sorted({i.assignee for i in all_issues_combined if i.assignee})
 
+    # Derived stats for the stats bar (no extra DB queries).
+    unassigned_open_count = len([i for i in all_open if not i.assignee])
+    total_comment_count = sum(i.comment_count for i in all_open + all_closed)
+    unique_author_count = len({i.author for i in all_open + all_closed if i.author})
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -1166,12 +1236,17 @@ async def issue_list_page(
         "labels_data": labels_data,
         "milestones_data": milestones_data,
         "assignees": assignees,
+        # Stats bar metrics
+        "unassigned_open_count": unassigned_open_count,
+        "total_comment_count": total_comment_count,
+        "unique_author_count": unique_author_count,
         "breadcrumb_data": _breadcrumbs(
             (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("Issues", f"{base_url}/issues"),
         ),
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1198,7 +1273,7 @@ async def context_page(
     missing elements, and Muse suggestions server-side so the template
     receives a populated ``context_data`` object with no client fetch required.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     context_data = await musehub_analysis.get_context(db, repo_id, ref=ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -1209,6 +1284,7 @@ async def context_page(
         "current_page": "analysis",
         "context_data": context_data,
     }
+    ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/analysis/context.html", ctx)
 
 
@@ -1229,7 +1305,7 @@ async def issue_detail_page(
     HTMX requests receive only the comment fragment; direct navigation receives
     the full page that extends base.html.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     issue = await musehub_issues.get_issue(db, repo_id, number)
     if not issue:
@@ -1270,6 +1346,7 @@ async def issue_detail_page(
             (f"#{number}", ""),
         ),
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1358,7 +1435,7 @@ async def listen_page(
     action rather than an empty list, so musicians know what to do next.
     No JWT required — the HTML shell's JS handles auth for private repos.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     json_data = await musehub_listen.build_track_listing(db, repo_id, ref)
 
     # Build playlist payload for WaveSurfer — passed as window.__playlist
@@ -1420,7 +1497,7 @@ async def listen_track_page(
     """
     import os
 
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     objects = await musehub_repository.list_objects(db, repo_id)
 
     object_map: dict[str, str] = {obj.path: obj.object_id for obj in objects}
@@ -1500,7 +1577,7 @@ async def credits_page(
 
     No JWT required — credits data is publicly readable.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     credits_data = await musehub_credits.aggregate_credits(db, repo_id, sort=sort)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -1512,6 +1589,7 @@ async def credits_page(
         "total_contributors": credits_data.total_contributors,
         "sort": sort,
     }
+    ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/credits.html", ctx)
 
 @router.get(
@@ -1532,7 +1610,7 @@ async def analysis_dashboard_page(
     response covers key, tempo, meter, dynamics, groove, emotion, form, motifs,
     chord map, and contour.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     aggregate = musehub_analysis.compute_aggregate_analysis(repo_id=repo_id, ref=ref)
     dim_map: dict[str, object] = {d.dimension: d.data for d in aggregate.dimensions}
     ctx: dict[str, object] = {
@@ -1545,6 +1623,7 @@ async def analysis_dashboard_page(
         "analysis_dimension": "dashboard",
         "dim_map": dim_map,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1578,7 +1657,7 @@ async def search_page(
     HTMX live-search swaps only the ``#repo-search-results`` fragment on
     debounced input, avoiding a full-page reload for subsequent queries.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     safe_mode = mode if mode in ("keyword", "pattern", "ask") else "keyword"
     search_result = None
     if q and len(q.strip()) >= 2 and safe_mode != "property":
@@ -1606,6 +1685,7 @@ async def search_page(
         "search_result": search_result,
         "modes": ["keyword", "pattern", "ask"],
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1636,7 +1716,7 @@ async def motifs_page(
     Auth is handled client-side via localStorage JWT, matching all other UI
     pages.  No JWT is required to render the HTML shell.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     motifs_data = musehub_analysis.compute_dimension("motifs", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -1648,6 +1728,7 @@ async def motifs_page(
         "analysis_dimension": "motifs",
         "motifs_data": motifs_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1684,7 +1765,7 @@ async def arrange_page(
     Auth is handled client-side via localStorage JWT, matching all other UI
     pages.  No JWT is required to render the HTML shell.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -1693,6 +1774,7 @@ async def arrange_page(
         "base_url": base_url,
         "current_page": "arrange",
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/arrange.html", ctx),
@@ -1737,7 +1819,7 @@ async def compare_page(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Both base and head refs must be non-empty",
         )
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     compare_data = await musehub_analysis.compare_refs(db, repo_id, base=base_ref, head=head_ref)
 
     context: dict[str, object] = {
@@ -1757,6 +1839,7 @@ async def compare_page(
             (f"{base_ref}...{head_ref}", ""),
         ),
     }
+    context.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/analysis/compare.html", context)
 
 
@@ -1780,7 +1863,7 @@ async def divergence_page(
     Optional ``?fork_repo_id=<uuid>`` compares against a specific fork.
     When omitted the comparison is relative to the repo itself (score=0).
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     divergence_data = await musehub_analysis.compute_divergence(db, repo_id, fork_repo_id=fork_repo_id)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -1791,6 +1874,7 @@ async def divergence_page(
         "fork_repo_id": fork_repo_id or "",
         "divergence_data": divergence_data,
     }
+    ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/analysis/divergence.html", ctx)
 
 
@@ -1810,14 +1894,42 @@ async def timeline_page(
     section markers, and track add/remove markers.  Includes a time
     scrubber and zoom controls (day/week/month/all-time).
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
+
+    # SSR stats — fast parallel queries for the stats bar
+    import asyncio as _asyncio
+
+    async def _commit_count() -> int:
+        r = await db.execute(
+            sa_select(func.count()).select_from(musehub_db.MusehubCommit).where(
+                musehub_db.MusehubCommit.repo_id == repo_id
+            )
+        )
+        return r.scalar_one_or_none() or 0
+
+    async def _session_count() -> int:
+        from musehub.db import musehub_models as _m
+        r = await db.execute(
+            sa_select(func.count()).select_from(_m.MusehubSession).where(
+                _m.MusehubSession.repo_id == repo_id
+            )
+        )
+        return r.scalar_one_or_none() or 0
+
+    total_commits, total_sessions = await _asyncio.gather(
+        _commit_count(), _session_count()
+    )
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "timeline",
+        "total_commits": total_commits,
+        "total_sessions": total_sessions,
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/timeline.html", ctx),
@@ -1837,19 +1949,51 @@ async def release_list_page(
     per_page: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the release list page: all published versions newest first.
+    """Render the supercharged release list page (SSR).
 
-    Data is resolved server-side and passed to the Jinja2 template so the page
-    is immediately readable without JavaScript execution.  HTMX partial requests
-    (HX-Request: true) receive only the ``release_rows.html`` fragment so HTMX
-    can swap just the row container without re-rendering the full shell.
+    The latest stable release is highlighted as a hero card in the page shell.
+    The HTMX-swappable fragment renders remaining (previous) releases as rich
+    cards below the hero.  All data is SSR'd — no client-side fetches needed.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     all_releases = await musehub_releases.list_releases(db, repo_id)
-    total = len(all_releases)
+
+    # Split: hero = latest stable/prerelease (first in newest-first list),
+    # list = everything else paginated.
+    latest_release = all_releases[0] if all_releases else None
+    other_releases = all_releases[1:] if len(all_releases) > 1 else []
+
+    # Paginate the "other releases" list (below the hero).
+    total = len(other_releases)
     total_pages = max(1, (total + per_page - 1) // per_page)
     start = (page - 1) * per_page
-    releases = all_releases[start : start + per_page]
+    releases = other_releases[start : start + per_page]
+
+    # Stats for the bar.
+    stable_count = sum(
+        1 for r in all_releases if not r.is_prerelease and not r.is_draft
+    )
+    prerelease_count = sum(1 for r in all_releases if r.is_prerelease)
+    draft_count = sum(1 for r in all_releases if r.is_draft)
+    # Count distinct download format types available across all releases.
+    formats_available: list[str] = []
+    for r in all_releases:
+        if r.download_urls.midi_bundle:
+            formats_available.append("MIDI")
+            break
+    for r in all_releases:
+        if r.download_urls.mp3:
+            formats_available.append("MP3")
+            break
+    for r in all_releases:
+        if r.download_urls.stems:
+            formats_available.append("Stems")
+            break
+    for r in all_releases:
+        if r.download_urls.musicxml:
+            formats_available.append("MusicXML")
+            break
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -1857,10 +2001,18 @@ async def release_list_page(
         "base_url": base_url,
         "current_page": "releases",
         "releases": releases,
-        "total": total,
+        "total": len(all_releases),
+        "other_count": total,
         "page": page,
         "total_pages": total_pages,
+        "latest_release": latest_release,
+        # Stats
+        "stable_count": stable_count,
+        "prerelease_count": prerelease_count,
+        "draft_count": draft_count,
+        "formats_available": formats_available,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1892,6 +2044,28 @@ async def release_detail_page(
     """
     repo, base_url = await _resolve_repo_full(owner, repo_slug, db)
     repo_id = str(repo.repo_id)
+    pr_ct, issue_ct = await asyncio.gather(
+        db.execute(
+            sa_select(func.count()).select_from(musehub_db.MusehubPullRequest).where(
+                musehub_db.MusehubPullRequest.repo_id == repo_id,
+                musehub_db.MusehubPullRequest.state == "open",
+            )
+        ),
+        db.execute(
+            sa_select(func.count()).select_from(musehub_db.MusehubIssue).where(
+                musehub_db.MusehubIssue.repo_id == repo_id,
+                musehub_db.MusehubIssue.state == "open",
+            )
+        ),
+    )
+    nav_ctx_release: dict = {
+        "repo_key": repo.key_signature or "",
+        "repo_bpm": repo.tempo_bpm,
+        "repo_tags": repo.tags or [],
+        "repo_visibility": repo.visibility or "private",
+        "nav_open_pr_count": pr_ct.scalar_one_or_none() or 0,
+        "nav_open_issue_count": issue_ct.scalar_one_or_none() or 0,
+    }
     release = await musehub_releases.get_release_by_tag(db, repo_id, tag)
     if release is None:
         raise HTTPException(
@@ -1912,6 +2086,7 @@ async def release_detail_page(
         "assets": assets_resp.assets,
         "jsonld_script": jsonld_script,
     }
+    ctx.update(nav_ctx_release)
     return templates.TemplateResponse(request, "musehub/pages/release_detail.html", ctx)
 
 
@@ -1927,32 +2102,68 @@ async def sessions_page(
     per_page: int = Query(25, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the session log page -- all recording sessions newest first.
+    """Render the supercharged session log page (SSR).
 
-    Fetches session data server-side and renders via Jinja2.  Active sessions
-    appear at the top of the list.  Supports HTMX partial swap via
-    ``htmx_fragment_or_full()``: a full HTML page is returned on initial load
-    and only the ``#session-rows`` fragment is returned when ``HX-Request``
-    is present.
+    Fetches all sessions for stats computation (total hours, commits captured,
+    unique collaborators) and the paginated slice for display.  Active sessions
+    float to the top.  Stats are SSR'd in the page shell; the fragment carries
+    paginated session cards for HTMX swapping.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
-    offset = (page - 1) * per_page
-    sessions, total = await musehub_repository.list_sessions(
-        db, repo_id, limit=per_page, offset=offset
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
+
+    # Fetch all sessions for aggregate stats (repos rarely exceed a few hundred).
+    all_sessions, total = await musehub_repository.list_sessions(
+        db, repo_id, limit=1000, offset=0
     )
+
+    # Aggregate stats across all sessions.
+    active_sessions = [s for s in all_sessions if s.is_active]
+    ended_sessions  = [s for s in all_sessions if not s.is_active]
+    total_hours = sum(
+        (s.duration_seconds or 0) for s in all_sessions
+    ) / 3600.0
+    total_commits_in_sessions = sum(len(s.commits) for s in all_sessions)
+    unique_collaborators = sorted(
+        {p for s in all_sessions for p in s.participants}
+    )
+
+    # Paginated slice for the fragment.
+    offset = (page - 1) * per_page
+    paginated = all_sessions[offset : offset + per_page]
     total_pages = max(1, (total + per_page - 1) // per_page)
+
+    # Most-recently-used locations for the sidebar vocabulary.
+    seen_locs: list[str] = []
+    for s in all_sessions:
+        if s.location and s.location not in seen_locs:
+            seen_locs.append(s.location)
+    top_locations = seen_locs[:6]
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "sessions",
-        "sessions": [s.model_dump(by_alias=True, mode="json") for s in sessions],
+        "sessions": [s.model_dump(by_alias=True, mode="json") for s in paginated],
         "total": total,
         "page": page,
         "per_page": per_page,
         "total_pages": total_pages,
+        # Stats
+        "active_count": len(active_sessions),
+        "ended_count": len(ended_sessions),
+        "total_hours": round(total_hours, 1),
+        "total_commits_in_sessions": total_commits_in_sessions,
+        "unique_collaborators": unique_collaborators,
+        "top_locations": top_locations,
+        # Live sessions for the hero (first active session if any)
+        "live_session": (
+            active_sessions[0].model_dump(by_alias=True, mode="json")
+            if active_sessions else None
+        ),
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -1979,7 +2190,7 @@ async def session_detail_page(
     via Jinja2.  Returns HTTP 404 when the session does not exist so callers
     receive a proper status code rather than an empty JS shell.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     session = await musehub_repository.get_session(db, repo_id, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1993,6 +2204,7 @@ async def session_detail_page(
         "session": session.model_dump(by_alias=True, mode="json"),
         "participants": session.participants,
     }
+    ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/session_detail.html", ctx)
 
 
@@ -2012,7 +2224,7 @@ async def insights_page(
     timeline (key/BPM/energy across commits), branch activity, and download
     statistics.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -2020,6 +2232,7 @@ async def insights_page(
         "base_url": base_url,
         "current_page": "insights",
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/insights.html", ctx),
@@ -2044,7 +2257,7 @@ async def contour_page(
     and passes the pitch curve directly to the Jinja2 template so the SVG
     polyline is rendered server-side without a client-side fetch.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     contour_data = musehub_analysis.compute_dimension("contour", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2056,6 +2269,7 @@ async def contour_page(
         "analysis_dimension": "contour",
         "contour_data": contour_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2081,7 +2295,7 @@ async def tempo_page(
     BPM, time feel, stability bar, and tempo-change timeline are all computed
     server-side and passed to the Jinja2 template — no client-side API fetch required.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     tempo_data: DimensionData = musehub_analysis.compute_dimension("tempo", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2093,6 +2307,7 @@ async def tempo_page(
         "analysis_dimension": "tempo",
         "tempo_data": tempo_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2120,7 +2335,7 @@ async def dynamics_analysis_page(
     and passes it directly to the Jinja2 template so velocity bars and arc
     badges are rendered server-side without a client-side fetch.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     dynamics_data = musehub_analysis.compute_dynamics_page_data(repo_id=repo_id, ref=ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2132,6 +2347,7 @@ async def dynamics_analysis_page(
         "analysis_dimension": "dynamics",
         "dynamics_data": dynamics_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2159,7 +2375,7 @@ async def key_analysis_page(
     this to confirm the tonal centre before generating harmonically compatible
     material without needing an authenticated client-side API call.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     key_data: DimensionData = musehub_analysis.compute_dimension("key", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2171,6 +2387,7 @@ async def key_analysis_page(
         "analysis_dimension": "key",
         "key_data": key_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2197,7 +2414,7 @@ async def meter_analysis_page(
     irregular-meter sections are all computed server-side.  Agents use this to
     generate rhythmically coherent material without an authenticated client call.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     meter_data: DimensionData = musehub_analysis.compute_dimension("meter", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2209,6 +2426,7 @@ async def meter_analysis_page(
         "analysis_dimension": "meter",
         "meter_data": meter_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2236,7 +2454,7 @@ async def chord_map_analysis_page(
     directly to the Jinja2 template so the chord timeline bars are rendered
     server-side without a client-side fetch.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     chord_map_data = musehub_analysis.compute_dimension("chord-map", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2248,6 +2466,7 @@ async def chord_map_analysis_page(
         "analysis_dimension": "chord-map",
         "chord_map_data": chord_map_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2274,7 +2493,7 @@ async def groove_analysis_page(
     factor are all computed server-side.  Agents use this to match rhythmic
     feel when generating continuation material.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     groove_data: DimensionData = musehub_analysis.compute_dimension("groove", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2286,6 +2505,7 @@ async def groove_analysis_page(
         "analysis_dimension": "groove",
         "groove_data": groove_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2313,7 +2533,7 @@ async def emotion_analysis_page(
     directly to the Jinja2 template so the valence/arousal scatter plot and
     trajectory are rendered server-side without a client-side fetch.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     emotion_data = musehub_analysis.compute_emotion_map(repo_id=repo_id, ref=ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2325,6 +2545,7 @@ async def emotion_analysis_page(
         "analysis_dimension": "emotion",
         "emotion_data": emotion_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2351,7 +2572,7 @@ async def form_analysis_page(
     table are all computed server-side.  Agents use this to understand where they
     are in the compositional arc without needing an authenticated client API call.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     form_data: DimensionData = musehub_analysis.compute_dimension("form", ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2363,6 +2584,7 @@ async def form_analysis_page(
         "analysis_dimension": "form",
         "form_data": form_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2394,7 +2616,7 @@ async def tree_page(
     a JSON listing from GET /api/v1/repos/{repo_id}/tree/{ref} when
     the Accept header is application/json.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -2404,6 +2626,7 @@ async def tree_page(
         "base_url": base_url,
         "current_page": "tree",
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/tree.html", ctx),
@@ -2432,7 +2655,7 @@ async def tree_subdir_page(
     Files are clickable and navigate to the blob viewer:
     /{owner}/{repo_slug}/blob/{ref}/{path}
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -2442,6 +2665,7 @@ async def tree_subdir_page(
         "base_url": base_url,
         "current_page": "tree",
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/tree.html", ctx),
@@ -2472,7 +2696,7 @@ async def groove_check_page(
     Auth is handled client-side via localStorage JWT, consistent with all other
     MuseHub UI pages.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -2480,6 +2704,7 @@ async def groove_check_page(
         "base_url": base_url,
         "current_page": "groove-check",
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/groove_check.html", ctx),
@@ -2498,32 +2723,113 @@ async def branches_page(
     format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> StarletteResponse:
-    """Render the branch list page (SSR).
+    """Render the supercharged branch list page (SSR).
 
-    Lists all branches with HEAD commit info, ahead/behind counts,
-    musical divergence scores (placeholder), and compare links rendered
-    server-side.  HTMX partial requests (``HX-Request: true``) return only
-    the ``fragments/branch_rows.html`` fragment for in-place swap.
-
-    JSON (``Accept: application/json`` or ``?format=json``): returns
-    ``BranchDetailListResponse`` with camelCase keys.
+    Lists all branches enriched with HEAD commit metadata (author, timestamp,
+    message preview), ahead/behind counts, branch type classification, and
+    repository-level stats.  All data is SSR'd — no client-side API fetches.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     branch_data: BranchDetailListResponse = (
         await musehub_repository.list_branches_with_detail(db, repo_id)
     )
     if format == "json" or "application/json" in request.headers.get("accept", ""):
         return JSONResponse(branch_data.model_dump(by_alias=True, mode="json"))
+
+    # Fetch HEAD commit metadata for all branches in a single query.
+    head_ids = [b.head_commit_id for b in branch_data.branches if b.head_commit_id]
+    commit_meta: dict[str, dict] = {}
+    if head_ids:
+        rows = (
+            await db.execute(
+                sa_select(
+                    musehub_db.MusehubCommit.commit_id,
+                    musehub_db.MusehubCommit.author,
+                    musehub_db.MusehubCommit.timestamp,
+                    musehub_db.MusehubCommit.message,
+                ).where(musehub_db.MusehubCommit.commit_id.in_(head_ids))
+            )
+        ).all()
+        for row in rows:
+            commit_meta[row.commit_id] = {
+                "author": row.author or "",
+                "timestamp": row.timestamp,
+                "message": (row.message or "").split("\n")[0][:80],
+            }
+
+    def _branch_type(name: str) -> str:
+        n = name.lower()
+        if n in ("main", "master", "dev", "develop"):
+            return "default"
+        if "feat" in n or "feature" in n:
+            return "feature"
+        if "experiment" in n or "remix" in n or "fusion" in n:
+            return "experiment"
+        if n.startswith("source-"):
+            return "source"
+        if any(
+            x in n
+            for x in ["analysis", "counterpoint", "ornament", "bassline", "arrangement"]
+        ):
+            return "collab"
+        if any(
+            x in n
+            for x in [
+                "mvt", "prelude", "fugue", "aria", "variation", "nocturne",
+                "sonata", "march", "allegro", "adagio", "presto", "theme", "waltz",
+            ]
+        ) or (n.startswith("op") and len(n) > 2 and n[2].isdigit()):
+            return "structure"
+        if (n.startswith("v") and len(n) > 1 and n[1].isdigit()) or any(
+            x in n for x in ["version", "slow-", "house-", "trap-", "swing-", "electro-"]
+        ):
+            return "version"
+        return "feature"
+
+    # Annotate each branch with its type for the template.
+    branch_type_map: dict[str, str] = {
+        b.name: _branch_type(b.name) for b in branch_data.branches
+    }
+
+    # Compute type counts (exclude default branch from per-type tabs).
+    from collections import Counter as _Counter
+    type_counts: dict[str, int] = _Counter(
+        branch_type_map[b.name]
+        for b in branch_data.branches
+        if not b.is_default
+    )
+
     default_branch = next((b for b in branch_data.branches if b.is_default), None)
+    non_default = [b for b in branch_data.branches if not b.is_default]
+
+    # Repo-level stats for the stats bar.
+    active_count = len(non_default)
+    ahead_count = sum(1 for b in non_default if b.ahead_count > 0)
+    unique_authors = len({
+        commit_meta[b.head_commit_id]["author"]
+        for b in branch_data.branches
+        if b.head_commit_id and b.head_commit_id in commit_meta
+        and commit_meta[b.head_commit_id]["author"]
+    })
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
-        "current_page": "code",
+        "current_page": "branches",
         "branches": branch_data.branches,
         "default_branch": default_branch,
+        "commit_meta": commit_meta,
+        "branch_type_map": branch_type_map,
+        "type_counts": type_counts,
+        # Stats bar
+        "total_branch_count": len(branch_data.branches),
+        "active_branch_count": active_count,
+        "ahead_branch_count": ahead_count,
+        "unique_author_count": unique_authors,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2542,28 +2848,30 @@ async def tags_page(
     owner: str,
     repo_slug: str,
     namespace: str | None = Query(None, description="Filter tags by namespace prefix"),
+    sort: str | None = Query(None, description="Sort order: 'newest' (default), 'alpha', 'namespace'"),
     format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> StarletteResponse:
-    """Render the tag browser page (SSR).
+    """Render the supercharged tag browser page (SSR).
 
-    Tags are sourced from repo releases.  The tag browser groups tags by their
-    namespace prefix (the text before ``:``, e.g. ``emotion``, ``genre``,
-    ``instrument``) — tags without a colon fall into the ``version`` namespace.
-
-    All tag data is rendered server-side; no client-side API fetch is required.
-    The optional ``?namespace`` query parameter filters to a single namespace.
+    Tags are derived from repo releases (tag field) plus repo semantic tags
+    (stored on the repo row).  Release tags without a ``:`` prefix fall into
+    the ``version`` namespace.  Semantic repo tags with a ``:`` are grouped by
+    their prefix (``genre``, ``emotion``, ``stage``, ``key``, ``tempo``, etc.)
+    and shown as a vocabulary vocabulary overview.  The optional ``?namespace``
+    query parameter filters the release-tag list.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     releases = await musehub_releases.list_releases(db, repo_id)
+
+    # Build release-tag objects — keep full release data for rich card display.
+    # Map tag_str → release so the template can access download_urls, author, etc.
+    release_by_tag: dict[str, object] = {r.tag: r for r in releases}
 
     all_tags: list[TagResponse] = []
     for release in releases:
         tag_str = release.tag
-        if ":" in tag_str:
-            ns, _ = tag_str.split(":", 1)
-        else:
-            ns = "version"
+        ns = tag_str.split(":", 1)[0] if ":" in tag_str else "version"
         all_tags.append(
             TagResponse(
                 tag=tag_str,
@@ -2574,26 +2882,55 @@ async def tags_page(
             )
         )
 
-    if namespace:
-        filtered_tags = [t for t in all_tags if t.namespace == namespace]
-    else:
-        filtered_tags = all_tags
+    # Sort.
+    active_sort = sort or "newest"
+    if active_sort == "alpha":
+        all_tags.sort(key=lambda t: t.tag)
+    elif active_sort == "namespace":
+        all_tags.sort(key=lambda t: (t.namespace, t.tag))
+    # default: newest first (releases already ordered by created_at desc)
+
+    # Namespace filter.
+    filtered_tags = [t for t in all_tags if t.namespace == namespace] if namespace else all_tags
 
     namespaces: list[str] = sorted({t.namespace for t in all_tags})
+
+    # Per-namespace counts for the sidebar.
+    from collections import Counter as _Counter
+    ns_counts: dict[str, int] = _Counter(t.namespace for t in all_tags)
+
+    # Stats.
+    stable_count = sum(
+        1 for r in releases if not r.is_prerelease and not r.is_draft
+    )
+    prerelease_count = sum(1 for r in releases if r.is_prerelease)
+    draft_count = sum(1 for r in releases if r.is_draft)
+
     if format == "json" or "application/json" in request.headers.get("accept", ""):
         tag_list = TagListResponse(tags=filtered_tags, namespaces=namespaces)
         return JSONResponse(tag_list.model_dump(by_alias=True, mode="json"))
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
-        "current_page": "releases",
+        "current_page": "tags",           # fixed: was "releases"
         "tags": filtered_tags,
         "all_tags": all_tags,
         "namespaces": namespaces,
+        "ns_counts": ns_counts,
         "active_namespace": namespace or "",
+        "active_sort": active_sort,
+        "release_by_tag": release_by_tag,
+        # Stats bar
+        "total_tag_count": len(all_tags),
+        "namespace_count": len(namespaces),
+        "stable_count": stable_count,
+        "prerelease_count": prerelease_count,
+        "draft_count": draft_count,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2654,7 +2991,7 @@ async def harmony_analysis_page(
     and passes it directly to the Jinja2 template so cadences, modulations,
     and the harmonic rhythm are rendered without a client-side API fetch.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     harmony_data = musehub_analysis.compute_harmony_analysis(repo_id=repo_id, ref=ref)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2666,6 +3003,7 @@ async def harmony_analysis_page(
         "analysis_dimension": "harmony",
         "harmony_data": harmony_data,
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2696,7 +3034,7 @@ async def piano_roll_page(
 
     No JWT required — HTML shell; JS fetches authed data via localStorage token.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     short_ref = ref[:8] if len(ref) >= 8 else ref
     instruments = await musehub_repository.get_instruments_for_repo(db, repo_id)
     piano_roll_data_url = f"/api/v1/repos/{repo_id}/midi?ref={ref}"
@@ -2715,6 +3053,7 @@ async def piano_roll_page(
         "track_path": None,
         "piano_roll_data_url": piano_roll_data_url,
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/piano_roll.html", ctx),
@@ -2743,7 +3082,7 @@ async def piano_roll_track_page(
     Useful for per-track deep-dive links from the tree browser or commit
     detail page.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     short_ref = ref[:8] if len(ref) >= 8 else ref
     track = await musehub_repository.get_track_info(db, repo_id, path)
     instruments = await musehub_repository.get_instruments_for_repo(db, repo_id)
@@ -2766,6 +3105,7 @@ async def piano_roll_track_page(
         "track_path": path,
         "piano_roll_data_url": piano_roll_data_url,
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/piano_roll.html", ctx),
@@ -2806,7 +3146,7 @@ async def blob_page(
     handled client-side via localStorage JWT (consistent with other
     MuseHub UI pages).
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     filename = path.split("/")[-1] if path else ""
 
     obj = await musehub_repository.get_object_by_path(db, repo_id, path)
@@ -2856,6 +3196,7 @@ async def blob_page(
         "line_count": line_count,
         "blob_found": obj is not None,
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/blob.html", ctx),
@@ -2886,7 +3227,7 @@ async def score_page(
     For a single-part view use the ``score/{ref}/{path}`` variant which filters
     to one instrument track.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     score_meta = await musehub_repository.get_score_meta_for_repo(db, repo_id, "")
     abc_url = f"/api/v1/repos/{repo_id}/abc?ref={ref}"
     ctx: dict[str, object] = {
@@ -2900,6 +3241,7 @@ async def score_page(
         "score_meta": score_meta.model_dump(by_alias=True, mode="json"),
         "abc_url": abc_url,
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/score.html", ctx),
@@ -2929,7 +3271,7 @@ async def activity_page(
 
     No JWT required — activity data is publicly readable.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     feed = await musehub_events.list_events(
         db,
         repo_id,
@@ -2952,6 +3294,7 @@ async def activity_page(
         "event_type": event_type or "",
         "event_types": sorted(musehub_events.KNOWN_EVENT_TYPES),
     }
+    ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
         request,
         templates,
@@ -2981,7 +3324,7 @@ async def score_part_page(
 
     No JWT is required to render the HTML shell.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     score_meta = await musehub_repository.get_score_meta_for_repo(db, repo_id, path)
     abc_url = f"/api/v1/repos/{repo_id}/abc?ref={ref}&path={path}"
     ctx: dict[str, object] = {
@@ -2995,6 +3338,7 @@ async def score_part_page(
         "score_meta": score_meta.model_dump(by_alias=True, mode="json"),
         "abc_url": abc_url,
     }
+    ctx.update(nav_ctx)
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/score.html", ctx),
