@@ -263,7 +263,7 @@ async def test_issue_list_tab_open_has_hx_get(
     """Open tab link carries hx-get for HTMX navigation."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "tab-open" in body
+    assert "state=open" in body
     assert "hx-get" in body
 
 
@@ -295,11 +295,11 @@ async def test_issue_list_state_filter_closed_shows_closed_only(
 ) -> None:
     """?state=closed returns only closed issues in the rendered HTML."""
     repo_id = await _make_repo(db_session)
-    await _make_issue(db_session, repo_id, number=1, title="Open issue", state="open")
-    await _make_issue(db_session, repo_id, number=2, title="Closed issue", state="closed")
+    await _make_issue(db_session, repo_id, number=1, title="UniqueOpenTitle", state="open")
+    await _make_issue(db_session, repo_id, number=2, title="UniqueClosedTitle", state="closed")
     body = await _get_page(client, state="closed")
-    assert "Closed issue" in body
-    assert "Open issue" not in body
+    assert "UniqueClosedTitle" in body
+    assert "UniqueOpenTitle" not in body
 
 
 # ---------------------------------------------------------------------------

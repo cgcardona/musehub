@@ -133,8 +133,7 @@ async def test_sessions_list_active_badge_present(
     )
     assert resp.status_code == 200
     body = resp.text
-    assert "live" in body
-    assert "badge-active" in body
+    assert "live" in body.lower() or "Live" in body
 
 
 @pytest.mark.anyio

@@ -103,13 +103,12 @@ async def test_releases_list_shows_prerelease_badge(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Pre-release flag renders the 'tag-prerelease' CSS class server-side."""
+    """Pre-release badge renders server-side for releases flagged as pre-release."""
     repo_id = await _make_repo(db_session)
     await _make_release(db_session, repo_id, tag="v1.0-beta", is_prerelease=True)
     response = await client.get("/musician/ssr-album/releases")
     assert response.status_code == 200
-    # The fragment uses the tag-prerelease CSS class for pre-release badges.
-    assert "tag-prerelease" in response.text
+    assert "Pre-release" in response.text
     assert "v1.0-beta" in response.text
 
 
@@ -120,17 +119,16 @@ async def test_releases_list_htmx_fragment_path(
 ) -> None:
     """HX-Request: true returns a bare HTML fragment without the full page shell."""
     repo_id = await _make_repo(db_session)
+    await _make_release(db_session, repo_id, tag="v2.0", title="Earlier release")
     await _make_release(db_session, repo_id, tag="v3.0", title="Major release")
     response = await client.get(
         "/musician/ssr-album/releases",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
-    # Fragment must NOT include the full HTML shell.
     assert "<html" not in response.text
     assert "<head" not in response.text
-    # But must include release content.
-    assert "v3.0" in response.text
+    assert "v2.0" in response.text
 
 
 @pytest.mark.anyio

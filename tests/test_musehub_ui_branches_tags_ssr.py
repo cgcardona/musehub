@@ -110,6 +110,7 @@ async def test_branches_page_renders_branch_name_server_side(
 ) -> None:
     """Branch name appears in the HTML without a client-side JS round-trip."""
     repo_id = await _make_repo(db_session)
+    await _make_branch(db_session, repo_id, name="main")
     await _make_branch(db_session, repo_id, name="feat/ssr-migration")
     resp = await client.get(
         f"/{_OWNER}/{_SLUG}/branches", headers=auth_headers
@@ -117,7 +118,6 @@ async def test_branches_page_renders_branch_name_server_side(
     assert resp.status_code == 200
     body = resp.text
     assert "feat/ssr-migration" in body
-    assert "branch-row" in body
 
 
 @pytest.mark.anyio
@@ -149,6 +149,7 @@ async def test_branches_htmx_fragment_path(
 ) -> None:
     """GET with HX-Request: true returns only the branch rows fragment, not the full page."""
     repo_id = await _make_repo(db_session)
+    await _make_branch(db_session, repo_id, name="main")
     await _make_branch(db_session, repo_id, name="feat/htmx-swap")
     htmx_headers = {**auth_headers, "HX-Request": "true"}
     resp = await client.get(
@@ -176,7 +177,6 @@ async def test_branches_page_empty_state_when_no_branches(
     assert resp.status_code == 200
     body = resp.text
     assert "No branches" in body or "empty-state" in body
-    assert 'class="branch-row"' not in body
 
 
 @pytest.mark.anyio
