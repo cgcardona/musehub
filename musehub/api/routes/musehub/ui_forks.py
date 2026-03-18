@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
@@ -42,25 +43,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-async def _resolve_repo(owner: str, repo_slug: str, db_session: AsyncSession) -> tuple[str, str]:
-    """Resolve owner+slug to (repo_id, base_url); raise 404 when not found.
-
-    Returns both the internal repo_id UUID and the canonical UI base URL so
-    route handlers can unpack both in one call without repeating the lookup.
-    """
+async def _resolve_repo(
+    owner: str, repo_slug: str, db_session: AsyncSession
+) -> tuple[str, str, dict[str, Any]]:
+    """Resolve owner+slug to (repo_id, base_url, nav_ctx); raise 404 when not found."""
     row = await musehub_repository.get_repo_orm_by_owner_slug(db_session, owner, repo_slug)
     if row is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), f"/{owner}/{repo_slug}"
+    repo_id = str(row.repo_id)
+    pr_count = await db_session.scalar(
+        select(func.count()).select_from(db.MusehubPullRequest).where(
+            db.MusehubPullRequest.repo_id == repo_id,
+            db.MusehubPullRequest.state == "open",
+        )
+    ) or 0
+    issue_count = await db_session.scalar(
+        select(func.count()).select_from(db.MusehubIssue).where(
+            db.MusehubIssue.repo_id == repo_id,
+            db.MusehubIssue.state == "open",
+        )
+    ) or 0
+    nav_ctx: dict[str, Any] = {
+        "repo_key": row.key_signature or "",
+        "repo_bpm": row.tempo_bpm,
+        "repo_tags": row.tags or [],
+        "repo_visibility": row.visibility or "private",
+        "nav_open_pr_count": pr_count,
+        "nav_open_issue_count": issue_count,
+    }
+    return repo_id, f"/{owner}/{repo_slug}", nav_ctx
 
 
 async def _count_commits(db_session: AsyncSession, repo_id: str) -> int:
@@ -177,7 +196,7 @@ async def forks_page(
 
     Returns 404 when the owner/slug combination is not found.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db_session)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db_session)
 
     source_commit_count = await _count_commits(db_session, repo_id)
     fork_network = await _build_fork_network(
@@ -188,32 +207,29 @@ async def forks_page(
         source_commit_count=source_commit_count,
     )
 
-    # Serialise fork nodes for the Jinja2 SSR table (snake_case dicts) and
-    # the SVG DAG JS renderer (camelCase JSON via window.__forkNetwork).
-    fork_nodes = [
-        child.model_dump(mode="json")
-        for child in fork_network.root.children
-    ]
+    fork_nodes = [child.model_dump(mode="json") for child in fork_network.root.children]
     fork_network_json = fork_network.model_dump(by_alias=True, mode="json")
 
+    forks_ctx: dict[str, Any] = {
+        "owner": owner,
+        "repo_slug": repo_slug,
+        "repo_id": repo_id,
+        "base_url": base_url,
+        "current_page": "forks",
+        "total_forks": fork_network.total_forks,
+        "forks": fork_nodes,
+        "fork_network_json": fork_network_json,
+        "breadcrumb_data": [
+            {"label": owner, "url": f"/{owner}"},
+            {"label": repo_slug, "url": base_url},
+            {"label": "forks", "url": ""},
+        ],
+    }
+    forks_ctx.update(nav_ctx)
     return await negotiate_response(
         request=request,
         template_name="musehub/pages/forks.html",
-        context={
-            "owner": owner,
-            "repo_slug": repo_slug,
-            "repo_id": repo_id,
-            "base_url": base_url,
-            "current_page": "forks",
-            "total_forks": fork_network.total_forks,
-            "forks": fork_nodes,
-            "fork_network_json": fork_network_json,
-            "breadcrumb_data": [
-                {"label": owner, "url": f"/{owner}"},
-                {"label": repo_slug, "url": base_url},
-                {"label": "forks", "url": ""},
-            ],
-        },
+        context=forks_ctx,
         templates=templates,
         json_data=fork_network,
         format_param=format,

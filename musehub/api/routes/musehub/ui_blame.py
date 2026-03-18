@@ -21,16 +21,18 @@ Auth:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import status as http_status
+from sqlalchemy import func, select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response
-
-
 
 from musehub.api.routes.musehub.blame import _build_blame_entries
 from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.db import get_db
+from musehub.db import musehub_models as musehub_db
 from musehub.models.musehub import BlameResponse
 from musehub.services import musehub_repository
 from musehub.api.routes.musehub._templates import templates
@@ -40,23 +42,38 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
-
-async def _resolve_repo(owner: str, repo_slug: str, db: AsyncSession) -> tuple[str, str]:
-    """Resolve owner + slug to (repo_id, base_url); raise 404 when missing.
-
-    Returns the repo_id string and the canonical UI base URL so callers can
-    unpack both in one line without repeating the lookup boilerplate.
-    """
-    from fastapi import HTTPException
-    from fastapi import status as http_status
-
+async def _resolve_repo(
+    owner: str, repo_slug: str, db: AsyncSession
+) -> tuple[str, str, dict[str, Any]]:
+    """Resolve owner + slug to (repo_id, base_url, nav_ctx); raise 404 when missing."""
     row = await musehub_repository.get_repo_orm_by_owner_slug(db, owner, repo_slug)
     if row is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), f"/{owner}/{repo_slug}"
+    repo_id = str(row.repo_id)
+    pr_count = await db.scalar(
+        sa_select(func.count()).select_from(musehub_db.MusehubPullRequest).where(
+            musehub_db.MusehubPullRequest.repo_id == repo_id,
+            musehub_db.MusehubPullRequest.state == "open",
+        )
+    ) or 0
+    issue_count = await db.scalar(
+        sa_select(func.count()).select_from(musehub_db.MusehubIssue).where(
+            musehub_db.MusehubIssue.repo_id == repo_id,
+            musehub_db.MusehubIssue.state == "open",
+        )
+    ) or 0
+    nav_ctx: dict[str, Any] = {
+        "repo_key": row.key_signature or "",
+        "repo_bpm": row.tempo_bpm,
+        "repo_tags": row.tags or [],
+        "repo_visibility": row.visibility or "private",
+        "nav_open_pr_count": pr_count,
+        "nav_open_issue_count": issue_count,
+    }
+    return repo_id, f"/{owner}/{repo_slug}", nav_ctx
 
 
 @router.get(
@@ -109,7 +126,7 @@ async def blame_page(
 
     Returns 404 when the repo owner/slug combination is unknown.
     """
-    repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
+    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     short_ref = ref[:8] if len(ref) >= 8 else ref
     short_path = path.split("/")[-1] if path else path
@@ -144,27 +161,27 @@ async def blame_page(
         len(entries),
     )
 
+    blame_ctx: dict[str, Any] = {
+        "owner": owner,
+        "repo_slug": repo_slug,
+        "repo_id": repo_id,
+        "ref": ref,
+        "short_ref": short_ref,
+        "path": path,
+        "short_path": short_path,
+        "base_url": base_url,
+        "current_page": "blame",
+        "track": track or "",
+        "beat_start": beat_start,
+        "beat_end": beat_end,
+        "blame_entries": blame_data.entries,
+        "total_entries": blame_data.total_entries,
+    }
+    blame_ctx.update(nav_ctx)
     return await negotiate_response(
         request=request,
         template_name="musehub/pages/blame.html",
-        context={
-            "owner": owner,
-            "repo_slug": repo_slug,
-            "repo_id": repo_id,
-            "ref": ref,
-            "short_ref": short_ref,
-            "path": path,
-            "short_path": short_path,
-            "base_url": base_url,
-            "current_page": "blame",
-            "track": track or "",
-            "beat_start": beat_start,
-            "beat_end": beat_end,
-            # SSR data — passed into template context so the blame table is
-            # rendered server-side instead of fetched client-side.
-            "blame_entries": blame_data.entries,
-            "total_entries": blame_data.total_entries,
-        },
+        context=blame_ctx,
         templates=templates,
         json_data=blame_data,
         format_param=format,

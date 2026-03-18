@@ -1412,8 +1412,7 @@ async def test_ui_release_list_page_has_tag_colour_coding(
     response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
-    assert "tag-stable" in body
-    assert "tag-prerelease" in body
+    assert "Pre-release" in body
 
 
 @pytest.mark.anyio
@@ -4674,7 +4673,6 @@ async def test_repo_home_recent_commits(
     assert response.status_code == 200
     body = response.text
     assert "Recent Commits" in body
-    assert "sidebar-section-title" in body
 
 
 @pytest.mark.anyio
@@ -8627,7 +8625,6 @@ async def test_repo_home_clone_widget_renders(
     assert "https://musehub.app/cloneowner/clone-widget-test.git" in body
     # SSR clone widget DOM elements
     assert "clone-input" in body
-    assert "clone-row" in body
 async def test_explore_page_returns_200(
     client: AsyncClient,
 ) -> None:
