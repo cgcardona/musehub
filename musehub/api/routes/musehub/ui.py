@@ -1579,15 +1579,77 @@ async def credits_page(
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     credits_data = await musehub_credits.aggregate_credits(db, repo_id, sort=sort)
+    contributors = credits_data.contributors
+
+    # --- Aggregate stats from credits data (no extra DB query) ----------
+    total_all_commits: int = sum(c.session_count for c in contributors) if contributors else 0
+    max_commits: int       = max((c.session_count for c in contributors), default=1)
+
+    from datetime import timezone as _tz
+    _epoch = __import__("datetime").datetime(1970, 1, 1, tzinfo=_tz.utc)
+    project_start = min((c.first_active for c in contributors), default=_epoch)
+    project_end   = max((c.last_active  for c in contributors), default=_epoch)
+    project_span_days: int = max(0, (project_end - project_start).days)
+
+    most_prolific = max(contributors, key=lambda c: c.session_count,                            default=None)
+    most_recent   = max(contributors, key=lambda c: c.last_active,                              default=None)
+    longest_active = max(contributors, key=lambda c: (c.last_active - c.first_active).days,    default=None)
+
+    # --- Per-author dimension + branch breakdown (one extra query) ------
+    commit_rows_r = await db.execute(
+        sa_select(
+            musehub_db.MusehubCommit.author,
+            musehub_db.MusehubCommit.message,
+            musehub_db.MusehubCommit.branch,
+        ).where(musehub_db.MusehubCommit.repo_id == repo_id)
+    )
+    author_dim_counts: dict[str, dict[str, int]] = {}
+    author_branches:   dict[str, set[str]]       = {}
+    for author, message, branch in commit_rows_r:
+        if author not in author_dim_counts:
+            author_dim_counts[author] = {}
+            author_branches[author]   = set()
+        author_branches[author].add(branch)
+        for dim in musehub_divergence.classify_message(message):
+            author_dim_counts[author][dim] = author_dim_counts[author].get(dim, 0) + 1
+
+    author_top_dims: dict[str, list[tuple[str, int]]] = {
+        author: sorted(dims.items(), key=lambda x: -x[1])[:3]
+        for author, dims in author_dim_counts.items()
+    }
+    author_branch_counts: dict[str, int] = {
+        a: len(brs) for a, brs in author_branches.items()
+    }
+
+    # --- Unique roles across the whole project --------------------------
+    all_roles: set[str] = set()
+    for c in contributors:
+        all_roles.update(c.contribution_types)
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "credits",
-        "contributors": credits_data.contributors,
-        "total_contributors": credits_data.total_contributors,
         "sort": sort,
+        # Core credits data
+        "contributors": contributors,
+        "total_contributors": credits_data.total_contributors,
+        # Aggregate stats
+        "total_all_commits": total_all_commits,
+        "max_commits": max_commits,
+        "project_start": project_start,
+        "project_end": project_end,
+        "project_span_days": project_span_days,
+        "all_roles": sorted(all_roles),
+        # Spotlights
+        "most_prolific": most_prolific,
+        "most_recent": most_recent,
+        "longest_active": longest_active,
+        # Per-author enrichment
+        "author_top_dims": author_top_dims,
+        "author_branch_counts": author_branch_counts,
     }
     ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/credits.html", ctx)
