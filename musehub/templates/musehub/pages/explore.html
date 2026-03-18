@@ -117,14 +117,16 @@ document.getElementById('filter-form').addEventListener('submit', function() {
 });
 
 // ── Chip toggle — reads/writes the URL directly so multi-select is reliable ──
-// Using URLSearchParams as source of truth avoids hidden-input DOM edge cases.
+// pushURL is not supported in htmx.ajax() context, so we call history.pushState()
+// manually first. This ensures window.location.search is correct for every
+// subsequent click — each chip always sees the full accumulated filter state.
 window.toggleChip = function(evt, filterName, value) {
   evt.preventDefault();
 
-  const params  = new URLSearchParams(window.location.search);
-  const current = params.getAll(filterName);
+  var params  = new URLSearchParams(window.location.search);
+  var current = params.getAll(filterName);
 
-  if (current.includes(value)) {
+  if (current.indexOf(value) !== -1) {
     // Deselect: rebuild the list without this value
     params.delete(filterName);
     current.filter(function(v) { return v !== value; })
@@ -137,7 +139,12 @@ window.toggleChip = function(evt, filterName, value) {
   }
 
   var url = '/explore?' + params.toString();
-  htmx.ajax('GET', url, { target: '#repo-grid', swap: 'innerHTML', pushURL: url });
+
+  // Push URL first so the next chip click reads the correct accumulated state
+  history.pushState({}, '', url);
+
+  // Fetch only the repo grid fragment
+  htmx.ajax('GET', url, { target: '#repo-grid', swap: 'innerHTML' });
 };
 {% endraw %}
 {% endblock %}
