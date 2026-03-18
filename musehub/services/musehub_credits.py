@@ -1,4 +1,4 @@
-"""Credits aggregation service for Muse Hub repos.
+"""Credits aggregation service for MuseHub repos.
 
 Aggregates contributor information from commit history — think dynamic album
 liner notes that update as the composition evolves. Every pushed commit

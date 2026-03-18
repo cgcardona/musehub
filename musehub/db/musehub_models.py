@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for Muse Hub — the remote collaboration backend.
+"""SQLAlchemy ORM models for MuseHub — the remote collaboration backend.
 
 Tables:
 - musehub_repos: Remote repos (one per project/musician)
@@ -122,7 +122,7 @@ class MusehubRepo(Base):
 
 
 class MusehubBranch(Base):
-    """A named branch pointer inside a Muse Hub repo."""
+    """A named branch pointer inside a MuseHub repo."""
 
     __tablename__ = "musehub_branches"
 
@@ -140,7 +140,7 @@ class MusehubBranch(Base):
     repo: Mapped[MusehubRepo] = relationship("MusehubRepo", back_populates="branches")
 
 class MusehubCommit(Base):
-    """A commit record pushed to the Muse Hub.
+    """A commit record pushed to the MuseHub.
 
     ``parent_ids`` is a JSON list so merge commits can carry two parents,
     matching the local CLI ``muse_cli_commits`` contract.
@@ -171,7 +171,7 @@ class MusehubCommit(Base):
     repo: Mapped[MusehubRepo] = relationship("MusehubRepo", back_populates="commits")
 
 class MusehubObject(Base):
-    """A binary artifact (MIDI, MP3, WebP piano roll) stored in Muse Hub.
+    """A binary artifact (MIDI, MP3, WebP piano roll) stored in MuseHub.
 
     Object content is written to disk at ``disk_path``; only metadata lives in
     Postgres. ``object_id`` is the canonical content-addressed identifier in
@@ -284,7 +284,7 @@ class MusehubIssueMilestone(Base):
 
 
 class MusehubIssue(Base):
-    """An issue opened against a Muse Hub repo.
+    """An issue opened against a MuseHub repo.
 
     ``number`` is auto-incremented per repo starting at 1 so musicians can
     reference issues as ``#1``, ``#2``, etc., independently of the global PK.
@@ -338,7 +338,7 @@ class MusehubIssue(Base):
 
 
 class MusehubIssueComment(Base):
-    """A comment in a threaded discussion on a Muse Hub issue.
+    """A comment in a threaded discussion on a MuseHub issue.
 
     Comments support threaded replies via ``parent_id``. Top-level comments
     have ``parent_id=None``. Markdown body is stored verbatim; rendering
@@ -512,7 +512,7 @@ class MusehubPRComment(Base):
 
 
 class MusehubRelease(Base):
-    """A published version release for a Muse Hub repo.
+    """A published version release for a MuseHub repo.
 
     Releases tie a human-readable ``tag`` (e.g. "v1.0") to a specific commit
     and carry markdown release notes plus a JSON map of download package URLs.
@@ -562,7 +562,7 @@ class MusehubRelease(Base):
 
 
 class MusehubReleaseAsset(Base):
-    """An asset (file attachment) associated with a Muse Hub release.
+    """An asset (file attachment) associated with a MuseHub release.
 
     Assets represent downloadable artifacts attached to a release — for example
     a MIDI bundle, a stems archive, or a rendered MP3. ``download_count``
@@ -604,7 +604,7 @@ class MusehubReleaseAsset(Base):
 
 
 class MusehubProfile(Base):
-    """Public user profile for Muse Hub — a musical portfolio page.
+    """Public user profile for MuseHub — a musical portfolio page.
 
     One profile per user, keyed by ``user_id`` (the JWT ``sub`` claim).
     ``username`` is a unique, URL-friendly display handle chosen by the user.
@@ -654,7 +654,7 @@ class MusehubProfile(Base):
 
 
 class MusehubWebhook(Base):
-    """A registered webhook subscription for a Muse Hub repo.
+    """A registered webhook subscription for a MuseHub repo.
 
     When an event matching one of the subscribed ``events`` types fires, the
     dispatcher POSTs a signed JSON payload to ``url``. The ``secret`` is used
@@ -754,7 +754,7 @@ class MusehubStar(Base):
 
 
 class MusehubSession(Base):
-    """A recording session record pushed to Muse Hub from the CLI.
+    """A recording session record pushed to MuseHub from the CLI.
 
     Sessions capture the creative context of a recording period: who was
     present, where they recorded, what they intended to create, which commits

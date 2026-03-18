@@ -1,14 +1,14 @@
-"""SSR tests for Muse Hub PR list + PR detail pages — issue #569.
+"""SSR tests for MuseHub PR list + PR detail pages — issue #569.
 
 Validates that PR data is rendered server-side into HTML (not deferred to client
 JS) and that HTMX fragment requests return bare HTML without the full page shell.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/pulls:
+Covers GET /{owner}/{repo_slug}/pulls:
 - test_pr_list_renders_pr_title_server_side         — PR title appears in HTML
 - test_pr_list_open_closed_counts_in_tabs           — tab counts reflect seeded PRs
 - test_pr_list_htmx_fragment_on_tab_switch          — HX-Request: true → fragment
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/pulls/{pr_id}:
+Covers GET /{owner}/{repo_slug}/pulls/{pr_id}:
 - test_pr_detail_renders_title_server_side          — PR title in HTML server-side
 - test_pr_detail_renders_diff_stats                 — branch info in HTML
 - test_pr_detail_merge_button_has_hx_post           — merge button has hx-post
@@ -88,7 +88,7 @@ async def test_pr_list_renders_pr_title_server_side(
     """PR title is rendered into the HTML response server-side without client JS."""
     repo_id = await _make_repo(db_session)
     await _make_pr(db_session, repo_id, title="Funk bridge with wah pedal")
-    response = await client.get("/musehub/ui/prdev/pr-ssr-album/pulls")
+    response = await client.get("/prdev/pr-ssr-album/pulls")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Funk bridge with wah pedal" in response.text
@@ -104,7 +104,7 @@ async def test_pr_list_open_closed_counts_in_tabs(
     await _make_pr(db_session, repo_id, title="Open PR 1", state="open")
     await _make_pr(db_session, repo_id, title="Open PR 2", state="open")
     await _make_pr(db_session, repo_id, title="Merged PR", state="merged")
-    response = await client.get("/musehub/ui/prdev/pr-ssr-album/pulls")
+    response = await client.get("/prdev/pr-ssr-album/pulls")
     assert response.status_code == 200
     body = response.text
     # Tab counts for open and merged must appear as server-rendered numbers.
@@ -121,7 +121,7 @@ async def test_pr_list_htmx_fragment_on_tab_switch(
     repo_id = await _make_repo(db_session)
     await _make_pr(db_session, repo_id, title="Merged feature", state="merged")
     response = await client.get(
-        "/musehub/ui/prdev/pr-ssr-album/pulls?state=merged",
+        "/prdev/pr-ssr-album/pulls?state=merged",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -148,7 +148,7 @@ async def test_pr_detail_renders_title_server_side(
     pr = await _make_pr(
         db_session, repo_id, title="Add jazz chord voicings", from_branch="feat/jazz"
     )
-    response = await client.get(f"/musehub/ui/prdev/pr-ssr-album/pulls/{pr.pr_id}")
+    response = await client.get(f"/prdev/pr-ssr-album/pulls/{pr.pr_id}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Add jazz chord voicings" in response.text
@@ -168,7 +168,7 @@ async def test_pr_detail_renders_diff_stats(
         from_branch="feat/bass-groove",
         to_branch="dev",
     )
-    response = await client.get(f"/musehub/ui/prdev/pr-ssr-album/pulls/{pr.pr_id}")
+    response = await client.get(f"/prdev/pr-ssr-album/pulls/{pr.pr_id}")
     assert response.status_code == 200
     body = response.text
     # Both branch names must appear in the server-rendered HTML.
@@ -184,7 +184,7 @@ async def test_pr_detail_merge_button_has_hx_post(
     """An open PR detail page includes a merge button with an hx-post attribute."""
     repo_id = await _make_repo(db_session)
     pr = await _make_pr(db_session, repo_id, title="Merge-ready PR", state="open")
-    response = await client.get(f"/musehub/ui/prdev/pr-ssr-album/pulls/{pr.pr_id}")
+    response = await client.get(f"/prdev/pr-ssr-album/pulls/{pr.pr_id}")
     assert response.status_code == 200
     body = response.text
     # The merge card must have at least one HTMX POST trigger.
@@ -200,7 +200,7 @@ async def test_pr_detail_merge_button_disabled_when_not_mergeable(
     """A closed or merged PR does not show the merge button."""
     repo_id = await _make_repo(db_session)
     pr = await _make_pr(db_session, repo_id, title="Already Merged PR", state="merged")
-    response = await client.get(f"/musehub/ui/prdev/pr-ssr-album/pulls/{pr.pr_id}")
+    response = await client.get(f"/prdev/pr-ssr-album/pulls/{pr.pr_id}")
     assert response.status_code == 200
     body = response.text
     # Merged/closed PRs must not render the merge action form.
@@ -215,6 +215,6 @@ async def test_pr_detail_unknown_number_404(
     """A request for a non-existent PR id returns HTTP 404."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/prdev/pr-ssr-album/pulls/nonexistent-pr-uuid"
+        "/prdev/pr-ssr-album/pulls/nonexistent-pr-uuid"
     )
     assert response.status_code == 404

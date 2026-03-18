@@ -2,110 +2,13 @@
 
 {% block title %}Groove Check — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / groove-check
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / groove-check
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block page_data %}
 const repoId  = {{ repo_id | tojson }};
 const base    = {{ base_url | tojson }};
-{% endblock %}
-
-{% block extra_css %}
-<style>
-.groove-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.groove-metric-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.groove-metric-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.groove-metric-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.groove-chart-wrap {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  margin-bottom: 8px;
-}
-.groove-chart-legend {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-.groove-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.groove-table th {
-  text-align: left;
-  padding: 8px 6px;
-  color: var(--text-muted);
-  font-weight: 500;
-  border-bottom: 1px solid var(--border);
-}
-.groove-table td {
-  padding: 8px 6px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-.groove-table tr:last-child td { border-bottom: none; }
-.status-badge {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #0d1117;
-}
-.status-ok   { background: #3fb950; }
-.status-warn { background: #f0883e; }
-.status-fail { background: #f85149; }
-.groove-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.groove-controls label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.groove-controls select,
-.groove-controls input[type="number"] {
-  background: var(--bg);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 13px;
-}
-</style>
 {% endblock %}
 
 {% block page_script %}

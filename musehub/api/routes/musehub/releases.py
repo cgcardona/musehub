@@ -1,14 +1,14 @@
-"""Muse Hub release management route handlers.
+"""MuseHub release management route handlers.
 
 Endpoint summary:
-  POST /musehub/repos/{repo_id}/releases — create a release
-  GET /musehub/repos/{repo_id}/releases — list all releases (newest first)
-  GET /musehub/repos/{repo_id}/releases/{tag} — get a single release by tag
-  GET /musehub/repos/{repo_id}/releases/{tag}/assets — list assets for a release
-  POST /musehub/repos/{repo_id}/releases/{tag}/assets — attach asset to release
-  POST /musehub/repos/{repo_id}/releases/{tag}/assets/{asset_id}/download — record download event
-  DELETE /musehub/repos/{repo_id}/releases/{tag}/assets/{asset_id} — remove asset from release
-  GET /musehub/repos/{repo_id}/releases/{tag}/downloads — per-asset download counts
+  POST /repos/{repo_id}/releases — create a release
+  GET /repos/{repo_id}/releases — list all releases (newest first)
+  GET /repos/{repo_id}/releases/{tag} — get a single release by tag
+  GET /repos/{repo_id}/releases/{tag}/assets — list assets for a release
+  POST /repos/{repo_id}/releases/{tag}/assets — attach asset to release
+  POST /repos/{repo_id}/releases/{tag}/assets/{asset_id}/download — record download event
+  DELETE /repos/{repo_id}/releases/{tag}/assets/{asset_id} — remove asset from release
+  GET /repos/{repo_id}/releases/{tag}/downloads — per-asset download counts
 
 A release ties a version tag (e.g. "v1.0") to a commit snapshot and carries
 Markdown release notes plus structured download package URLs. Tags are unique
@@ -50,7 +50,7 @@ router = APIRouter()
     response_model=ReleaseResponse,
     status_code=status.HTTP_201_CREATED,
     operation_id="createRelease",
-    summary="Create a release for a Muse Hub repo",
+    summary="Create a release for a MuseHub repo",
 )
 async def create_release(
     repo_id: str,
@@ -91,7 +91,7 @@ async def create_release(
     "/repos/{repo_id}/releases",
     response_model=ReleaseListResponse,
     operation_id="listReleases",
-    summary="List all releases for a Muse Hub repo",
+    summary="List all releases for a MuseHub repo",
 )
 async def list_releases(
     repo_id: str,

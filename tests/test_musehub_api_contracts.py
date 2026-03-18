@@ -30,7 +30,7 @@ async def test_create_repo_response_shape(
 ) -> None:
     """POST /repos returns all required fields with correct types."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "contract-test", "owner": "tester", "visibility": "public"},
         headers=auth_headers,
     )
@@ -57,13 +57,13 @@ async def test_get_repo_response_shape(
 ) -> None:
     """GET /repos/{id} returns all expected fields."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "get-shape-test", "owner": "tester"},
         headers=auth_headers,
     )
     repo_id = create.json()["repoId"]
 
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}", headers=auth_headers)
+    resp = await client.get(f"/api/v1/repos/{repo_id}", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
 
@@ -81,14 +81,14 @@ async def test_update_repo_settings_returns_updated_fields(
 ) -> None:
     """PATCH /repos/{id}/settings returns the updated repo fields."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "patch-test-repo", "owner": "patcher"},
         headers=auth_headers,
     )
     repo_id = create.json()["repoId"]
 
     patch_resp = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/settings",
+        f"/api/v1/repos/{repo_id}/settings",
         json={"description": "Updated description", "visibility": "public"},
         headers=auth_headers,
     )
@@ -115,7 +115,7 @@ async def test_list_branches_envelope(
     await create_branch(db_session, repo_id=str(repo.repo_id), name="feature-x")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/branches",
+        f"/api/v1/repos/{repo.repo_id}/branches",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -140,7 +140,7 @@ async def test_branch_names_are_correct(
     await create_branch(db_session, repo_id=str(repo.repo_id), name="develop")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/branches",
+        f"/api/v1/repos/{repo.repo_id}/branches",
         headers=auth_headers,
     )
     names = [b["name"] for b in resp.json()["branches"]]
@@ -163,7 +163,7 @@ async def test_list_commits_envelope(
     await create_commit(db_session, str(repo.repo_id), message="feat: second commit")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/commits",
+        f"/api/v1/repos/{repo.repo_id}/commits",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -190,7 +190,7 @@ async def test_commit_fields(
     )
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/commits",
+        f"/api/v1/repos/{repo.repo_id}/commits",
         headers=auth_headers,
     )
     commits = resp.json()["commits"]
@@ -217,14 +217,14 @@ async def test_create_issue_response_shape(
 ) -> None:
     """POST /repos/{id}/issues returns title, body, status, number, createdAt."""
     create_repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "issue-contract-repo", "owner": "issuer"},
         headers=auth_headers,
     )
     repo_id = create_repo_resp.json()["repoId"]
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": "Bug: tempo drift", "body": "The tempo drifts by 3 BPM"},
         headers=auth_headers,
     )
@@ -247,7 +247,7 @@ async def test_list_issues_returns_open_issues(
 ) -> None:
     """GET /repos/{id}/issues returns issues envelope with status=open."""
     create_repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "issue-list-contract", "owner": "issuer2"},
         headers=auth_headers,
     )
@@ -255,13 +255,13 @@ async def test_list_issues_returns_open_issues(
 
     for i in range(3):
         await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/issues",
+            f"/api/v1/repos/{repo_id}/issues",
             json={"title": f"Issue {i}"},
             headers=auth_headers,
         )
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -283,21 +283,21 @@ async def test_close_issue_changes_status(
 ) -> None:
     """POST /repos/{id}/issues/{n}/close sets status to 'closed'."""
     create_repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "close-issue-contract", "owner": "closer"},
         headers=auth_headers,
     )
     repo_id = create_repo_resp.json()["repoId"]
 
     issue_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": "Close me"},
         headers=auth_headers,
     )
     number = issue_resp.json()["number"]
 
     close_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/close",
+        f"/api/v1/repos/{repo_id}/issues/{number}/close",
         headers=auth_headers,
     )
     assert close_resp.status_code == 200
@@ -316,17 +316,17 @@ async def test_explore_returns_public_repos(
 ) -> None:
     """GET /repos/explore returns public repos and excludes private ones."""
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "explore-public", "owner": "explorer", "visibility": "public"},
         headers=auth_headers,
     )
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "explore-private", "owner": "explorer", "visibility": "private"},
         headers=auth_headers,
     )
 
-    resp = await client.get("/api/v1/musehub/discover/repos")
+    resp = await client.get("/api/v1/discover/repos")
     assert resp.status_code == 200
     body = resp.json()
     repos = body if isinstance(body, list) else body.get("repos", body.get("items", []))

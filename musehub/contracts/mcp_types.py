@@ -23,6 +23,8 @@ suitable as FastAPI response types because some contain recursive fields.
   Full responses → ``MCPInitializeResponse``, ``MCPToolsListResponse``,
                         ``MCPCallResponse``, ``MCPMethodResponse``
   DAW channel → ``DAWToolCallMessage``, ``DAWToolResponse``
+  Elicitation (2025-11-25) → ``ElicitationAction``, ``ElicitationRequest``,
+                              ``ElicitationResponse``, ``SessionInfo``
 
 ## Pydantic wire models (API route responses)
 
@@ -387,3 +389,88 @@ class MCPToolDefWire(BaseModel):
         alias="inputSchema",
     )
     server_side: bool | None = None
+
+
+# ── MCP 2025-11-25 Elicitation types ─────────────────────────────────────────
+
+
+class ElicitationAction(TypedDict, total=False):
+    """The action taken by the user in response to an elicitation request.
+
+    Fields:
+        action: One of ``"accept"``, ``"decline"``, or ``"cancel"``.
+            - ``"accept"`` means the user filled the form / completed the URL flow.
+            - ``"decline"`` means the user explicitly declined.
+            - ``"cancel"`` means the client cancelled (e.g. timeout or navigation).
+        content: Present only when ``action == "accept"``; the form data as a dict
+            whose shape matches the ``requestedSchema`` sent with the request.
+    """
+
+    action: Required[str]
+    content: NotRequired[dict[str, object]]
+
+
+class ElicitationRequest(TypedDict, total=False):
+    """An ``elicitation/create`` request sent from the server to the client.
+
+    Sent as a JSON-RPC 2.0 *request* (has ``id``) over the SSE stream,
+    or embedded in the ``POST /mcp`` SSE streaming response.
+
+    Fields:
+        mode: ``"form"`` for structured schema-based input, or ``"url"`` for
+            out-of-band browser interaction (OAuth, payment, etc.).
+        message: Human-readable message displayed to the user.
+        requestedSchema: JSON Schema for form mode (restricted subset: flat,
+            primitive properties only). Not present for URL mode.
+        url: Target URL for URL mode. Not present for form mode.
+        elicitationId: Stable ID used to correlate ``notifications/elicitation/complete``.
+    """
+
+    mode: Required[str]
+    message: Required[str]
+    requestedSchema: NotRequired[dict[str, object]]
+    url: NotRequired[str]
+    elicitationId: NotRequired[str]
+
+
+class ElicitationResponse(TypedDict, total=False):
+    """A JSON-RPC 2.0 response from the client to an ``elicitation/create`` request.
+
+    The client sends this as a normal JSON-RPC success response (``id`` matches
+    the server's elicitation request ID) via ``POST /mcp``.
+
+    Fields:
+        action: See :class:`ElicitationAction`.
+        content: User-provided data (form mode only; absent on decline/cancel).
+    """
+
+    action: Required[str]
+    content: NotRequired[dict[str, object]]
+
+
+class SessionInfo(TypedDict, total=False):
+    """Summary of an active MCP session — returned in server metadata endpoints.
+
+    Not part of the JSON-RPC wire protocol; used internally for admin/debug.
+
+    Fields:
+        session_id: Cryptographically secure session identifier (never log in full).
+        user_id: Authenticated user, or ``None`` for anonymous sessions.
+        client_capabilities: Capability map from ``initialize`` params.
+        pending_count: Number of outstanding elicitation Futures.
+        sse_queue_count: Number of active GET /mcp SSE consumers.
+        created_at: Unix timestamp of session creation.
+        last_active: Unix timestamp of last activity.
+        supports_form_elicitation: Whether the client can handle form-mode.
+        supports_url_elicitation: Whether the client can handle URL-mode.
+    """
+
+    session_id: Required[str]
+    user_id: Required[str | None]
+    client_capabilities: NotRequired[dict[str, object]]
+    pending_count: NotRequired[int]
+    sse_queue_count: NotRequired[int]
+    created_at: NotRequired[float]
+    last_active: NotRequired[float]
+    supports_form_elicitation: NotRequired[bool]
+    supports_url_elicitation: NotRequired[bool]

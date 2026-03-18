@@ -1,4 +1,4 @@
-"""Pydantic v2 models for the Muse Hub Analysis API and Dynamics Page.
+"""Pydantic v2 models for the MuseHub Analysis API and Dynamics Page.
 
 Each musical dimension has a dedicated typed data model. All models are
 consumed by AI agents and must be fully described so agents can reason
@@ -625,7 +625,7 @@ class SectionSimilarityHeatmap(CamelModel):
 class FormStructureResponse(CamelModel):
     """Combined form and structure analysis for a Muse commit ref.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/form-structure/{ref}``.
+    Returned by ``GET /api/v1/repos/{repo_id}/form-structure/{ref}``.
     Combines three complementary views of the piece's formal architecture:
 
     - ``section_map``: timeline of sections with bar ranges and colour hints
@@ -1004,7 +1004,7 @@ class HarmonyModulationEvent(CamelModel):
 class HarmonyAnalysisResponse(CamelModel):
     """Dedicated harmonic analysis response for a Muse commit ref.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/harmony``.
+    Returned by ``GET /api/v1/repos/{repo_id}/analysis/{ref}/harmony``.
     Maps to the ``muse harmony --ref {ref}`` command output.
 
     Unlike the generic ``harmony`` dimension in :class:`AnalysisResponse` (which
@@ -1046,7 +1046,7 @@ class RecallMatch(CamelModel):
     commit was recalled.
     """
 
-    commit_id: str = Field(..., description="Muse Hub commit SHA that matched the query")
+    commit_id: str = Field(..., description="MuseHub commit SHA that matched the query")
     commit_message: str = Field(..., description="Human-readable commit message")
     branch: str = Field(..., description="Branch the commit lives on, e.g. 'main'")
     score: float = Field(..., ge=0.0, le=1.0, description="Cosine similarity score (0–1, higher = more similar)")
@@ -1058,7 +1058,7 @@ class RecallMatch(CamelModel):
 class RecallResponse(CamelModel):
     """Response for the semantic recall endpoint.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/recall?q=``.
+    Returned by ``GET /api/v1/repos/{repo_id}/analysis/{ref}/recall?q=``.
 
     Agents use this to surface musically relevant commits given a natural-language
     query (e.g. ``"a jazzy chord progression with swing groove"``). The results
@@ -1070,7 +1070,7 @@ class RecallResponse(CamelModel):
     matching commits before ``limit`` was applied.
     """
 
-    repo_id: str = Field(..., description="Muse Hub repo UUID")
+    repo_id: str = Field(..., description="MuseHub repo UUID")
     ref: str = Field(..., description="Muse commit ref used as the search scope")
     query: str = Field(..., description="Natural-language query supplied by the caller")
     matches: list[RecallMatch] = Field(..., description="Ranked list of matching commits, best first")

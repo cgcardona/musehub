@@ -2,65 +2,10 @@
 
 {% block title %}Score {{ ref[:8] }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
   score / {{ ref[:8] }}{% if path %} / {{ path }}{% endif %}
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-.score-header {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.score-meta {
-  display: flex; gap: 20px; flex-wrap: wrap;
-  margin-bottom: 16px; font-size: 13px; color: var(--color-text-muted);
-}
-.score-meta-item { display: flex; flex-direction: column; gap: 2px; }
-.score-meta-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6e7681; }
-.score-meta-value { font-size: 14px; font-weight: 600; color: #e6edf3; }
-.track-selector {
-  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
-}
-.track-btn {
-  background: #161b22; border: 1px solid #30363d; color: #8b949e;
-  padding: 4px 12px; border-radius: 20px; font-size: 12px;
-  cursor: pointer; transition: all 0.15s;
-}
-.track-btn:hover { border-color: #58a6ff; color: #58a6ff; }
-.track-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; font-weight: 600; }
-.staff-container {
-  background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
-  padding: 20px; overflow-x: auto; margin-bottom: 16px;
-}
-.staff-label {
-  font-size: 12px; font-weight: 600; color: #58a6ff;
-  text-transform: uppercase; letter-spacing: 0.05em;
-  margin-bottom: 8px;
-}
-.staff-svg { display: block; width: 100%; overflow: visible; }
-.staff-line { stroke: #30363d; stroke-width: 1; }
-.bar-line { stroke: #444c56; stroke-width: 1.5; }
-.note-head { fill: #58a6ff; }
-.note-stem { stroke: #58a6ff; stroke-width: 1.5; }
-.note-ledger { stroke: #58a6ff; stroke-width: 1; }
-.rest-mark { fill: #6e7681; }
-.clef-text { fill: #8b949e; font-family: serif; font-size: 28px; }
-.timesig-text { fill: #8b949e; font-family: serif; font-size: 16px; font-weight: 700; }
-.beat-num { fill: #6e7681; font-size: 9px; font-family: monospace; }
-.score-empty {
-  text-align: center; color: #6e7681; padding: 40px;
-  font-style: italic;
-}
-.legend-row {
-  display: flex; gap: 16px; flex-wrap: wrap;
-  font-size: 12px; color: #8b949e; margin-top: 12px;
-}
-.legend-item { display: flex; align-items: center; gap: 6px; }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-</style>
-{% endblock %}
 
 {% block page_data %}
 const repoId   = {{ repo_id | tojson }};
@@ -327,11 +272,11 @@ async function load() {
   try {
     // Try JSON content negotiation first for notation data
     const url = scorePath
-      ? '/api/v1/musehub/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref) + '/' + encodeURIComponent(scorePath)
-      : '/api/v1/musehub/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref);
+      ? '/api/v1/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref) + '/' + encodeURIComponent(scorePath)
+      : '/api/v1/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref);
 
     // Fall back to the notation endpoint if dedicated score endpoint not yet available
-    const notationUrl = '/api/v1/musehub/repos/' + encodeURIComponent(repoId) + '/notation/' + encodeURIComponent(ref);
+    const notationUrl = '/api/v1/repos/' + encodeURIComponent(repoId) + '/notation/' + encodeURIComponent(ref);
 
     let data = null;
     try {

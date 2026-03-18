@@ -1,4 +1,4 @@
-"""Muse Hub discover/explore service — public repo discovery with filtering and sorting.
+"""MuseHub discover/explore service — public repo discovery with filtering and sorting.
 
 This module is the ONLY place that executes the discover query. Route handlers
 delegate here; no filtering or sorting logic lives in routes.

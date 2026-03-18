@@ -1,16 +1,16 @@
-"""SSR tests for Muse Hub releases UI pages — issue #572.
+"""SSR tests for MuseHub releases UI pages — issue #572.
 
 Validates that release data is rendered server-side into HTML (not deferred
 to client JS) and that HTMX fragment requests return bare HTML without the
 full page shell.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/releases:
+Covers GET /{owner}/{repo_slug}/releases:
 - test_releases_list_renders_tag_server_side           — release tag in HTML
 - test_releases_list_shows_prerelease_badge            — pre-release badge in HTML
 - test_releases_list_htmx_fragment_path                — HX-Request: true → bare fragment
 - test_releases_list_empty_state_when_no_releases      — no releases → empty state
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/releases/{tag}:
+Covers GET /{owner}/{repo_slug}/releases/{tag}:
 - test_release_detail_renders_tag_server_side          — tag in HTML
 - test_release_detail_shows_audio_player_container     — audioUrl → #release-audio-player div
 - test_release_detail_unknown_tag_404                  — unknown tag → 404
@@ -92,7 +92,7 @@ async def test_releases_list_renders_tag_server_side(
     """Release tag is in the HTML response server-side (no JS required)."""
     repo_id = await _make_repo(db_session)
     await _make_release(db_session, repo_id, tag="v2.5.0", title="Groove update 2.5")
-    response = await client.get("/musehub/ui/musician/ssr-album/releases")
+    response = await client.get("/musician/ssr-album/releases")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "v2.5.0" in response.text
@@ -106,7 +106,7 @@ async def test_releases_list_shows_prerelease_badge(
     """Pre-release flag renders the 'tag-prerelease' CSS class server-side."""
     repo_id = await _make_repo(db_session)
     await _make_release(db_session, repo_id, tag="v1.0-beta", is_prerelease=True)
-    response = await client.get("/musehub/ui/musician/ssr-album/releases")
+    response = await client.get("/musician/ssr-album/releases")
     assert response.status_code == 200
     # The fragment uses the tag-prerelease CSS class for pre-release badges.
     assert "tag-prerelease" in response.text
@@ -122,7 +122,7 @@ async def test_releases_list_htmx_fragment_path(
     repo_id = await _make_repo(db_session)
     await _make_release(db_session, repo_id, tag="v3.0", title="Major release")
     response = await client.get(
-        "/musehub/ui/musician/ssr-album/releases",
+        "/musician/ssr-album/releases",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -140,7 +140,7 @@ async def test_releases_list_empty_state_when_no_releases(
 ) -> None:
     """Empty release list renders the empty state message server-side."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/musician/ssr-album/releases")
+    response = await client.get("/musician/ssr-album/releases")
     assert response.status_code == 200
     # empty_state macro renders "No releases yet" when the list is empty.
     assert "No releases yet" in response.text
@@ -159,7 +159,7 @@ async def test_release_detail_renders_tag_server_side(
     """Release tag appears in the detail page HTML server-side."""
     repo_id = await _make_repo(db_session)
     await _make_release(db_session, repo_id, tag="v1.2.3", title="Polished mix")
-    response = await client.get("/musehub/ui/musician/ssr-album/releases/v1.2.3")
+    response = await client.get("/musician/ssr-album/releases/v1.2.3")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "v1.2.3" in response.text
@@ -180,7 +180,7 @@ async def test_release_detail_shows_audio_player_container(
         tag="v1.0-audio",
         mp3_url="https://cdn.example.com/album-v1.0.mp3",
     )
-    response = await client.get("/musehub/ui/musician/ssr-album/releases/v1.0-audio")
+    response = await client.get("/musician/ssr-album/releases/v1.0-audio")
     assert response.status_code == 200
     # The audio player container div must be present in the HTML.
     assert 'id="release-audio-player"' in response.text
@@ -194,5 +194,5 @@ async def test_release_detail_unknown_tag_404(
 ) -> None:
     """Non-existent release tag returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/musician/ssr-album/releases/vNOPE")
+    response = await client.get("/musician/ssr-album/releases/vNOPE")
     assert response.status_code == 404

@@ -1,11 +1,11 @@
-"""Tests for Muse Hub collaborators management endpoints.
+"""Tests for MuseHub collaborators management endpoints.
 
 Covers the acceptance criteria:
-- GET /musehub/repos/{repo_id}/collaborators returns collaborator list
-- POST /musehub/repos/{repo_id}/collaborators invites a collaborator (owner/admin+)
-- PUT /musehub/repos/{repo_id}/collaborators/{user_id}/permission updates permission
-- DELETE /musehub/repos/{repo_id}/collaborators/{user_id} removes collaborator
-- GET /musehub/repos/{repo_id}/collaborators/{user_id}/permission checks presence
+- GET /repos/{repo_id}/collaborators returns collaborator list
+- POST /repos/{repo_id}/collaborators invites a collaborator (owner/admin+)
+- PUT /repos/{repo_id}/collaborators/{user_id}/permission updates permission
+- DELETE /repos/{repo_id}/collaborators/{user_id} removes collaborator
+- GET /repos/{repo_id}/collaborators/{user_id}/permission checks presence
 - Owner cannot be removed as a collaborator
 - Only admin+ (or owner) may mutate collaborators
 - Duplicate invite returns 409
@@ -26,7 +26,7 @@ _COLLABORATOR_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "collab-test-repo") -> str:
     """Create a repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser"},
         headers=auth_headers,
     )
@@ -44,7 +44,7 @@ async def _invite_collaborator(
 ) -> dict[str, object]:
     """Invite a collaborator via the API."""
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators",
+        f"/api/v1/repos/{repo_id}/collaborators",
         json={"user_id": user_id, "permission": permission},
         headers=auth_headers,
     )
@@ -81,7 +81,7 @@ async def test_invite_collaborator_duplicate_returns_409(
     await _invite_collaborator(client, auth_headers, repo_id)
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators",
+        f"/api/v1/repos/{repo_id}/collaborators",
         json={"user_id": _COLLABORATOR_ID, "permission": "read"},
         headers=auth_headers,
     )
@@ -95,7 +95,7 @@ async def test_invite_collaborator_unknown_repo_returns_404(
 ) -> None:
     """Inviting a collaborator to a non-existent repo returns 404."""
     response = await client.post(
-        "/api/v1/musehub/repos/nonexistent-repo-id/collaborators",
+        "/api/v1/repos/nonexistent-repo-id/collaborators",
         json={"user_id": _COLLABORATOR_ID, "permission": "read"},
         headers=auth_headers,
     )
@@ -108,7 +108,7 @@ async def test_invite_collaborator_requires_auth(
 ) -> None:
     """POST /collaborators returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos/some-repo/collaborators",
+        "/api/v1/repos/some-repo/collaborators",
         json={"user_id": _COLLABORATOR_ID, "permission": "read"},
     )
     assert response.status_code == 401
@@ -125,7 +125,7 @@ async def test_list_collaborators_empty(
     """GET /collaborators returns empty list for a repo with no collaborators."""
     repo_id = await _create_repo(client, auth_headers, "list-empty-repo")
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators",
+        f"/api/v1/repos/{repo_id}/collaborators",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -144,7 +144,7 @@ async def test_list_collaborators_after_invite(
     await _invite_collaborator(client, auth_headers, repo_id)
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators",
+        f"/api/v1/repos/{repo_id}/collaborators",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -164,7 +164,7 @@ async def test_check_permission_not_collaborator(
     """Permission check returns 404 for a non-member user (access-check semantics)."""
     repo_id = await _create_repo(client, auth_headers, "perm-check-not-member-repo")
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
+        f"/api/v1/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -181,7 +181,7 @@ async def test_check_permission_is_collaborator(
     await _invite_collaborator(client, auth_headers, repo_id, permission="admin")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
+        f"/api/v1/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -203,7 +203,7 @@ async def test_update_permission_success(
     await _invite_collaborator(client, auth_headers, repo_id, permission="read")
 
     response = await client.put(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
+        f"/api/v1/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
         json={"permission": "admin"},
         headers=auth_headers,
     )
@@ -220,7 +220,7 @@ async def test_update_permission_not_found_returns_404(
     """Updating permission for a non-collaborator returns 404."""
     repo_id = await _create_repo(client, auth_headers, "update-perm-404-repo")
     response = await client.put(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
+        f"/api/v1/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}/permission",
         json={"permission": "admin"},
         headers=auth_headers,
     )
@@ -240,13 +240,13 @@ async def test_remove_collaborator_success(
     await _invite_collaborator(client, auth_headers, repo_id)
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}",
+        f"/api/v1/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}",
         headers=auth_headers,
     )
     assert response.status_code == 204
 
     list_response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators",
+        f"/api/v1/repos/{repo_id}/collaborators",
         headers=auth_headers,
     )
     assert list_response.json()["total"] == 0
@@ -260,7 +260,7 @@ async def test_remove_collaborator_not_found_returns_404(
     """Removing a non-collaborator returns 404."""
     repo_id = await _create_repo(client, auth_headers, "remove-404-repo")
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}",
+        f"/api/v1/repos/{repo_id}/collaborators/{_COLLABORATOR_ID}",
         headers=auth_headers,
     )
     assert response.status_code == 404

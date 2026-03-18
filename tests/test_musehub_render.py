@@ -421,7 +421,7 @@ async def test_render_status_endpoint_not_found(
     commit_id = "e" * 64
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{commit_id}/render-status",
+        f"/api/v1/repos/{repo_id}/commits/{commit_id}/render-status",
         headers=auth_headers,
     )
 
@@ -444,7 +444,7 @@ async def test_render_status_endpoint_complete(
     job = await _seed_render_job(db_session, repo_id, commit_id, status="complete")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{commit_id}/render-status",
+        f"/api/v1/repos/{repo_id}/commits/{commit_id}/render-status",
         headers=auth_headers,
     )
 
@@ -470,7 +470,7 @@ async def test_render_status_endpoint_pending(
     await _seed_render_job(db_session, repo_id, commit_id, status="pending")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{commit_id}/render-status",
+        f"/api/v1/repos/{repo_id}/commits/{commit_id}/render-status",
         headers=auth_headers,
     )
 
@@ -488,7 +488,7 @@ async def test_render_status_endpoint_private_repo_no_auth(
     commit_id = "1" * 64
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{commit_id}/render-status",
+        f"/api/v1/repos/{repo_id}/commits/{commit_id}/render-status",
     )
 
     assert resp.status_code == 401
@@ -504,7 +504,7 @@ async def test_render_status_endpoint_public_repo_no_auth(
     commit_id = "2" * 64
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{commit_id}/render-status",
+        f"/api/v1/repos/{repo_id}/commits/{commit_id}/render-status",
     )
 
     assert resp.status_code == 200
@@ -569,7 +569,7 @@ async def test_push_triggers_render(
         }
 
         resp = await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/push",
+            f"/api/v1/repos/{repo_id}/push",
             json=payload,
             headers=auth_headers,
         )
@@ -625,7 +625,7 @@ async def test_render_failure_does_not_block_push(
         }
 
         resp = await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/push",
+            f"/api/v1/repos/{repo_id}/push",
             json=payload,
             headers=auth_headers,
         )

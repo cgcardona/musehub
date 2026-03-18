@@ -1,6 +1,6 @@
-"""Muse Hub web UI route handlers.
+"""MuseHub web UI route handlers.
 
-Serves browser-readable HTML pages for navigating a Muse Hub repo --
+Serves browser-readable HTML pages for navigating a MuseHub repo --
 analogous to GitHub's repository browser but for music projects.
 
 All pages are rendered via Jinja2 templates stored in
@@ -9,54 +9,54 @@ All pages are rendered via Jinja2 templates stored in
 engine; all HTML, CSS, and JavaScript lives in the template files, not here.
 
 Endpoint summary (fixed-path):
-  GET /musehub/ui/search                                  -- global cross-repo search page
-  GET /musehub/ui/explore                                 -- public repo discovery grid
-  GET /musehub/ui/trending                                -- repos sorted by stars
-  GET /musehub/ui/users/{username}                        -- public user profile
+  GET /search                                  -- global cross-repo search page
+  GET /explore                                 -- public repo discovery grid
+  GET /trending                                -- repos sorted by stars
+  GET /{username}                              -- public user profile
 
 Endpoint summary (repo-scoped):
-  GET /musehub/ui/{owner}/{repo_slug}                           -- repo landing page
-  GET /musehub/ui/{owner}/{repo_slug}/commits                   -- paginated commit list with branch filter
-  GET /musehub/ui/{owner}/{repo_slug}/commits/{commit_id}       -- commit detail + artifacts
-  GET /musehub/ui/{owner}/{repo_slug}/commits/{commit_id}/diff  -- musical diff view
-  GET /musehub/ui/{owner}/{repo_slug}/graph                     -- interactive DAG commit graph
-  GET /musehub/ui/{owner}/{repo_slug}/pulls                     -- pull request list
-  GET /musehub/ui/{owner}/{repo_slug}/pulls/{pr_id}             -- PR detail with musical diff (radar, piano roll, audio A/B)
-  GET /musehub/ui/{owner}/{repo_slug}/issues                    -- issue list
-  GET /musehub/ui/{owner}/{repo_slug}/issues/{number}           -- issue detail + close button
-  GET /musehub/ui/{owner}/{repo_slug}/context/{ref}             -- AI context viewer
-  GET /musehub/ui/{owner}/{repo_slug}/credits                   -- dynamic credits (liner notes)
-  GET /musehub/ui/{owner}/{repo_slug}/embed/{ref}               -- iframe-safe audio player
-  GET /musehub/ui/{owner}/{repo_slug}/search                    -- in-repo search (4 modes)
-  GET /musehub/ui/{owner}/{repo_slug}/compare/{base}...{head}   -- multi-dimensional musical diff between two refs
-  GET /musehub/ui/{owner}/{repo_slug}/divergence                -- branch divergence radar chart
-  GET /musehub/ui/{owner}/{repo_slug}/timeline                  -- chronological SVG timeline
-  GET /musehub/ui/{owner}/{repo_slug}/releases                  -- release list
-  GET /musehub/ui/{owner}/{repo_slug}/releases/{tag}            -- release detail + downloads
-  GET /musehub/ui/{owner}/{repo_slug}/sessions                  -- recording session log
-  GET /musehub/ui/{owner}/{repo_slug}/sessions/{id}             -- session detail
-  GET /musehub/ui/{owner}/{repo_slug}/insights                  -- repo insights dashboard
-  GET /musehub/ui/{owner}/{repo_slug}/tree/{ref}                -- file tree browser (repo root)
-  GET /musehub/ui/{owner}/{repo_slug}/tree/{ref}/{path}         -- file tree browser (subdirectory)
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}            -- analysis dashboard (all 10 dimensions at a glance)
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/contour    -- melodic contour analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/tempo      -- tempo analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/dynamics   -- dynamics analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/key        -- key detection analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/meter      -- metric analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/chord-map  -- chord map analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/groove     -- rhythmic groove analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/emotion    -- emotion analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/form       -- formal structure analysis
-  GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/motifs     -- motif browser (recurring patterns, transformations)
-  GET /musehub/ui/{owner}/{repo_slug}/listen/{ref}              -- full-mix and per-track audio playback with track listing
-  GET /musehub/ui/{owner}/{repo_slug}/listen/{ref}/{path}       -- single-stem playback page
-  GET /musehub/ui/{owner}/{repo_slug}/listen/{ref}             -- Wavesurfer.js audio player (full mix)
-  GET /musehub/ui/{owner}/{repo_slug}/listen/{ref}/{path}      -- Wavesurfer.js audio player (single track)
-  GET /musehub/ui/{owner}/{repo_slug}/arrange/{ref}             -- arrangement matrix (instrument × section density grid)
-  GET /musehub/ui/{owner}/{repo_slug}/piano-roll/{ref}          -- interactive piano roll (all tracks)
-  GET /musehub/ui/{owner}/{repo_slug}/piano-roll/{ref}/{path}   -- interactive piano roll (single MIDI file)
-  GET /musehub/ui/{owner}/{repo_slug}/activity                  -- repo-level event stream (commits, PRs, issues, branches, tags, sessions)
+  GET /{owner}/{repo_slug}                           -- repo landing page
+  GET /{owner}/{repo_slug}/commits                   -- paginated commit list with branch filter
+  GET /{owner}/{repo_slug}/commits/{commit_id}       -- commit detail + artifacts
+  GET /{owner}/{repo_slug}/commits/{commit_id}/diff  -- musical diff view
+  GET /{owner}/{repo_slug}/graph                     -- interactive DAG commit graph
+  GET /{owner}/{repo_slug}/pulls                     -- pull request list
+  GET /{owner}/{repo_slug}/pulls/{pr_id}             -- PR detail with musical diff (radar, piano roll, audio A/B)
+  GET /{owner}/{repo_slug}/issues                    -- issue list
+  GET /{owner}/{repo_slug}/issues/{number}           -- issue detail + close button
+  GET /{owner}/{repo_slug}/context/{ref}             -- AI context viewer
+  GET /{owner}/{repo_slug}/credits                   -- dynamic credits (liner notes)
+  GET /{owner}/{repo_slug}/embed/{ref}               -- iframe-safe audio player
+  GET /{owner}/{repo_slug}/search                    -- in-repo search (4 modes)
+  GET /{owner}/{repo_slug}/compare/{base}...{head}   -- multi-dimensional musical diff between two refs
+  GET /{owner}/{repo_slug}/divergence                -- branch divergence radar chart
+  GET /{owner}/{repo_slug}/timeline                  -- chronological SVG timeline
+  GET /{owner}/{repo_slug}/releases                  -- release list
+  GET /{owner}/{repo_slug}/releases/{tag}            -- release detail + downloads
+  GET /{owner}/{repo_slug}/sessions                  -- recording session log
+  GET /{owner}/{repo_slug}/sessions/{id}             -- session detail
+  GET /{owner}/{repo_slug}/insights                  -- repo insights dashboard
+  GET /{owner}/{repo_slug}/tree/{ref}                -- file tree browser (repo root)
+  GET /{owner}/{repo_slug}/tree/{ref}/{path}         -- file tree browser (subdirectory)
+  GET /{owner}/{repo_slug}/analysis/{ref}            -- analysis dashboard (all 10 dimensions at a glance)
+  GET /{owner}/{repo_slug}/analysis/{ref}/contour    -- melodic contour analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/tempo      -- tempo analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/dynamics   -- dynamics analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/key        -- key detection analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/meter      -- metric analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/chord-map  -- chord map analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/groove     -- rhythmic groove analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/emotion    -- emotion analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/form       -- formal structure analysis
+  GET /{owner}/{repo_slug}/analysis/{ref}/motifs     -- motif browser (recurring patterns, transformations)
+  GET /{owner}/{repo_slug}/listen/{ref}              -- full-mix and per-track audio playback with track listing
+  GET /{owner}/{repo_slug}/listen/{ref}/{path}       -- single-stem playback page
+  GET /{owner}/{repo_slug}/listen/{ref}             -- Wavesurfer.js audio player (full mix)
+  GET /{owner}/{repo_slug}/listen/{ref}/{path}      -- Wavesurfer.js audio player (single track)
+  GET /{owner}/{repo_slug}/arrange/{ref}             -- arrangement matrix (instrument × section density grid)
+  GET /{owner}/{repo_slug}/piano-roll/{ref}          -- interactive piano roll (all tracks)
+  GET /{owner}/{repo_slug}/piano-roll/{ref}/{path}   -- interactive piano roll (single MIDI file)
+  GET /{owner}/{repo_slug}/activity                  -- repo-level event stream (commits, PRs, issues, branches, tags, sessions)
 
 These routes require NO JWT auth -- they return HTML shells whose embedded
 JavaScript fetches data from the authed JSON API (``/api/v1/musehub/...``)
@@ -102,11 +102,11 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 # Fixed-path routes registered BEFORE the /{owner}/{repo_slug} wildcard to
 # prevent /explore, /trending, and /users/* from being shadowed.
-fixed_router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+fixed_router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 
@@ -117,7 +117,7 @@ fixed_router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
 def _base_url(owner: str, repo_slug: str) -> str:
     """Return the canonical UI base URL for a repo."""
-    return f"/musehub/ui/{owner}/{repo_slug}"
+    return f"/{owner}/{repo_slug}"
 
 
 # Maps file extensions to display-friendly language names for the blob viewer.
@@ -244,7 +244,7 @@ def _og_tags(
 # ---------------------------------------------------------------------------
 
 
-@fixed_router.get("/feed", summary="Muse Hub activity feed")
+@fixed_router.get("/feed", summary="MuseHub activity feed")
 async def feed_page(request: Request) -> Response:
     """Render the activity feed page — events from followed users and watched repos."""
     ctx: dict[str, object] = {"title": "Feed"}
@@ -255,7 +255,7 @@ async def feed_page(request: Request) -> Response:
     )
 
 
-@fixed_router.get("/search", summary="Muse Hub global search page")
+@fixed_router.get("/search", summary="MuseHub global search page")
 async def global_search_page(
     request: Request,
     q: str = "",
@@ -305,7 +305,7 @@ async def global_search_page(
     )
 
 
-@fixed_router.get("/explore", summary="Muse Hub explore page")
+@fixed_router.get("/explore", summary="MuseHub explore page")
 async def explore_page(
     request: Request,
     lang: list[str] = Query(default=[], alias="lang", description="Language/instrument filter chips (multi-select)"),
@@ -396,7 +396,7 @@ async def explore_page(
             ("forks", "Most forked"),
             ("trending", "Trending"),
         ],
-        "base_explore_url": "/musehub/ui/explore",
+        "base_explore_url": "/explore",
     }
     return await htmx_fragment_or_full(
         request,
@@ -407,7 +407,7 @@ async def explore_page(
     )
 
 
-@fixed_router.get("/trending", summary="Muse Hub trending page")
+@fixed_router.get("/trending", summary="MuseHub trending page")
 async def trending_page(
     request: Request,
     page: int = Query(default=1, ge=1, description="Page number (1-based)"),
@@ -435,7 +435,7 @@ async def trending_page(
         "page": page,
         "total_pages": total_pages,
         "sort": "stars",
-        "base_explore_url": "/musehub/ui/trending",
+        "base_explore_url": "/trending",
     }
     return await htmx_fragment_or_full(
         request,
@@ -446,50 +446,6 @@ async def trending_page(
     )
 
 
-@fixed_router.get(
-    "/{username}",
-    response_class=HTMLResponse,
-    summary="Muse Hub user profile shortcut — redirects to /users/{username}",
-)
-async def profile_redirect(username: str) -> RedirectResponse:
-    """Redirect /musehub/ui/{username} → /musehub/ui/users/{username}.
-
-    This lets breadcrumb links like /musehub/ui/gabriel resolve to the profile
-    page instead of 404-ing (the two-segment /{owner}/{repo_slug} pattern only
-    matches when two segments are present).
-    """
-    return RedirectResponse(
-        url=f"/musehub/ui/users/{username}",
-        status_code=http_status.HTTP_302_FOUND,
-    )
-
-
-@fixed_router.get(
-    "/users/{username}",
-    summary='Muse Hub user profile page',
-)
-async def profile_page(request: Request, username: str) -> Response:
-    """Render the public user profile page.
-
-    Displays bio, avatar, pinned repos, all public repos with last-activity,
-    a GitHub-style contribution heatmap, and aggregated session credits.
-    Auth is handled client-side -- the profile itself is public.
-    """
-    ctx: dict[str, object] = {
-        "title": f"@{username}",
-        "username": username,
-        "og_meta": _og_tags(
-            title=f"@{username} — Muse Hub",
-            description=f"{username}'s music repos on Muse Hub",
-            og_type="profile",
-        ),
-    }
-    return json_or_html(
-        request,
-        lambda: templates.TemplateResponse(request, "musehub/pages/profile.html", ctx),
-        ctx,
-    )
-
 # ---------------------------------------------------------------------------
 # Repo-scoped pages
 # ---------------------------------------------------------------------------
@@ -497,7 +453,7 @@ async def profile_page(request: Request, username: str) -> Response:
 
 @router.get(
     "/{owner}/{repo_slug}",
-    summary="Muse Hub repo home page",
+    summary="MuseHub repo home page",
 )
 async def repo_page(
     request: Request,
@@ -557,7 +513,7 @@ async def repo_page(
         "tags_count": tags_count,
         "jsonld_script": render_jsonld_script(jsonld_repo(repo, page_url)),
         "og_meta": _og_tags(
-            title=f"{owner}/{repo_slug} — Muse Hub",
+            title=f"{owner}/{repo_slug} — MuseHub",
             description=repo.description or f"Music composition repository by {owner}",
             og_type="website",
         ),
@@ -576,7 +532,7 @@ async def repo_page(
 
 @router.get(
     "/{owner}/{repo_slug}/commits",
-    summary="Muse Hub commits list page",
+    summary="MuseHub commits list page",
 )
 async def commits_list_page(
     request: Request,
@@ -725,7 +681,7 @@ async def commits_list_page(
             "filter_tag": tag_filter or "",
             "active_filters": active_filters,
             "breadcrumb_data": _breadcrumbs(
-                (owner, f"/musehub/ui/{owner}"),
+                (owner, f"/{owner}"),
                 (repo_slug, base_url),
                 ("commits", ""),
             ),
@@ -739,7 +695,7 @@ async def commits_list_page(
 
 @router.get(
     "/{owner}/{repo_slug}/commits/{commit_id}",
-    summary="Muse Hub commit detail page",
+    summary="MuseHub commit detail page",
 )
 async def commit_page(
     request: Request,
@@ -796,7 +752,7 @@ async def commit_page(
 
     # Derive audio URL from snapshot_id when available.  WaveSurfer picks this
     # up from the data-url attribute; no JS API call needed when present.
-    api_base = f"/api/v1/musehub/repos/{repo_id}"
+    api_base = f"/api/v1/repos/{repo_id}"
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
         if commit.snapshot_id is not None
@@ -822,13 +778,13 @@ async def commit_page(
         "has_score": has_score,
         "abc_url": abc_url,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("commits", f"{base_url}/commits"),
             (short_id, ""),
         ),
         "og_meta": _og_tags(
-            title=f"Commit {short_id} · {owner}/{repo_slug} — Muse Hub",
+            title=f"Commit {short_id} · {owner}/{repo_slug} — MuseHub",
             description=commit.message,
             og_type="music.song",
         ),
@@ -844,7 +800,7 @@ async def commit_page(
 
 @router.get(
     "/{owner}/{repo_slug}/commits/{commit_id}/diff",
-    summary="Muse Hub musical diff view",
+    summary="MuseHub musical diff view",
 )
 async def diff_page(
     request: Request,
@@ -877,7 +833,7 @@ async def diff_page(
 
 @router.get(
     "/{owner}/{repo_slug}/graph",
-    summary="Muse Hub interactive DAG commit graph",
+    summary="MuseHub interactive DAG commit graph",
 )
 async def graph_page(
     request: Request,
@@ -932,7 +888,7 @@ async def graph_page(
 
 @router.get(
     "/{owner}/{repo_slug}/pulls",
-    summary="Muse Hub pull request list page",
+    summary="MuseHub pull request list page",
 )
 async def pr_list_page(
     request: Request,
@@ -981,7 +937,7 @@ async def pr_list_page(
         "state": state,
         "active_sort": sort,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("Pull Requests", f"{base_url}/pulls"),
         ),
@@ -998,13 +954,14 @@ async def pr_list_page(
 @router.get(
     "/{owner}/{repo_slug}/pulls/{pr_id}",
     response_class=HTMLResponse,
-    summary="Muse Hub PR detail page — SSR with HTMX review/merge actions",
+    summary="MuseHub PR detail page — SSR with HTMX review/merge actions",
 )
 async def pr_detail_page(
     request: Request,
     owner: str,
     repo_slug: str,
     pr_id: str,
+    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Render the PR detail page with full SSR data and HTMX fragment support.
@@ -1021,6 +978,30 @@ async def pr_detail_page(
     pr = await musehub_pull_requests.get_pr(db, repo_id, pr_id)
     if pr is None:
         raise HTTPException(status_code=404, detail=f"Pull request {pr_id} not found")
+
+    # JSON content negotiation — return PRDiffResponse for agent/API consumers.
+    if format == "json" or "application/json" in request.headers.get("accept", ""):
+        try:
+            divergence_result = await musehub_divergence.compute_hub_divergence(
+                db,
+                repo_id=repo_id,
+                branch_a=pr.from_branch,
+                branch_b=pr.to_branch,
+            )
+            diff_response = musehub_divergence.build_pr_diff_response(
+                pr_id=pr_id,
+                from_branch=pr.from_branch,
+                to_branch=pr.to_branch,
+                result=divergence_result,
+            )
+        except ValueError:
+            diff_response = musehub_divergence.build_zero_diff_response(
+                pr_id=pr_id,
+                repo_id=repo_id,
+                from_branch=pr.from_branch,
+                to_branch=pr.to_branch,
+            )
+        return JSONResponse(diff_response.model_dump(by_alias=True, mode="json"))
 
     reviews_resp = await musehub_pull_requests.list_reviews(
         db, repo_id=repo_id, pr_id=pr_id
@@ -1048,7 +1029,7 @@ async def pr_detail_page(
         "approved_count": approved_count,
         "changes_count": changes_count,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("Pull Requests", f"{base_url}/pulls"),
             (pr_id[:8], f"{base_url}/pulls/{pr_id}"),
@@ -1065,7 +1046,7 @@ async def pr_detail_page(
 
 @router.get(
     "/{owner}/{repo_slug}/issues",
-    summary="Muse Hub issue list page",
+    summary="MuseHub issue list page",
 )
 async def issue_list_page(
     request: Request,
@@ -1164,7 +1145,7 @@ async def issue_list_page(
         "milestones_data": milestones_data,
         "assignees": assignees,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("Issues", f"{base_url}/issues"),
         ),
@@ -1180,7 +1161,7 @@ async def issue_list_page(
 
 @router.get(
     "/{owner}/{repo_slug}/context/{ref}",
-    summary="Muse Hub AI context viewer",
+    summary="MuseHub AI context viewer",
 )
 async def context_page(
     request: Request,
@@ -1211,7 +1192,7 @@ async def context_page(
 
 @router.get(
     "/{owner}/{repo_slug}/issues/{number}",
-    summary="Muse Hub issue detail page",
+    summary="MuseHub issue detail page",
 )
 async def issue_detail_page(
     request: Request,
@@ -1261,7 +1242,7 @@ async def issue_detail_page(
         "labels_data": labels_data,
         "milestones_data": milestones_data,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("Issues", f"{base_url}/issues"),
             (f"#{number}", ""),
@@ -1290,12 +1271,12 @@ async def embed_page(
     """Render a compact, iframe-safe audio player for a MuseHub repo commit.
 
     Why this route exists: external sites embed MuseHub compositions via
-    ``<iframe src="/musehub/ui/{owner}/{repo_slug}/embed/{ref}">``.
+    ``<iframe src="/{owner}/{repo_slug}/embed/{ref}">``.
 
     Contract:
     - No JWT required -- public repos can be embedded without auth.
     - Returns ``X-Frame-Options: ALLOWALL`` so browsers permit cross-origin framing.
-    - Audio fetched from ``/api/v1/musehub/repos/{repo_id}/objects`` at runtime.
+    - Audio fetched from ``/api/v1/repos/{repo_id}/objects`` at runtime.
     """
     repo_id, _ = await _resolve_repo(owner, repo_slug, db)
     short_ref = ref[:8] if len(ref) >= 8 else ref
@@ -1328,7 +1309,7 @@ async def embed_page(
 
 @router.get(
     "/{owner}/{repo_slug}/listen/{ref}",
-    summary="Muse Hub listen page — full-mix and per-track audio playback",
+    summary="MuseHub listen page — full-mix and per-track audio playback",
 )
 async def listen_page(
     request: Request,
@@ -1392,7 +1373,7 @@ async def listen_page(
 
 @router.get(
     "/{owner}/{repo_slug}/listen/{ref}/{path:path}",
-    summary="Muse Hub listen page — individual stem playback",
+    summary="MuseHub listen page — individual stem playback",
 )
 async def listen_track_page(
     request: Request,
@@ -1422,7 +1403,7 @@ async def listen_track_page(
 
     object_map: dict[str, str] = {obj.path: obj.object_id for obj in objects}
     image_exts: frozenset[str] = frozenset({".webp", ".png", ".jpg", ".jpeg"})
-    api_base = f"/api/v1/musehub/repos/{repo_id}"
+    api_base = f"/api/v1/repos/{repo_id}"
 
     target_obj = next((obj for obj in objects if obj.path == path), None)
     has_renders = target_obj is not None
@@ -1479,7 +1460,7 @@ async def listen_track_page(
 
 @router.get(
     "/{owner}/{repo_slug}/credits",
-    summary="Muse Hub dynamic credits page",
+    summary="MuseHub dynamic credits page",
 )
 async def credits_page(
     request: Request,
@@ -1513,7 +1494,7 @@ async def credits_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}",
-    summary="Muse Hub analysis dashboard -- all musical dimensions at a glance",
+    summary="MuseHub analysis dashboard -- all musical dimensions at a glance",
 )
 async def analysis_dashboard_page(
     request: Request,
@@ -1553,7 +1534,7 @@ async def analysis_dashboard_page(
 
 @router.get(
     "/{owner}/{repo_slug}/search",
-    summary="Muse Hub in-repo search page",
+    summary="MuseHub in-repo search page",
 )
 async def search_page(
     request: Request,
@@ -1614,7 +1595,7 @@ async def search_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/motifs",
-    summary="Muse Hub motif browser page",
+    summary="MuseHub motif browser page",
 )
 async def motifs_page(
     request: Request,
@@ -1656,7 +1637,7 @@ async def motifs_page(
 
 @router.get(
     "/{owner}/{repo_slug}/arrange/{ref}",
-    summary="Muse Hub arrangement matrix page",
+    summary="MuseHub arrangement matrix page",
 )
 async def arrange_page(
     request: Request,
@@ -1667,7 +1648,7 @@ async def arrange_page(
 ) -> Response:
     """Render the arrangement matrix page for a given commit ref.
 
-    Fetches ``GET /api/v1/musehub/repos/{repo_id}/arrange/{ref}`` and renders
+    Fetches ``GET /api/v1/repos/{repo_id}/arrange/{ref}`` and renders
     an interactive instrument × section grid where:
 
     - Y-axis: instruments (bass, keys, guitar, drums, lead, pads)
@@ -1700,7 +1681,7 @@ async def arrange_page(
 @router.get(
     "/{owner}/{repo_slug}/compare/{refs}",
     response_class=HTMLResponse,
-    summary="Muse Hub compare view — multi-dimensional musical diff between two refs",
+    summary="MuseHub compare view — multi-dimensional musical diff between two refs",
 )
 async def compare_page(
     request: Request,
@@ -1748,7 +1729,7 @@ async def compare_page(
         "current_page": "compare",
         "compare_data": compare_data,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("compare", ""),
             (f"{base_ref}...{head_ref}", ""),
@@ -1759,7 +1740,7 @@ async def compare_page(
 
 @router.get(
     "/{owner}/{repo_slug}/divergence",
-    summary="Muse Hub divergence visualization page",
+    summary="MuseHub divergence visualization page",
 )
 async def divergence_page(
     request: Request,
@@ -1793,7 +1774,7 @@ async def divergence_page(
 
 @router.get(
     "/{owner}/{repo_slug}/timeline",
-    summary="Muse Hub timeline page",
+    summary="MuseHub timeline page",
 )
 async def timeline_page(
     request: Request,
@@ -1824,7 +1805,7 @@ async def timeline_page(
 
 @router.get(
     "/{owner}/{repo_slug}/releases",
-    summary="Muse Hub release list page",
+    summary="MuseHub release list page",
 )
 async def release_list_page(
     request: Request,
@@ -1869,7 +1850,7 @@ async def release_list_page(
 
 @router.get(
     "/{owner}/{repo_slug}/releases/{tag}",
-    summary="Muse Hub release detail page",
+    summary="MuseHub release detail page",
 )
 async def release_detail_page(
     request: Request,
@@ -1914,7 +1895,7 @@ async def release_detail_page(
 
 @router.get(
     "/{owner}/{repo_slug}/sessions",
-    summary="Muse Hub session log page",
+    summary="MuseHub session log page",
 )
 async def sessions_page(
     request: Request,
@@ -1961,7 +1942,7 @@ async def sessions_page(
 
 @router.get(
     "/{owner}/{repo_slug}/sessions/{session_id}",
-    summary="Muse Hub session detail page",
+    summary="MuseHub session detail page",
 )
 async def session_detail_page(
     request: Request,
@@ -1995,7 +1976,7 @@ async def session_detail_page(
 
 @router.get(
     "/{owner}/{repo_slug}/insights",
-    summary="Muse Hub repo insights dashboard",
+    summary="MuseHub repo insights dashboard",
 )
 async def insights_page(
     request: Request,
@@ -2026,7 +2007,7 @@ async def insights_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/contour",
-    summary="Muse Hub melodic contour analysis page",
+    summary="MuseHub melodic contour analysis page",
 )
 async def contour_page(
     request: Request,
@@ -2064,7 +2045,7 @@ async def contour_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/tempo",
-    summary="Muse Hub tempo analysis page",
+    summary="MuseHub tempo analysis page",
 )
 async def tempo_page(
     request: Request,
@@ -2101,7 +2082,7 @@ async def tempo_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/dynamics",
-    summary="Muse Hub dynamics analysis page",
+    summary="MuseHub dynamics analysis page",
 )
 async def dynamics_analysis_page(
     request: Request,
@@ -2140,7 +2121,7 @@ async def dynamics_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/key",
-    summary="Muse Hub key detection analysis page",
+    summary="MuseHub key detection analysis page",
 )
 async def key_analysis_page(
     request: Request,
@@ -2179,7 +2160,7 @@ async def key_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/meter",
-    summary="Muse Hub meter analysis page",
+    summary="MuseHub meter analysis page",
 )
 async def meter_analysis_page(
     request: Request,
@@ -2217,7 +2198,7 @@ async def meter_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/chord-map",
-    summary="Muse Hub chord map analysis page",
+    summary="MuseHub chord map analysis page",
 )
 async def chord_map_analysis_page(
     request: Request,
@@ -2256,7 +2237,7 @@ async def chord_map_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/groove",
-    summary="Muse Hub groove analysis page",
+    summary="MuseHub groove analysis page",
 )
 async def groove_analysis_page(
     request: Request,
@@ -2294,7 +2275,7 @@ async def groove_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/emotion",
-    summary="Muse Hub emotion analysis page",
+    summary="MuseHub emotion analysis page",
 )
 async def emotion_analysis_page(
     request: Request,
@@ -2333,7 +2314,7 @@ async def emotion_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/form",
-    summary="Muse Hub form analysis page",
+    summary="MuseHub form analysis page",
 )
 async def form_analysis_page(
     request: Request,
@@ -2371,7 +2352,7 @@ async def form_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/tree/{ref}",
-    summary="Muse Hub file tree browser — repo root",
+    summary="MuseHub file tree browser — repo root",
 )
 async def tree_page(
     request: Request,
@@ -2388,7 +2369,7 @@ async def tree_page(
     Breadcrumbs show: {owner} / {repo} / tree / {ref}.
 
     Content negotiation: the embedded JavaScript also uses this URL to fetch
-    a JSON listing from GET /api/v1/musehub/repos/{repo_id}/tree/{ref} when
+    a JSON listing from GET /api/v1/repos/{repo_id}/tree/{ref} when
     the Accept header is application/json.
     """
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
@@ -2410,7 +2391,7 @@ async def tree_page(
 
 @router.get(
     "/{owner}/{repo_slug}/tree/{ref}/{path:path}",
-    summary="Muse Hub file tree browser — subdirectory",
+    summary="MuseHub file tree browser — subdirectory",
 )
 async def tree_subdir_page(
     request: Request,
@@ -2448,7 +2429,7 @@ async def tree_subdir_page(
 
 @router.get(
     "/{owner}/{repo_slug}/groove-check",
-    summary="Muse Hub groove check page",
+    summary="MuseHub groove check page",
 )
 async def groove_check_page(
     request: Request,
@@ -2463,11 +2444,11 @@ async def groove_check_page(
 
     The chart encodes status as bar colour: green = OK, orange = WARN,
     red = FAIL.  Threshold and limit can be adjusted via controls that
-    re-fetch the underlying ``GET /api/v1/musehub/repos/{repo_id}/groove-check``
+    re-fetch the underlying ``GET /api/v1/repos/{repo_id}/groove-check``
     endpoint client-side.
 
     Auth is handled client-side via localStorage JWT, consistent with all other
-    Muse Hub UI pages.
+    MuseHub UI pages.
     """
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
     ctx: dict[str, object] = {
@@ -2486,12 +2467,13 @@ async def groove_check_page(
 
 @router.get(
     "/{owner}/{repo_slug}/branches",
-    summary="Muse Hub branch list page",
+    summary="MuseHub branch list page",
 )
 async def branches_page(
     request: Request,
     owner: str,
     repo_slug: str,
+    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> StarletteResponse:
     """Render the branch list page (SSR).
@@ -2500,11 +2482,16 @@ async def branches_page(
     musical divergence scores (placeholder), and compare links rendered
     server-side.  HTMX partial requests (``HX-Request: true``) return only
     the ``fragments/branch_rows.html`` fragment for in-place swap.
+
+    JSON (``Accept: application/json`` or ``?format=json``): returns
+    ``BranchDetailListResponse`` with camelCase keys.
     """
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
     branch_data: BranchDetailListResponse = (
         await musehub_repository.list_branches_with_detail(db, repo_id)
     )
+    if format == "json" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse(branch_data.model_dump(by_alias=True, mode="json"))
     default_branch = next((b for b in branch_data.branches if b.is_default), None)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2526,13 +2513,14 @@ async def branches_page(
 
 @router.get(
     "/{owner}/{repo_slug}/tags",
-    summary="Muse Hub tag browser page",
+    summary="MuseHub tag browser page",
 )
 async def tags_page(
     request: Request,
     owner: str,
     repo_slug: str,
     namespace: str | None = Query(None, description="Filter tags by namespace prefix"),
+    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
     db: AsyncSession = Depends(get_db),
 ) -> StarletteResponse:
     """Render the tag browser page (SSR).
@@ -2570,6 +2558,9 @@ async def tags_page(
         filtered_tags = all_tags
 
     namespaces: list[str] = sorted({t.namespace for t in all_tags})
+    if format == "json" or "application/json" in request.headers.get("accept", ""):
+        tag_list = TagListResponse(tags=filtered_tags, namespaces=namespaces)
+        return JSONResponse(tag_list.model_dump(by_alias=True, mode="json"))
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -2591,7 +2582,7 @@ async def tags_page(
 
 @router.get(
     "/{repo_id}/form-structure/{ref}",
-    summary="Muse Hub form and structure page",
+    summary="MuseHub form and structure page",
 )
 async def form_structure_page(
     request: Request,
@@ -2600,7 +2591,7 @@ async def form_structure_page(
 ) -> Response:
     """Render the form and structure analysis page for a commit ref.
 
-    Fetches ``GET /api/v1/musehub/repos/{repo_id}/form-structure/{ref}`` and
+    Fetches ``GET /api/v1/repos/{repo_id}/form-structure/{ref}`` and
     renders three structural analysis panels:
 
     - **Section map**: SVG timeline of intro/verse/chorus/bridge/outro bars,
@@ -2625,7 +2616,7 @@ async def form_structure_page(
 
 @router.get(
     "/{owner}/{repo_slug}/analysis/{ref}/harmony",
-    summary="Muse Hub harmony analysis page",
+    summary="MuseHub harmony analysis page",
 )
 async def harmony_analysis_page(
     request: Request,
@@ -2665,7 +2656,7 @@ async def harmony_analysis_page(
 
 @router.get(
     "/{owner}/{repo_slug}/piano-roll/{ref}",
-    summary="Muse Hub piano roll — all MIDI tracks",
+    summary="MuseHub piano roll — all MIDI tracks",
 )
 async def piano_roll_page(
     request: Request,
@@ -2686,7 +2677,7 @@ async def piano_roll_page(
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
     short_ref = ref[:8] if len(ref) >= 8 else ref
     instruments = await musehub_repository.get_instruments_for_repo(db, repo_id)
-    piano_roll_data_url = f"/api/v1/musehub/repos/{repo_id}/midi?ref={ref}"
+    piano_roll_data_url = f"/api/v1/repos/{repo_id}/midi?ref={ref}"
     instruments_data = [i.model_dump(by_alias=True, mode="json") for i in instruments]
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2711,7 +2702,7 @@ async def piano_roll_page(
 
 @router.get(
     "/{owner}/{repo_slug}/piano-roll/{ref}/{path:path}",
-    summary="Muse Hub piano roll — single MIDI track",
+    summary="MuseHub piano roll — single MIDI track",
 )
 async def piano_roll_track_page(
     request: Request,
@@ -2735,7 +2726,7 @@ async def piano_roll_track_page(
     track = await musehub_repository.get_track_info(db, repo_id, path)
     instruments = await musehub_repository.get_instruments_for_repo(db, repo_id)
     piano_roll_data_url = (
-        f"/api/v1/musehub/repos/{repo_id}/midi?ref={ref}&path={path}"
+        f"/api/v1/repos/{repo_id}/midi?ref={ref}&path={path}"
     )
     track_data = track.model_dump(by_alias=True, mode="json") if track else None
     instruments_data = [i.model_dump(by_alias=True, mode="json") for i in instruments]
@@ -2762,7 +2753,7 @@ async def piano_roll_track_page(
 
 @router.get(
     "/{owner}/{repo_slug}/blob/{ref}/{path:path}",
-    summary="Muse Hub file blob viewer — music-aware file rendering",
+    summary="MuseHub file blob viewer — music-aware file rendering",
 )
 async def blob_page(
     request: Request,
@@ -2852,7 +2843,7 @@ async def blob_page(
 
 @router.get(
     "/{owner}/{repo_slug}/score/{ref}",
-    summary="Muse Hub score renderer — full score, all tracks",
+    summary="MuseHub score renderer — full score, all tracks",
 )
 async def score_page(
     request: Request,
@@ -2875,7 +2866,7 @@ async def score_page(
     """
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
     score_meta = await musehub_repository.get_score_meta_for_repo(db, repo_id, "")
-    abc_url = f"/api/v1/musehub/repos/{repo_id}/abc?ref={ref}"
+    abc_url = f"/api/v1/repos/{repo_id}/abc?ref={ref}"
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -2896,7 +2887,7 @@ async def score_page(
 
 @router.get(
     "/{owner}/{repo_slug}/activity",
-    summary="Muse Hub activity feed — repo-level event stream",
+    summary="MuseHub activity feed — repo-level event stream",
 )
 async def activity_page(
     request: Request,
@@ -2950,7 +2941,7 @@ async def activity_page(
 
 @router.get(
     "/{owner}/{repo_slug}/score/{ref}/{path:path}",
-    summary="Muse Hub score renderer — single-track part view",
+    summary="MuseHub score renderer — single-track part view",
 )
 async def score_part_page(
     request: Request,
@@ -2970,7 +2961,7 @@ async def score_part_page(
     """
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
     score_meta = await musehub_repository.get_score_meta_for_repo(db, repo_id, path)
-    abc_url = f"/api/v1/musehub/repos/{repo_id}/abc?ref={ref}&path={path}"
+    abc_url = f"/api/v1/repos/{repo_id}/abc?ref={ref}&path={path}"
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,

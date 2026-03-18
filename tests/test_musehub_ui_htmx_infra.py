@@ -5,7 +5,7 @@ Verifies that:
 - base.html includes the correct <script> tags and hx-boost attribute.
 - musehub.js contains the HTMX JWT auth bridge and after-swap hook.
 - The is_htmx() / is_htmx_boosted() helpers return the correct values.
-- The static files are reachable via the /musehub/static/ HTTP endpoint.
+- The static files are reachable via the /static/ HTTP endpoint.
 """
 
 from __future__ import annotations
@@ -122,13 +122,13 @@ def test_is_htmx_boosted_helper_false() -> None:
 
 @pytest.mark.anyio
 async def test_htmx_min_js_served_over_http(client: AsyncClient) -> None:
-    """GET /musehub/static/htmx.min.js must return 200."""
-    resp = await client.get("/musehub/static/htmx.min.js")
+    """GET /static/htmx.min.js must return 200."""
+    resp = await client.get("/static/htmx.min.js")
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
 
 @pytest.mark.anyio
 async def test_alpinejs_min_js_served_over_http(client: AsyncClient) -> None:
-    """GET /musehub/static/alpinejs.min.js must return 200."""
-    resp = await client.get("/musehub/static/alpinejs.min.js")
+    """GET /static/alpinejs.min.js must return 200."""
+    resp = await client.get("/static/alpinejs.min.js")
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"

@@ -1,7 +1,7 @@
-"""Muse Hub blame API — attribute each MIDI note to the commit that last modified it.
+"""MuseHub blame API — attribute each MIDI note to the commit that last modified it.
 
 Endpoint:
-  GET /musehub/repos/{repo_id}/blame/{ref}?path=<midi_path>
+  GET /repos/{repo_id}/blame/{ref}?path=<midi_path>
 
 Query params:
   path (required) — MIDI file path within the repo

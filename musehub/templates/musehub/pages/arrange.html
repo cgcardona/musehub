@@ -2,139 +2,10 @@
 
 {% block title %}Arrange {{ ref[:8] }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
   arrange / {{ ref[:8] }}
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-/* ── Arrangement matrix grid ─────────────────────────────────────── */
-.arrange-wrap {
-  overflow-x: auto;
-  margin-top: 16px;
-}
-.arrange-table {
-  border-collapse: collapse;
-  font-size: 13px;
-  min-width: 100%;
-  table-layout: auto;
-}
-.arrange-table th {
-  background: #21262d;
-  color: #8b949e;
-  font-weight: 600;
-  padding: 8px 12px;
-  border: 1px solid #30363d;
-  text-align: center;
-  white-space: nowrap;
-}
-.arrange-table th.row-header {
-  text-align: left;
-  min-width: 100px;
-}
-.arrange-table td {
-  border: 1px solid #21262d;
-  padding: 0;
-  text-align: center;
-  vertical-align: middle;
-}
-.arrange-cell {
-  width: 72px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-  border-radius: 3px;
-  margin: 2px;
-  position: relative;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.85);
-}
-.arrange-cell:hover {
-  opacity: 0.85;
-  transform: scale(1.05);
-  z-index: 10;
-}
-.arrange-cell.silent {
-  background: #0d1117;
-  color: #30363d;
-  cursor: default;
-}
-.arrange-cell.silent:hover {
-  transform: none;
-  opacity: 1;
-}
-/* Row / column summary cells */
-.arrange-table td.summary-cell {
-  background: #161b22;
-  padding: 6px 10px;
-  color: #8b949e;
-  font-size: 12px;
-  white-space: nowrap;
-  text-align: right;
-}
-.arrange-table td.col-summary-cell {
-  background: #161b22;
-  padding: 6px 10px;
-  color: #8b949e;
-  font-size: 12px;
-  text-align: center;
-}
-/* Instrument icon mapping */
-.inst-icon::before { margin-right: 6px; }
-/* Legend */
-.legend {
-  display: flex; gap: 16px; flex-wrap: wrap;
-  align-items: center; margin-bottom: 12px; font-size: 12px; color: #8b949e;
-}
-.legend-swatch {
-  width: 18px; height: 18px; border-radius: 3px; display: inline-block;
-  vertical-align: middle; margin-right: 4px;
-}
-/* Density bar under row header */
-.density-bar {
-  height: 4px; border-radius: 2px; margin-top: 3px;
-  background: #1f6feb; transition: width 0.3s;
-}
-/* Section header beat info */
-.section-beats { font-size: 10px; color: #8b949e; display: block; margin-top: 2px; }
-/* Stats pills row */
-.stats-pills {
-  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
-}
-.stats-pill {
-  background: #161b22; border: 1px solid #30363d; border-radius: 12px;
-  padding: 4px 12px; font-size: 12px; color: #8b949e;
-}
-.stats-pill strong { color: #e6edf3; }
-/* Tooltip (native browser via title) — upgrading to CSS tooltip for richer info */
-.cell-tooltip {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1c2128;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 11px;
-  color: #c9d1d9;
-  white-space: nowrap;
-  z-index: 100;
-  pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  line-height: 1.5;
-  text-align: left;
-  min-width: 140px;
-}
-.arrange-cell:hover .cell-tooltip { display: block; }
-</style>
-{% endblock %}
 
 {% block page_data %}
 const repoId   = {{ repo_id | tojson }};
@@ -142,7 +13,7 @@ const ref      = {{ ref | tojson }};
 const owner    = {{ owner | tojson }};
 const repoSlug = {{ repo_slug | tojson }};
 const base     = {{ base_url | tojson }};
-const apiBase  = '/api/v1/musehub/repos/' + repoId;
+const apiBase  = '/api/v1/repos/' + repoId;
 {% endblock %}
 
 {% block page_script %}

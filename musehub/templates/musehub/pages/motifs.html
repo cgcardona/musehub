@@ -2,99 +2,10 @@
 
 {% block title %}Motifs {{ ref[:8] }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
   analysis / {{ ref[:8] }} / motifs
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-.motif-card {
-  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-  padding: 16px; margin-bottom: 16px; transition: border-color 0.15s;
-}
-.motif-card:hover { border-color: #58a6ff; }
-.motif-header {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.motif-id {
-  font-family: monospace; font-size: 16px; font-weight: 700;
-  color: #58a6ff; background: #0d1117;
-  padding: 2px 8px; border-radius: 4px; border: 1px solid #30363d;
-}
-.motif-meta {
-  display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px;
-}
-.motif-meta-item {
-  display: flex; flex-direction: column; gap: 2px;
-}
-.badge-contour {
-  background: #1a3a5c; border: 1px solid #1f6feb; color: #79c0ff;
-}
-.badge-transform {
-  background: #1f3a1f; border: 1px solid #238636; color: #56d364;
-}
-.badge-track {
-  background: #2d1a4a; border: 1px solid #6e40c9; color: #d2a8ff;
-}
-.piano-roll {
-  display: flex; gap: 3px; align-items: flex-end; height: 60px;
-  padding: 4px; background: #0d1117; border: 1px solid #30363d;
-  border-radius: 4px; overflow: hidden;
-}
-.piano-note {
-  width: 18px; border-radius: 3px 3px 0 0;
-  background: linear-gradient(to top, #1f6feb, #58a6ff);
-  border: 1px solid #388bfd; transition: opacity 0.15s;
-  cursor: default;
-}
-.piano-note:hover { opacity: 0.8; }
-.recurrence-grid {
-  overflow-x: auto; margin-top: 8px;
-}
-.recurrence-table {
-  border-collapse: collapse; font-size: 12px; min-width: 100%;
-}
-.recurrence-table th {
-  background: #21262d; color: #8b949e; font-weight: 600;
-  padding: 6px 10px; border: 1px solid #30363d;
-  text-align: center; white-space: nowrap;
-}
-.recurrence-table td {
-  padding: 6px 10px; border: 1px solid #30363d;
-  text-align: center; min-width: 80px;
-}
-.recurrence-table td.track-label {
-  background: #21262d; color: #c9d1d9; font-weight: 600;
-  text-align: left; white-space: nowrap;
-}
-.cell-present { background: #1a3a5c; }
-.cell-inversion { background: #1f3a1f; }
-.cell-transposition { background: #2d1a4a; }
-.cell-absent { background: #0d1117; }
-.transform-section {
-  margin-top: 12px; padding-top: 12px; border-top: 1px solid #21262d;
-}
-.transform-row {
-  display: flex; align-items: flex-start; gap: 12px; padding: 8px 0;
-  border-bottom: 1px solid #21262d;
-}
-.transform-row:last-child { border-bottom: none; }
-.filter-bar {
-  display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
-  margin-bottom: 16px;
-}
-.filter-bar label { font-size: 12px; color: #8b949e; }
-.filter-bar select {
-  display: block; margin-top: 4px;
-}
-.interval-label {
-  font-family: monospace; font-size: 11px; color: #8b949e;
-  margin-top: 4px; text-align: center;
-}
-</style>
-{% endblock %}
 
 {% block page_data %}
 const repoId   = {{ repo_id | tojson }};
@@ -102,7 +13,7 @@ const ref      = {{ ref | tojson }};
 const owner    = {{ owner | tojson }};
 const repoSlug = {{ repo_slug | tojson }};
 const base     = {{ base_url | tojson }};
-const apiBase  = '/api/v1/musehub/repos/' + repoId;
+const apiBase  = '/api/v1/repos/' + repoId;
 {% endblock %}
 
 {% block page_script %}

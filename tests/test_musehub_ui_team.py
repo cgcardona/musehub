@@ -1,6 +1,6 @@
 """Tests for the MuseHub collaborators/team management UI page (SSR).
 
-Covers — GET /musehub/ui/{owner}/{repo_slug}/settings/collaborators
+Covers — GET /{owner}/{repo_slug}/settings/collaborators
 
 Test index:
 - test_collaborators_settings_page_returns_200
@@ -99,9 +99,9 @@ async def test_collaborators_settings_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/settings/collaborators returns 200 HTML."""
+    """GET /{owner}/{slug}/settings/collaborators returns 200 HTML."""
     await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
 
@@ -118,7 +118,7 @@ async def test_collaborators_settings_page_no_auth_required(
     """
     await _make_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators",
+        f"/{_OWNER}/{_SLUG}/settings/collaborators",
         headers={}, # explicit: no Authorization header
     )
     assert resp.status_code == 200
@@ -129,7 +129,7 @@ async def test_collaborators_settings_page_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug combination returns 404."""
-    resp = await client.get("/musehub/ui/nobody/nonexistent-repo/settings/collaborators")
+    resp = await client.get("/nobody/nonexistent-repo/settings/collaborators")
     assert resp.status_code == 404
 
 
@@ -140,7 +140,7 @@ async def test_collaborators_settings_page_has_invite_form_htmx(
 ) -> None:
     """The page embeds the invite form with hx-post for HTMX submission."""
     await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     assert "hx-post" in resp.text
 
@@ -152,7 +152,7 @@ async def test_collaborators_settings_page_has_permission_badges(
 ) -> None:
     """The page renders colour-coded permission badge CSS classes server-side."""
     await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     body = resp.text
     assert "badge-perm-read" in body
@@ -168,7 +168,7 @@ async def test_collaborators_settings_page_has_owner_crown_badge(
 ) -> None:
     """The page marks owner permission with a crown emoji (👑)."""
     await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     assert "👑" in resp.text
 
@@ -181,7 +181,7 @@ async def test_collaborators_settings_page_has_remove_button_htmx(
     """Non-owner collaborator rows carry hx-delete on the remove form."""
     repo_id = await _make_repo(db_session)
     await _add_collaborator(db_session, repo_id, user_id=str(uuid.uuid4()), permission="write")
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     assert "hx-delete" in resp.text
 
@@ -193,7 +193,7 @@ async def test_collaborators_settings_json_response_empty(
     """?format=json returns CollaboratorListResponse with empty list for a new repo."""
     await _make_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators?format=json"
+        f"/{_OWNER}/{_SLUG}/settings/collaborators?format=json"
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -215,7 +215,7 @@ async def test_collaborators_settings_json_response_with_collaborators(
     )
 
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators?format=json"
+        f"/{_OWNER}/{_SLUG}/settings/collaborators?format=json"
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -234,7 +234,7 @@ async def test_collaborators_settings_page_has_settings_tabs(
 ) -> None:
     """The page includes the settings tab navigation bar."""
     await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     body = resp.text
     assert "settings-tabs" in body
@@ -248,7 +248,7 @@ async def test_collaborators_settings_page_has_invite_form_fields(
 ) -> None:
     """The invite form has user_id and permission input fields rendered server-side."""
     await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     body = resp.text
     assert 'name="user_id"' in body

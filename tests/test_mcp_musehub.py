@@ -115,11 +115,16 @@ class TestMusehubToolsRegistered:
 
     def test_musehub_tools_in_categories(self) -> None:
         """Every musehub_* tool has an entry in TOOL_CATEGORIES."""
-        from musehub.mcp.tools import MUSEHUB_WRITE_TOOL_NAMES
+        from musehub.mcp.tools import MUSEHUB_ELICITATION_TOOL_NAMES, MUSEHUB_WRITE_TOOL_NAMES
 
         for name in MUSEHUB_TOOL_NAMES:
             assert name in TOOL_CATEGORIES, f"Tool '{name}' missing from TOOL_CATEGORIES"
-            expected_category = "musehub-write" if name in MUSEHUB_WRITE_TOOL_NAMES else "musehub-read"
+            if name in MUSEHUB_ELICITATION_TOOL_NAMES:
+                expected_category = "musehub-elicitation"
+            elif name in MUSEHUB_WRITE_TOOL_NAMES:
+                expected_category = "musehub-write"
+            else:
+                expected_category = "musehub-read"
             assert TOOL_CATEGORIES[name] == expected_category, (
                 f"Tool '{name}' has category '{TOOL_CATEGORIES[name]}', expected '{expected_category}'"
             )
@@ -140,7 +145,7 @@ class TestMusehubToolsRegistered:
             )
 
     def test_all_tools_defined(self) -> None:
-        """All 27 MuseHub tools (15 read + 12 write) are defined."""
+        """All 32 MuseHub tools (15 read + 12 write + 5 elicitation) are defined."""
         expected_read = {
             "musehub_browse_repo",
             "musehub_list_branches",
@@ -172,7 +177,14 @@ class TestMusehubToolsRegistered:
             "musehub_star_repo",
             "musehub_create_label",
         }
-        assert MUSEHUB_TOOL_NAMES == expected_read | expected_write
+        expected_elicitation = {
+            "musehub_compose_with_preferences",
+            "musehub_review_pr_interactive",
+            "musehub_connect_streaming_platform",
+            "musehub_connect_daw_cloud",
+            "musehub_create_release_interactive",
+        }
+        assert MUSEHUB_TOOL_NAMES == expected_read | expected_write | expected_elicitation
 
 
 # ---------------------------------------------------------------------------

@@ -1,17 +1,17 @@
-"""Muse Hub pull request route handlers.
+"""MuseHub pull request route handlers.
 
 Endpoint summary:
-  POST /musehub/repos/{repo_id}/pull-requests — open a PR
-  GET /musehub/repos/{repo_id}/pull-requests — list PRs
-  GET /musehub/repos/{repo_id}/pull-requests/{pr_id} — get a PR
-  GET /musehub/repos/{repo_id}/pull-requests/{pr_id}/diff — musical diff (radar data)
-  POST /musehub/repos/{repo_id}/pull-requests/{pr_id}/merge — merge a PR
-  POST /musehub/repos/{repo_id}/pull-requests/{pr_id}/comments — create review comment
-  GET /musehub/repos/{repo_id}/pull-requests/{pr_id}/comments — list review comments (threaded)
-  POST /musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers — request review from users
-  DELETE /musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers/{username} — remove review request
-  GET /musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews — list reviews
-  POST /musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews — submit a review
+  POST /repos/{repo_id}/pull-requests — open a PR
+  GET /repos/{repo_id}/pull-requests — list PRs
+  GET /repos/{repo_id}/pull-requests/{pr_id} — get a PR
+  GET /repos/{repo_id}/pull-requests/{pr_id}/diff — musical diff (radar data)
+  POST /repos/{repo_id}/pull-requests/{pr_id}/merge — merge a PR
+  POST /repos/{repo_id}/pull-requests/{pr_id}/comments — create review comment
+  GET /repos/{repo_id}/pull-requests/{pr_id}/comments — list review comments (threaded)
+  POST /repos/{repo_id}/pull-requests/{pr_id}/reviewers — request review from users
+  DELETE /repos/{repo_id}/pull-requests/{pr_id}/reviewers/{username} — remove review request
+  GET /repos/{repo_id}/pull-requests/{pr_id}/reviews — list reviews
+  POST /repos/{repo_id}/pull-requests/{pr_id}/reviews — submit a review
 
 All endpoints require a valid JWT Bearer token (except diff which accepts anonymous reads
 of public repos, matching the same visibility rules as get_pull_request).
@@ -56,7 +56,7 @@ router = APIRouter()
     response_model=PRResponse,
     status_code=status.HTTP_201_CREATED,
     operation_id="createPullRequest",
-    summary="Open a pull request against a Muse Hub repo",
+    summary="Open a pull request against a MuseHub repo",
 )
 async def create_pull_request(
     repo_id: str,
@@ -117,7 +117,7 @@ async def create_pull_request(
     "/repos/{repo_id}/pull-requests",
     response_model=PRListResponse,
     operation_id="listPullRequests",
-    summary="List pull requests for a Muse Hub repo",
+    summary="List pull requests for a MuseHub repo",
 )
 async def list_pull_requests(
     repo_id: str,

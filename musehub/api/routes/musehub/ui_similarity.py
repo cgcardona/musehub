@@ -1,10 +1,10 @@
-"""Muse Hub musical similarity page.
+"""MuseHub musical similarity page.
 
 Serves the ``/{owner}/{repo_slug}/similarity/{base}...{head}`` UI page that
 visualises the 10-dimension musical similarity vector between two Muse refs.
 
 Endpoint summary:
-  GET /musehub/ui/{owner}/{repo_slug}/similarity/{refs}
+  GET /{owner}/{repo_slug}/similarity/{refs}
     refs encodes ``base...head`` (same convention as the compare page).
     HTML (default) → interactive similarity report with server-side SVG radar chart.
     JSON (``?format=json`` or ``Accept: application/json``)
@@ -40,7 +40,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 # 10 musical dimensions in radar order — (model_attr, display_label)
@@ -162,12 +162,12 @@ async def _resolve_repo(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), f"/musehub/ui/{owner}/{repo_slug}"
+    return str(row.repo_id), f"/{owner}/{repo_slug}"
 
 
 @router.get(
     "/{owner}/{repo_slug}/similarity/{refs}",
-    summary="Muse Hub musical similarity score page",
+    summary="MuseHub musical similarity score page",
 )
 async def similarity_page(
     request: Request,
@@ -248,7 +248,7 @@ async def similarity_page(
         "base_url": base_url,
         "current_page": "similarity",
         "breadcrumb_data": [
-            {"label": owner, "url": f"/musehub/ui/{owner}"},
+            {"label": owner, "url": f"/{owner}"},
             {"label": repo_slug, "url": base_url},
             {"label": "similarity", "url": ""},
             {"label": f"{base_ref}...{head_ref}", "url": ""},

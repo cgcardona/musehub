@@ -1,6 +1,11 @@
-"""MuseHub MCP tool definitions — all 27 tools for AI agents.
+"""MuseHub MCP tool definitions — all 32 tools for AI agents (MCP 2025-11-25).
 
-Covers the full MuseHub surface: reads (15) and writes (12).
+Covers the full MuseHub surface: reads (15), writes (12), and elicitation-powered
+interactive tools (5).
+
+Elicitation-powered tools use the ToolCallContext to collect user preferences
+mid-call via the MCP 2025-11-25 elicitation protocol. They require an active
+session (``Mcp-Session-Id``) and degrade gracefully without one.
 
 Reads give agents complete browsing power — repos, branches, commits, files,
 musical analysis, issues, PRs, releases, and global discovery.
@@ -842,12 +847,150 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
 ]
 
 
+# ── Elicitation-powered tools (MCP 2025-11-25) ────────────────────────────────
+
+
+MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
+    {
+        "name": "musehub_compose_with_preferences",
+        "server_side": True,
+        "description": (
+            "Interactively compose a musical piece by collecting user preferences via "
+            "form-mode elicitation. Asks the user for key signature, tempo, time signature, "
+            "mood, genre, reference artist, and duration. Returns a complete composition plan "
+            "with chord progressions, section structure, harmonic tension profile, and a "
+            "step-by-step Muse project workflow. "
+            "Requires an active MCP session with elicitation capability. "
+            "Example: musehub_compose_with_preferences(repo_id='a3f2-...')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "Optional repository to scaffold the composition into.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "musehub_review_pr_interactive",
+        "server_side": True,
+        "description": (
+            "Review a pull request interactively by first eliciting the reviewer's focus "
+            "dimension (melodic / harmonic / rhythmic / structural / dynamic / all) and "
+            "depth (quick / standard / thorough). Returns a deep structured review targeting "
+            "the user-chosen dimensions with harmonic tension and rhythmic consistency checks. "
+            "Requires an active MCP session with elicitation capability. "
+            "Example: musehub_review_pr_interactive(repo_id='a3f2-...', pr_id='pr-uuid')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the MuseHub repository.",
+                },
+                "pr_id": {
+                    "type": "string",
+                    "description": "UUID of the pull request to review.",
+                },
+            },
+            "required": ["repo_id", "pr_id"],
+        },
+    },
+    {
+        "name": "musehub_connect_streaming_platform",
+        "server_side": True,
+        "description": (
+            "Connect a streaming platform account (Spotify, SoundCloud, Bandcamp, YouTube Music, "
+            "Apple Music, TIDAL, Amazon Music, Deezer) via URL-mode elicitation (OAuth). "
+            "Directs the user to a MuseHub OAuth start page; once authorised, the agent can "
+            "distribute Muse releases directly to the platform. "
+            "Requires an active MCP session with URL elicitation capability. "
+            "Example: musehub_connect_streaming_platform(platform='Spotify', repo_id='a3f2-...')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "platform": {
+                    "type": "string",
+                    "description": "Streaming platform name. Elicited from user if omitted.",
+                    "enum": [
+                        "Spotify", "SoundCloud", "Bandcamp", "YouTube Music",
+                        "Apple Music", "TIDAL", "Amazon Music", "Deezer",
+                    ],
+                },
+                "repo_id": {
+                    "type": "string",
+                    "description": "Optional repository context for release distribution.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "musehub_connect_daw_cloud",
+        "server_side": True,
+        "description": (
+            "Connect a cloud DAW or mastering service (LANDR, Splice, Soundtrap, BandLab, "
+            "Audiotool) via URL-mode elicitation (OAuth). Once connected, agents can trigger "
+            "cloud renders, stems exports, and AI mastering jobs directly from MuseHub workflows. "
+            "Requires an active MCP session with URL elicitation capability. "
+            "Example: musehub_connect_daw_cloud(service='LANDR')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "service": {
+                    "type": "string",
+                    "description": "Cloud DAW / mastering service name. Elicited if omitted.",
+                    "enum": ["LANDR", "Splice", "Soundtrap", "BandLab", "Audiotool"],
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "musehub_create_release_interactive",
+        "server_side": True,
+        "description": (
+            "Create a release interactively in two chained elicitation steps: "
+            "(1) form-mode: collects tag, title, release notes, changelog highlight, "
+            "and pre-release flag; "
+            "(2) URL-mode (optional): offers streaming platform OAuth connection. "
+            "Creates the release then returns distribution guidance for connected platforms. "
+            "Requires an active MCP session with elicitation capability. "
+            "Example: musehub_create_release_interactive(repo_id='a3f2-...')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the repository to create the release in.",
+                },
+            },
+            "required": ["repo_id"],
+        },
+    },
+]
+
+
 # ── Combined catalogue ────────────────────────────────────────────────────────
 
-MUSEHUB_TOOLS: list[MCPToolDef] = MUSEHUB_READ_TOOLS + MUSEHUB_WRITE_TOOLS
+MUSEHUB_TOOLS: list[MCPToolDef] = (
+    MUSEHUB_READ_TOOLS + MUSEHUB_WRITE_TOOLS + MUSEHUB_ELICITATION_TOOLS
+)
 
 MUSEHUB_TOOL_NAMES: set[str] = {t["name"] for t in MUSEHUB_TOOLS}
 """Set of all musehub_* tool names — used by the MCP dispatcher to route calls."""
 
-MUSEHUB_WRITE_TOOL_NAMES: set[str] = {t["name"] for t in MUSEHUB_WRITE_TOOLS}
-"""Set of write tool names — requires authentication."""
+MUSEHUB_WRITE_TOOL_NAMES: set[str] = {
+    t["name"] for t in MUSEHUB_WRITE_TOOLS + MUSEHUB_ELICITATION_TOOLS
+}
+"""Set of write/interactive tool names — requires authentication."""
+
+MUSEHUB_ELICITATION_TOOL_NAMES: set[str] = {t["name"] for t in MUSEHUB_ELICITATION_TOOLS}
+"""Set of elicitation-powered tool names — requires active session."""

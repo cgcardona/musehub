@@ -5,7 +5,7 @@ Endpoints:
   GET /musehub/search?q={q}&mode={mode}
     — Global cross-repo commit search (keyword or pattern).
 
-  GET /musehub/repos/{repo_id}/search?q={q}&mode={mode}
+  GET /repos/{repo_id}/search?q={q}&mode={mode}
     — In-repo commit search with four modes:
         property — filter by musical properties (harmony, rhythm, etc.)
         ask — natural-language query (keyword extraction + overlap scoring)
@@ -44,7 +44,7 @@ _REPO_VALID_MODES = frozenset({"property", "ask", "keyword", "pattern"})
     "/search",
     response_model=GlobalSearchResult,
     operation_id="globalSearch",
-    summary="Global cross-repo search across all public Muse Hub repos",
+    summary="Global cross-repo search across all public MuseHub repos",
 )
 async def global_search(
     q: str = Query(..., min_length=1, max_length=500, description="Search query string"),
@@ -54,7 +54,7 @@ async def global_search(
     db: AsyncSession = Depends(get_db),
     _: TokenClaims | None = Depends(optional_token),
 ) -> GlobalSearchResult:
-    """Search commit messages across all public Muse Hub repos.
+    """Search commit messages across all public MuseHub repos.
 
     Results are grouped by repo — each group contains up to 20 matching
     commits ordered newest-first with repo-level metadata (name, owner).
@@ -72,7 +72,7 @@ async def global_search(
       Use ``%`` as wildcard (e.g. ``q=%minor%``).
 
     Content negotiation: this endpoint always returns JSON. The companion
-    HTML page at ``GET /musehub/ui/search`` renders the browser UI shell.
+    HTML page at ``GET /search`` renders the browser UI shell.
     """
     effective_mode = mode if mode in _GLOBAL_VALID_MODES else "keyword"
     if effective_mode != mode:

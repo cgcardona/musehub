@@ -1,8 +1,8 @@
-"""Muse Hub sync protocol route handlers.
+"""MuseHub sync protocol route handlers.
 
 Endpoint summary:
-  POST /musehub/repos/{repo_id}/push — batch-commit and object upload
-  POST /musehub/repos/{repo_id}/pull — fetch missing commits and objects
+  POST /repos/{repo_id}/push — batch-commit and object upload
+  POST /repos/{repo_id}/pull — fetch missing commits and objects
 
 Both endpoints require a valid JWT Bearer token. No business logic lives
 here — all persistence is delegated to musehub.services.musehub_sync.

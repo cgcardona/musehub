@@ -1,4 +1,4 @@
-"""Pydantic v2 request/response models for the Muse Hub API.
+"""Pydantic v2 request/response models for the MuseHub API.
 
 All wire-format fields use camelCase via CamelModel. Python code uses
 snake_case throughout; only serialisation to JSON uses camelCase.
@@ -177,7 +177,7 @@ class CreateRepoRequest(CamelModel):
 
 
 class RepoResponse(CamelModel):
-    """Wire representation of a Muse Hub repo.
+    """Wire representation of a MuseHub repo.
 
     ``owner`` and ``slug`` together form the canonical /{owner}/{slug} URL scheme.
     ``repo_id`` is the internal UUID primary key — never exposed in external URLs.
@@ -189,7 +189,7 @@ class RepoResponse(CamelModel):
     slug: str = Field(..., description="URL-safe slug auto-generated from name", examples=["jazz-standards-2024"])
     visibility: str = Field(..., description="'public' or 'private'", examples=["public"])
     owner_user_id: str = Field(..., description="UUID of the owning user account")
-    clone_url: str = Field(..., description="URL used by the CLI for push/pull", examples=["https://musehub.app/api/v1/musehub/repos/e3b0c44298fc"])
+    clone_url: str = Field(..., description="URL used by the CLI for push/pull", examples=["https://musehub.app/api/v1/repos/e3b0c44298fc"])
     description: str = Field("", description="Short description shown on the explore page", examples=["Classic jazz standards arranged for quartet"])
     tags: list[str] = Field(default_factory=list, description="Free-form tags (genre, key, instrumentation)", examples=[["jazz", "F# minor", "bass"]])
     key_signature: str | None = Field(None, description="Musical key (e.g. 'C major', 'F# minor')", examples=["F# minor"])
@@ -329,7 +329,7 @@ class CommitListResponse(CamelModel):
 class RepoStatsResponse(CamelModel):
     """Aggregated counts for the repo home page stats bar.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/stats``.
+    Returned by ``GET /api/v1/repos/{repo_id}/stats``.
     All counts are non-negative integers; 0 when the repo has no data yet.
     """
 
@@ -375,7 +375,7 @@ class IssueUpdate(CamelModel):
 
 
 class IssueResponse(CamelModel):
-    """Wire representation of a Muse Hub issue."""
+    """Wire representation of a MuseHub issue."""
 
     issue_id: str = Field(..., description="Internal UUID for this issue")
     number: int = Field(..., description="Per-repo sequential issue number", examples=[42])
@@ -494,7 +494,7 @@ class MilestoneCreate(CamelModel):
 
 
 class MilestoneResponse(CamelModel):
-    """Wire representation of a Muse Hub milestone."""
+    """Wire representation of a MuseHub milestone."""
 
     milestone_id: str = Field(..., description="Internal UUID for this milestone")
     number: int = Field(..., description="Per-repo sequential milestone number", examples=[1])
@@ -576,7 +576,7 @@ class PRCreate(CamelModel):
 
 
 class PRResponse(CamelModel):
-    """Wire representation of a Muse Hub pull request."""
+    """Wire representation of a MuseHub pull request."""
 
     pr_id: str = Field(..., description="Internal UUID for this pull request")
     title: str = Field(..., description="PR title", examples=["Add bossa nova bridge section"])
@@ -638,7 +638,7 @@ class PRDiffDimensionScore(CamelModel):
 class PRDiffResponse(CamelModel):
     """Musical diff between the from_branch and to_branch of a pull request.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/diff``.
+    Returned by ``GET /api/v1/repos/{repo_id}/pull-requests/{pr_id}/diff``.
     Consumed by the PR detail page to render the radar chart, piano roll diff,
     audio A/B toggle, and dimension badges. Also consumed by AI agents to
     reason about musical impact before merging.
@@ -905,7 +905,7 @@ class ReleaseDownloadUrls(CamelModel):
 
 
 class ReleaseResponse(CamelModel):
-    """Wire representation of a Muse Hub release.
+    """Wire representation of a MuseHub release.
 
     is_prerelease and is_draft drive the UI badges on the release detail page.
     gpg_signature is None when the tag was not GPG-signed; a non-empty string
@@ -1038,7 +1038,7 @@ class ContributorCredits(CamelModel):
 class CreditsResponse(CamelModel):
     """Wire representation of the full credits roll for a repo.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/credits``.
+    Returned by ``GET /api/v1/repos/{repo_id}/credits``.
     The ``sort`` field echoes back the sort order applied to the list.
     An empty ``contributors`` list means no commits have been pushed yet.
     """
@@ -1183,7 +1183,7 @@ class DivergenceDimensionResponse(CamelModel):
 
 
 class DivergenceResponse(CamelModel):
-    """Full musical divergence report between two Muse Hub branches.
+    """Full musical divergence report between two MuseHub branches.
 
     Returned by ``GET /musehub/repos/{repo_id}/divergence``. Contains five
     per-dimension scores (melodic, harmonic, rhythmic, structural, dynamic)
@@ -1227,7 +1227,7 @@ class CommitDiffDimensionScore(CamelModel):
 class CommitDiffSummaryResponse(CamelModel):
     """Multi-dimensional diff summary between a commit and its parent.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/commits/{commit_id}/diff-summary``.
+    Returned by ``GET /api/v1/repos/{repo_id}/commits/{commit_id}/diff-summary``.
     Consumed by the commit detail page to render dimension-change badges that help
     musicians understand *what* changed musically between two pushes.
     """
@@ -1274,7 +1274,7 @@ class ExploreRepoResult(CamelModel):
 
 
 class ProfileUpdateRequest(CamelModel):
-    """Body for PUT /api/v1/musehub/users/{username}.
+    """Body for PUT /api/v1/users/{username}.
 
     All fields are optional -- send only the ones to change.
     ``is_verified`` and ``cc_license`` are intentionally excluded: they are
@@ -1311,7 +1311,7 @@ class ProfileRepoSummary(CamelModel):
 
 
 class ExploreResponse(CamelModel):
-    """Paginated response from GET /api/v1/musehub/discover/repos.
+    """Paginated response from GET /api/v1/discover/repos.
 
     ``total`` reflects the full filtered result set size -- not just the current
     page -- so clients can render pagination controls without a second query.
@@ -1342,9 +1342,9 @@ class ContributionDay(CamelModel):
 
 
 class ProfileResponse(CamelModel):
-    """Full wire representation of a Muse Hub user profile.
+    """Full wire representation of a MuseHub user profile.
 
-    Returned by GET /api/v1/musehub/users/{username}.
+    Returned by GET /api/v1/users/{username}.
     ``repos`` contains only public repos when the caller is not the owner.
     ``contribution_graph`` is the last 52 weeks of daily commit activity.
     ``session_credits`` is the total number of commits across all repos
@@ -1620,7 +1620,7 @@ class MuseHubContextMusicalState(CamelModel):
 class MuseHubContextResponse(CamelModel):
     """Human-readable and agent-consumable musical context document for a commit.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/context/{ref}``.
+    Returned by ``GET /api/v1/repos/{repo_id}/context/{ref}``.
 
     This is the MuseHub equivalent of ``MuseContextResult`` -- built from
     the remote repo's commit graph and stored objects rather than the local
@@ -1716,7 +1716,7 @@ class DagEdge(CamelModel):
 
 
 class DagGraphResponse(CamelModel):
-    """Topologically sorted commit graph for a Muse Hub repo.
+    """Topologically sorted commit graph for a MuseHub repo.
 
     ``nodes`` are ordered from oldest ancestor to newest commit (Kahn's
     algorithm). ``edges`` enumerate every parent→child relationship.
@@ -1870,7 +1870,7 @@ class UserActivityEventItem(CamelModel):
 
 
 class UserActivityFeedResponse(CamelModel):
-    """Cursor-paginated public activity feed for a Muse Hub user (newest-first).
+    """Cursor-paginated public activity feed for a MuseHub user (newest-first).
 
     ``events`` contains up to ``limit`` events for the given user, filtered to
     public repos only (or all repos when the caller is the profile owner).
@@ -2069,7 +2069,7 @@ class BlobMetaResponse(CamelModel):
 
 
 class GrooveCheckResponse(CamelModel):
-    """Rhythmic consistency dashboard data for a commit range in a Muse Hub repo.
+    """Rhythmic consistency dashboard data for a commit range in a MuseHub repo.
 
     Aggregates timing deviation, swing ratio, and quantization tightness
     metrics derived from MIDI snapshots across a window of commits. The
@@ -2181,7 +2181,7 @@ class EmotionDiffResponse(CamelModel):
 
 
 class CompareResponse(CamelModel):
-    """Multi-dimensional musical comparison between two refs in a Muse Hub repo.
+    """Multi-dimensional musical comparison between two refs in a MuseHub repo.
 
     Returned by ``GET /musehub/repos/{repo_id}/compare?base=X&head=Y``.
     Combines divergence scores, unique commits, and emotion diff into a single
@@ -2237,7 +2237,7 @@ class StargazerEntry(CamelModel):
 class StargazerListResponse(CamelModel):
     """Paginated list of users who have starred a repo.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/stargazers``.
+    Returned by ``GET /api/v1/repos/{repo_id}/stargazers``.
     ``total`` is the full count, not just the current page, so clients can
     display "N stargazers" without a second query.
     """
@@ -2265,7 +2265,7 @@ class ForkEntry(CamelModel):
 class ForkListResponse(CamelModel):
     """Paginated list of forks of a repo.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/forks``.
+    Returned by ``GET /api/v1/repos/{repo_id}/forks``.
     """
 
     forks: list[ForkEntry] = Field(..., description="Forks of this repo")
@@ -2275,7 +2275,7 @@ class ForkListResponse(CamelModel):
 class ForkCreateResponse(CamelModel):
     """Confirmation that a fork was created.
 
-    Returned by ``POST /api/v1/musehub/repos/{repo_id}/fork``.
+    Returned by ``POST /api/v1/repos/{repo_id}/fork``.
     ``fork_repo`` is the newly created repo under the authenticated user's
     namespace. ``source_repo_id`` is the original repo's ID for lineage
     display on the fork's home page.
@@ -2305,7 +2305,7 @@ class UserForkedRepoEntry(CamelModel):
 class UserForksResponse(CamelModel):
     """Paginated list of repos forked by a user.
 
-    Returned by ``GET /api/v1/musehub/users/{username}/forks``.
+    Returned by ``GET /api/v1/users/{username}/forks``.
     """
 
     forks: list[UserForkedRepoEntry] = Field(..., description="Repos forked by this user")
@@ -2384,7 +2384,7 @@ class UserStarredRepoEntry(CamelModel):
 class UserStarredResponse(CamelModel):
     """Paginated list of repos starred by a user.
 
-    Returned by ``GET /api/v1/musehub/users/{username}/starred``.
+    Returned by ``GET /api/v1/users/{username}/starred``.
     """
 
     starred: list[UserStarredRepoEntry] = Field(..., description="Repos starred by this user")
@@ -2407,7 +2407,7 @@ class UserWatchedRepoEntry(CamelModel):
 class UserWatchedResponse(CamelModel):
     """Paginated list of repos watched by a user.
 
-    Returned by ``GET /api/v1/musehub/users/{username}/watched``.
+    Returned by ``GET /api/v1/users/{username}/watched``.
     """
 
     watched: list[UserWatchedRepoEntry] = Field(..., description="Repos watched by this user")
@@ -2418,9 +2418,9 @@ class UserWatchedResponse(CamelModel):
 
 
 class RepoSettingsResponse(CamelModel):
-    """Mutable settings for a Muse Hub repo.
+    """Mutable settings for a MuseHub repo.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/settings``.
+    Returned by ``GET /api/v1/repos/{repo_id}/settings``.
 
     Fields map to GitHub-style repo settings. ``name``, ``description``,
     ``visibility``, and ``topics`` are stored in dedicated repo columns;
@@ -2447,7 +2447,7 @@ class RepoSettingsResponse(CamelModel):
 
 
 class RepoSettingsPatch(CamelModel):
-    """Partial update body for ``PATCH /api/v1/musehub/repos/{repo_id}/settings``.
+    """Partial update body for ``PATCH /api/v1/repos/{repo_id}/settings``.
 
     All fields are optional — only provided fields are updated.
     ``visibility`` must be ``'public'`` or ``'private'`` when supplied.
@@ -2480,7 +2480,7 @@ class RepoSettingsPatch(CamelModel):
 class RenderStatusResponse(CamelModel):
     """Render job status for a single commit's auto-generated artifacts.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/commits/{sha}/render-status``.
+    Returned by ``GET /api/v1/repos/{repo_id}/commits/{sha}/render-status``.
 
     ``status`` lifecycle: ``pending`` → ``rendering`` → ``complete`` | ``failed``.
     ``mp3_object_ids`` and ``image_object_ids`` are populated only when

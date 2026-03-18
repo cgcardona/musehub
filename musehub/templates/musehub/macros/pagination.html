@@ -19,7 +19,7 @@
   Usage
   -----
   {% from "musehub/macros/pagination.html" import pagination %}
-  {{ pagination(page, total_pages, url="/musehub/ui/owner/repo/issues",
+  {{ pagination(page, total_pages, url="/owner/repo/issues",
                 extra_params={"q": q, "state": state}) }}
 #}
 {% macro pagination(page, total_pages, url, extra_params={}) %}

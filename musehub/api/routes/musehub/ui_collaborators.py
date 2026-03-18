@@ -1,7 +1,7 @@
-"""Muse Hub collaborators/team management UI route.
+"""MuseHub collaborators/team management UI route.
 
 Serves the admin-only team management page at:
-  GET /musehub/ui/{owner}/{repo_slug}/settings/collaborators
+  GET /{owner}/{repo_slug}/settings/collaborators
 
 The page lets repository admins and owners manage team access:
 - Server-rendered collaborators table with colour-coded permission badges and HTMX remove buttons
@@ -11,7 +11,7 @@ The page lets repository admins and owners manage team access:
 Auth policy
 -----------
 The HTML page requires no JWT for rendering — auth is enforced by the mutation API endpoints:
-  - POST/DELETE /api/v1/musehub/repos/{repo_id}/collaborators/* return 403 for
+  - POST/DELETE /api/v1/repos/{repo_id}/collaborators/* return 403 for
     callers without admin+ permission.
   - The page renders all server-fetched collaborator data without client-side JS fetching.
 
@@ -28,7 +28,7 @@ JSON alternate
 populated from the database, suitable for agent consumption.
 
 Endpoint summary:
-  GET /musehub/ui/{owner}/{repo_slug}/settings/collaborators — HTML (default), HTMX fragment, or JSON
+  GET /{owner}/{repo_slug}/settings/collaborators — HTML (default), HTMX fragment, or JSON
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 # Instantiate locally rather than importing from ui.py to avoid a circular dep.
@@ -56,7 +56,7 @@ router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
 def _base_url(owner: str, repo_slug: str) -> str:
     """Return the canonical UI base URL for a repo."""
-    return f"/musehub/ui/{owner}/{repo_slug}"
+    return f"/{owner}/{repo_slug}"
 
 
 async def _resolve_repo_id(owner: str, repo_slug: str, db: AsyncSession) -> tuple[str, str]:
@@ -78,7 +78,7 @@ async def _resolve_repo_id(owner: str, repo_slug: str, db: AsyncSession) -> tupl
 
 @router.get(
     "/{owner}/{repo_slug}/settings/collaborators",
-    summary="Muse Hub team management page — add/remove collaborators and set permissions",
+    summary="MuseHub team management page — add/remove collaborators and set permissions",
 )
 async def collaborators_settings_page(
     request: Request,
@@ -126,7 +126,7 @@ async def collaborators_settings_page(
         # Pass ORM rows directly so templates can access invited_at (not in CollaboratorResponse).
         "collaborators": rows,
         "breadcrumb_data": [
-            {"label": owner, "url": f"/musehub/ui/{owner}"},
+            {"label": owner, "url": f"/{owner}"},
             {"label": repo_slug, "url": base_url},
             {"label": "Settings", "url": f"{base_url}/settings"},
             {"label": "Collaborators", "url": ""},

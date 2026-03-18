@@ -32,8 +32,8 @@ MuseHub extension fields (prefixed ``musehub:`` per oEmbed convention):
   musehub:audio_url — render URL for audio preview
 
 URL patterns accepted:
-  /musehub/ui/{repo_id}/embed/{ref} → /oembed
-  /musehub/ui/{repo_id}/commit/{commit_sha} → /oembed/commit
+  /{repo_id}/embed/{ref} → /oembed
+  /{repo_id}/commit/{commit_sha} → /oembed/commit
 
 Returns 404 for non-matching URLs so oEmbed consumers distinguish
 supported from unsupported URLs gracefully.
@@ -52,10 +52,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["musehub-oembed"])
 
 _EMBED_URL_PATTERN = re.compile(
-    r"/musehub/ui/(?P<repo_id>[^/]+)/embed/(?P<ref>[^/?#]+)"
+    r"/(?P<repo_id>[^/]+)/embed/(?P<ref>[^/?#]+)"
 )
 _COMMIT_URL_PATTERN = re.compile(
-    r"/musehub/ui/(?P<repo_id>[^/]+)/commit/(?P<sha>[^/?#]+)"
+    r"/(?P<repo_id>[^/]+)/commit/(?P<sha>[^/?#]+)"
 )
 
 _DEFAULT_WIDTH = 560
@@ -139,10 +139,10 @@ def _build_oembed_payload(
     )
 
     author_url = (
-        f"{_PROVIDER_URL}/musehub/ui/users/{owner}" if owner else _PROVIDER_URL
+        f"{_PROVIDER_URL}/users/{owner}" if owner else _PROVIDER_URL
     )
     thumbnail_url = f"{_PROVIDER_URL}/static/thumbnails/{repo_id}/{short_ref}.png"
-    audio_url = f"{_PROVIDER_URL}/api/v1/musehub/repos/{repo_id}/render/{ref}"
+    audio_url = f"{_PROVIDER_URL}/api/v1/repos/{repo_id}/render/{ref}"
 
     return {
         # ── Standard oEmbed fields ────────────────────────────────────────
@@ -194,7 +194,7 @@ async def oembed_endpoint(
     the embed card wherever the consumer supports custom oEmbed fields.
 
     Contract:
-    - ``url`` must contain a path matching ``/musehub/ui/{repo_id}/embed/{ref}``.
+    - ``url`` must contain a path matching ``/{repo_id}/embed/{ref}``.
     - Returns 404 if the URL does not match the embed pattern.
     - Returns 501 if ``format`` is not ``json``.
     - Width and height are clamped to [100, 1200] and [80, 400] respectively.
@@ -222,7 +222,7 @@ async def oembed_endpoint(
         raise HTTPException(
             status_code=404,
             detail="URL does not match a MuseHub embed URL. "
-            "Expected format: /musehub/ui/{repo_id}/embed/{ref}",
+            "Expected format: /{repo_id}/embed/{ref}",
         )
 
     repo_id = match.group("repo_id")
@@ -232,7 +232,7 @@ async def oembed_endpoint(
     width = min(maxwidth, _MAX_WIDTH)
     height = min(maxheight, _MAX_HEIGHT)
 
-    embed_path = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_path = f"/{repo_id}/embed/{ref}"
     title = f"MuseHub Composition {short_ref}"
 
     payload = _build_oembed_payload(
@@ -267,7 +267,7 @@ async def oembed_commit_endpoint(
     changelogs, or social previews without the composition evolving under the link.
 
     Contract:
-    - ``url`` must contain a path matching ``/musehub/ui/{repo_id}/commit/{sha}``.
+    - ``url`` must contain a path matching ``/{repo_id}/commit/{sha}``.
     - Returns 404 if the URL does not match the commit pattern.
     - Returns 501 if ``format`` is not ``json``.
     - The iframe ``src`` points to the standard embed route using the commit SHA as ref,
@@ -296,7 +296,7 @@ async def oembed_commit_endpoint(
         raise HTTPException(
             status_code=404,
             detail="URL does not match a MuseHub commit URL. "
-            "Expected format: /musehub/ui/{repo_id}/commit/{sha}",
+            "Expected format: /{repo_id}/commit/{sha}",
         )
 
     repo_id = match.group("repo_id")
@@ -307,7 +307,7 @@ async def oembed_commit_endpoint(
     height = min(maxheight, _MAX_HEIGHT)
 
     # The embed player accepts a commit SHA as the ref — it shows that exact snapshot.
-    embed_path = f"/musehub/ui/{repo_id}/embed/{sha}"
+    embed_path = f"/{repo_id}/embed/{sha}"
     title = f"MuseHub Commit {short_sha}"
 
     payload = _build_oembed_payload(

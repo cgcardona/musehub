@@ -1,6 +1,6 @@
 """SSR tests for the MuseHub collaborators settings page (issue #564).
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/settings/collaborators after SSR migration:
+Covers GET /{owner}/{repo_slug}/settings/collaborators after SSR migration:
 
 - test_collaborators_page_renders_collaborator_server_side
     Seed a collaborator, GET the page, assert the user_id appears in the HTML body
@@ -96,7 +96,7 @@ async def test_collaborators_page_renders_collaborator_server_side(
     known_user_id = str(uuid.uuid4())
     await _add_collaborator(db_session, repo_id, user_id=known_user_id, permission="write")
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     assert known_user_id in resp.text
 
@@ -111,7 +111,7 @@ async def test_collaborators_page_invite_form_has_hx_post(
     HTMX form that posts directly to the JSON API endpoint.
     """
     await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     assert "hx-post" in resp.text
     assert "/collaborators" in resp.text
@@ -130,7 +130,7 @@ async def test_collaborators_page_remove_form_has_hx_delete(
     target_user_id = str(uuid.uuid4())
     await _add_collaborator(db_session, repo_id, user_id=target_user_id, permission="write")
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/settings/collaborators")
     assert resp.status_code == 200
     assert "hx-delete" in resp.text
     assert target_user_id in resp.text
@@ -150,7 +150,7 @@ async def test_collaborators_page_htmx_request_returns_fragment(
     await _add_collaborator(db_session, repo_id, user_id=known_user_id)
 
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/settings/collaborators",
+        f"/{_OWNER}/{_SLUG}/settings/collaborators",
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200

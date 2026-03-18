@@ -1,9 +1,9 @@
-"""Tests for Muse Hub issue tracking endpoints.
+"""Tests for MuseHub issue tracking endpoints.
 
 Covers every acceptance criterion:
-- POST /musehub/repos/{repo_id}/issues creates an issue in open state
+- POST /repos/{repo_id}/issues creates an issue in open state
 - Issue numbers are sequential per repo starting at 1
-- GET /musehub/repos/{repo_id}/issues returns open issues by default
+- GET /repos/{repo_id}/issues returns open issues by default
 - GET .../issues?label=<label> filters by label
 - POST .../issues/{number}/close sets state to closed
 - GET .../issues/{number} returns 404 for unknown issue numbers
@@ -29,7 +29,7 @@ from musehub.services import musehub_repository, musehub_issues
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "test-repo") -> str:
     """Create a repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser"},
         headers=auth_headers,
     )
@@ -47,7 +47,7 @@ async def _create_issue(
     labels: list[str] | None = None,
 ) -> dict[str, object]:
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": title, "body": body, "labels": labels or []},
         headers=auth_headers,
     )
@@ -57,7 +57,7 @@ async def _create_issue(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/issues
+# POST /repos/{repo_id}/issues
 # ---------------------------------------------------------------------------
 
 
@@ -69,7 +69,7 @@ async def test_create_issue_returns_open_state(
     """POST /issues creates an issue in 'open' state with all required fields."""
     repo_id = await _create_repo(client, auth_headers, "open-state-repo")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": "Hi-hat / synth pad clash", "body": "Measure 8 has a frequency clash.", "labels": ["bug"]},
         headers=auth_headers,
     )
@@ -117,7 +117,7 @@ async def test_issue_numbers_independent_per_repo(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/issues
+# GET /repos/{repo_id}/issues
 # ---------------------------------------------------------------------------
 
 
@@ -133,12 +133,12 @@ async def test_list_issues_default_open_only(
     # Create a second issue and close it
     issue = await _create_issue(client, auth_headers, repo_id, title="Closed issue")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/close",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/close",
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -157,12 +157,12 @@ async def test_list_issues_state_all_returns_all(
     await _create_issue(client, auth_headers, repo_id, title="Open issue")
     issue = await _create_issue(client, auth_headers, repo_id, title="To close")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/close",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/close",
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues?state=all",
+        f"/api/v1/repos/{repo_id}/issues?state=all",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -181,7 +181,7 @@ async def test_list_issues_label_filter(
     await _create_issue(client, auth_headers, repo_id, title="Multi-label", labels=["bug", "musical"])
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues?label=bug",
+        f"/api/v1/repos/{repo_id}/issues?label=bug",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -192,7 +192,7 @@ async def test_list_issues_label_filter(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/issues/{issue_number}
+# GET /repos/{repo_id}/issues/{issue_number}
 # ---------------------------------------------------------------------------
 
 
@@ -205,7 +205,7 @@ async def test_get_issue_not_found_returns_404(
     repo_id = await _create_repo(client, auth_headers, "not-found-repo")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues/999",
+        f"/api/v1/repos/{repo_id}/issues/999",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -226,7 +226,7 @@ async def test_get_issue_returns_full_object(
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{created['number']}",
+        f"/api/v1/repos/{repo_id}/issues/{created['number']}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -238,7 +238,7 @@ async def test_get_issue_returns_full_object(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/issues/{issue_number}/close
+# POST /repos/{repo_id}/issues/{issue_number}/close
 # ---------------------------------------------------------------------------
 
 
@@ -253,7 +253,7 @@ async def test_close_issue_changes_state(
     assert issue["state"] == "open"
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/close",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/close",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -269,7 +269,7 @@ async def test_close_nonexistent_issue_returns_404(
     repo_id = await _create_repo(client, auth_headers, "close-404-repo")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/999/close",
+        f"/api/v1/repos/{repo_id}/issues/999/close",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -284,8 +284,8 @@ async def test_close_nonexistent_issue_returns_404(
 async def test_issue_write_endpoints_require_auth(client: AsyncClient) -> None:
     """POST issue endpoints return 401 without a Bearer token (always require auth)."""
     write_endpoints = [
-        ("POST", "/api/v1/musehub/repos/some-repo/issues"),
-        ("POST", "/api/v1/musehub/repos/some-repo/issues/1/close"),
+        ("POST", "/api/v1/repos/some-repo/issues"),
+        ("POST", "/api/v1/repos/some-repo/issues/1/close"),
     ]
     for method, url in write_endpoints:
         response = await client.post(url, json={})
@@ -302,8 +302,8 @@ async def test_issue_read_endpoints_return_404_for_nonexistent_repo_without_auth
     lookup happens before the auth check, so a missing repo returns 404.
     """
     read_endpoints = [
-        "/api/v1/musehub/repos/non-existent-repo/issues",
-        "/api/v1/musehub/repos/non-existent-repo/issues/1",
+        "/api/v1/repos/non-existent-repo/issues",
+        "/api/v1/repos/non-existent-repo/issues/1",
     ]
     for url in read_endpoints:
         response = await client.get(url)
@@ -389,7 +389,7 @@ async def test_create_issue_author_in_response(
     """POST /issues response includes the author field (JWT sub) — regression f."""
     repo_id = await _create_repo(client, auth_headers, "author-issue-repo")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": "Author field regression", "body": "", "labels": []},
         headers=auth_headers,
     )
@@ -408,12 +408,12 @@ async def test_create_issue_author_persisted_in_list(
     """Author field is persisted and returned in the issue list endpoint — regression f."""
     repo_id = await _create_repo(client, auth_headers, "author-list-repo")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": "Authored issue", "body": "", "labels": []},
         headers=auth_headers,
     )
     list_response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         headers=auth_headers,
     )
     assert list_response.status_code == 200
@@ -438,7 +438,7 @@ async def test_issue_detail_page_shows_author_label(
     )
     number = issue["number"]
 
-    response = await client.get(f"/musehub/ui/testuser/author-detail-beats/issues/{number}")
+    response = await client.get(f"/testuser/author-detail-beats/issues/{number}")
     assert response.status_code == 200
     body = response.text
     # The SSR template renders author inline: "Opened … by <strong>…</strong>"
@@ -460,7 +460,7 @@ async def test_create_issue_comment(
     issue = await _create_issue(client, auth_headers, repo_id, title="Bass clash in chorus")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/comments",
         json={"body": "The section:chorus beats:16-24 has a frequency clash with track:bass."},
         headers=auth_headers,
     )
@@ -484,18 +484,18 @@ async def test_list_issue_comments(
     issue = await _create_issue(client, auth_headers, repo_id, title="Kick timing issue")
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/comments",
         json={"body": "First comment."},
         headers=auth_headers,
     )
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/comments",
         json={"body": "Second comment."},
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/comments",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -515,7 +515,7 @@ async def test_musical_context_parsed(
     issue = await _create_issue(client, auth_headers, repo_id, title="Musical context test")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/comments",
         json={"body": "Check track:bass at section:chorus around beats:16-24 please."},
         headers=auth_headers,
     )
@@ -539,7 +539,7 @@ async def test_assign_issue(
     issue = await _create_issue(client, auth_headers, repo_id, title="Assign test issue")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/assign",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/assign",
         json={"assignee": "miles_davis"},
         headers=auth_headers,
     )
@@ -558,12 +558,12 @@ async def test_unassign_issue(
     issue = await _create_issue(client, auth_headers, repo_id, title="Unassign test")
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/assign",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/assign",
         json={"assignee": "coltrane"},
         headers=auth_headers,
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/assign",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/assign",
         json={"assignee": None},
         headers=auth_headers,
     )
@@ -580,7 +580,7 @@ async def test_create_milestone(
     repo_id = await _create_repo(client, auth_headers, "milestone-create-repo")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Album v1.0", "description": "First release cut"},
         headers=auth_headers,
     )
@@ -603,14 +603,14 @@ async def test_assign_issue_to_milestone(
     issue = await _create_issue(client, auth_headers, repo_id, title="Milestone target issue")
 
     ms_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Mix Revision 2"},
         headers=auth_headers,
     )
     milestone_id: str = ms_resp.json()["milestoneId"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/milestone",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/milestone",
         params={"milestone_id": milestone_id},
         headers=auth_headers,
     )
@@ -631,12 +631,12 @@ async def test_reopen_issue(
     number = issue["number"]
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/close",
+        f"/api/v1/repos/{repo_id}/issues/{number}/close",
         headers=auth_headers,
     )
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/reopen",
+        f"/api/v1/repos/{repo_id}/issues/{number}/reopen",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -654,14 +654,14 @@ async def test_threaded_comment_reply(
     number = issue["number"]
 
     first_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{number}/comments",
         json={"body": "Top-level comment."},
         headers=auth_headers,
     )
     parent_id = first_resp.json()["comments"][0]["commentId"]
 
     reply_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{number}/comments",
         json={"body": "Reply to the top-level.", "parentId": parent_id},
         headers=auth_headers,
     )
@@ -683,18 +683,18 @@ async def test_issue_comment_count_in_response(
     number = issue["number"]
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{number}/comments",
         json={"body": "Comment one."},
         headers=auth_headers,
     )
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/comments",
+        f"/api/v1/repos/{repo_id}/issues/{number}/comments",
         json={"body": "Comment two."},
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}",
+        f"/api/v1/repos/{repo_id}/issues/{number}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -711,7 +711,7 @@ async def test_edit_issue_title_and_body(
     issue = await _create_issue(client, auth_headers, repo_id, title="Original title")
 
     response = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}",
         json={"title": "Updated title", "body": "Updated body."},
         headers=auth_headers,
     )
@@ -730,18 +730,18 @@ async def test_list_milestones(
     repo_id = await _create_repo(client, auth_headers, "milestone-list-repo")
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Phase 1"},
         headers=auth_headers,
     )
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Phase 2"},
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -760,7 +760,7 @@ async def test_get_milestone_by_number(
     repo_id = await _create_repo(client, auth_headers, "milestone-get-repo")
 
     ms_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Single Milestone", "description": "Only one here"},
         headers=auth_headers,
     )
@@ -768,7 +768,7 @@ async def test_get_milestone_by_number(
     number = ms_resp.json()["number"]
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/milestones/{number}",
+        f"/api/v1/repos/{repo_id}/milestones/{number}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -789,7 +789,7 @@ async def test_get_milestone_not_found(
     repo_id = await _create_repo(client, auth_headers, "milestone-get-404-repo")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/milestones/999",
+        f"/api/v1/repos/{repo_id}/milestones/999",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -804,14 +804,14 @@ async def test_update_milestone_title_and_state(
     repo_id = await _create_repo(client, auth_headers, "milestone-patch-repo")
 
     ms_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Initial Title"},
         headers=auth_headers,
     )
     number = ms_resp.json()["number"]
 
     response = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/milestones/{number}",
+        f"/api/v1/repos/{repo_id}/milestones/{number}",
         json={"title": "Revised Title", "state": "closed"},
         headers=auth_headers,
     )
@@ -830,14 +830,14 @@ async def test_update_milestone_clear_due_on(
     repo_id = await _create_repo(client, auth_headers, "milestone-clear-due-repo")
 
     ms_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Dated Milestone", "dueOn": "2026-12-31T00:00:00Z"},
         headers=auth_headers,
     )
     number = ms_resp.json()["number"]
 
     response = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/milestones/{number}",
+        f"/api/v1/repos/{repo_id}/milestones/{number}",
         json={"dueOn": None},
         headers=auth_headers,
     )
@@ -854,7 +854,7 @@ async def test_delete_milestone_unlinks_issues(
     repo_id = await _create_repo(client, auth_headers, "milestone-delete-repo")
 
     ms_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Ephemeral Milestone"},
         headers=auth_headers,
     )
@@ -863,27 +863,27 @@ async def test_delete_milestone_unlinks_issues(
 
     issue = await _create_issue(client, auth_headers, repo_id, title="Issue to unlink")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/milestone",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/milestone",
         params={"milestone_id": milestone_id},
         headers=auth_headers,
     )
 
     delete_resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/milestones/{number}",
+        f"/api/v1/repos/{repo_id}/milestones/{number}",
         headers=auth_headers,
     )
     assert delete_resp.status_code == 204
 
     # Milestone is gone
     get_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/milestones/{number}",
+        f"/api/v1/repos/{repo_id}/milestones/{number}",
         headers=auth_headers,
     )
     assert get_resp.status_code == 404
 
     # Issue still exists with milestone unlinked
     issue_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}",
         headers=auth_headers,
     )
     assert issue_resp.status_code == 200
@@ -900,13 +900,13 @@ async def test_list_milestones_sort_by_title(
 
     for title in ["Zeta", "Alpha", "Mu"]:
         await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/milestones",
+            f"/api/v1/repos/{repo_id}/milestones",
             json={"title": title},
             headers=auth_headers,
         )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         params={"sort": "title"},
         headers=auth_headers,
     )
@@ -930,7 +930,7 @@ async def test_delete_issue_milestone_removes_link(
     issue = await _create_issue(client, auth_headers, repo_id, title="Issue with milestone")
 
     ms_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/milestones",
+        f"/api/v1/repos/{repo_id}/milestones",
         json={"title": "Temp Milestone"},
         headers=auth_headers,
     )
@@ -938,14 +938,14 @@ async def test_delete_issue_milestone_removes_link(
 
     # Link milestone
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/milestone",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/milestone",
         params={"milestone_id": milestone_id},
         headers=auth_headers,
     )
 
     # Remove milestone via DELETE
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/milestone",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/milestone",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -964,7 +964,7 @@ async def test_delete_issue_milestone_idempotent(
     issue = await _create_issue(client, auth_headers, repo_id, title="No milestone issue")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/milestone",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/milestone",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -980,7 +980,7 @@ async def test_delete_issue_milestone_not_found(
     repo_id = await _create_repo(client, auth_headers, "del-milestone-404-repo")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/999/milestone",
+        f"/api/v1/repos/{repo_id}/issues/999/milestone",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -999,7 +999,7 @@ async def test_assign_issue_labels_replaces_labels(
     assert issue["labels"] == ["old-label"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/labels",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/labels",
         json={"labels": ["harmony", "needs-review"]},
         headers=auth_headers,
     )
@@ -1021,7 +1021,7 @@ async def test_assign_issue_labels_empty_clears_labels(
     )
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/labels",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/labels",
         json={"labels": []},
         headers=auth_headers,
     )
@@ -1038,7 +1038,7 @@ async def test_assign_issue_labels_not_found(
     repo_id = await _create_repo(client, auth_headers, "label-assign-404-repo")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/999/labels",
+        f"/api/v1/repos/{repo_id}/issues/999/labels",
         json={"labels": ["bug"]},
         headers=auth_headers,
     )
@@ -1061,7 +1061,7 @@ async def test_remove_issue_label_removes_single_label(
     )
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/labels/harmony",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/labels/harmony",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1083,7 +1083,7 @@ async def test_remove_issue_label_idempotent(
     )
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue['number']}/labels/nonexistent",
+        f"/api/v1/repos/{repo_id}/issues/{issue['number']}/labels/nonexistent",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1099,7 +1099,7 @@ async def test_remove_issue_label_not_found(
     repo_id = await _create_repo(client, auth_headers, "label-remove-404-repo")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/999/labels/bug",
+        f"/api/v1/repos/{repo_id}/issues/999/labels/bug",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -1109,9 +1109,9 @@ async def test_remove_issue_label_not_found(
 async def test_new_endpoints_require_auth(client: AsyncClient) -> None:
     """DELETE /milestone, POST /labels, DELETE /labels/{name} all require authentication."""
     endpoints: list[tuple[str, str, dict[str, object]]] = [
-        ("DELETE", "/api/v1/musehub/repos/some-repo/issues/1/milestone", {}),
-        ("POST", "/api/v1/musehub/repos/some-repo/issues/1/labels", {"labels": ["bug"]}),
-        ("DELETE", "/api/v1/musehub/repos/some-repo/issues/1/labels/bug", {}),
+        ("DELETE", "/api/v1/repos/some-repo/issues/1/milestone", {}),
+        ("POST", "/api/v1/repos/some-repo/issues/1/labels", {"labels": ["bug"]}),
+        ("DELETE", "/api/v1/repos/some-repo/issues/1/labels/bug", {}),
     ]
     for method, url, payload in endpoints:
         if method == "DELETE":

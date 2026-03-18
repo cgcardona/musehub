@@ -3,21 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/musehub/static/app.css">
-  <title>{% block title %}Muse Hub{% endblock %} — Muse Hub</title>
+  <link rel="preconnect" href="https://fonts.bunny.net">
+  <link rel="stylesheet" href="https://fonts.bunny.net/css?family=jetbrains-mono:400,500,600,700&display=swap">
+  <link rel="stylesheet" href="/static/app.css">
+  <title>{% block title %}MuseHub{% endblock %} — MuseHub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
   {% block oembed_link %}<link rel="alternate" type="application/json+oembed"
        href="https://musehub.app/musehub/oembed?url={{ request.url | urlencode }}"
        title="MuseHub oEmbed">{% endblock %}
   {% block extra_css %}{% endblock %}
   {% block jsonld %}{% endblock %}
-  <script src="/musehub/static/alpinejs.min.js" defer></script>
-  <script src="/musehub/static/htmx.min.js"></script>
-  <script src="/musehub/static/vendor/json-enc.js"></script>
-  <script src="/musehub/static/vendor/response-targets.js"></script>
+  <script src="/static/alpinejs.min.js" defer></script>
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/vendor/json-enc.js"></script>
+  <script src="/static/vendor/response-targets.js"></script>
 </head>
 <body>
   {# HTMX top-of-page loading bar #}
@@ -68,33 +67,13 @@
     </button>
   </div>
 
-  <script src="/musehub/static/app.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>
-    lucide.createIcons();
-
-    async function loadNotifBadge() {
-      if (!getToken()) return;
-      try {
-        const data = await apiFetch('/notifications');
-        const unread = Array.isArray(data) ? data.filter(n => !n.is_read).length : 0;
-        const badge = document.getElementById('nav-notif-badge');
-        if (badge) {
-          badge.textContent = unread > 99 ? '99+' : String(unread);
-          badge.style.display = unread > 0 ? 'flex' : 'none';
-        }
-      } catch (e) { /* silent fail */ }
-    }
-
-    window.addEventListener('DOMContentLoaded', function() {
-      if (getToken()) {
-        var btn = document.getElementById('signout-btn');
-        if (btn) btn.style.display = '';
-      }
-      loadNotifBadge();
-      {% block page_data %}{% endblock %}
-      {% block page_script %}{% endblock %}
-    });
-  </script>
+  <script src="/static/app.js"></script>
+  {# page_data: backward-compatible JS variable injection for templates not yet on TypeScript modules #}
+  <script>{% block page_data %}{% endblock %}</script>
+  {# page_json: JSON data bridge for new TypeScript page modules (read by musehub.ts dispatchPageModule) #}
+  <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>
+  {# page_script: legacy inline scripts; prefer page modules via page_json instead #}
+  <script>{% block page_script %}{% endblock %}</script>
 </body>
 </html>

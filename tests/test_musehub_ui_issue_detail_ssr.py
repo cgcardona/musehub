@@ -117,7 +117,7 @@ async def _get_detail(
 ) -> tuple[int, str]:
     """Fetch the issue detail page; return (status_code, body_text)."""
     resp = await client.get(
-        f"/musehub/ui/{owner}/{slug}/issues/{number}",
+        f"/{owner}/{slug}/issues/{number}",
         headers=headers or {},
     )
     return resp.status_code, resp.text
@@ -151,7 +151,7 @@ async def test_issue_detail_unknown_number_404(
     """A non-existent issue number returns 404."""
     await _make_repo(db_session)
 
-    resp = await client.get("/musehub/ui/songwriter/melodies/issues/999")
+    resp = await client.get("/songwriter/melodies/issues/999")
     assert resp.status_code == 404
 
 

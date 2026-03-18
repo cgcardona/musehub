@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for Muse Hub label tables.
+"""SQLAlchemy ORM models for MuseHub label tables.
 
 Tables:
 - musehub_labels: Coloured label definitions scoped to a repo

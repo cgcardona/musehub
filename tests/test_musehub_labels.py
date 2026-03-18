@@ -1,10 +1,10 @@
-"""Tests for Muse Hub label management endpoints.
+"""Tests for MuseHub label management endpoints.
 
 Covers all acceptance criteria:
-- GET /musehub/repos/{repo_id}/labels — list labels (public)
-- POST /musehub/repos/{repo_id}/labels — create label (auth required)
-- PATCH /musehub/repos/{repo_id}/labels/{label_id} — update label (auth required)
-- DELETE /musehub/repos/{repo_id}/labels/{label_id} — delete label (auth required)
+- GET /repos/{repo_id}/labels — list labels (public)
+- POST /repos/{repo_id}/labels — create label (auth required)
+- PATCH /repos/{repo_id}/labels/{label_id} — update label (auth required)
+- DELETE /repos/{repo_id}/labels/{label_id} — delete label (auth required)
 - POST .../issues/{number}/labels — assign labels to issue (auth required)
 - DELETE .../issues/{number}/labels/{label_id} — remove label from issue (auth required)
 - POST .../pull-requests/{pr_id}/labels — assign labels to PR (auth required)
@@ -33,7 +33,7 @@ from musehub.db.musehub_models import MusehubBranch, MusehubCommit
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "label-test-repo") -> str:
     """Create a repo and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -55,7 +55,7 @@ async def _create_label(
     if description is not None:
         payload["description"] = description
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/labels",
+        f"/api/v1/repos/{repo_id}/labels",
         json=payload,
         headers=auth_headers,
     )
@@ -72,7 +72,7 @@ async def _create_issue(
 ) -> dict[str, object]:
     """Create an issue and return the response body."""
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": title, "body": "", "labels": []},
         headers=auth_headers,
     )
@@ -112,7 +112,7 @@ async def _create_pr(
 ) -> dict[str, object]:
     """Create a pull request and return the response body."""
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         json={"title": title, "body": "", "fromBranch": "feature", "toBranch": "main"},
         headers=auth_headers,
     )
@@ -122,7 +122,7 @@ async def _create_pr(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/labels
+# POST /repos/{repo_id}/labels
 # ---------------------------------------------------------------------------
 
 
@@ -148,7 +148,7 @@ async def test_create_label_requires_auth(
 ) -> None:
     """POST /labels without auth returns 401."""
     response = await client.post(
-        "/api/v1/musehub/repos/nonexistent/labels",
+        "/api/v1/repos/nonexistent/labels",
         json={"name": "bug", "color": "#d73a4a"},
     )
     assert response.status_code == 401
@@ -161,7 +161,7 @@ async def test_create_label_unknown_repo_returns_404(
 ) -> None:
     """POST /labels for a non-existent repo returns 404."""
     response = await client.post(
-        "/api/v1/musehub/repos/does-not-exist/labels",
+        "/api/v1/repos/does-not-exist/labels",
         json={"name": "bug", "color": "#d73a4a"},
         headers=auth_headers,
     )
@@ -178,7 +178,7 @@ async def test_create_label_duplicate_name_returns_409(
     await _create_label(client, auth_headers, repo_id, name="bug")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/labels",
+        f"/api/v1/repos/{repo_id}/labels",
         json={"name": "bug", "color": "#aabbcc"},
         headers=auth_headers,
     )
@@ -193,7 +193,7 @@ async def test_create_label_invalid_color_returns_422(
     """POST /labels with an invalid colour format returns 422."""
     repo_id = await _create_repo(client, auth_headers, "color-invalid-repo")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/labels",
+        f"/api/v1/repos/{repo_id}/labels",
         json={"name": "bug", "color": "red"},
         headers=auth_headers,
     )
@@ -201,7 +201,7 @@ async def test_create_label_invalid_color_returns_422(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/labels
+# GET /repos/{repo_id}/labels
 # ---------------------------------------------------------------------------
 
 
@@ -216,7 +216,7 @@ async def test_list_labels_public_access(
     await _create_label(client, auth_headers, repo_id, name="enhancement", color="#a2eeef")
 
     # No auth headers — public endpoint.
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/labels")
+    response = await client.get(f"/api/v1/repos/{repo_id}/labels")
     assert response.status_code == 200
     body = response.json()
     assert "items" in body
@@ -231,7 +231,7 @@ async def test_list_labels_unknown_repo_returns_404(
     client: AsyncClient,
 ) -> None:
     """GET /labels for a non-existent repo returns 404."""
-    response = await client.get("/api/v1/musehub/repos/no-such-repo/labels")
+    response = await client.get("/api/v1/repos/no-such-repo/labels")
     assert response.status_code == 404
 
 
@@ -242,7 +242,7 @@ async def test_list_labels_empty_repo(
 ) -> None:
     """GET /labels for a repo with no labels returns an empty list."""
     repo_id = await _create_repo(client, auth_headers, "empty-labels-repo")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/labels")
+    response = await client.get(f"/api/v1/repos/{repo_id}/labels")
     assert response.status_code == 200
     body = response.json()
     assert body["items"] == []
@@ -250,7 +250,7 @@ async def test_list_labels_empty_repo(
 
 
 # ---------------------------------------------------------------------------
-# PATCH /musehub/repos/{repo_id}/labels/{label_id}
+# PATCH /repos/{repo_id}/labels/{label_id}
 # ---------------------------------------------------------------------------
 
 
@@ -265,7 +265,7 @@ async def test_update_label_name(
     label_id = label.get("label_id") or label.get("labelId")
 
     response = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/labels/{label_id}",
         json={"name": "new-name"},
         headers=auth_headers,
     )
@@ -285,7 +285,7 @@ async def test_update_label_requires_auth(
     label_id = label.get("label_id") or label.get("labelId")
 
     response = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/labels/{label_id}",
         json={"name": "hacked"},
     )
     assert response.status_code == 401
@@ -299,7 +299,7 @@ async def test_update_label_not_found_returns_404(
     """PATCH /labels/{id} with an unknown label_id returns 404."""
     repo_id = await _create_repo(client, auth_headers, "update-404-repo")
     response = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/labels/00000000-0000-0000-0000-000000000000",
+        f"/api/v1/repos/{repo_id}/labels/00000000-0000-0000-0000-000000000000",
         json={"name": "ghost"},
         headers=auth_headers,
     )
@@ -307,7 +307,7 @@ async def test_update_label_not_found_returns_404(
 
 
 # ---------------------------------------------------------------------------
-# DELETE /musehub/repos/{repo_id}/labels/{label_id}
+# DELETE /repos/{repo_id}/labels/{label_id}
 # ---------------------------------------------------------------------------
 
 
@@ -322,13 +322,13 @@ async def test_delete_label_returns_204(
     label_id = label.get("label_id") or label.get("labelId")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/labels/{label_id}",
         headers=auth_headers,
     )
     assert response.status_code == 204
 
     # Confirm the label is gone.
-    list_resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/labels")
+    list_resp = await client.get(f"/api/v1/repos/{repo_id}/labels")
     assert list_resp.json()["total"] == 0
 
 
@@ -343,7 +343,7 @@ async def test_delete_label_requires_auth(
     label_id = label.get("label_id") or label.get("labelId")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/labels/{label_id}",
     )
     assert response.status_code == 401
 
@@ -365,7 +365,7 @@ async def test_assign_labels_to_issue(
     issue_number = issue["number"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels",
+        f"/api/v1/repos/{repo_id}/issues/{issue_number}/labels",
         json={"labels": ["bug"]},
         headers=auth_headers,
     )
@@ -387,7 +387,7 @@ async def test_assign_labels_to_issue_idempotent(
 
     for _ in range(2):
         response = await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels",
+            f"/api/v1/repos/{repo_id}/issues/{issue_number}/labels",
             json={"labels": ["bug"]},
             headers=auth_headers,
         )
@@ -407,14 +407,14 @@ async def test_remove_label_from_issue(
 
     # Assign first.
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels",
+        f"/api/v1/repos/{repo_id}/issues/{issue_number}/labels",
         json={"labels": ["bug"]},
         headers=auth_headers,
     )
 
     # Then remove (by label name, returns updated issue with 200).
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels/bug",
+        f"/api/v1/repos/{repo_id}/issues/{issue_number}/labels/bug",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -432,7 +432,7 @@ async def test_remove_label_from_issue_unknown_issue_returns_404(
     label_id = label.get("label_id") or label.get("labelId")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/issues/9999/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/issues/9999/labels/{label_id}",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -459,7 +459,7 @@ async def test_assign_labels_to_pr(
     pr_id = pr.get("prId") or pr.get("pr_id")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/labels",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/labels",
         json={"label_ids": [label_id]},
         headers=auth_headers,
     )
@@ -486,14 +486,14 @@ async def test_remove_label_from_pr(
 
     # Assign first.
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/labels",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/labels",
         json={"label_ids": [label_id]},
         headers=auth_headers,
     )
 
     # Then remove — should be idempotent too.
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/labels/{label_id}",
         headers=auth_headers,
     )
     assert response.status_code == 204
@@ -510,7 +510,7 @@ async def test_remove_label_from_pr_unknown_pr_returns_404(
     label_id = label.get("label_id") or label.get("labelId")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/00000000-0000-0000-0000-000000000000/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/pull-requests/00000000-0000-0000-0000-000000000000/labels/{label_id}",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -529,17 +529,17 @@ async def test_delete_label_cascades_to_issue_associations(
     issue_number = issue["number"]
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{issue_number}/labels",
+        f"/api/v1/repos/{repo_id}/issues/{issue_number}/labels",
         json={"label_ids": [label_id]},
         headers=auth_headers,
     )
 
     delete_resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/labels/{label_id}",
+        f"/api/v1/repos/{repo_id}/labels/{label_id}",
         headers=auth_headers,
     )
     assert delete_resp.status_code == 204
 
     # The label should no longer appear in the repo's label list.
-    list_resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/labels")
+    list_resp = await client.get(f"/api/v1/repos/{repo_id}/labels")
     assert list_resp.json()["total"] == 0

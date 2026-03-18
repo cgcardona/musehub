@@ -1,10 +1,10 @@
-"""Muse Hub RSS/Atom feed route handlers.
+"""MuseHub RSS/Atom feed route handlers.
 
 Endpoint summary:
-  GET /musehub/repos/{repo_id}/feed.rss — RSS 2.0 feed of recent commits
-  GET /musehub/repos/{repo_id}/releases.rss — RSS 2.0 feed of releases
-  GET /musehub/repos/{repo_id}/issues.rss — RSS 2.0 feed of open issues
-  GET /musehub/repos/{repo_id}/feed.atom — Atom 1.0 feed of recent commits
+  GET /repos/{repo_id}/feed.rss — RSS 2.0 feed of recent commits
+  GET /repos/{repo_id}/releases.rss — RSS 2.0 feed of releases
+  GET /repos/{repo_id}/issues.rss — RSS 2.0 feed of open issues
+  GET /repos/{repo_id}/feed.atom — Atom 1.0 feed of recent commits
 
 All feed endpoints are restricted to **public** repos only. Private repos return
 403 Forbidden. Feed consumers (aggregators, agent subscribers) poll these URLs
@@ -110,7 +110,7 @@ def _build_rss_envelope(title: str, link: str, description: str, items: list[str
 def _commit_rss_item(commit: CommitResponse, owner: str, slug: str) -> str:
     """Render a single commit as an RSS <item>."""
     title = escape(commit.message[:80])
-    link = escape(f"/musehub/ui/{owner}/{slug}/commits/{commit.commit_id}")
+    link = escape(f"/{owner}/{slug}/commits/{commit.commit_id}")
     description = _commit_description(commit)
     pub_date = _rss_pub_date(commit.timestamp)
     guid = escape(commit.commit_id)
@@ -128,7 +128,7 @@ def _commit_rss_item(commit: CommitResponse, owner: str, slug: str) -> str:
 def _release_rss_item(release: ReleaseResponse, owner: str, slug: str) -> str:
     """Render a single release as an RSS <item>, with optional mp3 <enclosure>."""
     title = escape(f"Release {release.tag}: {release.title}")
-    link = escape(f"/musehub/ui/{owner}/{slug}/releases/{release.tag}")
+    link = escape(f"/{owner}/{slug}/releases/{release.tag}")
     description = escape(release.body or "")
     pub_date = _rss_pub_date(release.created_at)
     guid = escape(release.release_id)
@@ -155,7 +155,7 @@ def _release_rss_item(release: ReleaseResponse, owner: str, slug: str) -> str:
 def _issue_rss_item(issue: IssueResponse, owner: str, slug: str) -> str:
     """Render a single issue as an RSS <item>."""
     title = escape(issue.title)
-    link = escape(f"/musehub/ui/{owner}/{slug}/issues/{issue.number}")
+    link = escape(f"/{owner}/{slug}/issues/{issue.number}")
     description = escape(issue.body or "")
     pub_date = _rss_pub_date(issue.created_at)
     guid = escape(issue.issue_id)
@@ -192,7 +192,7 @@ def _build_atom_envelope(
 def _commit_atom_entry(commit: CommitResponse, owner: str, slug: str) -> str:
     """Render a single commit as an Atom <entry>."""
     title = escape(commit.message[:80])
-    link = escape(f"/musehub/ui/{owner}/{slug}/commits/{commit.commit_id}")
+    link = escape(f"/{owner}/{slug}/commits/{commit.commit_id}")
     entry_id = escape(f"tag:musehub:{commit.commit_id}")
     updated = _atom_date(commit.timestamp)
     summary = escape(commit.message)
@@ -238,7 +238,7 @@ async def get_commit_feed_rss(
     commits, _ = await musehub_repository.list_commits(db, repo_id, limit=_COMMIT_FEED_LIMIT)
     items = [_commit_rss_item(c, repo.owner, repo.slug) for c in commits]
 
-    feed_link = f"/musehub/ui/{repo.owner}/{repo.slug}"
+    feed_link = f"/{repo.owner}/{repo.slug}"
     xml = _build_rss_envelope(
         title=f"{repo.owner}/{repo.slug} commits",
         link=feed_link,
@@ -276,7 +276,7 @@ async def get_releases_feed_rss(
     releases = releases[:_RELEASE_FEED_LIMIT]
     items = [_release_rss_item(r, repo.owner, repo.slug) for r in releases]
 
-    feed_link = f"/musehub/ui/{repo.owner}/{repo.slug}/releases"
+    feed_link = f"/{repo.owner}/{repo.slug}/releases"
     xml = _build_rss_envelope(
         title=f"{repo.owner}/{repo.slug} releases",
         link=feed_link,
@@ -314,7 +314,7 @@ async def get_issues_feed_rss(
     issues = issues[:_ISSUE_FEED_LIMIT]
     items = [_issue_rss_item(i, repo.owner, repo.slug) for i in issues]
 
-    feed_link = f"/musehub/ui/{repo.owner}/{repo.slug}/issues"
+    feed_link = f"/{repo.owner}/{repo.slug}/issues"
     xml = _build_rss_envelope(
         title=f"{repo.owner}/{repo.slug} issues",
         link=feed_link,

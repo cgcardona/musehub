@@ -1,8 +1,8 @@
-"""Tests for the Muse Hub export endpoint and musehub_exporter service.
+"""Tests for the MuseHub export endpoint and musehub_exporter service.
 
 Covers every acceptance criterion:
-- GET /musehub/repos/{repo_id}/export/{ref}?format=midi returns a .mid file
-- GET /musehub/repos/{repo_id}/export/{ref}?format=json returns valid JSON
+- GET /repos/{repo_id}/export/{ref}?format=midi returns a .mid file
+- GET /repos/{repo_id}/export/{ref}?format=json returns valid JSON
 - split_tracks=true bundles artifacts into a ZIP with per-track files
 - sections filter restricts artifacts to matching path substrings
 - Unknown format string returns 422 Unprocessable Entity
@@ -46,7 +46,7 @@ def _b64(data: bytes) -> str:
 
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "export-test") -> str:
     r = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -67,7 +67,7 @@ async def _push_with_objects(
     with patch("musehub.services.musehub_sync.settings") as mock_cfg:
         mock_cfg.musehub_objects_dir = tmp_dir
         r = await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/push",
+            f"/api/v1/repos/{repo_id}/push",
             json={
                 "branch": "main",
                 "headCommitId": commit_id,
@@ -153,7 +153,7 @@ async def test_export_midi(
             mock_repo.get_object_row = AsyncMock(return_value=fake_row)
 
             r = await client.get(
-                f"/api/v1/musehub/repos/{repo_id}/export/c-midi-001?format=midi",
+                f"/api/v1/repos/{repo_id}/export/c-midi-001?format=midi",
                 headers=auth_headers,
             )
 
@@ -206,7 +206,7 @@ async def test_export_json(
             )
 
             r = await client.get(
-                f"/api/v1/musehub/repos/{repo_id}/export/c-json-001?format=json",
+                f"/api/v1/repos/{repo_id}/export/c-json-001?format=json",
                 headers=auth_headers,
             )
 
@@ -290,7 +290,7 @@ async def test_export_split_tracks_zip(
             mock_repo.get_object_row = AsyncMock(side_effect=_fake_get_object_row)
 
             r = await client.get(
-                f"/api/v1/musehub/repos/{repo_id}/export/c-zip-001?format=midi&splitTracks=true",
+                f"/api/v1/repos/{repo_id}/export/c-zip-001?format=midi&splitTracks=true",
                 headers=auth_headers,
             )
 
@@ -364,7 +364,7 @@ async def test_export_section_filter(
             mock_repo.get_object_row = AsyncMock(return_value=verse_row)
 
             r = await client.get(
-                f"/api/v1/musehub/repos/{repo_id}/export/c-sec-001?format=midi&sections=verse",
+                f"/api/v1/repos/{repo_id}/export/c-sec-001?format=midi&sections=verse",
                 headers=auth_headers,
             )
 
@@ -387,7 +387,7 @@ async def test_export_unknown_format_422(
     """An unrecognised format query param returns HTTP 422."""
     repo_id = await _create_repo(client, auth_headers, "bad-format")
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/export/main?format=flac",
+        f"/api/v1/repos/{repo_id}/export/main?format=flac",
         headers=auth_headers,
     )
     assert r.status_code == 422
@@ -412,7 +412,7 @@ async def test_export_ref_not_found_404(
         mock_repo.list_branches = AsyncMock(return_value=[])
 
         r = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/export/nonexistent-sha?format=midi",
+            f"/api/v1/repos/{repo_id}/export/nonexistent-sha?format=midi",
             headers=auth_headers,
         )
 

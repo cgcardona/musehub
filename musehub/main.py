@@ -39,6 +39,7 @@ from musehub.api.routes.musehub import (
     ui_forks as musehub_ui_forks_routes,
     ui_emotion_diff as musehub_ui_emotion_diff_routes,
     ui_user_profile as musehub_ui_profile_routes,
+    ui_mcp_elicitation as musehub_ui_mcp_elicitation_routes,
     ui_new_repo as musehub_ui_new_repo_routes,
     discover as musehub_discover_routes,
     users as musehub_user_routes,
@@ -163,15 +164,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Static files mounted FIRST — must come before the /{owner}/{repo_slug} wildcard
+# UI routes, otherwise "static" would be matched as an owner name.
+_STATIC_DIR = Path(__file__).parent / "templates" / "musehub" / "static"
+app.mount(
+    "/static",
+    StaticFiles(directory=str(_STATIC_DIR)),
+    name="static",
+)
+
 # Fixed-prefix subrouters registered BEFORE the main musehub router
 # so their concrete paths are matched first, not shadowed by /{owner}/{repo_slug}.
-app.include_router(musehub_user_routes.router, prefix="/api/v1/musehub", tags=["Users"])
+app.include_router(musehub_user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(musehub_discover_routes.router, prefix="/api/v1", tags=["Discover"])
 app.include_router(musehub_discover_routes.star_router, prefix="/api/v1", tags=["Social"])
 app.include_router(musehub_router_pkg.router, prefix="/api/v1")
 app.include_router(musehub_ui_notifications_routes.router, tags=["musehub-ui-notifications"])
 app.include_router(musehub_ui_topics_routes.router, tags=["musehub-ui"])
-app.include_router(musehub_ui_profile_routes.router, tags=["musehub-ui"])
+app.include_router(musehub_ui_mcp_elicitation_routes.router, tags=["musehub-ui-mcp"])
 app.include_router(musehub_ui_new_repo_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_routes.fixed_router, tags=["musehub-ui"])
 app.include_router(musehub_ui_milestones_routes.router, tags=["musehub-ui"])
@@ -179,25 +189,26 @@ app.include_router(musehub_ui_stash_routes.router, tags=["musehub-ui-stash"])
 app.include_router(musehub_ui_forks_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_collab_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_labels_routes.router, tags=["musehub-ui"])
+
+# Fixed-path routers that must come BEFORE the /{owner}/{repo_slug} wildcard in ui_routes.router.
+# Registering them after would cause /oembed, /oembed/commit, /sitemap.xml, /mcp, etc.
+# to be shadowed and matched as if "oembed"/"sitemap"/"mcp" were repo owner names.
+app.include_router(musehub_oembed_routes.router, tags=["musehub-oembed"])
+app.include_router(musehub_raw_routes.router, prefix="/api/v1", tags=["musehub-raw"])
+app.include_router(musehub_sitemap_routes.router, tags=["musehub-sitemap"])
+app.include_router(mcp_router)
+
+# Wildcard UI routes — /{owner}/{repo_slug} and deeper paths.
+# Must come after all fixed-path routers above.
 app.include_router(musehub_ui_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_blame_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_settings_routes.router, tags=["musehub-ui-settings"])
 app.include_router(musehub_ui_similarity_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_emotion_diff_routes.router, tags=["musehub-ui"])
-app.include_router(musehub_oembed_routes.router, tags=["musehub-oembed"])
-app.include_router(musehub_raw_routes.router, prefix="/api/v1", tags=["musehub-raw"])
-app.include_router(musehub_sitemap_routes.router, tags=["musehub-sitemap"])
 
-# MCP endpoint — mounted at root (no prefix) per MCP spec.
-# POST /mcp accepts JSON-RPC 2.0 single requests and batch arrays.
-app.include_router(mcp_router)
-
-_STATIC_DIR = Path(__file__).parent / "templates" / "musehub" / "static"
-app.mount(
-    "/musehub/static",
-    StaticFiles(directory=str(_STATIC_DIR)),
-    name="musehub-static",
-)
+# Profile catch-all MUST be last — /{username} is a single-segment wildcard and
+# would shadow fixed routes (e.g. /explore, /feed, /topics, /mcp) if registered earlier.
+app.include_router(musehub_ui_profile_routes.router, tags=["musehub-ui"])
 
 if settings.debug:
     @app.get("/docs", include_in_schema=False)
@@ -220,4 +231,4 @@ if settings.debug:
 @app.get("/", include_in_schema=False)
 async def root() -> RedirectResponse:
     """Redirect browsers to the UI; agents should use /api/v1/openapi.json."""
-    return RedirectResponse(url="/musehub/ui/explore")
+    return RedirectResponse(url="/explore")

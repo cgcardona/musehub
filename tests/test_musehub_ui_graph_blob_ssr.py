@@ -132,7 +132,7 @@ async def test_graph_page_sets_graph_data_js_global(
     cid = await _seed_commit(db_session, repo_id)
     await _seed_branch(db_session, repo_id, cid)
 
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/graph")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
     assert "window.__graphData" in response.text
 
@@ -152,7 +152,7 @@ async def test_graph_page_shows_commit_count(
     cid2 = await _seed_commit(db_session, repo_id, message="Second commit")
     await _seed_branch(db_session, repo_id, cid2)
 
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/graph")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
     # "2 commits" should appear in the SSR metadata span
     assert "2 commits" in response.text
@@ -169,7 +169,7 @@ async def test_graph_page_shows_branch_count(
     await _seed_branch(db_session, repo_id, cid, name="main")
     await _seed_branch(db_session, repo_id, cid, name="feat/jazz")
 
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/graph")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
     assert "2 branches" in response.text
 
@@ -207,7 +207,7 @@ async def test_blob_page_renders_file_content_server_side(
             size_bytes=16,
         )
 
-        response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/blob/main/main.py")
+        response = await client.get(f"/{_OWNER}/{_SLUG}/blob/main/main.py")
         assert response.status_code == 200
         body = response.text
         # File content must appear in the SSR HTML (inside the line table)
@@ -243,7 +243,7 @@ async def test_blob_page_renders_line_numbers(
             size_bytes=18,
         )
 
-        response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/blob/main/code.py")
+        response = await client.get(f"/{_OWNER}/{_SLUG}/blob/main/code.py")
         assert response.status_code == 200
         body = response.text
         assert 'id="L1"' in body
@@ -278,7 +278,7 @@ async def test_blob_page_shows_file_size(
             size_bytes=2048,
         )
 
-        response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/blob/main/readme.txt")
+        response = await client.get(f"/{_OWNER}/{_SLUG}/blob/main/readme.txt")
         assert response.status_code == 200
         # filesizeformat renders 2048 bytes as "2.0 KB"
         assert "2.0 KB" in response.text
@@ -313,7 +313,7 @@ async def test_blob_page_binary_shows_download_link(
             size_bytes=4,
         )
 
-        response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/blob/main/image.webp")
+        response = await client.get(f"/{_OWNER}/{_SLUG}/blob/main/image.webp")
         assert response.status_code == 200
         body = response.text
         # SSR renders binary download link, no line table
@@ -351,7 +351,7 @@ async def test_blob_page_midi_shows_player_shell(
             size_bytes=4,
         )
 
-        response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/blob/main/track.mid")
+        response = await client.get(f"/{_OWNER}/{_SLUG}/blob/main/track.mid")
         assert response.status_code == 200
         body = response.text
         assert "midi-player" in body
@@ -374,7 +374,7 @@ async def test_blob_page_unknown_path_no_ssr(
     """
     await _seed_repo(db_session)
 
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/blob/main/nonexistent.py")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/blob/main/nonexistent.py")
     assert response.status_code == 200
     # No SSR blob content block when object is absent — the id="blob-ssr-content" div
     # must NOT appear (note: the string 'blob-ssr-content' may appear in JS code).

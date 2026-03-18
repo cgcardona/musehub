@@ -14,7 +14,7 @@
     issues        : list[IssueResponse]  — current page of filtered issues
     labels_data   : list[dict]           — all repo labels ({name, color}) for colour lookup
     active_label  : str                  — currently active label filter ('' if none)
-    base_url      : str                  — repo base URL, e.g. /musehub/ui/owner/slug
+    base_url      : str                  — repo base URL, e.g. /owner/slug
 
     Pattern: copy this file for every other list-page fragment.  All context
     variables are prepared server-side by the route handler — no JS fetches.

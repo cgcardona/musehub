@@ -1,6 +1,6 @@
-"""Tests for Muse Hub fork network UI endpoint.
+"""Tests for MuseHub fork network UI endpoint.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/forks:
+Covers GET /{owner}/{repo_slug}/forks:
 
 - test_forks_page_returns_200 — page renders without auth
 - test_forks_page_no_auth_required — no JWT needed for HTML shell
@@ -106,9 +106,9 @@ async def test_forks_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/forks returns 200 HTML."""
+    """GET /{owner}/{slug}/forks returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -120,7 +120,7 @@ async def test_forks_page_no_auth_required(
 ) -> None:
     """Fork network page is publicly accessible — no JWT needed."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
 
 
@@ -131,7 +131,7 @@ async def test_forks_page_has_svg_dag_markup(
 ) -> None:
     """Page HTML includes an SVG element as the DAG scaffold."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     body = response.text
     assert "fork-svg" in body or "fork-canvas" in body
@@ -144,7 +144,7 @@ async def test_forks_page_has_legend(
 ) -> None:
     """Page contains a divergence colour legend."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     body = response.text
     assert "legend" in body or "In sync" in body or "ahead" in body
@@ -157,7 +157,7 @@ async def test_forks_page_has_compare_button_js(
 ) -> None:
     """Page JavaScript includes Compare action."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     assert "Compare" in response.text
 
@@ -169,7 +169,7 @@ async def test_forks_page_has_contribute_upstream_js(
 ) -> None:
     """Page JavaScript includes Contribute upstream action."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     assert "Contribute upstream" in response.text or "contribute" in response.text.lower()
 
@@ -181,9 +181,9 @@ async def test_forks_page_base_url_in_html(
 ) -> None:
     """HTML uses the owner/slug base URL, not raw repo_id UUIDs."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
-    assert "/musehub/ui/upstream/bass-project" in response.text
+    assert "/upstream/bass-project" in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ async def test_forks_page_json_response(
 ) -> None:
     """?format=json returns HTTP 200 with application/json content-type."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks?format=json")
+    response = await client.get("/upstream/bass-project/forks?format=json")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")
 
@@ -210,7 +210,7 @@ async def test_forks_page_json_has_root_and_total(
 ) -> None:
     """JSON response contains root node and totalForks counter."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks?format=json")
+    response = await client.get("/upstream/bass-project/forks?format=json")
     assert response.status_code == 200
     data = response.json()
     assert "root" in data
@@ -225,7 +225,7 @@ async def test_forks_page_json_children_present(
     """A fork repo appears as a child node in the JSON root.children list."""
     source_id = await _make_repo(db_session)
     await _make_fork(db_session, source_id, fork_owner="alice", fork_slug="bass-project")
-    response = await client.get("/musehub/ui/upstream/bass-project/forks?format=json")
+    response = await client.get("/upstream/bass-project/forks?format=json")
     assert response.status_code == 200
     data = response.json()
     children = data["root"]["children"]
@@ -244,7 +244,7 @@ async def test_forks_page_json_divergence_computed(
     fork_id = await _make_fork(db_session, source_id, fork_owner="bob", fork_slug="bass-project")
     # Add a commit to the fork so divergence > 0
     await _make_commit(db_session, fork_id, sha="fork-commit-001")
-    response = await client.get("/musehub/ui/upstream/bass-project/forks?format=json")
+    response = await client.get("/upstream/bass-project/forks?format=json")
     assert response.status_code == 200
     data = response.json()
     children = data["root"]["children"]
@@ -260,7 +260,7 @@ async def test_forks_page_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug returns 404."""
-    response = await client.get("/musehub/ui/nobody/nonexistent/forks")
+    response = await client.get("/nobody/nonexistent/forks")
     assert response.status_code == 404
 
 
@@ -271,7 +271,7 @@ async def test_forks_page_json_empty_repo(
 ) -> None:
     """A repo with no forks returns totalForks=0 and empty children list."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/upstream/bass-project/forks?format=json")
+    response = await client.get("/upstream/bass-project/forks?format=json")
     assert response.status_code == 200
     data = response.json()
     assert data["totalForks"] == 0

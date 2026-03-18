@@ -1,4 +1,4 @@
-"""Muse Hub webhook dispatcher — event-driven HTTP notification delivery.
+"""MuseHub webhook dispatcher — event-driven HTTP notification delivery.
 
 This module is the single point responsible for delivering webhook events to
 registered subscriber URLs. It is called by route handlers after a state-

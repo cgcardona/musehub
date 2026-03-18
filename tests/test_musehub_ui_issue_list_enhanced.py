@@ -168,7 +168,7 @@ async def _get_page(
     **params: str,
 ) -> str:
     """Fetch the issue list page and return its text body."""
-    resp = await client.get(f"/musehub/ui/{owner}/{slug}/issues", params=params)
+    resp = await client.get(f"/{owner}/{slug}/issues", params=params)
     assert resp.status_code == 200
     return resp.text
 
@@ -183,9 +183,9 @@ async def test_issue_list_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/issues returns 200 HTML."""
+    """GET /{owner}/{slug}/issues returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/grooves/issues")
+    response = await client.get("/beatmaker/grooves/issues")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -197,7 +197,7 @@ async def test_issue_list_no_auth_required(
 ) -> None:
     """Issue list page renders without a JWT token."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/grooves/issues")
+    response = await client.get("/beatmaker/grooves/issues")
     assert response.status_code == 200
 
 
@@ -207,7 +207,7 @@ async def test_issue_list_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug returns 404."""
-    response = await client.get("/musehub/ui/nobody/norepo/issues")
+    response = await client.get("/nobody/norepo/issues")
     assert response.status_code == 404
 
 
@@ -334,7 +334,7 @@ async def test_issue_list_htmx_request_returns_fragment(
     """HX-Request: true returns a bare fragment — no <html> wrapper."""
     await _make_repo(db_session)
     resp = await client.get(
-        "/musehub/ui/beatmaker/grooves/issues",
+        "/beatmaker/grooves/issues",
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200
@@ -350,7 +350,7 @@ async def test_issue_list_fragment_contains_issue_title(
     repo_id = await _make_repo(db_session)
     await _make_issue(db_session, repo_id, title="Synth pad too bright")
     resp = await client.get(
-        "/musehub/ui/beatmaker/grooves/issues",
+        "/beatmaker/grooves/issues",
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200
@@ -366,7 +366,7 @@ async def test_issue_list_fragment_empty_state_when_no_issues(
     repo_id = await _make_repo(db_session)
     await _make_issue(db_session, repo_id, number=1, title="Open issue", state="open")
     resp = await client.get(
-        "/musehub/ui/beatmaker/grooves/issues",
+        "/beatmaker/grooves/issues",
         params={"state": "closed"},
         headers={"HX-Request": "true"},
     )
@@ -436,10 +436,11 @@ async def test_issue_list_milestone_progress_bar_css_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """milestone-progress-bar-fill CSS class is defined in the page."""
+    """milestone-progress-bar-fill CSS class is in app.css; page renders milestone sidebar."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "milestone-progress-bar-fill" in body
+    # Class moved to app.css (SCSS refactor); verify the milestone sidebar renders instead
+    assert "milestone-progress-heading" in body
 
 
 @pytest.mark.anyio
@@ -622,10 +623,12 @@ async def test_issue_list_issue_templates_const_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """ISSUE_TEMPLATES constant is present in the page JS."""
+    """ISSUE_TEMPLATES is in app.js (TypeScript module); page dispatches issue-list module."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "ISSUE_TEMPLATES" in body
+    # ISSUE_TEMPLATES moved to app.js; verify page dispatch JSON and template picker HTML
+    assert '"page": "issue-list"' in body
+    assert "template-picker" in body
 
 
 @pytest.mark.anyio
@@ -739,10 +742,11 @@ async def test_issue_list_toggle_issue_select_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """toggleIssueSelect() JS function is present in the page."""
+    """toggleIssueSelect() is in app.js (TypeScript module); page renders bulk toolbar."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "toggleIssueSelect" in body
+    # Function moved to app.js; verify bulk toolbar HTML element is present
+    assert "bulk-toolbar" in body
 
 
 @pytest.mark.anyio
@@ -761,10 +765,11 @@ async def test_issue_list_update_bulk_toolbar_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """updateBulkToolbar() JS function is present in the page."""
+    """updateBulkToolbar() is in app.js (TypeScript module); page renders bulk action buttons."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "updateBulkToolbar" in body
+    # Function moved to app.js; verify bulk action buttons are in the HTML
+    assert "bulk-action-btn" in body
 
 
 @pytest.mark.anyio
@@ -818,6 +823,6 @@ async def test_issue_list_full_page_contains_html_wrapper(
 ) -> None:
     """Direct browser navigation (no HX-Request) returns a full HTML page with <html> tag."""
     await _make_repo(db_session)
-    resp = await client.get("/musehub/ui/beatmaker/grooves/issues")
+    resp = await client.get("/beatmaker/grooves/issues")
     assert resp.status_code == 200
     assert "<html" in resp.text

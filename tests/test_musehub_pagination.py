@@ -1,13 +1,13 @@
-"""Tests for RFC 8288 Link header pagination on Muse Hub list endpoints.
+"""Tests for RFC 8288 Link header pagination on MuseHub list endpoints.
 
 Covers acceptance criteria:
 - PaginationParams dependency parses page/per_page and cursor/limit query params
 - build_link_header emits correct RFC 8288 rel links for first/last/prev/next
 - build_cursor_link_header emits a rel="next" link with cursor and limit
 - paginate_list slices correctly and returns accurate total
-- GET /musehub/repos/{repo_id}/issues returns Link header and total field
-- GET /musehub/repos/{repo_id}/pull-requests returns Link header and total field
-- GET /musehub/repos/{repo_id}/commits returns Link header when per_page > 0
+- GET /repos/{repo_id}/issues returns Link header and total field
+- GET /repos/{repo_id}/pull-requests returns Link header and total field
+- GET /repos/{repo_id}/commits returns Link header when per_page > 0
 - GET /musehub/repos returns rel="next" Link header when next_cursor is present
 
 All tests use fixtures from conftest.py. No live external APIs are called.
@@ -86,7 +86,7 @@ def test_paginate_list_empty_input() -> None:
 
 def test_build_link_header_single_page() -> None:
     """build_link_header emits only first and last when there is exactly one page."""
-    req = _make_request("http://test/api/v1/musehub/repos/r1/issues?page=1&per_page=20")
+    req = _make_request("http://test/api/v1/repos/r1/issues?page=1&per_page=20")
     header = build_link_header(req, total=5, page=1, per_page=20)
     assert 'rel="first"' in header
     assert 'rel="last"' in header
@@ -96,7 +96,7 @@ def test_build_link_header_single_page() -> None:
 
 def test_build_link_header_first_of_many() -> None:
     """build_link_header emits first, last, and next (but not prev) on page 1 of N."""
-    req = _make_request("http://test/api/v1/musehub/repos/r1/issues?page=1&per_page=10")
+    req = _make_request("http://test/api/v1/repos/r1/issues?page=1&per_page=10")
     header = build_link_header(req, total=55, page=1, per_page=10)
     assert 'rel="first"' in header
     assert 'rel="last"' in header
@@ -108,7 +108,7 @@ def test_build_link_header_first_of_many() -> None:
 
 def test_build_link_header_middle_page() -> None:
     """build_link_header emits all four rels on an interior page."""
-    req = _make_request("http://test/api/v1/musehub/repos/r1/issues?page=3&per_page=10")
+    req = _make_request("http://test/api/v1/repos/r1/issues?page=3&per_page=10")
     header = build_link_header(req, total=55, page=3, per_page=10)
     assert 'rel="first"' in header
     assert 'rel="last"' in header
@@ -120,7 +120,7 @@ def test_build_link_header_middle_page() -> None:
 
 def test_build_link_header_last_page() -> None:
     """build_link_header emits prev (but not next) on the last page."""
-    req = _make_request("http://test/api/v1/musehub/repos/r1/issues?page=6&per_page=10")
+    req = _make_request("http://test/api/v1/repos/r1/issues?page=6&per_page=10")
     header = build_link_header(req, total=55, page=6, per_page=10)
     assert 'rel="first"' in header
     assert 'rel="last"' in header
@@ -130,14 +130,14 @@ def test_build_link_header_last_page() -> None:
 
 def test_build_link_header_preserves_existing_query_params() -> None:
     """build_link_header keeps non-pagination query params on generated URLs."""
-    req = _make_request("http://test/api/v1/musehub/repos/r1/issues?state=open&page=1&per_page=10")
+    req = _make_request("http://test/api/v1/repos/r1/issues?state=open&page=1&per_page=10")
     header = build_link_header(req, total=30, page=1, per_page=10)
     assert "state=open" in header
 
 
 def test_build_cursor_link_header_emits_next_only() -> None:
     """build_cursor_link_header emits exactly one rel="next" with cursor and limit encoded."""
-    req = _make_request("http://test/api/v1/musehub/repos?limit=20")
+    req = _make_request("http://test/api/v1/repos?limit=20")
     header = build_cursor_link_header(req, next_cursor="abc123", limit=20)
     assert 'rel="next"' in header
     assert "cursor=abc123" in header
@@ -153,7 +153,7 @@ def test_build_cursor_link_header_emits_next_only() -> None:
 
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str) -> str:
     r = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser"},
         headers=auth_headers,
     )
@@ -169,7 +169,7 @@ async def _create_issue(
     title: str,
 ) -> None:
     r = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": title, "body": ""},
         headers=auth_headers,
     )
@@ -187,7 +187,7 @@ async def test_list_issues_link_header_present(
         await _create_issue(client, auth_headers, repo_id, f"Issue {i}")
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues?page=1&per_page=2",
+        f"/api/v1/repos/{repo_id}/issues?page=1&per_page=2",
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -209,7 +209,7 @@ async def test_list_issues_total_field_returned(
         await _create_issue(client, auth_headers, repo_id, f"Track issue {i}")
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues?page=1&per_page=3",
+        f"/api/v1/repos/{repo_id}/issues?page=1&per_page=3",
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -229,7 +229,7 @@ async def test_list_issues_last_page_no_next(
         await _create_issue(client, auth_headers, repo_id, f"Issue {i}")
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues?page=2&per_page=3",
+        f"/api/v1/repos/{repo_id}/issues?page=2&per_page=3",
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -249,7 +249,7 @@ async def test_list_issues_default_page_returns_all_when_small(
         await _create_issue(client, auth_headers, repo_id, f"Default page {i}")
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -287,7 +287,7 @@ async def test_list_prs_link_header_present(
     await db_session.commit()
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests?page=1&per_page=2",
+        f"/api/v1/repos/{repo_id}/pull-requests?page=1&per_page=2",
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -319,7 +319,7 @@ async def test_list_prs_total_field_returned(
     await db_session.commit()
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -359,7 +359,7 @@ async def test_list_commits_link_header_with_per_page(
     await db_session.commit()
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits?page=1&per_page=2",
+        f"/api/v1/repos/{repo_id}/commits?page=1&per_page=2",
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -378,7 +378,7 @@ async def test_list_commits_no_link_header_without_per_page(
     repo_id = await _create_repo(client, auth_headers, "pagination-commits-no-link")
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits",
+        f"/api/v1/repos/{repo_id}/commits",
         headers=auth_headers,
     )
     assert r.status_code == 200

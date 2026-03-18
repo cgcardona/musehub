@@ -11,7 +11,7 @@ Covers acceptance criteria:
 - test_sitemap_xml_well_formed — sitemap can be parsed as valid XML
 - test_sitemap_loc_uses_request_host — loc entries use the base URL from the request
 - test_robots_txt_returns_plain_text — GET /robots.txt returns 200 text/plain
-- test_robots_txt_allows_musehub_ui — Allow: /musehub/ui/ is present
+- test_robots_txt_allows_musehub_ui — Allow: / is present
 - test_robots_txt_disallows_settings — settings path is disallowed
 - test_robots_txt_disallows_notifications — notifications path is disallowed
 - test_robots_txt_disallows_api — /api/ directory is disallowed
@@ -121,9 +121,9 @@ async def test_sitemap_contains_static_pages(
     response = await client.get("/sitemap.xml")
     assert response.status_code == 200
     body = response.text
-    assert "/musehub/ui/explore" in body
-    assert "/musehub/ui/trending" in body
-    assert "/musehub/ui/topics" in body
+    assert "/explore" in body
+    assert "/trending" in body
+    assert "/topics" in body
 
 
 @pytest.mark.anyio
@@ -135,7 +135,7 @@ async def test_sitemap_contains_public_repo(
     response = await client.get("/sitemap.xml")
     assert response.status_code == 200
     body = response.text
-    assert "/musehub/ui/artist/cool-track" in body
+    assert "/artist/cool-track" in body
 
 
 @pytest.mark.anyio
@@ -155,24 +155,24 @@ async def test_sitemap_excludes_private_repo(
 async def test_sitemap_contains_user_profile(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """A seeded user profile generates a /musehub/ui/users/{username} entry."""
+    """A seeded user profile generates a /users/{username} entry."""
     await _make_profile(db_session, username="jazzmaster", user_id="jazzmaster-uid")
     response = await client.get("/sitemap.xml")
     assert response.status_code == 200
-    assert "/musehub/ui/users/jazzmaster" in response.text
+    assert "/users/jazzmaster" in response.text
 
 
 @pytest.mark.anyio
 async def test_sitemap_contains_topic_urls(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """Tags on public repos generate /musehub/ui/topics/{tag} entries."""
+    """Tags on public repos generate /topics/{tag} entries."""
     await _make_public_repo(db_session, owner="producer", slug="beats", tags=["lo-fi", "jazz"])
     response = await client.get("/sitemap.xml")
     assert response.status_code == 200
     body = response.text
-    assert "/musehub/ui/topics/lo-fi" in body
-    assert "/musehub/ui/topics/jazz" in body
+    assert "/topics/lo-fi" in body
+    assert "/topics/jazz" in body
 
 
 @pytest.mark.anyio
@@ -184,7 +184,7 @@ async def test_sitemap_contains_release_url(
     await _make_release(db_session, repo.repo_id, tag="v1.0")
     response = await client.get("/sitemap.xml")
     assert response.status_code == 200
-    assert "/musehub/ui/bandname/debut-album/releases/v1.0" in response.text
+    assert "/bandname/debut-album/releases/v1.0" in response.text
 
 
 @pytest.mark.anyio
@@ -230,7 +230,7 @@ async def test_sitemap_repo_commits_page_included(
     await _make_public_repo(db_session, owner="composer", slug="symphony-no1")
     response = await client.get("/sitemap.xml")
     assert response.status_code == 200
-    assert "/musehub/ui/composer/symphony-no1/commits" in response.text
+    assert "/composer/symphony-no1/commits" in response.text
 
 
 @pytest.mark.anyio
@@ -241,7 +241,7 @@ async def test_sitemap_repo_issues_page_included(
     await _make_public_repo(db_session, owner="composer", slug="symphony-no2")
     response = await client.get("/sitemap.xml")
     assert response.status_code == 200
-    assert "/musehub/ui/composer/symphony-no2/issues" in response.text
+    assert "/composer/symphony-no2/issues" in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -263,10 +263,10 @@ async def test_robots_txt_returns_plain_text(
 async def test_robots_txt_allows_musehub_ui(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """Allow: /musehub/ui/ is present for all crawlers."""
+    """Allow: / is present for all crawlers."""
     response = await client.get("/robots.txt")
     assert response.status_code == 200
-    assert "Allow: /musehub/ui/" in response.text
+    assert "Allow: /" in response.text
 
 
 @pytest.mark.anyio
@@ -276,7 +276,7 @@ async def test_robots_txt_disallows_settings(
     """Settings paths are disallowed to prevent indexing of private user config pages."""
     response = await client.get("/robots.txt")
     assert response.status_code == 200
-    assert "Disallow: /musehub/ui/*/settings" in response.text
+    assert "Disallow: /*/settings" in response.text
 
 
 @pytest.mark.anyio
@@ -286,7 +286,7 @@ async def test_robots_txt_disallows_notifications(
     """Notification pages are disallowed (user-private inbox content)."""
     response = await client.get("/robots.txt")
     assert response.status_code == 200
-    assert "Disallow: /musehub/ui/notifications" in response.text
+    assert "Disallow: /notifications" in response.text
 
 
 @pytest.mark.anyio

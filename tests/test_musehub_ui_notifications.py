@@ -1,6 +1,6 @@
-"""Tests for the Muse Hub notification inbox UI page (ui_notifications.py).
+"""Tests for the MuseHub notification inbox UI page (ui_notifications.py).
 
-Covers — GET /musehub/ui/notifications:
+Covers — GET /notifications:
 
 HTML page (SSR):
 - test_notifications_page_returns_200_html — page renders without auth
@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from musehub.db.musehub_models import MusehubNotification
 
 _TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
-_UI_PATH = "/musehub/ui/notifications"
+_UI_PATH = "/notifications"
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ async def _seed(db: AsyncSession, *notifs: MusehubNotification) -> None:
 
 @pytest.mark.anyio
 async def test_notifications_page_returns_200_html(client: AsyncClient) -> None:
-    """GET /musehub/ui/notifications returns 200 HTML without auth."""
+    """GET /notifications returns 200 HTML without auth."""
     resp = await client.get(_UI_PATH)
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]

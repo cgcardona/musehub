@@ -2,7 +2,7 @@
 
 {% block title %}Emotion Diff {{ base_ref[:8] }}...{{ head_ref[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
   <a href="{{ base_url }}">{{ repo_slug }}</a> /
   emotion-diff /
   <span class="text-mono">{{ base_ref[:8] }}...{{ head_ref[:8] }}</span>

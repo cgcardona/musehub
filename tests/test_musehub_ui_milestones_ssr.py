@@ -1,15 +1,15 @@
-"""SSR tests for Muse Hub milestones UI pages — issue #558.
+"""SSR tests for MuseHub milestones UI pages — issue #558.
 
 Validates that milestone data is rendered server-side into HTML (not deferred
 to client JS) and that HTMX fragment requests return bare HTML without the
 full page shell.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/milestones:
+Covers GET /{owner}/{repo_slug}/milestones:
 - test_milestones_list_renders_title_server_side      — milestone title in HTML
 - test_milestones_list_progress_bar_has_correct_width — width:75% for 3/4 closed
 - test_milestones_list_htmx_state_switch_returns_fragment — HX-Request → bare fragment
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/milestones/{number}:
+Covers GET /{owner}/{repo_slug}/milestones/{number}:
 - test_milestone_detail_renders_milestone_title        — title in HTML server-side
 - test_milestone_detail_shows_linked_issues            — issue title in HTML
 - test_milestone_detail_issue_state_filter_open        — ?state=closed shows only closed
@@ -112,7 +112,7 @@ async def test_milestones_list_renders_title_server_side(
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, title="Album Release Milestone")
     response = await client.get(
-        "/musehub/ui/artist/ssr-album/milestones?state=all"
+        "/artist/ssr-album/milestones?state=all"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -136,7 +136,7 @@ async def test_milestones_list_progress_bar_has_correct_width(
     await _make_issue(db_session, repo_id, number=3, state="closed", milestone_id=mid)
     await _make_issue(db_session, repo_id, number=4, state="open", milestone_id=mid)
 
-    response = await client.get("/musehub/ui/artist/ssr-album/milestones?state=all")
+    response = await client.get("/artist/ssr-album/milestones?state=all")
     assert response.status_code == 200
     # Fragment renders the inline style; int(75.0) == 75 → "width:75%"
     assert "width:75%" in response.text
@@ -153,7 +153,7 @@ async def test_milestones_list_htmx_state_switch_returns_fragment(
     _ = ms  # milestone exists so the closed tab has content
 
     response = await client.get(
-        "/musehub/ui/artist/ssr-album/milestones?state=closed",
+        "/artist/ssr-album/milestones?state=closed",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -177,7 +177,7 @@ async def test_milestone_detail_renders_milestone_title(
     """Milestone title is in the response HTML server-side (not behind JS)."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, number=1, title="SSR Detail Title")
-    response = await client.get("/musehub/ui/artist/ssr-album/milestones/1")
+    response = await client.get("/artist/ssr-album/milestones/1")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "SSR Detail Title" in response.text
@@ -198,7 +198,7 @@ async def test_milestone_detail_shows_linked_issues(
         title="Bass groove needs more swing",
         milestone_id=str(ms.milestone_id),
     )
-    response = await client.get("/musehub/ui/artist/ssr-album/milestones/1")
+    response = await client.get("/artist/ssr-album/milestones/1")
     assert response.status_code == 200
     assert "Bass groove needs more swing" in response.text
 
@@ -218,7 +218,7 @@ async def test_milestone_detail_issue_state_filter_closed(
     await _make_issue(
         db_session, repo_id, number=2, title="Closed issue title", state="closed", milestone_id=mid
     )
-    response = await client.get("/musehub/ui/artist/ssr-album/milestones/1?state=closed")
+    response = await client.get("/artist/ssr-album/milestones/1?state=closed")
     assert response.status_code == 200
     body = response.text
     assert "Closed issue title" in body
@@ -232,5 +232,5 @@ async def test_milestone_detail_unknown_number_404(
 ) -> None:
     """Non-existent milestone number returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/ssr-album/milestones/9999")
+    response = await client.get("/artist/ssr-album/milestones/9999")
     assert response.status_code == 404

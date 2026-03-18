@@ -1,7 +1,6 @@
-"""Muse Hub route package.
+"""MuseHub route package.
 
-Auto-discovers and registers all sub-routers under the shared ``/musehub``
-prefix. Registered in ``musehub.main`` as:
+Auto-discovers and registers all sub-routers. Registered in ``musehub.main`` as:
 
     app.include_router(musehub.router, prefix="/api/v1", tags=["musehub"])
 
@@ -34,7 +33,7 @@ from fastapi import APIRouter
 
 from musehub.api.routes.musehub import analysis
 
-router = APIRouter(prefix="/musehub")
+router = APIRouter(prefix="")
 
 _PACKAGE = "musehub.api.routes.musehub"
 _HERE = [str(Path(__file__).parent)]
@@ -61,6 +60,7 @@ _DIRECT_REGISTERED = {
     "ui_similarity",   # registered in main.py at root
     "ui_stash",        # registered in main.py at root
     "ui_topics",       # registered in main.py at root
+    "ui_mcp_elicitation", # registered in main.py at root (MCP elicitation UI pages)
     "ui_user_profile", # registered in main.py at root
     "users",           # registered in main.py at /api/v1/musehub (same path as auto-discovery)
     "oembed",          # registered in main.py at root

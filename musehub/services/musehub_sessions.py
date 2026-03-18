@@ -1,4 +1,4 @@
-"""Muse Hub session persistence service.
+"""MuseHub session persistence service.
 
 Handles storage and retrieval of recording session records in the musehub_sessions
 table. Sessions are pushed from the CLI (``muse session end``) and displayed in
@@ -79,7 +79,7 @@ async def list_sessions(
 
     Args:
         db: Active async database session.
-        repo_id: The Muse Hub repo to query.
+        repo_id: The MuseHub repo to query.
         limit: Maximum number of sessions to return (default 50, max 200).
 
     Returns:
@@ -112,7 +112,7 @@ async def get_session(
 
     Args:
         db: Active async database session.
-        repo_id: The Muse Hub repo to constrain the lookup.
+        repo_id: The MuseHub repo to constrain the lookup.
         session_id: The session UUID.
 
     Returns:

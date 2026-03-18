@@ -515,8 +515,79 @@ declare global {
     parseCommitMeta: (message: string) => Record<string, string>;
     loadReactions: (targetType: string, targetId: string, containerId: string) => Promise<void>;
     toggleReaction: (targetType: string, targetId: string, emoji: string, containerId: string) => Promise<void>;
+    // Page-module helpers exposed for inline onclick handlers
+    showTemplatePicker?: () => void;
+    selectTemplate?: (tplId: string) => void;
+    toggleIssueSelect?: (issueId: string, checked: boolean) => void;
+    deselectAll?: () => void;
+    bulkClose?: () => void;
+    bulkReopen?: () => void;
+    bulkAssignLabel?: () => void;
+    bulkAssignMilestone?: () => void;
+    bodyPreview?: (text: string, maxLen?: number) => string;
+    switchTab?: (tab: string, filter?: string, page?: number) => void;
+    renderFromObjectId?: (repoId: string, objectId: string, container: HTMLElement | null) => void;
+    renderFromUrl?: (url: string, container: HTMLElement | null) => void;
+    // Lucide global (loaded from CDN)
+    lucide?: { createIcons: () => void };
+    // WaveSurfer global (loaded from CDN)
+    WaveSurfer?: { create: (opts: Record<string, unknown>) => unknown };
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+ * 8. Global page initialisation (replaces base.html inline script)
+ * ═══════════════════════════════════════════════════════════════ */
+
+async function loadNotifBadge(): Promise<void> {
+  if (!getToken()) return;
+  try {
+    const data = await apiFetch('/notifications') as Array<{ is_read: boolean }>;
+    const unread = Array.isArray(data) ? data.filter((n) => !n.is_read).length : 0;
+    const badge = document.getElementById('nav-notif-badge');
+    if (badge) {
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      (badge as HTMLElement).style.display = unread > 0 ? 'flex' : 'none';
+    }
+  } catch (_) { /* silent fail */ }
+}
+
+function initPageGlobals(): void {
+  // Show sign-out button when JWT is present
+  if (getToken()) {
+    const btn = document.getElementById('signout-btn');
+    if (btn) (btn as HTMLElement).style.display = '';
+  }
+  // Refresh notification badge
+  loadNotifBadge();
+  // Hydrate Lucide icons (CDN global)
+  if (typeof (window as unknown as Record<string, unknown>).lucide === 'object') {
+    (window as unknown as { lucide: { createIcons: () => void } }).lucide.createIcons();
+  }
+  // Dispatch to the active page module via the #page-data JSON element
+  const pageDataEl = document.getElementById('page-data');
+  if (pageDataEl) {
+    try {
+      const pageData = JSON.parse(pageDataEl.textContent ?? '{}') as Record<string, unknown>;
+      dispatchPageModule(pageData);
+    } catch (_) { /* malformed JSON — ignore */ }
+  }
+}
+
+function dispatchPageModule(data: Record<string, unknown>): void {
+  const page = data['page'] as string | undefined;
+  if (!page) return;
+  // Page modules register themselves on window.MusePages
+  const pages = (window as unknown as { MusePages?: Record<string, (d: Record<string, unknown>) => void> }).MusePages;
+  if (pages && typeof pages[page] === 'function') {
+    pages[page](data);
+  }
+}
+
+// Run on initial hard load
+document.addEventListener('DOMContentLoaded', initPageGlobals);
+// Re-run after every HTMX swap so page modules activate on navigation
+document.addEventListener('htmx:afterSettle', initPageGlobals);
 
 window.getToken = getToken;
 window.setToken = setToken;

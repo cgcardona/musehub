@@ -2,14 +2,14 @@
 
 {% block title %}Form &amp; Structure {{ short_ref }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ repo_id }}">{{ repo_id[:8] }}</a> /
+  <a href="/{{ repo_id }}">{{ repo_id[:8] }}</a> /
   form-structure / {{ short_ref }}
 {% endblock %}
 
 {% block page_data %}
 const repoId = {{ repo_id | tojson }};
 const ref    = {{ ref | tojson }};
-const base   = '/musehub/ui/' + repoId;
+const base   = '/' + repoId;
 {% endblock %}
 
 {% block page_script %}

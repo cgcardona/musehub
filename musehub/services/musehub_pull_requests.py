@@ -1,4 +1,4 @@
-"""Muse Hub pull request persistence adapter — single point of DB access for PRs.
+"""MuseHub pull request persistence adapter — single point of DB access for PRs.
 
 This module is the ONLY place that touches the ``musehub_pull_requests`` table.
 Route handlers delegate here; no business logic lives in routes.

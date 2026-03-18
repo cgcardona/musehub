@@ -1,9 +1,9 @@
-"""Muse Hub notification inbox UI page.
+"""MuseHub notification inbox UI page.
 
-Serves the authenticated notification inbox at ``/musehub/ui/notifications``.
+Serves the authenticated notification inbox at ``/notifications``.
 
 Endpoint:
-  GET /musehub/ui/notifications
+  GET /notifications
     - HTML (default): full SSR paginated, filterable notification inbox
       with HTMX filter swaps.  Authenticated users see their notifications
       server-side rendered on the first load; unauthenticated users see a
@@ -52,7 +52,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui-notifications"])
+router = APIRouter(prefix="", tags=["musehub-ui-notifications"])
 
 
 # Register a relative-time filter so templates can render ``created_at``
@@ -170,7 +170,7 @@ class NotificationsPageResponse(BaseModel):
 
 @router.get(
     "/notifications",
-    summary="Muse Hub notification inbox",
+    summary="MuseHub notification inbox",
 )
 async def notifications_page(
     request: Request,

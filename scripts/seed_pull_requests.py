@@ -707,7 +707,7 @@ async def seed(db: AsyncSession, force: bool = False) -> None:
 
 
 def _print_summary(prs: int, cross_prs: int, reviews: int, comments: int) -> None:
-    BASE = "http://localhost:10001/musehub/ui"
+    BASE = "http://localhost:10001"
     print("=" * 72)
     print("🎵  SEED PULL REQUESTS — COMPLETE")
     print("=" * 72)

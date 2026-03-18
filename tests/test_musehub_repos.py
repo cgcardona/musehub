@@ -1,11 +1,11 @@
-"""Tests for Muse Hub repo, branch, and commit endpoints.
+"""Tests for MuseHub repo, branch, and commit endpoints.
 
 Covers every acceptance criterion:
 - POST /musehub/repos returns 201 with correct fields
 - POST requires auth — unauthenticated requests return 401
-- GET /musehub/repos/{repo_id} returns 200; 404 for unknown repo
-- GET /musehub/repos/{repo_id}/branches returns empty list on new repo
-- GET /musehub/repos/{repo_id}/commits returns newest first, respects ?limit
+- GET /repos/{repo_id} returns 200; 404 for unknown repo
+- GET /repos/{repo_id}/branches returns empty list on new repo
+- GET /repos/{repo_id}/commits returns newest first, respects ?limit
 
 Covers (compare view API endpoint):
 - test_compare_radar_data — compare endpoint returns 5 dimension scores
@@ -36,7 +36,7 @@ async def test_create_repo_returns_201(
 ) -> None:
     """POST /musehub/repos creates a repo and returns all required fields."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "my-beats", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -54,7 +54,7 @@ async def test_create_repo_returns_201(
 async def test_create_repo_requires_auth(client: AsyncClient) -> None:
     """POST /musehub/repos returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "my-beats", "owner": "testuser"},
     )
     assert response.status_code == 401
@@ -67,7 +67,7 @@ async def test_create_repo_default_visibility_is_private(
 ) -> None:
     """Omitting visibility defaults to 'private'."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "silent-sessions", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -76,7 +76,7 @@ async def test_create_repo_default_visibility_is_private(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}
+# GET /repos/{repo_id}
 # ---------------------------------------------------------------------------
 
 
@@ -85,16 +85,16 @@ async def test_get_repo_returns_200(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/repos/{repo_id} returns the repo after creation."""
+    """GET /repos/{repo_id} returns the repo after creation."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "jazz-sessions", "owner": "testuser"},
         headers=auth_headers,
     )
     assert create.status_code == 201
     repo_id = create.json()["repoId"]
 
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}", headers=auth_headers)
+    response = await client.get(f"/api/v1/repos/{repo_id}", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["repoId"] == repo_id
     assert response.json()["name"] == "jazz-sessions"
@@ -105,9 +105,9 @@ async def test_get_repo_not_found_returns_404(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/repos/{repo_id} returns 404 for unknown repo."""
+    """GET /repos/{repo_id} returns 404 for unknown repo."""
     response = await client.get(
-        "/api/v1/musehub/repos/does-not-exist",
+        "/api/v1/repos/does-not-exist",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -115,16 +115,16 @@ async def test_get_repo_not_found_returns_404(
 
 @pytest.mark.anyio
 async def test_get_nonexistent_repo_returns_404_without_auth(client: AsyncClient) -> None:
-    """GET /musehub/repos/{repo_id} returns 404 for a non-existent repo without auth.
+    """GET /repos/{repo_id} returns 404 for a non-existent repo without auth.
 
     Uses optional_token — auth is visibility-based; missing repo → 404 before auth check.
     """
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo-id")
+    response = await client.get("/api/v1/repos/non-existent-repo-id")
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/branches
+# GET /repos/{repo_id}/branches
 # ---------------------------------------------------------------------------
 
 
@@ -135,14 +135,14 @@ async def test_list_branches_empty_on_new_repo(
 ) -> None:
     """A newly created repo has an empty branches list when not initialized."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "drum-patterns", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
     repo_id = create.json()["repoId"]
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/branches",
+        f"/api/v1/repos/{repo_id}/branches",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -156,14 +156,14 @@ async def test_list_branches_not_found_returns_404(
 ) -> None:
     """GET /branches returns 404 when the repo doesn't exist."""
     response = await client.get(
-        "/api/v1/musehub/repos/ghost-repo/branches",
+        "/api/v1/repos/ghost-repo/branches",
         headers=auth_headers,
     )
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/commits
+# GET /repos/{repo_id}/commits
 # ---------------------------------------------------------------------------
 
 
@@ -174,14 +174,14 @@ async def test_list_commits_empty_on_new_repo(
 ) -> None:
     """A new repo has no commits when initialize=false."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "empty-repo", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
     repo_id = create.json()["repoId"]
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits",
+        f"/api/v1/repos/{repo_id}/commits",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -201,7 +201,7 @@ async def test_list_commits_returns_newest_first(
 
     # Create repo via API (no init commit so we control the full history)
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "ordered-commits", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -231,7 +231,7 @@ async def test_list_commits_returns_newest_first(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits",
+        f"/api/v1/repos/{repo_id}/commits",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -251,7 +251,7 @@ async def test_list_commits_limit_param(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "limited-repo", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -273,7 +273,7 @@ async def test_list_commits_limit_param(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits?limit=1",
+        f"/api/v1/repos/{repo_id}/commits?limit=1",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -328,7 +328,7 @@ async def test_list_branches_returns_empty_for_new_repo(db_session: AsyncSession
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/divergence
+# GET /repos/{repo_id}/divergence
 # ---------------------------------------------------------------------------
 
 
@@ -342,7 +342,7 @@ async def test_divergence_endpoint_returns_five_dimensions(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "divergence-test-repo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -375,7 +375,7 @@ async def test_divergence_endpoint_returns_five_dimensions(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/divergence?branch_a=main&branch_b=feature",
+        f"/api/v1/repos/{repo_id}/divergence?branch_a=main&branch_b=feature",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -403,7 +403,7 @@ async def test_divergence_overall_score_is_mean_of_dimensions(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "divergence-mean-repo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -435,7 +435,7 @@ async def test_divergence_overall_score_is_mean_of_dimensions(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/divergence?branch_a=alpha&branch_b=beta",
+        f"/api/v1/repos/{repo_id}/divergence?branch_a=alpha&branch_b=beta",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -456,7 +456,7 @@ async def test_divergence_json_response_structure(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "divergence-struct-repo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -480,7 +480,7 @@ async def test_divergence_json_response_structure(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/divergence?branch_a=main&branch_b=dev",
+        f"/api/v1/repos/{repo_id}/divergence?branch_a=main&branch_b=dev",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -511,7 +511,7 @@ async def test_divergence_endpoint_returns_404_for_unknown_repo(
 ) -> None:
     """GET /divergence returns 404 for an unknown repo."""
     response = await client.get(
-        "/api/v1/musehub/repos/no-such-repo/divergence?branch_a=a&branch_b=b",
+        "/api/v1/repos/no-such-repo/divergence?branch_a=a&branch_b=b",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -525,14 +525,14 @@ async def test_divergence_endpoint_returns_422_for_empty_branch(
 ) -> None:
     """GET /divergence returns 422 when a branch has no commits."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "empty-branch-repo", "owner": "testuser"},
         headers=auth_headers,
     )
     repo_id = create.json()["repoId"]
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/divergence?branch_a=ghost&branch_b=also-ghost",
+        f"/api/v1/repos/{repo_id}/divergence?branch_a=ghost&branch_b=also-ghost",
         headers=auth_headers,
     )
     assert response.status_code == 422
@@ -540,7 +540,7 @@ async def test_divergence_endpoint_returns_422_for_empty_branch(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/dag
+# GET /repos/{repo_id}/dag
 # ---------------------------------------------------------------------------
 
 
@@ -551,14 +551,14 @@ async def test_graph_dag_endpoint_returns_empty_for_new_repo(
 ) -> None:
     """GET /dag returns empty nodes/edges for a repo with no commits (initialize=false)."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-empty", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
     repo_id = create.json()["repoId"]
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/dag",
+        f"/api/v1/repos/{repo_id}/dag",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -578,7 +578,7 @@ async def test_graph_dag_has_edges(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-edges", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -607,7 +607,7 @@ async def test_graph_dag_has_edges(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/dag",
+        f"/api/v1/repos/{repo_id}/dag",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -630,7 +630,7 @@ async def test_graph_dag_endpoint_topological_order(
     from datetime import datetime, timedelta, timezone
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-topo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -670,7 +670,7 @@ async def test_graph_dag_endpoint_topological_order(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/dag",
+        f"/api/v1/repos/{repo_id}/dag",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -686,7 +686,7 @@ async def test_graph_dag_nonexistent_repo_returns_404_without_auth(client: Async
 
     Uses optional_token — auth is visibility-based; missing repo → 404.
     """
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo/dag")
+    response = await client.get("/api/v1/repos/non-existent-repo/dag")
     assert response.status_code == 404
 
 
@@ -697,7 +697,7 @@ async def test_graph_dag_404_for_unknown_repo(
 ) -> None:
     """GET /dag returns 404 for a non-existent repo."""
     response = await client.get(
-        "/api/v1/musehub/repos/ghost-repo-dag/dag",
+        "/api/v1/repos/ghost-repo-dag/dag",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -713,7 +713,7 @@ async def test_graph_json_response_has_required_fields(
     from datetime import datetime, timezone
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-fields", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -733,7 +733,7 @@ async def test_graph_json_response_has_required_fields(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/dag",
+        f"/api/v1/repos/{repo_id}/dag",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -747,7 +747,7 @@ async def test_graph_json_response_has_required_fields(
         assert field in node, f"Missing field '{field}' in DAG node"
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/credits
+# GET /repos/{repo_id}/credits
 # ---------------------------------------------------------------------------
 
 
@@ -808,10 +808,10 @@ async def test_credits_aggregation(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/credits aggregates contributors from commits."""
+    """GET /api/v1/repos/{repo_id}/credits aggregates contributors from commits."""
     repo_id = await _seed_credits_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/credits",
+        f"/api/v1/repos/{repo_id}/credits",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -831,7 +831,7 @@ async def test_credits_sorted_by_count(
     """Default sort (count) puts the most prolific contributor first."""
     repo_id = await _seed_credits_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/credits?sort=count",
+        f"/api/v1/repos/{repo_id}/credits?sort=count",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -849,7 +849,7 @@ async def test_credits_sorted_by_recency(
     """sort=recency puts the most recently active contributor first."""
     repo_id = await _seed_credits_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/credits?sort=recency",
+        f"/api/v1/repos/{repo_id}/credits?sort=recency",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -867,7 +867,7 @@ async def test_credits_sorted_by_alpha(
     """sort=alpha returns contributors in alphabetical order."""
     repo_id = await _seed_credits_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/credits?sort=alpha",
+        f"/api/v1/repos/{repo_id}/credits?sort=alpha",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -885,7 +885,7 @@ async def test_credits_contribution_types_inferred(
     """Contribution types are inferred from commit messages."""
     repo_id = await _seed_credits_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/credits",
+        f"/api/v1/repos/{repo_id}/credits",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -901,9 +901,9 @@ async def test_credits_404_for_unknown_repo(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/credits returns 404."""
+    """GET /api/v1/repos/{unknown}/credits returns 404."""
     response = await client.get(
-        "/api/v1/musehub/repos/does-not-exist/credits",
+        "/api/v1/repos/does-not-exist/credits",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -914,14 +914,14 @@ async def test_credits_requires_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/credits returns 401 without JWT."""
+    """GET /api/v1/repos/{repo_id}/credits returns 401 without JWT."""
     repo = MusehubRepo(name="auth-test-repo",
         owner="testuser",
         slug="auth-test-repo", visibility="private", owner_user_id="u1")
     db_session.add(repo)
     await db_session.commit()
     await db_session.refresh(repo)
-    response = await client.get(f"/api/v1/musehub/repos/{repo.repo_id}/credits")
+    response = await client.get(f"/api/v1/repos/{repo.repo_id}/credits")
     assert response.status_code == 401
 
 
@@ -931,7 +931,7 @@ async def test_credits_invalid_sort_param(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/credits with invalid sort returns 422."""
+    """GET /api/v1/repos/{repo_id}/credits with invalid sort returns 422."""
     repo = MusehubRepo(name="sort-test",
         owner="testuser",
         slug="sort-test", visibility="private", owner_user_id="u1")
@@ -939,7 +939,7 @@ async def test_credits_invalid_sort_param(
     await db_session.commit()
     await db_session.refresh(repo)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/credits?sort=invalid",
+        f"/api/v1/repos/{repo.repo_id}/credits?sort=invalid",
         headers=auth_headers,
     )
     assert response.status_code == 422
@@ -993,7 +993,7 @@ async def _make_compare_repo(
     from datetime import datetime, timezone
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "compare-test", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -1033,10 +1033,10 @@ async def test_compare_radar_data(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{id}/compare returns 5 dimension scores."""
+    """GET /api/v1/repos/{id}/compare returns 5 dimension scores."""
     repo_id = await _make_compare_repo(db_session, client, auth_headers)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/compare?base=main&head=feature",
+        f"/api/v1/repos/{repo_id}/compare?base=main&head=feature",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1062,7 +1062,7 @@ async def test_compare_commit_list(
     """Commits unique to head are listed in the compare response."""
     repo_id = await _make_compare_repo(db_session, client, auth_headers)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/compare?base=main&head=feature",
+        f"/api/v1/repos/{repo_id}/compare?base=main&head=feature",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1083,14 +1083,14 @@ async def test_compare_unknown_ref_422(
 ) -> None:
     """Unknown ref (branch with no commits) returns 422."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "empty-compare", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
     assert create.status_code == 201
     repo_id = create.json()["repoId"]
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/compare?base=nonexistent&head=alsoabsent",
+        f"/api/v1/repos/{repo_id}/compare?base=nonexistent&head=alsoabsent",
         headers=auth_headers,
     )
     assert response.status_code == 422
@@ -1105,7 +1105,7 @@ async def test_compare_emotion_diff_fields(
     """Compare response includes emotion diff with required delta fields."""
     repo_id = await _make_compare_repo(db_session, client, auth_headers)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/compare?base=main&head=feature",
+        f"/api/v1/repos/{repo_id}/compare?base=main&head=feature",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1130,7 +1130,7 @@ async def test_arrange_endpoint_returns_200(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/arrange/{ref} returns 200 with JSON body."""
+    """GET /api/v1/repos/{repo_id}/arrange/{ref} returns 200 with JSON body."""
     repo = MusehubRepo(
         name="arrange-test",
         owner="testuser",
@@ -1144,7 +1144,7 @@ async def test_arrange_endpoint_returns_200(
     repo_id = str(repo.repo_id)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/arrange/HEAD",
+        f"/api/v1/repos/{repo_id}/arrange/HEAD",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1173,7 +1173,7 @@ async def test_arrange_endpoint_has_required_fields(
     repo_id = str(repo.repo_id)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/arrange/abc1234",
+        f"/api/v1/repos/{repo_id}/arrange/abc1234",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1211,7 +1211,7 @@ async def test_arrange_endpoint_cells_have_required_fields(
     repo_id = str(repo.repo_id)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/arrange/main",
+        f"/api/v1/repos/{repo_id}/arrange/main",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1249,7 +1249,7 @@ async def test_arrange_endpoint_instruments_x_sections_coverage(
     repo_id = str(repo.repo_id)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/arrange/ref-abc",
+        f"/api/v1/repos/{repo_id}/arrange/ref-abc",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1284,11 +1284,11 @@ async def test_arrange_endpoint_deterministic(
     repo_id = str(repo.repo_id)
 
     resp1 = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/arrange/stable-ref",
+        f"/api/v1/repos/{repo_id}/arrange/stable-ref",
         headers=auth_headers,
     )
     resp2 = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/arrange/stable-ref",
+        f"/api/v1/repos/{repo_id}/arrange/stable-ref",
         headers=auth_headers,
     )
     assert resp1.status_code == 200
@@ -1301,9 +1301,9 @@ async def test_arrange_endpoint_404_for_unknown_repo(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/arrange/{ref} returns 404 for an unknown repo."""
+    """GET /api/v1/repos/{unknown}/arrange/{ref} returns 404 for an unknown repo."""
     resp = await client.get(
-        "/api/v1/musehub/repos/00000000-0000-0000-0000-000000000000/arrange/HEAD",
+        "/api/v1/repos/00000000-0000-0000-0000-000000000000/arrange/HEAD",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1329,7 +1329,7 @@ async def test_arrange_row_summaries_match_cells(
     repo_id = str(repo.repo_id)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/arrange/HEAD",
+        f"/api/v1/repos/{repo_id}/arrange/HEAD",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1386,7 +1386,7 @@ async def test_star_repo_increases_star_count(
     await db_session.refresh(repo)
     repo_id = str(repo.repo_id)
 
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
     assert body["starred"] is True
@@ -1412,8 +1412,8 @@ async def test_unstar_repo_decreases_star_count(
     await db_session.refresh(repo)
     repo_id = str(repo.repo_id)
 
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
-    resp = await client.delete(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
+    resp = await client.delete(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
     assert body["starred"] is False
@@ -1439,8 +1439,8 @@ async def test_star_idempotent_double_call(
     await db_session.refresh(repo)
     repo_id = str(repo.repo_id)
 
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
     assert body["starred"] is True
@@ -1462,7 +1462,7 @@ async def test_star_requires_auth(client: AsyncClient, db_session: AsyncSession)
     await db_session.refresh(repo)
     repo_id = str(repo.repo_id)
 
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/star")
+    resp = await client.post(f"/api/v1/repos/{repo_id}/star")
     assert resp.status_code == 401
 
 
@@ -1486,7 +1486,7 @@ async def test_fork_repo_creates_fork_under_user(
     await db_session.refresh(repo)
     repo_id = str(repo.repo_id)
 
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/fork", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/fork", headers=auth_headers)
     assert resp.status_code == 201
     body = resp.json()
     # social.py returns ForkResponse (snake_case from_attributes model)
@@ -1528,12 +1528,12 @@ async def test_fork_preserves_branches(
     db_session.add(branch)
     await db_session.commit()
 
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/fork", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/fork", headers=auth_headers)
     assert resp.status_code == 201
     fork_repo_id = resp.json()["fork_repo_id"]
 
     branches_resp = await client.get(
-        f"/api/v1/musehub/repos/{fork_repo_id}/branches", headers=auth_headers
+        f"/api/v1/repos/{fork_repo_id}/branches", headers=auth_headers
     )
     assert branches_resp.status_code == 200
     branches = branches_resp.json().get("branches", [])
@@ -1559,9 +1559,9 @@ async def test_list_stargazers_returns_starrers(
     await db_session.refresh(repo)
     repo_id = str(repo.repo_id)
 
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
 
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/stargazers")
+    resp = await client.get(f"/api/v1/repos/{repo_id}/stargazers")
     assert resp.status_code == 200
     body = resp.json()
     assert body["total"] == 1
@@ -1587,9 +1587,9 @@ async def test_list_forks_returns_fork_entry(
     await db_session.refresh(repo)
     repo_id = str(repo.repo_id)
 
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/fork", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/fork", headers=auth_headers)
 
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/forks")
+    resp = await client.get(f"/api/v1/repos/{repo_id}/forks")
     assert resp.status_code == 200
     # social.py returns list[ForkResponse] (a JSON array)
     body = resp.json()
@@ -1624,7 +1624,7 @@ async def test_get_repo_settings_returns_defaults(
     await db_session.refresh(repo)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/settings",
+        f"/api/v1/repos/{repo.repo_id}/settings",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1655,7 +1655,7 @@ async def test_get_repo_settings_requires_auth(
     await db_session.commit()
     await db_session.refresh(repo)
 
-    resp = await client.get(f"/api/v1/musehub/repos/{repo.repo_id}/settings")
+    resp = await client.get(f"/api/v1/repos/{repo.repo_id}/settings")
     assert resp.status_code == 401
 
 
@@ -1678,7 +1678,7 @@ async def test_get_repo_settings_returns_403_for_non_admin(
     await db_session.refresh(repo)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/settings",
+        f"/api/v1/repos/{repo.repo_id}/settings",
         headers=auth_headers,
     )
     assert resp.status_code == 403
@@ -1691,7 +1691,7 @@ async def test_get_repo_settings_returns_404_for_unknown_repo(
 ) -> None:
     """GET /repos/{repo_id}/settings returns 404 for a non-existent repo."""
     resp = await client.get(
-        "/api/v1/musehub/repos/nonexistent-repo-id/settings",
+        "/api/v1/repos/nonexistent-repo-id/settings",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1721,7 +1721,7 @@ async def test_patch_repo_settings_updates_fields(
     await db_session.refresh(repo)
 
     resp = await client.patch(
-        f"/api/v1/musehub/repos/{repo.repo_id}/settings",
+        f"/api/v1/repos/{repo.repo_id}/settings",
         json={
             "description": "Updated description",
             "visibility": "public",
@@ -1763,7 +1763,7 @@ async def test_patch_repo_settings_partial_update_preserves_other_fields(
     await db_session.refresh(repo)
 
     resp = await client.patch(
-        f"/api/v1/musehub/repos/{repo.repo_id}/settings",
+        f"/api/v1/repos/{repo.repo_id}/settings",
         json={"defaultBranch": "develop"},
         headers=auth_headers,
     )
@@ -1794,7 +1794,7 @@ async def test_patch_repo_settings_requires_auth(
     await db_session.refresh(repo)
 
     resp = await client.patch(
-        f"/api/v1/musehub/repos/{repo.repo_id}/settings",
+        f"/api/v1/repos/{repo.repo_id}/settings",
         json={"visibility": "public"},
     )
     assert resp.status_code == 401
@@ -1819,7 +1819,7 @@ async def test_patch_repo_settings_returns_403_for_non_admin(
     await db_session.refresh(repo)
 
     resp = await client.patch(
-        f"/api/v1/musehub/repos/{repo.repo_id}/settings",
+        f"/api/v1/repos/{repo.repo_id}/settings",
         json={"hasWiki": True},
         headers=auth_headers,
     )
@@ -1838,14 +1838,14 @@ async def test_delete_repo_returns_204(
 ) -> None:
     """DELETE /repos/{repo_id} soft-deletes a repo owned by the caller and returns 204."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "to-delete", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
     assert create.status_code == 201
     repo_id = create.json()["repoId"]
 
-    resp = await client.delete(f"/api/v1/musehub/repos/{repo_id}", headers=auth_headers)
+    resp = await client.delete(f"/api/v1/repos/{repo_id}", headers=auth_headers)
     assert resp.status_code == 204
 
 
@@ -1856,15 +1856,15 @@ async def test_delete_repo_hides_repo_from_get(
 ) -> None:
     """After DELETE, GET /repos/{repo_id} returns 404."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "hidden-after-delete", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
     repo_id = create.json()["repoId"]
 
-    await client.delete(f"/api/v1/musehub/repos/{repo_id}", headers=auth_headers)
+    await client.delete(f"/api/v1/repos/{repo_id}", headers=auth_headers)
 
-    get_resp = await client.get(f"/api/v1/musehub/repos/{repo_id}", headers=auth_headers)
+    get_resp = await client.get(f"/api/v1/repos/{repo_id}", headers=auth_headers)
     assert get_resp.status_code == 404
 
 
@@ -1885,7 +1885,7 @@ async def test_delete_repo_requires_auth(
     await db_session.commit()
     await db_session.refresh(repo)
 
-    resp = await client.delete(f"/api/v1/musehub/repos/{repo.repo_id}")
+    resp = await client.delete(f"/api/v1/repos/{repo.repo_id}")
     assert resp.status_code == 401
 
 
@@ -1908,7 +1908,7 @@ async def test_delete_repo_returns_403_for_non_owner(
     await db_session.refresh(repo)
 
     resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo.repo_id}", headers=auth_headers
+        f"/api/v1/repos/{repo.repo_id}", headers=auth_headers
     )
     assert resp.status_code == 403
 
@@ -1920,7 +1920,7 @@ async def test_delete_repo_returns_404_for_unknown_repo(
 ) -> None:
     """DELETE /repos/{repo_id} returns 404 for a non-existent repo."""
     resp = await client.delete(
-        "/api/v1/musehub/repos/nonexistent-repo-id", headers=auth_headers
+        "/api/v1/repos/nonexistent-repo-id", headers=auth_headers
     )
     assert resp.status_code == 404
 
@@ -1969,7 +1969,7 @@ async def test_transfer_repo_ownership_returns_200(
 ) -> None:
     """POST /repos/{repo_id}/transfer returns 200 with updated ownerUserId."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "transfer-me", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -1978,7 +1978,7 @@ async def test_transfer_repo_ownership_returns_200(
     new_owner = "another-user-uuid-1234"
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/transfer",
+        f"/api/v1/repos/{repo_id}/transfer",
         json={"newOwnerUserId": new_owner},
         headers=auth_headers,
     )
@@ -2006,7 +2006,7 @@ async def test_transfer_repo_requires_auth(
     await db_session.refresh(repo)
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo.repo_id}/transfer",
+        f"/api/v1/repos/{repo.repo_id}/transfer",
         json={"newOwnerUserId": "new-user-id"},
     )
     assert resp.status_code == 401
@@ -2024,7 +2024,7 @@ async def test_create_repo_wizard_initialize_creates_branch_and_commit(
 ) -> None:
     """POST /repos with initialize=true creates a default branch + initial commit."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "wizard-init-repo",
             "owner": "testuser",
@@ -2038,7 +2038,7 @@ async def test_create_repo_wizard_initialize_creates_branch_and_commit(
     repo_id = resp.json()["repoId"]
 
     branches_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/branches",
+        f"/api/v1/repos/{repo_id}/branches",
         headers=auth_headers,
     )
     assert branches_resp.status_code == 200
@@ -2046,7 +2046,7 @@ async def test_create_repo_wizard_initialize_creates_branch_and_commit(
     assert any(b["name"] == "main" for b in branches), "Expected 'main' branch to be created"
 
     commits_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits",
+        f"/api/v1/repos/{repo_id}/commits",
         headers=auth_headers,
     )
     assert commits_resp.status_code == 200
@@ -2062,7 +2062,7 @@ async def test_create_repo_wizard_no_initialize_stays_empty(
 ) -> None:
     """POST /repos with initialize=false leaves branches and commits empty."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "wizard-noinit-repo",
             "owner": "testuser",
@@ -2074,13 +2074,13 @@ async def test_create_repo_wizard_no_initialize_stays_empty(
     repo_id = resp.json()["repoId"]
 
     branches_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/branches",
+        f"/api/v1/repos/{repo_id}/branches",
         headers=auth_headers,
     )
     assert branches_resp.json()["branches"] == []
 
     commits_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits",
+        f"/api/v1/repos/{repo_id}/commits",
         headers=auth_headers,
     )
     assert commits_resp.json()["commits"] == []
@@ -2093,7 +2093,7 @@ async def test_create_repo_wizard_topics_merged_into_tags(
 ) -> None:
     """POST /repos with topics merges them into the tag list (deduplicated)."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "topics-test-repo",
             "owner": "testuser",
@@ -2118,7 +2118,7 @@ async def test_create_repo_wizard_clone_url_uses_musehub_scheme(
 ) -> None:
     """Clone URL returned by POST /repos uses the musehub:// protocol scheme."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "clone-url-test", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -2150,7 +2150,7 @@ async def test_create_repo_wizard_template_copies_description(
     template_id = str(template.repo_id)
 
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "from-template-repo",
             "owner": "testuser",
@@ -2188,7 +2188,7 @@ async def test_create_repo_wizard_private_template_not_copied(
     template_id = str(private_template.repo_id)
 
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "refused-template-repo",
             "owner": "testuser",
@@ -2212,7 +2212,7 @@ async def test_create_repo_wizard_custom_default_branch(
 ) -> None:
     """POST /repos with initialize=true and custom defaultBranch creates the right branch."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "custom-branch-repo",
             "owner": "testuser",
@@ -2225,7 +2225,7 @@ async def test_create_repo_wizard_custom_default_branch(
     repo_id = resp.json()["repoId"]
 
     branches_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/branches",
+        f"/api/v1/repos/{repo_id}/branches",
         headers=auth_headers,
     )
     branch_names = [b["name"] for b in branches_resp.json()["branches"]]
@@ -2247,12 +2247,12 @@ async def test_list_my_repos_returns_owned_repos(
     # Create two repos
     for name in ("owned-repo-a", "owned-repo-b"):
         await client.post(
-            "/api/v1/musehub/repos",
+            "/api/v1/repos",
             json={"name": name, "owner": "testuser", "initialize": False},
             headers=auth_headers,
         )
 
-    resp = await client.get("/api/v1/musehub/repos", headers=auth_headers)
+    resp = await client.get("/api/v1/repos", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
     assert "repos" in body
@@ -2266,7 +2266,7 @@ async def test_list_my_repos_returns_owned_repos(
 @pytest.mark.anyio
 async def test_list_my_repos_requires_auth(client: AsyncClient) -> None:
     """GET /repos returns 401 without a Bearer token."""
-    resp = await client.get("/api/v1/musehub/repos")
+    resp = await client.get("/api/v1/repos")
     assert resp.status_code == 401
 
 
@@ -2289,7 +2289,7 @@ async def test_transfer_repo_returns_403_for_non_owner(
     await db_session.refresh(repo)
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo.repo_id}/transfer",
+        f"/api/v1/repos/{repo.repo_id}/transfer",
         json={"newOwnerUserId": "attacker-user-id"},
         headers=auth_headers,
     )
@@ -2303,7 +2303,7 @@ async def test_transfer_repo_returns_404_for_unknown_repo(
 ) -> None:
     """POST /repos/{repo_id}/transfer returns 404 for a non-existent repo."""
     resp = await client.post(
-        "/api/v1/musehub/repos/nonexistent-repo-id/transfer",
+        "/api/v1/repos/nonexistent-repo-id/transfer",
         json={"newOwnerUserId": "some-user"},
         headers=auth_headers,
     )
@@ -2359,16 +2359,16 @@ async def test_list_my_repos_total_matches_count(
     auth_headers: dict[str, str],
 ) -> None:
     """total field in GET /repos matches the number of repos created."""
-    initial = await client.get("/api/v1/musehub/repos", headers=auth_headers)
+    initial = await client.get("/api/v1/repos", headers=auth_headers)
     initial_total: int = initial.json()["total"]
 
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "total-count-test", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
 
-    resp = await client.get("/api/v1/musehub/repos", headers=auth_headers)
+    resp = await client.get("/api/v1/repos", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["total"] == initial_total + 1
 
@@ -2397,7 +2397,7 @@ async def test_list_my_repos_pagination_cursor(
     await db_session.commit()
 
     first_page = await client.get(
-        "/api/v1/musehub/repos?limit=1",
+        "/api/v1/repos?limit=1",
         headers=auth_headers,
     )
     assert first_page.status_code == 200
@@ -2407,7 +2407,7 @@ async def test_list_my_repos_pagination_cursor(
     assert next_cursor is not None
 
     second_page = await client.get(
-        f"/api/v1/musehub/repos?limit=1&cursor={next_cursor}",
+        f"/api/v1/repos?limit=1&cursor={next_cursor}",
         headers=auth_headers,
     )
     assert second_page.status_code == 200
@@ -2477,7 +2477,7 @@ async def test_collab_access_owner_returns_owner_permission(
     await db_session.refresh(repo)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/collaborators/{owner_id}/permission",
+        f"/api/v1/repos/{repo.repo_id}/collaborators/{owner_id}/permission",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -2523,7 +2523,7 @@ async def test_collab_access_collaborator_returns_permission(
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/collaborators/{collab_user_id}/permission",
+        f"/api/v1/repos/{repo.repo_id}/collaborators/{collab_user_id}/permission",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -2553,7 +2553,7 @@ async def test_collab_access_non_collaborator_returns_404(
 
     stranger = "total-stranger-user"
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/collaborators/{stranger}/permission",
+        f"/api/v1/repos/{repo.repo_id}/collaborators/{stranger}/permission",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -2567,7 +2567,7 @@ async def test_collab_access_unknown_repo_returns_404(
 ) -> None:
     """Querying an unknown repo_id returns 404."""
     resp = await client.get(
-        "/api/v1/musehub/repos/nonexistent-repo/collaborators/anyone/permission",
+        "/api/v1/repos/nonexistent-repo/collaborators/anyone/permission",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -2591,7 +2591,7 @@ async def test_collab_access_requires_auth(
     await db_session.refresh(repo)
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/collaborators/anyone/permission"
+        f"/api/v1/repos/{repo.repo_id}/collaborators/anyone/permission"
     )
     assert resp.status_code == 401
 
@@ -2627,7 +2627,7 @@ async def test_collab_access_admin_permission(
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/collaborators/{admin_user}/permission",
+        f"/api/v1/repos/{repo.repo_id}/collaborators/{admin_user}/permission",
         headers=auth_headers,
     )
     assert resp.status_code == 200

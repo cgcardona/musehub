@@ -50,7 +50,7 @@ async def _make_repo(db_session: AsyncSession) -> str:
 
 
 _REF = "abc1234def5678"
-_BASE = "/musehub/ui/analysisuser/analysis-ssr-beats"
+_BASE = "/analysisuser/analysis-ssr-beats"
 _DASHBOARD_URL = f"{_BASE}/analysis/{_REF}"
 _KEY_URL = f"{_BASE}/analysis/{_REF}/key"
 _TEMPO_URL = f"{_BASE}/analysis/{_REF}/tempo"

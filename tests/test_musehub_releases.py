@@ -1,9 +1,9 @@
-"""Tests for Muse Hub release management endpoints.
+"""Tests for MuseHub release management endpoints.
 
 Covers every acceptance criterion:
-- POST /musehub/repos/{repo_id}/releases creates a release tied to a tag
-- GET /musehub/repos/{repo_id}/releases lists all releases (newest first)
-- GET /musehub/repos/{repo_id}/releases/{tag} returns release detail with download URLs
+- POST /repos/{repo_id}/releases creates a release tied to a tag
+- GET /repos/{repo_id}/releases lists all releases (newest first)
+- GET /repos/{repo_id}/releases/{tag} returns release detail with download URLs
 - Duplicate tag within the same repo returns 409 Conflict
 - All endpoints require valid JWT (401 without token)
 - Service layer: create_release, list_releases, get_release_by_tag, get_latest_release
@@ -42,7 +42,7 @@ async def _create_repo(
 ) -> str:
     """Create a repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser"},
         headers=auth_headers,
     )
@@ -65,7 +65,7 @@ async def _create_release(
     if commit_id is not None:
         payload["commitId"] = commit_id
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         json=payload,
         headers=auth_headers,
     )
@@ -75,7 +75,7 @@ async def _create_release(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/releases
+# POST /repos/{repo_id}/releases
 # ---------------------------------------------------------------------------
 
 
@@ -87,7 +87,7 @@ async def test_create_release_returns_all_fields(
     """POST /releases creates a release and returns all required fields."""
     repo_id = await _create_repo(client, auth_headers, "create-release-repo")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         json={
             "tag": "v1.0",
             "title": "First Release",
@@ -114,7 +114,7 @@ async def test_create_release_with_commit_id(
     repo_id = await _create_repo(client, auth_headers, "release-commit-repo")
     commit_sha = "abc123def456abc123def456abc123def456abc1"
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         json={"tag": "v2.0", "title": "Tagged Release", "commitId": commit_sha},
         headers=auth_headers,
     )
@@ -132,7 +132,7 @@ async def test_create_release_duplicate_tag_returns_409(
     await _create_release(client, auth_headers, repo_id, tag="v1.0")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         json={"tag": "v1.0", "title": "Duplicate", "body": ""},
         headers=auth_headers,
     )
@@ -151,7 +151,7 @@ async def test_create_release_same_tag_different_repos_ok(
     await _create_release(client, auth_headers, repo_a, tag="v1.0", title="A v1.0")
     # Creating the same tag in a different repo must succeed.
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_b}/releases",
+        f"/api/v1/repos/{repo_b}/releases",
         json={"tag": "v1.0", "title": "B v1.0"},
         headers=auth_headers,
     )
@@ -165,7 +165,7 @@ async def test_create_release_repo_not_found_returns_404(
 ) -> None:
     """POST /releases returns 404 when the repo does not exist."""
     response = await client.post(
-        "/api/v1/musehub/repos/nonexistent-repo-id/releases",
+        "/api/v1/repos/nonexistent-repo-id/releases",
         json={"tag": "v1.0", "title": "Ghost release"},
         headers=auth_headers,
     )
@@ -173,7 +173,7 @@ async def test_create_release_repo_not_found_returns_404(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/releases
+# GET /repos/{repo_id}/releases
 # ---------------------------------------------------------------------------
 
 
@@ -185,7 +185,7 @@ async def test_list_releases_empty_repo(
     """GET /releases returns an empty list for a repo with no releases."""
     repo_id = await _create_repo(client, auth_headers, "empty-releases-repo")
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -204,7 +204,7 @@ async def test_list_releases_ordered_newest_first(
     await _create_release(client, auth_headers, repo_id, tag="v3.0", title="Third")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -223,14 +223,14 @@ async def test_list_releases_repo_not_found_returns_404(
 ) -> None:
     """GET /releases returns 404 when the repo does not exist."""
     response = await client.get(
-        "/api/v1/musehub/repos/ghost-repo/releases",
+        "/api/v1/repos/ghost-repo/releases",
         headers=auth_headers,
     )
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/releases/{tag}
+# GET /repos/{repo_id}/releases/{tag}
 # ---------------------------------------------------------------------------
 
 
@@ -244,7 +244,7 @@ async def test_release_detail_includes_download_urls(
     await _create_release(client, auth_headers, repo_id, tag="v1.0")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v1.0",
+        f"/api/v1/repos/{repo_id}/releases/v1.0",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -268,7 +268,7 @@ async def test_release_detail_tag_not_found_returns_404(
     """GET /releases/{tag} returns 404 when the tag does not exist."""
     repo_id = await _create_repo(client, auth_headers, "tag-404-repo")
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases/nonexistent-tag",
+        f"/api/v1/repos/{repo_id}/releases/nonexistent-tag",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -287,7 +287,7 @@ async def test_release_detail_body_preserved(
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v1.0",
+        f"/api/v1/repos/{repo_id}/releases/v1.0",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -302,7 +302,7 @@ async def test_release_detail_body_preserved(
 @pytest.mark.anyio
 async def test_release_write_requires_auth(client: AsyncClient) -> None:
     """POST release endpoint returns 401 without a Bearer token (always requires auth)."""
-    response = await client.post("/api/v1/musehub/repos/some-repo/releases", json={})
+    response = await client.post("/api/v1/repos/some-repo/releases", json={})
     assert response.status_code == 401, "POST /releases should require auth"
 
 
@@ -315,8 +315,8 @@ async def test_release_read_endpoints_return_404_for_nonexistent_repo_without_au
     Read endpoints use optional_token — auth is visibility-based; missing repo → 404.
     """
     read_endpoints = [
-        "/api/v1/musehub/repos/non-existent-repo/releases",
-        "/api/v1/musehub/repos/non-existent-repo/releases/v1.0",
+        "/api/v1/repos/non-existent-repo/releases",
+        "/api/v1/repos/non-existent-repo/releases/v1.0",
     ]
     for url in read_endpoints:
         response = await client.get(url)
@@ -537,7 +537,7 @@ async def test_create_release_author_in_response(
     """POST /releases response includes the author field (JWT sub) — regression f."""
     repo_id = await _create_repo(client, auth_headers, "author-release-repo")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         json={"tag": "v1.0", "title": "Author Field Test", "body": ""},
         headers=auth_headers,
     )
@@ -555,12 +555,12 @@ async def test_create_release_author_persisted_in_list(
     """Author field is persisted and returned in the release list endpoint — regression f."""
     repo_id = await _create_repo(client, auth_headers, "author-release-list-repo")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         json={"tag": "v0.1", "title": "Listed Release", "body": ""},
         headers=auth_headers,
     )
     list_response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         headers=auth_headers,
     )
     assert list_response.status_code == 200
@@ -588,7 +588,7 @@ async def _attach_asset(
 ) -> dict[str, object]:
     """Attach an asset to a release via the API and return the response body."""
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases/{tag}/assets",
+        f"/api/v1/repos/{repo_id}/releases/{tag}/assets",
         json={
             "name": name,
             "label": label,
@@ -633,7 +633,7 @@ async def test_attach_asset_release_not_found_returns_404(
     """POST /assets returns 404 when the release tag does not exist."""
     repo_id = await _create_repo(client, auth_headers, "attach-asset-404-repo")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases/nonexistent-tag/assets",
+        f"/api/v1/repos/{repo_id}/releases/nonexistent-tag/assets",
         json={"name": "file.mid", "downloadUrl": "https://cdn.example.com/file.mid"},
         headers=auth_headers,
     )
@@ -647,7 +647,7 @@ async def test_attach_asset_repo_not_found_returns_404(
 ) -> None:
     """POST /assets returns 404 when the repo does not exist."""
     response = await client.post(
-        "/api/v1/musehub/repos/ghost-repo/releases/v1.0/assets",
+        "/api/v1/repos/ghost-repo/releases/v1.0/assets",
         json={"name": "file.mid", "downloadUrl": "https://cdn.example.com/file.mid"},
         headers=auth_headers,
     )
@@ -658,7 +658,7 @@ async def test_attach_asset_repo_not_found_returns_404(
 async def test_attach_asset_requires_auth(client: AsyncClient) -> None:
     """POST /assets returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos/some-repo/releases/v1.0/assets",
+        "/api/v1/repos/some-repo/releases/v1.0/assets",
         json={"name": "file.mid", "downloadUrl": "https://cdn.example.com/file.mid"},
     )
     assert response.status_code == 401
@@ -679,14 +679,14 @@ async def test_delete_asset_removes_from_release(
     asset_id = asset["assetId"]
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v1.0/assets/{asset_id}",
+        f"/api/v1/repos/{repo_id}/releases/v1.0/assets/{asset_id}",
         headers=auth_headers,
     )
     assert response.status_code == 204
 
     # Confirm asset is gone from download stats.
     stats_response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v1.0/downloads",
+        f"/api/v1/repos/{repo_id}/releases/v1.0/downloads",
         headers=auth_headers,
     )
     assert stats_response.status_code == 200
@@ -703,7 +703,7 @@ async def test_delete_asset_not_found_returns_404(
     await _create_release(client, auth_headers, repo_id, tag="v1.0")
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v1.0/assets/nonexistent-id",
+        f"/api/v1/repos/{repo_id}/releases/v1.0/assets/nonexistent-id",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -724,7 +724,7 @@ async def test_delete_asset_wrong_release_returns_404(
     asset_id = asset["assetId"]
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v2.0/assets/{asset_id}",
+        f"/api/v1/repos/{repo_id}/releases/v2.0/assets/{asset_id}",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -734,7 +734,7 @@ async def test_delete_asset_wrong_release_returns_404(
 async def test_delete_asset_requires_auth(client: AsyncClient) -> None:
     """DELETE /assets/{asset_id} returns 401 without a Bearer token."""
     response = await client.delete(
-        "/api/v1/musehub/repos/repo/releases/v1.0/assets/some-asset-id"
+        "/api/v1/repos/repo/releases/v1.0/assets/some-asset-id"
     )
     assert response.status_code == 401
 
@@ -752,7 +752,7 @@ async def test_download_stats_empty_when_no_assets(
     await _create_release(client, auth_headers, repo_id, tag="v1.0")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v1.0/downloads",
+        f"/api/v1/repos/{repo_id}/releases/v1.0/downloads",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -782,7 +782,7 @@ async def test_download_stats_lists_assets_with_counts(
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases/v1.0/downloads",
+        f"/api/v1/repos/{repo_id}/releases/v1.0/downloads",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -803,7 +803,7 @@ async def test_download_stats_release_not_found_returns_404(
     """GET /downloads returns 404 when the release tag does not exist."""
     repo_id = await _create_repo(client, auth_headers, "dl-stats-404-repo")
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/releases/nonexistent-tag/downloads",
+        f"/api/v1/repos/{repo_id}/releases/nonexistent-tag/downloads",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -966,7 +966,7 @@ async def test_create_release_is_prerelease_flag(
     await db_session.commit()
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo.repo_id}/releases",
+        f"/api/v1/repos/{repo.repo_id}/releases",
         json={"tag": "v0.9-beta", "title": "Beta build", "body": "", "isPrerelease": True},
         headers=auth_headers,
     )
@@ -994,7 +994,7 @@ async def test_create_release_is_draft_flag(
     await db_session.commit()
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo.repo_id}/releases",
+        f"/api/v1/repos/{repo.repo_id}/releases",
         json={"tag": "v1.0-draft", "title": "Draft release", "body": "", "isDraft": True},
         headers=auth_headers,
     )
@@ -1021,7 +1021,7 @@ async def test_create_release_gpg_signature(
 
     sig = "-----BEGIN PGP SIGNATURE-----\nMockSignatureData==\n-----END PGP SIGNATURE-----"
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo.repo_id}/releases",
+        f"/api/v1/repos/{repo.repo_id}/releases",
         json={"tag": "v1.0", "title": "Signed release", "body": "", "gpgSignature": sig},
         headers=auth_headers,
     )
@@ -1047,7 +1047,7 @@ async def test_create_release_defaults_for_new_fields(
     await db_session.commit()
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo.repo_id}/releases",
+        f"/api/v1/repos/{repo.repo_id}/releases",
         json={"tag": "v1.0", "title": "Default fields release", "body": ""},
         headers=auth_headers,
     )
@@ -1095,7 +1095,7 @@ async def test_list_release_assets_endpoint(
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/releases/v1.0/assets"
+        f"/api/v1/repos/{repo.repo_id}/releases/v1.0/assets"
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -1142,7 +1142,7 @@ async def test_record_asset_download_increments_counter(
     await db_session.commit()
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo.repo_id}/releases/v1.0/assets/{asset.asset_id}/download"
+        f"/api/v1/repos/{repo.repo_id}/releases/v1.0/assets/{asset.asset_id}/download"
     )
     assert resp.status_code == 204
 

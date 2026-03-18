@@ -1,4 +1,4 @@
-"""Tests for the Muse Hub topics/tag browse API endpoints.
+"""Tests for the MuseHub topics/tag browse API endpoints.
 
 Covers acceptance criteria:
 - test_list_topics_empty — no public repos → empty topics list
@@ -91,14 +91,14 @@ async def _add_commit(
 
 
 # ---------------------------------------------------------------------------
-# GET /api/v1/musehub/topics
+# GET /api/v1/topics
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_list_topics_empty(client: AsyncClient) -> None:
     """No public repos → topics list is empty."""
-    response = await client.get("/api/v1/musehub/topics")
+    response = await client.get("/api/v1/topics")
     assert response.status_code == 200
     assert response.json() == {"topics": []}
 
@@ -112,7 +112,7 @@ async def test_list_topics_aggregates_counts(
     await _make_repo(db_session, name="repo-b", tags=["jazz", "ambient"])
     await _make_repo(db_session, name="repo-c", tags=["ambient"])
 
-    response = await client.get("/api/v1/musehub/topics")
+    response = await client.get("/api/v1/topics")
     assert response.status_code == 200
 
     topics = {t["name"]: t["repo_count"] for t in response.json()["topics"]}
@@ -129,7 +129,7 @@ async def test_list_topics_excludes_private_repos(
     await _make_repo(db_session, name="pub-jazz", tags=["jazz"], visibility="public")
     await _make_repo(db_session, name="priv-jazz", tags=["jazz", "secret-tag"], visibility="private")
 
-    response = await client.get("/api/v1/musehub/topics")
+    response = await client.get("/api/v1/topics")
     assert response.status_code == 200
 
     topics = {t["name"]: t["repo_count"] for t in response.json()["topics"]}
@@ -146,7 +146,7 @@ async def test_list_topics_sorted_by_count_desc(
     await _make_repo(db_session, name="r2", tags=["jazz", "baroque"])
     await _make_repo(db_session, name="r3", tags=["jazz", "baroque"])
 
-    response = await client.get("/api/v1/musehub/topics")
+    response = await client.get("/api/v1/topics")
     assert response.status_code == 200
 
     topics = response.json()["topics"]
@@ -155,14 +155,14 @@ async def test_list_topics_sorted_by_count_desc(
 
 
 # ---------------------------------------------------------------------------
-# GET /api/v1/musehub/topics/{tag}/repos
+# GET /api/v1/topics/{tag}/repos
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_repos_by_topic_empty(client: AsyncClient) -> None:
     """Unknown/unused tag → empty repos list, not 404."""
-    response = await client.get("/api/v1/musehub/topics/nonexistent-tag/repos")
+    response = await client.get("/api/v1/topics/nonexistent-tag/repos")
     assert response.status_code == 200
     body = response.json()
     assert body["repos"] == []
@@ -179,7 +179,7 @@ async def test_repos_by_topic_returns_tagged_repos(
     await _make_repo(db_session, name="piano-only-repo", tags=["piano"])
     await _make_repo(db_session, name="unrelated-repo", tags=["ambient"])
 
-    response = await client.get("/api/v1/musehub/topics/jazz/repos")
+    response = await client.get("/api/v1/topics/jazz/repos")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -195,7 +195,7 @@ async def test_repos_by_topic_excludes_private(
     await _make_repo(db_session, name="pub", tags=["classical"], visibility="public")
     await _make_repo(db_session, name="priv", tags=["classical"], visibility="private")
 
-    response = await client.get("/api/v1/musehub/topics/classical/repos")
+    response = await client.get("/api/v1/topics/classical/repos")
     assert response.status_code == 200
     assert response.json()["total"] == 1 # only the public repo
 
@@ -212,7 +212,7 @@ async def test_repos_by_topic_sort_by_stars(
     await _add_star(db_session, id_high, "user2")
     await _add_star(db_session, id_low, "user3")
 
-    response = await client.get("/api/v1/musehub/topics/edm/repos?sort=stars")
+    response = await client.get("/api/v1/topics/edm/repos?sort=stars")
     assert response.status_code == 200
     names = [r["name"] for r in response.json()["repos"]]
     assert names.index("high-star") < names.index("low-star")
@@ -229,7 +229,7 @@ async def test_repos_by_topic_sort_by_updated(
     await _add_commit(db_session, id_old, sha="sha-old", timestamp="2023-01-01T00:00:00")
     await _add_commit(db_session, id_new, sha="sha-new", timestamp="2024-06-01T00:00:00")
 
-    response = await client.get("/api/v1/musehub/topics/ambient/repos?sort=updated")
+    response = await client.get("/api/v1/topics/ambient/repos?sort=updated")
     assert response.status_code == 200
     names = [r["name"] for r in response.json()["repos"]]
     assert names.index("new-commits") < names.index("old-commits")
@@ -239,7 +239,7 @@ async def test_repos_by_topic_sort_by_updated(
 async def test_repos_by_topic_invalid_sort(client: AsyncClient, db_session: AsyncSession) -> None:
     """Invalid sort parameter returns 422."""
     await _make_repo(db_session, name="any-repo", tags=["jazz"])
-    response = await client.get("/api/v1/musehub/topics/jazz/repos?sort=invalid")
+    response = await client.get("/api/v1/topics/jazz/repos?sort=invalid")
     assert response.status_code == 422
 
 
@@ -251,8 +251,8 @@ async def test_repos_by_topic_pagination(
     for i in range(5):
         await _make_repo(db_session, name=f"cinematic-{i}", tags=["cinematic"])
 
-    page1 = await client.get("/api/v1/musehub/topics/cinematic/repos?page=1&page_size=2")
-    page2 = await client.get("/api/v1/musehub/topics/cinematic/repos?page=2&page_size=2")
+    page1 = await client.get("/api/v1/topics/cinematic/repos?page=1&page_size=2")
+    page2 = await client.get("/api/v1/topics/cinematic/repos?page=2&page_size=2")
 
     assert page1.status_code == 200
     assert page2.status_code == 200
@@ -263,7 +263,7 @@ async def test_repos_by_topic_pagination(
 
 
 # ---------------------------------------------------------------------------
-# POST /api/v1/musehub/repos/{repo_id}/topics
+# POST /api/v1/repos/{repo_id}/topics
 # ---------------------------------------------------------------------------
 
 
@@ -274,7 +274,7 @@ async def test_set_topics_requires_auth(
     """POST without a JWT returns 401."""
     repo_id = await _make_repo(db_session, name="auth-test")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz"]},
     )
     assert response.status_code == 401
@@ -287,7 +287,7 @@ async def test_set_topics_owner_only(
     """A user who is not the repo owner receives 403."""
     repo_id = await _make_repo(db_session, name="owned-elsewhere", owner_user_id="different-owner")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz"]},
         headers=auth_headers,
     )
@@ -306,7 +306,7 @@ async def test_set_topics_replaces_list(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz", "piano"]},
         headers=auth_headers,
     )
@@ -327,7 +327,7 @@ async def test_set_topics_deduplicates(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz", "jazz", "piano", "jazz"]},
         headers=auth_headers,
     )
@@ -346,7 +346,7 @@ async def test_set_topics_invalid_slug(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["Valid-slug", "BAD SLUG!", "ok-slug"]},
         headers=auth_headers,
     )
@@ -365,7 +365,7 @@ async def test_set_topics_too_many(
     )
     many_topics = [f"topic-{i}" for i in range(21)]
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": many_topics},
         headers=auth_headers,
     )
@@ -384,7 +384,7 @@ async def test_set_topics_clears_list(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": []},
         headers=auth_headers,
     )
@@ -398,7 +398,7 @@ async def test_set_topics_repo_not_found(
 ) -> None:
     """Unknown repo_id returns 404."""
     response = await client.post(
-        "/api/v1/musehub/repos/nonexistent-repo-id/topics",
+        "/api/v1/repos/nonexistent-repo-id/topics",
         json={"topics": ["jazz"]},
         headers=auth_headers,
     )

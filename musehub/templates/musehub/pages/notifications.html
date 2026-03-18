@@ -20,8 +20,8 @@
   </div>
 
   {# Filter bar — HTMX form swaps #notification-rows on change #}
-  <form method="get" action="/musehub/ui/notifications"
-        hx-get="/musehub/ui/notifications"
+  <form method="get" action="/notifications"
+        hx-get="/notifications"
         hx-target="#notification-rows"
         hx-push-url="true"
         style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)">
@@ -40,7 +40,7 @@
       {% endfor %}
     </select>
     {% if type_filter or unread_only %}
-      <a href="/musehub/ui/notifications" class="btn btn-ghost btn-sm">Clear</a>
+      <a href="/notifications" class="btn btn-ghost btn-sm">Clear</a>
     {% endif %}
   </form>
 
@@ -48,7 +48,7 @@
     {% include "musehub/fragments/notification_rows.html" %}
   </div>
 
-  {{ pagination(page, total_pages, '/musehub/ui/notifications',
+  {{ pagination(page, total_pages, '/notifications',
                extra_params={'type_filter': type_filter or '', 'unread_only': 'true' if unread_only else ''}) }}
 </div>
 {% endif %}

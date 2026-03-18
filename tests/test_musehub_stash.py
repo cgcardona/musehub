@@ -1,4 +1,4 @@
-"""Tests for Muse Hub stash endpoints (musehub/stash.py).
+"""Tests for MuseHub stash endpoints (musehub/stash.py).
 
 Covers all 6 endpoints introduced in PR #467:
   - list_stash: GET /repos/{repo_id}/stash (paginated, user-scoped)
@@ -25,7 +25,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 _TEST_REPO_ID = str(uuid.uuid4())
-_BASE = f"/api/v1/musehub/repos/{_TEST_REPO_ID}/stash"
+_BASE = f"/api/v1/repos/{_TEST_REPO_ID}/stash"
 
 _PUSH_BODY = {
     "message": "WIP: bridge section",

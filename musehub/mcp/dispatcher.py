@@ -1,17 +1,20 @@
-"""MuseHub MCP Dispatcher — async JSON-RPC 2.0 engine.
+"""MuseHub MCP Dispatcher — async JSON-RPC 2.0 engine (MCP 2025-11-25).
 
 This is the protocol core: it receives a parsed JSON-RPC 2.0 message dict
 and returns the appropriate JSON-RPC 2.0 response dict.
 
 Supported methods:
-  initialize              → server capabilities handshake
-  tools/list              → full 27-tool catalogue
-  tools/call              → route to read or write executor
+  initialize              → server capabilities handshake (2025-11-25)
+  tools/list              → full tool catalogue (27 standard + 5 elicitation-powered)
+  tools/call              → route to read, write, or elicitation-powered executor
   resources/list          → static resource catalogue
   resources/templates/list → RFC 6570 URI templates
   resources/read          → musehub:// URI dispatcher
   prompts/list            → prompt catalogue
   prompts/get             → assembled prompt messages
+  notifications/cancelled → cancel pending elicitation Futures
+  notifications/elicitation/complete → resolve URL-mode elicitation Futures
+  ping                    → liveness check
 
 Design principles (from agentception):
   - JSON-RPC envelope is always success (200 OK / no envelope error).
@@ -19,12 +22,13 @@ Design principles (from agentception):
   - No external MCP SDK dependency — pure Python async.
   - All DB access happens inside executor/resource functions, never here.
   - Notifications (no ``id`` field) return None — callers return 202.
+  - Session context is optional; tools without elicitation work stateless.
 """
 from __future__ import annotations
 
 import json
 import logging
-from typing import Literal
+from typing import TYPE_CHECKING
 
 from musehub.contracts.json_types import JSONObject, JSONValue
 from musehub.contracts.mcp_types import (
@@ -43,11 +47,15 @@ from musehub.mcp.resources import (
 )
 from musehub.mcp.tools import MCP_TOOLS, MUSEHUB_WRITE_TOOL_NAMES
 
+if TYPE_CHECKING:
+    from musehub.mcp.context import ToolCallContext
+    from musehub.mcp.session import MCPSession
+
 logger = logging.getLogger(__name__)
 
-_PROTOCOL_VERSION = "2025-03-26"
+_PROTOCOL_VERSION = "2025-11-25"
 _SERVER_NAME = "musehub-mcp"
-_SERVER_VERSION = "1.0.0"
+_SERVER_VERSION = "1.1.0"
 
 # JSON-RPC 2.0 error codes
 _PARSE_ERROR = -32700
@@ -55,21 +63,25 @@ _INVALID_REQUEST = -32600
 _METHOD_NOT_FOUND = -32601
 _INVALID_PARAMS = -32602
 _INTERNAL_ERROR = -32603
+_URL_ELICITATION_REQUIRED = -32042  # MCP 2025-11-25 new error code
 
 
-# ── Public entry point ────────────────────────────────────────────────────────
+# ── Public entry points ───────────────────────────────────────────────────────
 
 
 async def handle_request(
     raw: JSONObject,
     *,
     user_id: str | None = None,
+    session: "MCPSession | None" = None,
 ) -> JSONObject | None:
     """Dispatch a single JSON-RPC 2.0 request and return the response dict.
 
     Args:
         raw: Parsed JSON-RPC 2.0 request dict.
         user_id: Authenticated user ID from JWT (``None`` for anonymous).
+        session: Active MCP session for elicitation and progress features,
+            or ``None`` for stateless (non-elicitation) clients.
 
     Returns:
         JSON-serialisable response dict, or ``None`` for notifications
@@ -88,7 +100,7 @@ async def handle_request(
     params: JSONObject = raw_params if isinstance(raw_params, dict) else {}
 
     try:
-        result = await _dispatch(method, params, user_id=user_id)
+        result = await _dispatch(method, params, user_id=user_id, session=session)
         if is_notification:
             return None
         return _success(req_id, result)
@@ -107,19 +119,21 @@ async def handle_batch(
     requests: list[JSONObject],
     *,
     user_id: str | None = None,
+    session: "MCPSession | None" = None,
 ) -> list[JSONObject]:
     """Dispatch a JSON-RPC 2.0 batch and return all non-notification responses.
 
     Args:
         requests: List of parsed JSON-RPC 2.0 request dicts.
         user_id: Authenticated user ID (``None`` for anonymous).
+        session: Active MCP session, or ``None`` for stateless clients.
 
     Returns:
         List of response dicts (excluding None responses for notifications).
     """
     results: list[JSONObject] = []
     for req in requests:
-        resp = await handle_request(req, user_id=user_id)
+        resp = await handle_request(req, user_id=user_id, session=session)
         if resp is not None:
             results.append(resp)
     return results
@@ -141,6 +155,7 @@ async def _dispatch(
     params: JSONObject,
     *,
     user_id: str | None,
+    session: "MCPSession | None",
 ) -> JSONObject:
     """Route a method name to its handler and return the result dict."""
 
@@ -151,7 +166,7 @@ async def _dispatch(
         return _handle_tools_list()
 
     if method == "tools/call":
-        return await _handle_tools_call(params, user_id=user_id)
+        return await _handle_tools_call(params, user_id=user_id, session=session)
 
     if method == "resources/list":
         return _handle_resources_list()
@@ -168,7 +183,22 @@ async def _dispatch(
     if method == "prompts/get":
         return _handle_prompts_get(params)
 
-    # ping / other standard methods
+    # ── MCP 2025-11-25 notification methods ───────────────────────────────────
+
+    if method == "notifications/cancelled":
+        _handle_notifications_cancelled(params, session=session)
+        return {}
+
+    if method == "notifications/elicitation/complete":
+        _handle_elicitation_complete(params, session=session)
+        return {}
+
+    if method == "notifications/initialized":
+        # Acknowledgement from client after initialize — no-op.
+        return {}
+
+    # ── Standard methods ──────────────────────────────────────────────────────
+
     if method == "ping":
         return {}
 
@@ -179,41 +209,56 @@ async def _dispatch(
 
 
 def _handle_initialize(params: JSONObject) -> JSONObject:
-    """Return server capabilities and protocol version."""
+    """Return server capabilities and protocol version per MCP 2025-11-25.
+
+    Spec fix applied: ``serverInfo`` contains only ``name`` and ``version``.
+    Capabilities live exclusively at the top level of the result.
+    """
     return {
         "protocolVersion": _PROTOCOL_VERSION,
         "serverInfo": {
             "name": _SERVER_NAME,
             "version": _SERVER_VERSION,
-            "protocolVersion": _PROTOCOL_VERSION,
-            "capabilities": {
-                "tools": {},
-                "resources": {"subscribe": False, "listChanged": False},
-                "prompts": {},
-            },
         },
         "capabilities": {
-            "tools": {},
+            "tools": {"listChanged": False},
             "resources": {"subscribe": False, "listChanged": False},
-            "prompts": {},
+            "prompts": {"listChanged": False},
+            "elicitation": {
+                "form": {},
+                "url": {},
+            },
+            "logging": {},
         },
+        "instructions": (
+            "MuseHub is a Git-for-music platform. "
+            "Use musehub_browse_repo to explore repositories, "
+            "musehub_compose_with_preferences to interactively compose, "
+            "and musehub_connect_streaming_platform to publish releases. "
+            "Elicitation is supported: call interactive tools to collect "
+            "user preferences for musical composition and platform connections."
+        ),
     }
 
 
 def _handle_tools_list() -> JSONObject:
     """Return the full tool catalogue."""
-    # Strip the internal ``server_side`` flag before sending to clients.
-    # Serialise via json round-trip to produce a plain dict[str, JSONValue].
     import json as _json
     raw = _json.dumps([{k: v for k, v in t.items() if k != "server_side"} for t in MCP_TOOLS])
     tools: list[JSONValue] = _json.loads(raw)
     return {"tools": tools}
 
 
-async def _handle_tools_call(params: JSONObject, *, user_id: str | None) -> JSONObject:
+async def _handle_tools_call(
+    params: JSONObject,
+    *,
+    user_id: str | None,
+    session: "MCPSession | None",
+) -> JSONObject:
     """Route a ``tools/call`` request to the appropriate executor."""
     name = params.get("name")
     arguments = params.get("arguments") or {}
+    meta = params.get("_meta") or {}
 
     if not isinstance(name, str):
         raise _MCPError(_INVALID_PARAMS, "tools/call requires a 'name' string parameter")
@@ -224,9 +269,18 @@ async def _handle_tools_call(params: JSONObject, *, user_id: str | None) -> JSON
     if name in MUSEHUB_WRITE_TOOL_NAMES and user_id is None:
         return _tool_error(f"Tool '{name}' requires authentication. Provide a Bearer JWT.")
 
-    # Route to the appropriate executor.
+    # Build tool call context with session for elicitation/progress support.
+    from musehub.mcp.context import ToolCallContext
+    progress_token: str | None = None
+    if isinstance(meta, dict):
+        pt = meta.get("progressToken")
+        if isinstance(pt, str):
+            progress_token = pt
+
+    ctx = ToolCallContext(user_id=user_id, session=session)
+
     try:
-        return await _call_tool(name, arguments, user_id=user_id)
+        return await _call_tool(name, arguments, ctx=ctx)
     except Exception as exc:
         logger.exception("Tool execution error (tool=%s): %s", name, exc)
         return _tool_error(f"Internal error executing tool '{name}': {exc}")
@@ -236,10 +290,12 @@ async def _call_tool(
     name: str,
     arguments: JSONObject,
     *,
-    user_id: str | None,
+    ctx: "ToolCallContext",
 ) -> JSONObject:
     """Delegate to the correct executor and wrap result in MCP content block."""
     from musehub.services import musehub_mcp_executor as exe
+
+    user_id = ctx.user_id
 
     def _str(key: str) -> str:
         v = arguments.get(key, "")
@@ -337,11 +393,10 @@ async def _call_tool(
             limit=_int("limit", 20),
         )
 
-    # ── Write tools ───────────────────────────────────────────────────────────
+    # ── Standard write tools ──────────────────────────────────────────────────
 
     elif name == "musehub_create_repo":
         from musehub.mcp.write_tools.repos import execute_create_repo
-
         result = await execute_create_repo(
             name=_str("name"),
             owner=user_id or "",
@@ -355,7 +410,6 @@ async def _call_tool(
         )
     elif name == "musehub_create_issue":
         from musehub.mcp.write_tools.issues import execute_create_issue
-
         result = await execute_create_issue(
             repo_id=_str("repo_id"),
             title=_str("title"),
@@ -365,7 +419,6 @@ async def _call_tool(
         )
     elif name == "musehub_update_issue":
         from musehub.mcp.write_tools.issues import execute_update_issue
-
         result = await execute_update_issue(
             repo_id=_str("repo_id"),
             issue_number=_int("issue_number", 0),
@@ -377,7 +430,6 @@ async def _call_tool(
         )
     elif name == "musehub_create_issue_comment":
         from musehub.mcp.write_tools.issues import execute_create_issue_comment
-
         result = await execute_create_issue_comment(
             repo_id=_str("repo_id"),
             issue_number=_int("issue_number", 0),
@@ -386,7 +438,6 @@ async def _call_tool(
         )
     elif name == "musehub_create_pr":
         from musehub.mcp.write_tools.pulls import execute_create_pr
-
         result = await execute_create_pr(
             repo_id=_str("repo_id"),
             title=_str("title"),
@@ -397,7 +448,6 @@ async def _call_tool(
         )
     elif name == "musehub_merge_pr":
         from musehub.mcp.write_tools.pulls import execute_merge_pr
-
         result = await execute_merge_pr(
             repo_id=_str("repo_id"),
             pr_id=_str("pr_id"),
@@ -405,7 +455,6 @@ async def _call_tool(
         )
     elif name == "musehub_create_pr_comment":
         from musehub.mcp.write_tools.pulls import execute_create_pr_comment
-
         result = await execute_create_pr_comment(
             repo_id=_str("repo_id"),
             pr_id=_str("pr_id"),
@@ -418,7 +467,6 @@ async def _call_tool(
         )
     elif name == "musehub_submit_pr_review":
         from musehub.mcp.write_tools.pulls import execute_submit_pr_review
-
         result = await execute_submit_pr_review(
             repo_id=_str("repo_id"),
             pr_id=_str("pr_id"),
@@ -428,7 +476,6 @@ async def _call_tool(
         )
     elif name == "musehub_create_release":
         from musehub.mcp.write_tools.releases import execute_create_release
-
         result = await execute_create_release(
             repo_id=_str("repo_id"),
             tag=_str("tag"),
@@ -440,15 +487,12 @@ async def _call_tool(
         )
     elif name == "musehub_star_repo":
         from musehub.mcp.write_tools.social import execute_star_repo
-
         result = await execute_star_repo(repo_id=_str("repo_id"), actor=user_id or "")
     elif name == "musehub_fork_repo":
         from musehub.mcp.write_tools.repos import execute_fork_repo
-
         result = await execute_fork_repo(repo_id=_str("repo_id"), actor=user_id or "")
     elif name == "musehub_create_label":
         from musehub.mcp.write_tools.social import execute_create_label
-
         result = await execute_create_label(
             repo_id=_str("repo_id"),
             name=_str("name"),
@@ -456,6 +500,42 @@ async def _call_tool(
             description=_str_or_none("description") or "",
             actor=user_id or "",
         )
+
+    # ── Elicitation-powered tools (MCP 2025-11-25) ────────────────────────────
+
+    elif name == "musehub_compose_with_preferences":
+        from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
+        result = await execute_compose_with_preferences(
+            repo_id=_str_or_none("repo_id"),
+            ctx=ctx,
+        )
+    elif name == "musehub_review_pr_interactive":
+        from musehub.mcp.write_tools.elicitation_tools import execute_review_pr_interactive
+        result = await execute_review_pr_interactive(
+            repo_id=_str("repo_id"),
+            pr_id=_str("pr_id"),
+            ctx=ctx,
+        )
+    elif name == "musehub_connect_streaming_platform":
+        from musehub.mcp.write_tools.elicitation_tools import execute_connect_streaming_platform
+        result = await execute_connect_streaming_platform(
+            platform=_str_or_none("platform"),
+            repo_id=_str_or_none("repo_id"),
+            ctx=ctx,
+        )
+    elif name == "musehub_connect_daw_cloud":
+        from musehub.mcp.write_tools.elicitation_tools import execute_connect_daw_cloud
+        result = await execute_connect_daw_cloud(
+            service=_str_or_none("service"),
+            ctx=ctx,
+        )
+    elif name == "musehub_create_release_interactive":
+        from musehub.mcp.write_tools.elicitation_tools import execute_create_release_interactive
+        result = await execute_create_release_interactive(
+            repo_id=_str("repo_id"),
+            ctx=ctx,
+        )
+
     else:
         return _tool_error(f"Unknown tool: {name!r}")
 
@@ -475,6 +555,58 @@ async def _call_tool(
             "content": [{"type": "text", "text": error_text}],
             "isError": True,
         }
+
+
+def _handle_notifications_cancelled(
+    params: JSONObject,
+    *,
+    session: "MCPSession | None",
+) -> None:
+    """Cancel a pending elicitation Future on client cancellation.
+
+    Called when the client sends ``notifications/cancelled`` with the request
+    ID of an outstanding ``elicitation/create`` request.
+    """
+    if session is None:
+        return
+    request_id = params.get("requestId")
+    if request_id is None:
+        return
+    from musehub.mcp.session import cancel_elicitation
+    cancelled = cancel_elicitation(session, request_id)  # type: ignore[arg-type]
+    if cancelled:
+        logger.info(
+            "Elicitation cancelled by client (session %.8s..., id=%s)",
+            session.session_id,
+            request_id,
+        )
+
+
+def _handle_elicitation_complete(
+    params: JSONObject,
+    *,
+    session: "MCPSession | None",
+) -> None:
+    """Resolve a pending URL-mode elicitation when the out-of-band flow completes.
+
+    The server sends ``notifications/elicitation/complete`` after an external
+    OAuth / URL flow finishes. The client echoes it here; we resolve the Future
+    that the tool is awaiting.
+    """
+    if session is None:
+        return
+    elicitation_id = params.get("elicitationId")
+    if not isinstance(elicitation_id, str):
+        return
+    # URL-mode elicitations use the elicitation_id as the pending key.
+    from musehub.mcp.session import resolve_elicitation
+    resolved = resolve_elicitation(session, elicitation_id, {"action": "accept"})
+    if resolved:
+        logger.info(
+            "URL elicitation completed (session %.8s..., id=%s)",
+            session.session_id,
+            elicitation_id,
+        )
 
 
 def _handle_resources_list() -> JSONObject:

@@ -1,10 +1,10 @@
-"""Muse Hub emotion-diff UI page.
+"""MuseHub emotion-diff UI page.
 
 Serves the ``/{owner}/{repo_slug}/emotion-diff/{base}...{head}`` page that
 visualises the 8-axis emotional shift between two Muse refs.
 
 Endpoint summary:
-  GET /musehub/ui/{owner}/{repo_slug}/emotion-diff/{refs}
+  GET /{owner}/{repo_slug}/emotion-diff/{refs}
     refs encodes ``base...head`` (same convention as the compare page).
     HTML (default) → interactive emotion-diff report with side-by-side
                      server-rendered SVG radar charts, delta bar chart,
@@ -44,7 +44,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 # 8 emotional dimensions in radar order — (model_attr, display_label, description)
@@ -149,12 +149,12 @@ async def _resolve_repo(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), f"/musehub/ui/{owner}/{repo_slug}"
+    return str(row.repo_id), f"/{owner}/{repo_slug}"
 
 
 @router.get(
     "/{owner}/{repo_slug}/emotion-diff/{refs}",
-    summary="Muse Hub emotion-diff page — 8-axis emotional shift between two refs",
+    summary="MuseHub emotion-diff page — 8-axis emotional shift between two refs",
 )
 async def emotion_diff_page(
     request: Request,
@@ -260,7 +260,7 @@ async def emotion_diff_page(
         "base_url": base_url,
         "current_page": "emotion-diff",
         "breadcrumb_data": [
-            {"label": owner, "url": f"/musehub/ui/{owner}"},
+            {"label": owner, "url": f"/{owner}"},
             {"label": repo_slug, "url": base_url},
             {"label": "emotion-diff", "url": ""},
             {"label": f"{base_ref}...{head_ref}", "url": ""},

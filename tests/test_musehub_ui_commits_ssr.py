@@ -1,9 +1,9 @@
-"""SSR + HTMX fragment tests for the Muse Hub commits list page — issue #570.
+"""SSR + HTMX fragment tests for the MuseHub commits list page — issue #570.
 
 Validates that commit data is rendered server-side into HTML (no JS required)
 and that HTMX fragment requests return bare HTML without the full page shell.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/commits:
+Covers GET /{owner}/{repo_slug}/commits:
 
 - test_commits_page_renders_commit_message_server_side
     Seed a commit; its message appears in the response HTML.
@@ -106,7 +106,7 @@ async def test_commits_page_renders_commit_message_server_side(
     )
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/commits")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/commits")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -123,7 +123,7 @@ async def test_commits_page_filter_form_has_hx_get(
     await _seed_commit(db_session, repo_id)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/commits")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/commits")
 
     assert response.status_code == 200
     assert "hx-get" in response.text
@@ -142,7 +142,7 @@ async def test_commits_page_fragment_on_htmx_request(
     await db_session.commit()
 
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/commits",
+        f"/{_OWNER}/{_SLUG}/commits",
         headers={"HX-Request": "true"},
     )
 
@@ -176,7 +176,7 @@ async def test_commits_page_author_filter_narrows_results(
     await db_session.commit()
 
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/commits?author=alice"
+        f"/{_OWNER}/{_SLUG}/commits?author=alice"
     )
 
     assert response.status_code == 200
@@ -202,7 +202,7 @@ async def test_commits_page_pagination_renders_next(
         )
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/commits")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/commits")
 
     assert response.status_code == 200
     # "Older →" appears as an anchor when there is a next page.

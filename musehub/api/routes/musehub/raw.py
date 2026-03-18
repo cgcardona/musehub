@@ -1,7 +1,7 @@
-"""Muse Hub raw file endpoint — direct file download with correct MIME types.
+"""MuseHub raw file endpoint — direct file download with correct MIME types.
 
 Endpoint:
-  GET /musehub/repos/{repo_id}/raw/{ref}/{path}
+  GET /repos/{repo_id}/raw/{ref}/{path}
 
 Serves artifact bytes from disk with:
 - Correct Content-Type for .mid, .mp3, .wav, .json, .webp, .xml, .abc, and more
@@ -77,8 +77,8 @@ def _resolve_mime(path: str) -> str:
 
 
 @router.get(
-    "/musehub/repos/{repo_id}/raw/{ref}/{path:path}",
-    summary="Download a raw file from a Muse Hub repo",
+    "/repos/{repo_id}/raw/{ref}/{path:path}",
+    summary="Download a raw file from a MuseHub repo",
     response_class=FileResponse,
 )
 async def raw_file(
@@ -88,7 +88,7 @@ async def raw_file(
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
 ) -> FileResponse:
-    """Serve raw artifact bytes from a Muse Hub repo at the given ref and path.
+    """Serve raw artifact bytes from a MuseHub repo at the given ref and path.
 
     Auth rules:
     - Public repos: no token required. Anyone can ``curl`` or ``wget`` files.
@@ -100,7 +100,7 @@ async def raw_file(
     object at ``path`` regardless of ref — consistent with MVP scope.
 
     Args:
-        repo_id: UUID of the target Muse Hub repo.
+        repo_id: UUID of the target MuseHub repo.
         ref: Branch or tag name, e.g. ``main``. Accepted but not yet
             used for filtering (future: return the object at that branch HEAD).
         path: Relative file path inside the repo, e.g. ``tracks/bass.mid``.

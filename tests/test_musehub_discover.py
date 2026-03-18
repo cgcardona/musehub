@@ -1,8 +1,8 @@
-"""Tests for the Muse Hub explore/discover API endpoints.
+"""Tests for the MuseHub explore/discover API endpoints.
 
 Covers acceptance criteria:
-- test_explore_page_renders — GET /musehub/ui/explore returns 200 HTML
-- test_trending_page_renders — GET /musehub/ui/trending returns 200 HTML
+- test_explore_page_renders — GET /explore returns 200 HTML
+- test_trending_page_renders — GET /trending returns 200 HTML
 - test_list_public_repos_empty — no public repos → empty list
 - test_explore_only_public_repos — private repos are excluded from results
 - test_explore_filters_by_genre — genre tag filter works
@@ -88,28 +88,28 @@ async def _make_private_repo(db_session: AsyncSession, name: str = "private-beat
 
 @pytest.mark.anyio
 async def test_explore_page_renders(client: AsyncClient) -> None:
-    """GET /musehub/ui/explore returns 200 HTML with filter controls."""
-    response = await client.get("/musehub/ui/explore")
+    """GET /explore returns 200 HTML with filter controls."""
+    response = await client.get("/explore")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Explore" in body
     # Filter sidebar and sort controls rendered by the Jinja2 template
     assert "filter-form" in body
     assert 'name="sort"' in body
     assert 'name="license"' in body
-    assert "/musehub/ui/explore" in body
+    assert "/explore" in body
 
 
 @pytest.mark.anyio
 async def test_trending_page_renders(client: AsyncClient) -> None:
-    """GET /musehub/ui/trending returns 200 HTML with repo grid."""
-    response = await client.get("/musehub/ui/trending")
+    """GET /trending returns 200 HTML with repo grid."""
+    response = await client.get("/trending")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Trending" in body
     # Repo grid container rendered by the Jinja2 template
     assert "repo-grid" in body
@@ -118,8 +118,8 @@ async def test_trending_page_renders(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_explore_page_no_auth_required(client: AsyncClient) -> None:
-    """GET /musehub/ui/explore must not return 401 — it is a public page."""
-    response = await client.get("/musehub/ui/explore")
+    """GET /explore must not return 401 — it is a public page."""
+    response = await client.get("/explore")
     assert response.status_code == 200
 
 
@@ -130,8 +130,8 @@ async def test_explore_page_no_auth_required(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_list_public_repos_empty(client: AsyncClient, db_session: AsyncSession) -> None:
-    """GET /api/v1/musehub/discover/repos returns empty list when no public repos exist."""
-    response = await client.get("/api/v1/musehub/discover/repos")
+    """GET /api/v1/discover/repos returns empty list when no public repos exist."""
+    response = await client.get("/api/v1/discover/repos")
     assert response.status_code == 200
     body = response.json()
     assert body["repos"] == []
@@ -148,7 +148,7 @@ async def test_explore_only_public_repos(
     await _make_public_repo(db_session, name="public-one")
     await _make_private_repo(db_session, name="private-one")
 
-    response = await client.get("/api/v1/musehub/discover/repos")
+    response = await client.get("/api/v1/discover/repos")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -165,7 +165,7 @@ async def test_explore_filters_by_genre(
     await _make_public_repo(db_session, name="jazz-project", tags=["jazz", "swing"])
     await _make_public_repo(db_session, name="lofi-project", tags=["lo-fi", "chill"])
 
-    response = await client.get("/api/v1/musehub/discover/repos?genre=jazz")
+    response = await client.get("/api/v1/discover/repos?genre=jazz")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -180,7 +180,7 @@ async def test_explore_filters_by_key(
     await _make_public_repo(db_session, name="fsharp-minor", key_signature="F# minor")
     await _make_public_repo(db_session, name="c-major", key_signature="C major")
 
-    response = await client.get("/api/v1/musehub/discover/repos?key=F%23+minor")
+    response = await client.get("/api/v1/discover/repos?key=F%23+minor")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -196,7 +196,7 @@ async def test_explore_filters_by_tempo(
     await _make_public_repo(db_session, name="mid", tempo_bpm=100)
     await _make_public_repo(db_session, name="fast", tempo_bpm=150)
 
-    response = await client.get("/api/v1/musehub/discover/repos?tempo_min=90&tempo_max=120")
+    response = await client.get("/api/v1/discover/repos?tempo_min=90&tempo_max=120")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -211,7 +211,7 @@ async def test_explore_filters_by_instrumentation(
     await _make_public_repo(db_session, name="bass-heavy", tags=["jazz", "bass", "drums"])
     await _make_public_repo(db_session, name="keys-only", tags=["ambient", "keys"])
 
-    response = await client.get("/api/v1/musehub/discover/repos?instrumentation=bass")
+    response = await client.get("/api/v1/discover/repos?instrumentation=bass")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -233,7 +233,7 @@ async def test_explore_sorts_by_stars(
     db_session.add_all([star1, star2, star3])
     await db_session.commit()
 
-    response = await client.get("/api/v1/musehub/discover/repos?sort=stars")
+    response = await client.get("/api/v1/discover/repos?sort=stars")
     assert response.status_code == 200
     body = response.json()
     repos = body["repos"]
@@ -253,7 +253,7 @@ async def test_explore_sorts_by_created(
     await _make_public_repo(db_session, name="first-created")
     await _make_public_repo(db_session, name="second-created")
 
-    response = await client.get("/api/v1/musehub/discover/repos?sort=created")
+    response = await client.get("/api/v1/discover/repos?sort=created")
     assert response.status_code == 200
     body = response.json()
     # Newest first — second-created was inserted last
@@ -269,8 +269,8 @@ async def test_explore_pagination(
     for i in range(5):
         await _make_public_repo(db_session, name=f"repo-{i:02d}")
 
-    page1 = (await client.get("/api/v1/musehub/discover/repos?page=1&page_size=3")).json()
-    page2 = (await client.get("/api/v1/musehub/discover/repos?page=2&page_size=3")).json()
+    page1 = (await client.get("/api/v1/discover/repos?page=1&page_size=3")).json()
+    page2 = (await client.get("/api/v1/discover/repos?page=2&page_size=3")).json()
 
     assert page1["total"] == 5
     assert page2["total"] == 5
@@ -285,7 +285,7 @@ async def test_explore_invalid_sort_returns_422(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     """sort= with an invalid value returns 422 Unprocessable Entity."""
-    response = await client.get("/api/v1/musehub/discover/repos?sort=invalid")
+    response = await client.get("/api/v1/discover/repos?sort=invalid")
     assert response.status_code == 422
 
 
@@ -298,9 +298,9 @@ async def test_explore_invalid_sort_returns_422(
 async def test_star_repo_requires_auth(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """POST /api/v1/musehub/repos/{repo_id}/star returns 401 without a JWT."""
+    """POST /api/v1/repos/{repo_id}/star returns 401 without a JWT."""
     repo_id = await _make_public_repo(db_session)
-    response = await client.post(f"/api/v1/musehub/repos/{repo_id}/star")
+    response = await client.post(f"/api/v1/repos/{repo_id}/star")
     assert response.status_code == 401
 
 
@@ -310,10 +310,10 @@ async def test_star_repo_adds_star(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """POST /api/v1/musehub/repos/{repo_id}/star returns starred=True and correct count."""
+    """POST /api/v1/repos/{repo_id}/star returns starred=True and correct count."""
     repo_id = await _make_public_repo(db_session)
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/star",
+        f"/api/v1/repos/{repo_id}/star",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -330,9 +330,9 @@ async def test_star_repo_idempotent(
 ) -> None:
     """Starring the same repo twice does not create duplicate stars."""
     repo_id = await _make_public_repo(db_session)
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers
+        f"/api/v1/repos/{repo_id}/star", headers=auth_headers
     )
     assert response.status_code == 200
     assert response.json()["starCount"] == 1
@@ -346,10 +346,10 @@ async def test_unstar_repo_removes_star(
 ) -> None:
     """DELETE .../star after starring reduces star_count to 0."""
     repo_id = await _make_public_repo(db_session)
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/star", headers=auth_headers)
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers
+        f"/api/v1/repos/{repo_id}/star", headers=auth_headers
     )
     assert response.status_code == 200
     body = response.json()
@@ -366,7 +366,7 @@ async def test_unstar_repo_idempotent(
     """Unstarring a repo that was never starred returns 200 with star_count=0."""
     repo_id = await _make_public_repo(db_session)
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers
+        f"/api/v1/repos/{repo_id}/star", headers=auth_headers
     )
     assert response.status_code == 200
     assert response.json()["starCount"] == 0
@@ -381,6 +381,6 @@ async def test_star_private_repo_returns_404(
     """POST /star on a private repo returns 404 — private repos cannot be starred."""
     repo_id = await _make_private_repo(db_session)
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/star", headers=auth_headers
+        f"/api/v1/repos/{repo_id}/star", headers=auth_headers
     )
     assert response.status_code == 404

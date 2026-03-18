@@ -14,7 +14,7 @@
     events       : list[ActivityEventResponse]  — current page of activity events
     page         : int                          — current 1-based page number
     total_pages  : int                          — total number of pages
-    base_url     : str                          — repo base URL, e.g. /musehub/ui/owner/slug
+    base_url     : str                          — repo base URL, e.g. /owner/slug
     event_type   : str                          — active event_type filter ('' if none)
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
@@ -26,7 +26,7 @@
     <div class="activity-body">
       <div class="activity-description">{{ event.description }}</div>
       <div class="activity-meta">
-        <a href="/musehub/ui/users/{{ event.actor | urlencode }}"
+        <a href="/{{ event.actor | urlencode }}"
            class="activity-actor">{{ event.actor }}</a>
         &bull;
         <span class="activity-type-badge">{{ event.event_type | replace('_', ' ') | title }}</span>

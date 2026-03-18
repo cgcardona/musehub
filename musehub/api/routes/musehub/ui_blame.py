@@ -1,22 +1,22 @@
-"""Muse Hub blame view page — per-note commit attribution browser.
+"""MuseHub blame view page — per-note commit attribution browser.
 
 Serves the blame UI page for a given MIDI file path at a commit ref. Each note
 event is annotated with the commit that last introduced or modified it, giving
 musicians and AI agents a per-measure provenance view of the composition.
 
 Endpoint:
-  GET /musehub/ui/{owner}/{repo_slug}/blame/{ref}/{path:path}
+  GET /{owner}/{repo_slug}/blame/{ref}/{path:path}
 
 Content negotiation (one URL, two audiences):
   HTML (default) — interactive blame view rendered via Jinja2.
   JSON (``Accept: application/json`` or ``?format=json``) — returns
   ``BlameResponse`` with the full list of ``BlameEntry`` items in camelCase,
-  mirroring the ``/api/v1/musehub/repos/{repo_id}/blame/{ref}`` API contract.
+  mirroring the ``/api/v1/repos/{repo_id}/blame/{ref}`` API contract.
 
 Auth:
   No JWT required to receive the HTML shell. The client-side JavaScript reads
   a token from ``localStorage`` and passes it as a Bearer header when calling the
-  JSON API, matching all other Muse Hub UI pages.
+  JSON API, matching all other MuseHub UI pages.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 
@@ -56,12 +56,12 @@ async def _resolve_repo(owner: str, repo_slug: str, db: AsyncSession) -> tuple[s
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), f"/musehub/ui/{owner}/{repo_slug}"
+    return str(row.repo_id), f"/{owner}/{repo_slug}"
 
 
 @router.get(
     "/{owner}/{repo_slug}/blame/{ref}/{path:path}",
-    summary="Muse Hub blame view — per-note commit attribution",
+    summary="MuseHub blame view — per-note commit attribution",
 )
 async def blame_page(
     request: Request,

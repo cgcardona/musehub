@@ -1,15 +1,15 @@
-"""Muse Hub object (artifact) route handlers.
+"""MuseHub object (artifact) route handlers.
 
 Endpoint summary:
-  GET /musehub/repos/{repo_id}/objects — list artifact metadata
-  GET /musehub/repos/{repo_id}/objects/{object_id}/content — serve raw artifact bytes
-  GET /musehub/repos/{repo_id}/blob/{ref}/{path} — blob metadata + text content for UI
-  GET /musehub/repos/{repo_id}/objects/{object_id}/parse-midi — MIDI-to-JSON parsing endpoint
-  GET /musehub/repos/{repo_id}/export/{ref}?format=midi&... — download export package
+  GET /repos/{repo_id}/objects — list artifact metadata
+  GET /repos/{repo_id}/objects/{object_id}/content — serve raw artifact bytes
+  GET /repos/{repo_id}/blob/{ref}/{path} — blob metadata + text content for UI
+  GET /repos/{repo_id}/objects/{object_id}/parse-midi — MIDI-to-JSON parsing endpoint
+  GET /repos/{repo_id}/export/{ref}?format=midi&... — download export package
 
 Objects are binary artifacts (MIDI, MP3, WebP piano rolls) pushed via the
 sync protocol. They are stored on disk; only metadata lives in Postgres.
-These endpoints are primarily consumed by the Muse Hub web UI.
+These endpoints are primarily consumed by the MuseHub web UI.
 
 The export endpoint packages stored artifacts at a given commit ref into a
 single downloadable file (or ZIP archive for multi-track exports).
@@ -138,7 +138,7 @@ async def get_blob_meta(
         )
 
     file_type = _detect_file_type(obj.path)
-    raw_url = f"/musehub/repos/{repo_id}/raw/{ref}/{path}"
+    raw_url = f"/repos/{repo_id}/raw/{ref}/{path}"
 
     content_text: str | None = None
     if file_type in ("json", "xml") and obj.size_bytes <= _MAX_TEXT_EMBED_BYTES:
@@ -166,7 +166,7 @@ async def get_blob_meta(
     "/repos/{repo_id}/objects",
     response_model=ObjectMetaListResponse,
     operation_id="listObjects",
-    summary="List artifact metadata for a Muse Hub repo",
+    summary="List artifact metadata for a MuseHub repo",
 )
 async def list_objects(
     repo_id: str,

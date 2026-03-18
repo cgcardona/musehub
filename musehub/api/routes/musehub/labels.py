@@ -1,14 +1,14 @@
-"""Muse Hub label management route handlers.
+"""MuseHub label management route handlers.
 
 Endpoint summary:
-  GET /musehub/repos/{repo_id}/labels — list labels (public)
-  POST /musehub/repos/{repo_id}/labels — create label (auth required)
-  PATCH /musehub/repos/{repo_id}/labels/{label_id} — update label (auth required)
-  DELETE /musehub/repos/{repo_id}/labels/{label_id} — delete label (auth required)
-  POST /musehub/repos/{repo_id}/issues/{number}/labels — assign labels to issue (auth required)
-  DELETE /musehub/repos/{repo_id}/issues/{number}/labels/{label_id} — remove label from issue (auth required)
-  POST /musehub/repos/{repo_id}/pull-requests/{pr_id}/labels — assign labels to PR (auth required)
-  DELETE /musehub/repos/{repo_id}/pull-requests/{pr_id}/labels/{label_id} — remove label from PR (auth required)
+  GET /repos/{repo_id}/labels — list labels (public)
+  POST /repos/{repo_id}/labels — create label (auth required)
+  PATCH /repos/{repo_id}/labels/{label_id} — update label (auth required)
+  DELETE /repos/{repo_id}/labels/{label_id} — delete label (auth required)
+  POST /repos/{repo_id}/issues/{number}/labels — assign labels to issue (auth required)
+  DELETE /repos/{repo_id}/issues/{number}/labels/{label_id} — remove label from issue (auth required)
+  POST /repos/{repo_id}/pull-requests/{pr_id}/labels — assign labels to PR (auth required)
+  DELETE /repos/{repo_id}/pull-requests/{pr_id}/labels/{label_id} — remove label from PR (auth required)
 
 Read endpoints use optional_token — unauthenticated access is allowed for public repos.
 Write endpoints always require a valid JWT Bearer token.
@@ -133,7 +133,7 @@ async def _get_label_or_404(db: AsyncSession, repo_id: str, label_id: str) -> La
     "/repos/{repo_id}/labels",
     response_model=LabelListResponse,
     operation_id="listLabels",
-    summary="List all labels for a Muse Hub repo",
+    summary="List all labels for a MuseHub repo",
 )
 async def list_labels(
     repo_id: str,
@@ -167,7 +167,7 @@ async def list_labels(
     response_model=LabelResponse,
     status_code=status.HTTP_201_CREATED,
     operation_id="createLabel",
-    summary="Create a label in a Muse Hub repo",
+    summary="Create a label in a MuseHub repo",
 )
 async def create_label(
     repo_id: str,
@@ -290,7 +290,7 @@ async def update_label(
     "/repos/{repo_id}/labels/{label_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     operation_id="deleteLabel",
-    summary="Delete a label from a Muse Hub repo",
+    summary="Delete a label from a MuseHub repo",
 )
 async def delete_label(
     repo_id: str,

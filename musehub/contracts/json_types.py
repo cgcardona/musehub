@@ -1,7 +1,7 @@
 """Canonical type definitions for JSON data and music-domain dicts.
 
 This module is the **single source of truth for every named data shape** in
-Muse Hub. Import from here; do not redefine shapes ad hoc.
+MuseHub. Import from here; do not redefine shapes ad hoc.
 
 ## When to use which type
 

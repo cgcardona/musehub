@@ -1,4 +1,4 @@
-"""Muse Hub activity event service — single point of access for the event stream.
+"""MuseHub activity event service — single point of access for the event stream.
 
 This module is the ONLY place that touches the ``musehub_events`` table.
 Route handlers record events atomically alongside their primary action (e.g.

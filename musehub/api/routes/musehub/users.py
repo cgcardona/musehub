@@ -1,4 +1,4 @@
-"""Muse Hub user-profile route handlers (JSON API).
+"""MuseHub user-profile route handlers (JSON API).
 
 Endpoint summary:
   GET /musehub/users/{username} — fetch full profile (public, no JWT required)
@@ -73,7 +73,7 @@ class UserCardResponse(CamelModel):
     "/users/{username}",
     response_model=ProfileResponse,
     operation_id="getUserProfile",
-    summary="Get a Muse Hub user profile (public)",
+    summary="Get a MuseHub user profile (public)",
 )
 async def get_user_profile(
     username: str,
@@ -192,7 +192,7 @@ async def get_user_watched(
     response_model=ProfileResponse,
     status_code=status.HTTP_201_CREATED,
     operation_id="createUserProfile",
-    summary="Create a Muse Hub user profile",
+    summary="Create a MuseHub user profile",
 )
 async def create_user_profile(
     body: CreateProfileBody,
@@ -242,7 +242,7 @@ async def create_user_profile(
     "/users/{username}",
     response_model=ProfileResponse,
     operation_id="updateUserProfile",
-    summary="Update a Muse Hub user profile (owner only)",
+    summary="Update a MuseHub user profile (owner only)",
 )
 async def update_user_profile(
     username: str,

@@ -1,7 +1,7 @@
-"""SSR tests for the Muse Hub sessions list and session detail pages (issue #573).
+"""SSR tests for the MuseHub sessions list and session detail pages (issue #573).
 
-Verifies that both ``GET /musehub/ui/{owner}/{repo_slug}/sessions`` and
-``GET /musehub/ui/{owner}/{repo_slug}/sessions/{session_id}`` render session
+Verifies that both ``GET /{owner}/{repo_slug}/sessions`` and
+``GET /{owner}/{repo_slug}/sessions/{session_id}`` render session
 data server-side rather than relying on client-side JavaScript fetches.
 
 Tests:
@@ -110,7 +110,7 @@ async def test_sessions_list_renders_session_name_server_side(
     repo_id = await _make_repo(db_session)
     row = await _make_session(db_session, repo_id, intent="Compose bridge section")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/sessions", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/sessions", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -129,7 +129,7 @@ async def test_sessions_list_active_badge_present(
     repo_id = await _make_repo(db_session)
     await _make_session(db_session, repo_id, is_active=True)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/sessions", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/sessions", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -153,7 +153,7 @@ async def test_sessions_list_htmx_fragment_path(
     row = await _make_session(db_session, repo_id)
     htmx_headers = {**auth_headers, "HX-Request": "true"}
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/sessions", headers=htmx_headers
+        f"/{_OWNER}/{_SLUG}/sessions", headers=htmx_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -172,7 +172,7 @@ async def test_sessions_list_empty_state_when_no_sessions(
     """Empty session list renders an empty-state component server-side (no JS fetch needed)."""
     await _make_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/sessions", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/sessions", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -198,7 +198,7 @@ async def test_session_detail_renders_session_id(
         db_session, repo_id, intent="Lay down the horn section", location="Studio B"
     )
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/sessions/{row.session_id}",
+        f"/{_OWNER}/{_SLUG}/sessions/{row.session_id}",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -220,7 +220,7 @@ async def test_session_detail_renders_participants(
         db_session, repo_id, participants=["alice", "bob"]
     )
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/sessions/{row.session_id}",
+        f"/{_OWNER}/{_SLUG}/sessions/{row.session_id}",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -240,7 +240,7 @@ async def test_session_detail_unknown_id_404(
     await _make_repo(db_session)
     fake_id = str(uuid.uuid4())
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/sessions/{fake_id}",
+        f"/{_OWNER}/{_SLUG}/sessions/{fake_id}",
         headers=auth_headers,
     )
     assert resp.status_code == 404

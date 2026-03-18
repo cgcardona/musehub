@@ -1,6 +1,6 @@
-"""Tests for Muse Hub repo settings page.
+"""Tests for MuseHub repo settings page.
 
-Covers the new ``GET /musehub/ui/{owner}/{repo_slug}/settings`` endpoint
+Covers the new ``GET /{owner}/{repo_slug}/settings`` endpoint
 implemented in ``musehub/api/routes/musehub/ui_settings.py``.
 
 Test matrix:
@@ -65,9 +65,9 @@ async def test_settings_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/settings returns HTTP 200."""
+    """GET /{owner}/{slug}/settings returns HTTP 200."""
     repo = await _make_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
 
 
@@ -82,7 +82,7 @@ async def test_settings_page_no_auth_required(
     shell itself — consistent with all other MuseHub UI pages.
     """
     repo = await _make_repo(db_session, owner="pubowner", slug="pub-repo", visibility="public")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "text/html" in resp.headers.get("content-type", "")
 
@@ -92,8 +92,8 @@ async def test_settings_page_unknown_repo_404(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/settings returns 404 for unknown repos."""
-    resp = await client.get("/musehub/ui/ghost-owner/nonexistent-repo/settings")
+    """GET /{owner}/{slug}/settings returns 404 for unknown repos."""
+    resp = await client.get("/ghost-owner/nonexistent-repo/settings")
     assert resp.status_code == 404
 
 
@@ -109,7 +109,7 @@ async def test_settings_page_contains_general_section(
 ) -> None:
     """Settings page HTML contains the General settings form."""
     repo = await _make_repo(db_session, owner="genowner", slug="gen-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "section-general" in resp.text
 
@@ -121,7 +121,7 @@ async def test_settings_page_contains_danger_zone(
 ) -> None:
     """Settings page HTML contains the Danger Zone section."""
     repo = await _make_repo(db_session, owner="dangowner", slug="dang-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "danger" in resp.text.lower()
     assert "Delete" in resp.text or "delete" in resp.text
@@ -134,7 +134,7 @@ async def test_settings_page_contains_merge_section(
 ) -> None:
     """Settings page HTML contains the Merge settings section."""
     repo = await _make_repo(db_session, owner="mergeowner", slug="merge-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "section-merge" in resp.text
 
@@ -146,7 +146,7 @@ async def test_settings_page_contains_collaboration(
 ) -> None:
     """Settings page HTML contains the Collaboration section."""
     repo = await _make_repo(db_session, owner="collabowner", slug="collab-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "section-collaboration" in resp.text
 
@@ -158,7 +158,7 @@ async def test_settings_page_sidebar_navigation(
 ) -> None:
     """Settings page HTML contains Alpine.js-powered sidebar navigation links."""
     repo = await _make_repo(db_session, owner="navowner", slug="nav-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     html = resp.text
     assert "settings-nav-link" in html
@@ -172,7 +172,7 @@ async def test_settings_page_section_param(
 ) -> None:
     """?section=danger pre-selects the danger sidebar section in the template context."""
     repo = await _make_repo(db_session, owner="secpowner", slug="secp-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings?section=danger")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings?section=danger")
     assert resp.status_code == 200
     # The activeSection JS variable should be populated from the context
     assert "activeSection" in resp.text or "active_section" in resp.text or "danger" in resp.text
@@ -188,9 +188,9 @@ async def test_settings_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/settings?format=json returns RepoSettingsResponse."""
+    """GET /{owner}/{slug}/settings?format=json returns RepoSettingsResponse."""
     repo = await _make_repo(db_session, owner="jsonowner", slug="json-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings?format=json")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings?format=json")
     assert resp.status_code == 200
     assert "application/json" in resp.headers.get("content-type", "")
     data = resp.json()
@@ -204,7 +204,7 @@ async def test_settings_json_has_visibility(
 ) -> None:
     """JSON response includes the ``visibility`` field."""
     repo = await _make_repo(db_session, owner="visowner", slug="vis-repo", visibility="public")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings?format=json")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings?format=json")
     assert resp.status_code == 200
     data = resp.json()
     assert data.get("visibility") == "public"
@@ -217,7 +217,7 @@ async def test_settings_json_has_merge_flags(
 ) -> None:
     """JSON response includes merge strategy boolean flags."""
     repo = await _make_repo(db_session, owner="flagowner", slug="flag-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings?format=json")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings?format=json")
     assert resp.status_code == 200
     data = resp.json()
     # RepoSettingsResponse uses camelCase via by_alias=True in negotiate_response
@@ -236,7 +236,7 @@ async def test_settings_page_topic_tag_input(
 ) -> None:
     """Settings page includes the topic tag input container."""
     repo = await _make_repo(db_session, owner="tagowner", slug="tag-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "topics-container" in resp.text or "tag-input" in resp.text
 
@@ -248,7 +248,7 @@ async def test_settings_page_danger_zone_delete_confirm(
 ) -> None:
     """Settings page requires typing the full repo name to confirm deletion."""
     repo = await _make_repo(db_session, owner="delowner", slug="del-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "confirm-delete-name" in resp.text
 
@@ -260,7 +260,7 @@ async def test_settings_page_danger_zone_transfer(
 ) -> None:
     """Settings page includes a transfer ownership action."""
     repo = await _make_repo(db_session, owner="tfrowner", slug="tfr-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "transfer" in resp.text.lower()
     assert "modal-transfer" in resp.text
@@ -273,7 +273,7 @@ async def test_settings_page_danger_zone_archive(
 ) -> None:
     """Settings page includes an archive repository action."""
     repo = await _make_repo(db_session, owner="archowner", slug="arch-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "archive" in resp.text.lower()
     assert "modal-archive" in resp.text
@@ -286,10 +286,10 @@ async def test_settings_page_uses_owner_slug_base_url(
 ) -> None:
     """The page injects the owner/slug-based base URL into the JS context, not a UUID.
 
-    Regression guard: all MuseHub UI pages must use ``/musehub/ui/{owner}/{slug}``
+    Regression guard: all MuseHub UI pages must use ``/{owner}/{slug}``
     style URLs so breadcrumb links and API calls are human-readable.
     """
     repo = await _make_repo(db_session, owner="slugowner", slug="slug-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
-    assert f"/musehub/ui/{repo.owner}/{repo.slug}" in resp.text
+    assert f"/{repo.owner}/{repo.slug}" in resp.text

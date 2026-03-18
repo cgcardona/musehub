@@ -3,7 +3,7 @@
 {% block title %}Compare {{ base_ref }}...{{ head_ref }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
   <a href="{{ base_url }}">{{ repo_slug }}</a> /
   compare /
   <span class="text-mono">{{ base_ref }}...{{ head_ref }}</span>
@@ -16,7 +16,7 @@ const repoId  = {{ repo_id | tojson }};
 const baseRef = {{ base_ref | tojson }};
 const headRef = {{ head_ref | tojson }};
 const uiBase  = {{ base_url | tojson }};
-const apiBase = '/api/v1/musehub/repos/' + repoId;
+const apiBase = '/api/v1/repos/' + repoId;
 {% endblock %}
 
 {% block content %}

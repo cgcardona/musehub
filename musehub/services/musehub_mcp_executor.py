@@ -42,6 +42,9 @@ MusehubErrorCode = Literal[
     "invalid_dimension",
     "invalid_mode",
     "db_unavailable",
+    "elicitation_unavailable",
+    "elicitation_declined",
+    "not_confirmed",
 ]
 """Enumeration of error codes returned by MuseHub MCP executors.
 
@@ -50,6 +53,9 @@ Callers pattern-match on these to build appropriate error messages:
   - ``invalid_dimension`` — unrecognised analysis dimension
   - ``invalid_mode`` — unrecognised search mode
   - ``db_unavailable`` — DB session factory not initialised (startup race)
+  - ``elicitation_unavailable`` — client has no active session / no elicitation capability
+  - ``elicitation_declined`` — user declined or cancelled the elicitation form/URL flow
+  - ``not_confirmed`` — user did not confirm a required confirmation prompt
 """
 
 

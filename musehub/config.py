@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     muse_mcp_url: str | None = None
     mcp_token: str | None = None
 
-    # Muse Hub object storage — binary artifacts (MIDI, MP3, WebP) stored as flat files
+    # MuseHub object storage — binary artifacts (MIDI, MP3, WebP) stored as flat files
     # under <musehub_objects_dir>/<repo_id>/<object_id>. Mount on a persistent volume in prod.
     musehub_objects_dir: str = "/data/musehub/objects"
 

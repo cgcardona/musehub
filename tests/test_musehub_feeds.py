@@ -1,10 +1,10 @@
-"""Tests for Muse Hub RSS/Atom feed endpoints.
+"""Tests for MuseHub RSS/Atom feed endpoints.
 
 Covers every acceptance criterion:
-- GET /musehub/repos/{repo_id}/feed.rss — RSS 2.0 commit feed
-- GET /musehub/repos/{repo_id}/releases.rss — RSS 2.0 releases feed
-- GET /musehub/repos/{repo_id}/issues.rss — RSS 2.0 open-issues feed
-- GET /musehub/repos/{repo_id}/feed.atom — Atom 1.0 commit feed
+- GET /repos/{repo_id}/feed.rss — RSS 2.0 commit feed
+- GET /repos/{repo_id}/releases.rss — RSS 2.0 releases feed
+- GET /repos/{repo_id}/issues.rss — RSS 2.0 open-issues feed
+- GET /repos/{repo_id}/feed.atom — Atom 1.0 commit feed
 - Public repos return 200 with correct Content-Type
 - Private repos return 403 (feed readers cannot supply credentials)
 - Non-existent repos return 404
@@ -52,7 +52,7 @@ async def _create_public_repo(
 ) -> str:
     """Create a public repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "visibility": "public"},
         headers=auth_headers,
     )
@@ -68,7 +68,7 @@ async def _create_private_repo(
 ) -> str:
     """Create a private repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -107,7 +107,7 @@ async def _create_release(
 ) -> None:
     """Create a release via the API."""
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/releases",
+        f"/api/v1/repos/{repo_id}/releases",
         json={"tag": tag, "title": title, "body": "## Notes\n\nFirst release."},
         headers=auth_headers,
     )
@@ -122,7 +122,7 @@ async def _create_issue(
 ) -> None:
     """Create an open issue via the API."""
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": title, "body": "Needs work.", "labels": []},
         headers=auth_headers,
     )
@@ -141,7 +141,7 @@ async def test_commit_rss_feed_public_repo_200(
 ) -> None:
     """Public repo commit RSS feed returns 200 with application/rss+xml."""
     repo_id = await _create_public_repo(client, auth_headers, "rss-commit-public-1")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.rss")
     assert response.status_code == 200
     assert "application/rss+xml" in response.headers["content-type"]
 
@@ -153,7 +153,7 @@ async def test_commit_rss_feed_contains_rss_structure(
 ) -> None:
     """Commit RSS feed body is valid RSS 2.0 with <rss> and <channel> tags."""
     repo_id = await _create_public_repo(client, auth_headers, "rss-commit-structure")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.rss")
     assert response.status_code == 200
     body = response.text
     assert '<rss version="2.0">' in body
@@ -173,7 +173,7 @@ async def test_commit_rss_feed_includes_commit_items(
     await _insert_commit(db_session, repo_id, "cmt001", "Add melodic intro")
     await _insert_commit(db_session, repo_id, "cmt002", "Rework verse harmony")
 
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.rss")
     assert response.status_code == 200
     body = response.text
     assert "<item>" in body
@@ -188,14 +188,14 @@ async def test_commit_rss_feed_private_repo_returns_403(
 ) -> None:
     """Private repo commit RSS feed returns 403 Forbidden."""
     repo_id = await _create_private_repo(client, auth_headers, "rss-commit-private")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.rss")
     assert response.status_code == 403
 
 
 @pytest.mark.anyio
 async def test_commit_rss_feed_nonexistent_repo_returns_404(client: AsyncClient) -> None:
     """Commit RSS feed returns 404 for a non-existent repo."""
-    response = await client.get("/api/v1/musehub/repos/ghost-repo-id/feed.rss")
+    response = await client.get("/api/v1/repos/ghost-repo-id/feed.rss")
     assert response.status_code == 404
 
 
@@ -210,7 +210,7 @@ async def test_commit_rss_feed_empty_repo_returns_valid_xml(
     at least one <item>. This test verifies the XML envelope is well-formed.
     """
     repo_id = await _create_public_repo(client, auth_headers, "rss-commit-empty")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.rss")
     assert response.status_code == 200
     body = response.text
     assert '<rss version="2.0">' in body
@@ -231,7 +231,7 @@ async def test_releases_rss_feed_public_repo_200(
 ) -> None:
     """Public repo releases RSS feed returns 200 with application/rss+xml."""
     repo_id = await _create_public_repo(client, auth_headers, "rss-releases-public-1")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/releases.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/releases.rss")
     assert response.status_code == 200
     assert "application/rss+xml" in response.headers["content-type"]
 
@@ -246,7 +246,7 @@ async def test_releases_rss_feed_includes_release_items(
     await _create_release(client, auth_headers, repo_id, tag="v1.0", title="First Cut")
     await _create_release(client, auth_headers, repo_id, tag="v2.0", title="Second Cut")
 
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/releases.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/releases.rss")
     assert response.status_code == 200
     body = response.text
     assert "<item>" in body
@@ -261,14 +261,14 @@ async def test_releases_rss_feed_private_repo_returns_403(
 ) -> None:
     """Private repo releases RSS feed returns 403 Forbidden."""
     repo_id = await _create_private_repo(client, auth_headers, "rss-releases-private")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/releases.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/releases.rss")
     assert response.status_code == 403
 
 
 @pytest.mark.anyio
 async def test_releases_rss_feed_nonexistent_repo_returns_404(client: AsyncClient) -> None:
     """Releases RSS feed returns 404 for a non-existent repo."""
-    response = await client.get("/api/v1/musehub/repos/ghost-repo-id/releases.rss")
+    response = await client.get("/api/v1/repos/ghost-repo-id/releases.rss")
     assert response.status_code == 404
 
 
@@ -284,7 +284,7 @@ async def test_issues_rss_feed_public_repo_200(
 ) -> None:
     """Public repo issues RSS feed returns 200 with application/rss+xml."""
     repo_id = await _create_public_repo(client, auth_headers, "rss-issues-public-1")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/issues.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/issues.rss")
     assert response.status_code == 200
     assert "application/rss+xml" in response.headers["content-type"]
 
@@ -299,7 +299,7 @@ async def test_issues_rss_feed_includes_open_issues(
     await _create_issue(client, auth_headers, repo_id, title="Bass muddy in chorus")
     await _create_issue(client, auth_headers, repo_id, title="Drums too loud")
 
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/issues.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/issues.rss")
     assert response.status_code == 200
     body = response.text
     assert "<item>" in body
@@ -314,14 +314,14 @@ async def test_issues_rss_feed_private_repo_returns_403(
 ) -> None:
     """Private repo issues RSS feed returns 403 Forbidden."""
     repo_id = await _create_private_repo(client, auth_headers, "rss-issues-private")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/issues.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/issues.rss")
     assert response.status_code == 403
 
 
 @pytest.mark.anyio
 async def test_issues_rss_feed_nonexistent_repo_returns_404(client: AsyncClient) -> None:
     """Issues RSS feed returns 404 for a non-existent repo."""
-    response = await client.get("/api/v1/musehub/repos/ghost-repo-id/issues.rss")
+    response = await client.get("/api/v1/repos/ghost-repo-id/issues.rss")
     assert response.status_code == 404
 
 
@@ -332,7 +332,7 @@ async def test_issues_rss_feed_empty_repo(
 ) -> None:
     """Issues RSS feed is valid XML with no <item> tags when repo has no issues."""
     repo_id = await _create_public_repo(client, auth_headers, "rss-issues-empty")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/issues.rss")
+    response = await client.get(f"/api/v1/repos/{repo_id}/issues.rss")
     assert response.status_code == 200
     assert "<item>" not in response.text
 
@@ -349,7 +349,7 @@ async def test_commit_atom_feed_public_repo_200(
 ) -> None:
     """Public repo commit Atom feed returns 200 with application/atom+xml."""
     repo_id = await _create_public_repo(client, auth_headers, "atom-commit-public-1")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.atom")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.atom")
     assert response.status_code == 200
     assert "application/atom+xml" in response.headers["content-type"]
 
@@ -361,7 +361,7 @@ async def test_commit_atom_feed_contains_atom_structure(
 ) -> None:
     """Atom feed body contains Atom 1.0 namespace and required <feed> tags."""
     repo_id = await _create_public_repo(client, auth_headers, "atom-commit-structure")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.atom")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.atom")
     assert response.status_code == 200
     body = response.text
     assert 'xmlns="http://www.w3.org/2005/Atom"' in body
@@ -381,7 +381,7 @@ async def test_commit_atom_feed_includes_entries(
     repo_id = await _create_public_repo(client, auth_headers, "atom-commit-entries")
     await _insert_commit(db_session, repo_id, "cmt003", "Introduce syncopated kick pattern")
 
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.atom")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.atom")
     assert response.status_code == 200
     body = response.text
     assert "<entry>" in body
@@ -395,14 +395,14 @@ async def test_commit_atom_feed_private_repo_returns_403(
 ) -> None:
     """Private repo Atom feed returns 403 Forbidden."""
     repo_id = await _create_private_repo(client, auth_headers, "atom-commit-private")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.atom")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.atom")
     assert response.status_code == 403
 
 
 @pytest.mark.anyio
 async def test_commit_atom_feed_nonexistent_repo_returns_404(client: AsyncClient) -> None:
     """Atom commit feed returns 404 for a non-existent repo."""
-    response = await client.get("/api/v1/musehub/repos/ghost-repo-id/feed.atom")
+    response = await client.get("/api/v1/repos/ghost-repo-id/feed.atom")
     assert response.status_code == 404
 
 
@@ -418,7 +418,7 @@ async def test_commit_atom_feed_empty_repo_valid_xml(
     well-formed Atom 1.0.
     """
     repo_id = await _create_public_repo(client, auth_headers, "atom-commit-empty")
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/feed.atom")
+    response = await client.get(f"/api/v1/repos/{repo_id}/feed.atom")
     assert response.status_code == 200
     body = response.text
     assert 'xmlns="http://www.w3.org/2005/Atom"' in body
@@ -513,7 +513,7 @@ def test_commit_rss_item_contains_required_fields() -> None:
     assert "<item>" in xml
     assert "<title>Add bass groove</title>" in xml
     assert "abc123" in xml
-    assert "/musehub/ui/miles/kind-of-blue/commits/abc123" in xml
+    assert "/miles/kind-of-blue/commits/abc123" in xml
     assert "<pubDate>" in xml
     assert "<guid" in xml
 
@@ -547,7 +547,7 @@ def test_release_rss_item_link_includes_tag() -> None:
     """_release_rss_item link path includes the release tag."""
     release = _make_release(tag="v1.0")
     xml = _release_rss_item(release, owner="u", slug="r")
-    assert "/musehub/ui/u/r/releases/v1.0" in xml
+    assert "/u/r/releases/v1.0" in xml
 
 
 def test_release_rss_item_no_enclosure_when_no_mp3() -> None:
@@ -563,7 +563,7 @@ def test_issue_rss_item_contains_required_fields() -> None:
     xml = _issue_rss_item(issue, owner="miles", slug="kind-of-blue")
     assert "<item>" in xml
     assert "Chord clash on beat 3" in xml
-    assert "/musehub/ui/miles/kind-of-blue/issues/7" in xml
+    assert "/miles/kind-of-blue/issues/7" in xml
     assert "<guid" in xml
 
 
@@ -573,7 +573,7 @@ def test_commit_atom_entry_contains_required_fields() -> None:
     xml = _commit_atom_entry(commit, owner="miles", slug="kind-of-blue")
     assert "<entry>" in xml
     assert "Reharmonise verse" in xml
-    assert 'href="/musehub/ui/miles/kind-of-blue/commits/def456"' in xml
+    assert 'href="/miles/kind-of-blue/commits/def456"' in xml
     assert "<updated>" in xml
     assert "<id>" in xml
 

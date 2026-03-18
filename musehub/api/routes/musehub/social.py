@@ -1,27 +1,27 @@
-"""Muse Hub social layer — comments, reactions, follows, watches, notifications, forks.
+"""MuseHub social layer — comments, reactions, follows, watches, notifications, forks.
 
 Endpoint summary:
-  GET /musehub/repos/{repo_id}/comments?target_type=&target_id= — list comments on an object
-  POST /musehub/repos/{repo_id}/comments — add a comment (auth required)
-  DELETE /musehub/repos/{repo_id}/comments/{comment_id} — soft-delete (auth, owner only)
+  GET /repos/{repo_id}/comments?target_type=&target_id= — list comments on an object
+  POST /repos/{repo_id}/comments — add a comment (auth required)
+  DELETE /repos/{repo_id}/comments/{comment_id} — soft-delete (auth, owner only)
 
-  GET /musehub/repos/{repo_id}/reactions?target_type=&target_id= — reaction counts
-  POST /musehub/repos/{repo_id}/reactions — toggle reaction (auth required)
+  GET /repos/{repo_id}/reactions?target_type=&target_id= — reaction counts
+  POST /repos/{repo_id}/reactions — toggle reaction (auth required)
 
   GET /musehub/users/{username}/followers — list followers
   POST /musehub/users/{username}/follow — follow user (auth required)
   DELETE /musehub/users/{username}/follow — unfollow (auth required)
 
-  GET /musehub/repos/{repo_id}/watches — watch count
-  POST /musehub/repos/{repo_id}/watch — watch repo (auth required)
-  DELETE /musehub/repos/{repo_id}/watch — unwatch (auth required)
+  GET /repos/{repo_id}/watches — watch count
+  POST /repos/{repo_id}/watch — watch repo (auth required)
+  DELETE /repos/{repo_id}/watch — unwatch (auth required)
 
   GET /musehub/notifications — inbox (auth required)
   POST /musehub/notifications/{notif_id}/read — mark read (auth required)
   POST /musehub/notifications/read-all — mark all read (auth required)
 
-  POST /musehub/repos/{repo_id}/fork — fork repo (auth required)
-  GET /musehub/repos/{repo_id}/forks — list forks
+  POST /repos/{repo_id}/fork — fork repo (auth required)
+  GET /repos/{repo_id}/forks — list forks
 
   GET /musehub/feed — activity feed (auth required)
 

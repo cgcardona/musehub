@@ -1,10 +1,10 @@
-"""Muse Hub topics/tag browse API route handlers.
+"""MuseHub topics/tag browse API route handlers.
 
 Endpoints:
   GET /musehub/topics — list all topics with repo_count, sorted desc
   GET /musehub/topics/{tag}/repos — list public repos tagged with this topic
                                              (paginated, sortable by stars/updated)
-  POST /musehub/repos/{repo_id}/topics — set topics for a repo (replaces entire list,
+  POST /repos/{repo_id}/topics — set topics for a repo (replaces entire list,
                                              auth required)
 
 Topics are free-form lowercase slugs stored in ``musehub_repos.tags`` as a JSON array.
@@ -91,7 +91,7 @@ class TopicReposResponse(BaseModel):
 
 
 class SetTopicsRequest(BaseModel):
-    """Body for POST /musehub/repos/{repo_id}/topics.
+    """Body for POST /repos/{repo_id}/topics.
 
     Replaces the repo's topic list entirely — send ``[]`` to clear all topics.
     Each topic must match ``[a-z0-9-]+``; topics are deduplicated and
@@ -107,7 +107,7 @@ class SetTopicsRequest(BaseModel):
 
 
 class SetTopicsResponse(BaseModel):
-    """Result of POST /musehub/repos/{repo_id}/topics."""
+    """Result of POST /repos/{repo_id}/topics."""
 
     repo_id: str
     topics: list[str] = Field(..., description="The stored topic list after update")

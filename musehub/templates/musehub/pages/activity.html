@@ -3,7 +3,7 @@
 
 {% block title %}Activity — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / activity
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / activity
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
@@ -35,35 +35,4 @@
   </div>
 </div>
 
-<style>
-.activity-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-color);
-}
-.activity-row:last-child { border-bottom: none; }
-.activity-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  width: 28px;
-  text-align: center;
-  margin-top: 2px;
-}
-.activity-body { flex: 1; min-width: 0; }
-.activity-description { font-size: 14px; margin-bottom: 4px; }
-.activity-description a { color: var(--text-primary); text-decoration: none; }
-.activity-description a:hover { text-decoration: underline; }
-.activity-meta { font-size: 12px; color: var(--text-muted); }
-.activity-actor { color: var(--accent-color); text-decoration: none; font-weight: 600; }
-.activity-actor:hover { text-decoration: underline; }
-.activity-type-badge {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 11px;
-}
-</style>
 {% endblock %}

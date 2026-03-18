@@ -1,4 +1,4 @@
-"""Muse Hub profile persistence adapter.
+"""MuseHub profile persistence adapter.
 
 Single point of DB access for user-profile entities (``musehub_profiles``).
 Aggregates cross-repo data (public repos, contribution graph, session credits)

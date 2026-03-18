@@ -2,94 +2,11 @@
 
 {% block title %}Stash — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
   stash
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-.stash-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.stash-header h1 { margin: 0; }
-.stash-count {
-  font-size: 13px;
-  color: var(--text-muted, #8b949e);
-}
-.stash-row {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border, #30363d);
-}
-.stash-row:last-child { border-bottom: none; }
-.stash-ref {
-  font-family: var(--font-mono, "Fira Code", monospace);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent, #58a6ff);
-  margin-bottom: 4px;
-}
-.stash-message {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary, #e6edf3);
-  margin-bottom: 4px;
-  word-break: break-word;
-}
-.stash-meta {
-  font-size: 12px;
-  color: var(--text-muted, #8b949e);
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-.stash-branch {
-  font-family: var(--font-mono, "Fira Code", monospace);
-  background: var(--bg-overlay, #161b22);
-  border: 1px solid var(--border, #30363d);
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 11px;
-}
-.stash-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.btn {
-  padding: 4px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: opacity 0.15s;
-}
-.btn:hover { opacity: 0.8; }
-.btn-apply {
-  background: var(--bg-overlay, #161b22);
-  border-color: var(--accent, #58a6ff);
-  color: var(--accent, #58a6ff);
-}
-.btn-pop {
-  background: var(--bg-overlay, #161b22);
-  border-color: var(--green, #3fb950);
-  color: var(--green, #3fb950);
-}
-.btn-drop {
-  background: var(--bg-overlay, #161b22);
-  border-color: var(--red, #f85149);
-  color: var(--red, #f85149);
-}
-</style>
-{% endblock %}
 
 {% block content %}
 <div class="card">

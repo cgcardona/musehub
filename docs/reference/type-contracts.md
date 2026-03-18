@@ -1,9 +1,10 @@
-# Muse Hub — Type Contracts Reference
+# MuseHub — Type Contracts Reference
 
-> Updated: 2026-03-17 | Covers every named entity in the Muse Hub surface:
-> MIDI type aliases, JSON wire types, MCP protocol types, Pydantic API models,
-> auth tokens, SSE event hierarchy, SQLAlchemy ORM models, and the full
-> MCP integration layer (dispatcher, resources, prompts, write tools, transports).
+> Updated: 2026-03-17 | MCP Protocol: **2025-11-25** | Covers every named entity in the MuseHub surface:
+> MIDI type aliases, JSON wire types, MCP protocol types (including Elicitation, Session, and SSE),
+> Pydantic API models, auth tokens, SSE event hierarchy, SQLAlchemy ORM models, and the full
+> MCP integration layer (Streamable HTTP transport, session management, dispatcher, resources,
+> prompts, read tools, write tools, elicitation-powered tools).
 > `Any` and bare `list` / `dict` (without type arguments) do not appear in any
 > production file. Every type boundary is named. The mypy strict ratchet
 > enforces zero violations on every CI run across 111 source files.
@@ -208,9 +209,9 @@ Used by the analysis service to describe structural section metadata.
 
 **Path:** `musehub/contracts/mcp_types.py`
 
-Typed shapes for the Model Context Protocol JSON-RPC 2.0 interface. TypedDicts
-cover the wire format; Pydantic models (`MCPToolDefWire` etc.) are used for
-FastAPI response serialisation.
+Typed shapes for the Model Context Protocol 2025-11-25 JSON-RPC 2.0 interface.
+TypedDicts cover the wire format; Pydantic models (`MCPToolDefWire` etc.) are
+used for FastAPI response serialisation.
 
 ### Type Aliases
 
@@ -255,6 +256,15 @@ FastAPI response serialisation.
 | `MCPCapabilitiesResult` | required | Capability block in `initialize` result |
 | `MCPToolCallParams` | required | Params for `tools/call` |
 
+### Elicitation TypedDicts (MCP 2025-11-25)
+
+| Name | Kind | Description |
+|------|------|-------------|
+| `ElicitationAction` | `Literal` | `"accept"` \| `"decline"` \| `"cancel"` |
+| `ElicitationRequest` | `total=False` | Server→client elicitation request: `mode` (`"form"` \| `"url"`), `schema` (form), `url` (URL), `message`, `request_id` |
+| `ElicitationResponse` | required | Client→server elicitation response: `action` (`ElicitationAction`), `content` (form fields on accept) |
+| `SessionInfo` | required | Active session summary: `session_id`, `user_id`, `created_at`, `last_active`, `pending_elicitations_count`, `sse_queue_count` |
+
 ### DAW ↔ MCP Bridge TypedDicts
 
 | Name | Kind | Description |
@@ -276,11 +286,71 @@ FastAPI response serialisation.
 
 **Paths:** `musehub/mcp/dispatcher.py`, `musehub/mcp/resources.py`,
 `musehub/mcp/prompts.py`, `musehub/mcp/tools/`, `musehub/mcp/write_tools/`,
-`musehub/api/routes/mcp.py`, `musehub/mcp/stdio_server.py`
+`musehub/mcp/session.py`, `musehub/mcp/sse.py`, `musehub/mcp/context.py`,
+`musehub/mcp/elicitation.py`, `musehub/api/routes/mcp.py`, `musehub/mcp/stdio_server.py`
 
-The MCP integration layer implements the full [MCP 2025-03-26 specification](https://spec.modelcontextprotocol.io/)
-as a pure-Python async stack. No external MCP SDK dependency. Two transports
-are supported: HTTP Streamable (`POST /mcp`) and stdio.
+The MCP integration layer implements the full [MCP 2025-11-25 specification](https://modelcontextprotocol.io/specification/2025-11-25)
+as a pure-Python async stack. No external MCP SDK dependency. Three HTTP endpoints
+(`POST /mcp`, `GET /mcp`, `DELETE /mcp`) and stdio are supported.
+
+### Session Layer (`mcp/session.py`)
+
+Stateful connection management for the Streamable HTTP transport.
+
+| Type / Export | Kind | Description |
+|---------------|------|-------------|
+| `MCPSession` | `@dataclass` | Active session: `session_id`, `user_id`, `client_capabilities`, `pending` (elicitation Futures), `sse_queues`, `event_buffer`, `created_at`, `last_active` |
+| `create_session(user_id, client_capabilities)` | function | Mint a new session; registers background cleanup task |
+| `get_session(session_id)` | function | Look up by ID; returns `None` if expired |
+| `delete_session(session_id)` | function | Terminate session; drains SSE queues; cancels pending Futures |
+| `push_to_session(session, event_text)` | function | Broadcast SSE event to all open GET /mcp consumers |
+| `register_sse_queue(session, last_event_id)` | async generator | Yield SSE events; replay buffer; heartbeat-friendly |
+| `create_pending_elicitation(session, request_id)` | function | Register a `Future` for an outbound `elicitation/create` |
+| `resolve_elicitation(session, request_id, result)` | function | Set the Future result on client response |
+| `cancel_elicitation(session, request_id)` | function | Cancel the Future on `notifications/cancelled` |
+
+Session TTL: 1 hour of inactivity. Background cleanup runs every 5 minutes. SSE ring buffer holds 50 events for `Last-Event-ID` replay.
+
+### SSE Utilities (`mcp/sse.py`)
+
+| Export | Signature | Description |
+|--------|-----------|-------------|
+| `sse_event(data, *, event_id, event_type, retry_ms)` | `(JSONObject, ...) → str` | Format a JSON object as an SSE event string ending with `\n\n` |
+| `sse_notification(method, params, *, event_id)` | `(str, ...) → str` | Format a JSON-RPC 2.0 notification as SSE |
+| `sse_request(req_id, method, params, *, event_id)` | `(str\|int, str, ...) → str` | Format a JSON-RPC 2.0 request (server-initiated) as SSE |
+| `sse_response(req_id, result, *, event_id)` | `(str\|int\|None, JSONObject, ...) → str` | Format a JSON-RPC 2.0 success response as SSE |
+| `sse_heartbeat()` | `() → str` | Return the SSE heartbeat comment (`": heartbeat\n\n"`) |
+| `heartbeat_stream(event_stream, *, interval_seconds)` | `async generator` | Interleave heartbeat comments into an event stream |
+| `SSE_CONTENT_TYPE` | `str` | `"text/event-stream"` |
+
+### Tool Call Context (`mcp/context.py`)
+
+| Type | Kind | Description |
+|------|------|-------------|
+| `ToolCallContext` | `@dataclass` | Passed to every tool executor; carries `user_id` and `session` |
+| `.elicit_form(schema, message)` | `async → dict \| None` | Send form elicitation, await Future (5 min timeout); returns `content` dict on accept, `None` on decline/cancel/no-session |
+| `.elicit_url(url, message, elicitation_id)` | `async → bool` | Send URL elicitation, await Future; returns `True` on accept |
+| `.progress(token, value, total, label)` | `async → None` | Push `notifications/progress` SSE event; silent no-op without session |
+| `.has_session` | `bool` | `True` if session is attached |
+| `.has_elicitation` | `bool` | `True` if client supports form-mode elicitation |
+
+### Elicitation Schemas (`mcp/elicitation.py`)
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `SCHEMAS` | `dict[str, JSONObject]` | 5 restricted JSON Schema objects for musical form elicitation |
+| `AVAILABLE_KEYS` | `list[str]` | 24 musical key signatures |
+| `AVAILABLE_MOODS` | `list[str]` | 10 mood enums |
+| `AVAILABLE_GENRES` | `list[str]` | 10 genre enums |
+| `AVAILABLE_DAWS` | `list[str]` | 10 DAW names |
+| `AVAILABLE_PLATFORMS` | `list[str]` | 8 streaming platform names |
+| `AVAILABLE_DAW_CLOUDS` | `list[str]` | 5 cloud DAW / mastering service names |
+| `build_form_elicitation(schema_key, message, *, request_id)` | function | Build form-mode elicitation params dict |
+| `build_url_elicitation(url, message, *, elicitation_id)` | function | Build URL-mode elicitation params dict + stable ID |
+| `oauth_connect_url(platform, elicitation_id, base_url)` | function | Build MuseHub OAuth start page URL |
+| `daw_cloud_connect_url(service, elicitation_id, base_url)` | function | Build cloud DAW OAuth start page URL |
+
+Schema keys: `compose_preferences`, `repo_creation`, `pr_review_focus`, `release_metadata`, `platform_connect_confirm`.
 
 ### Tool Catalogue (`mcp/tools/`)
 
@@ -288,11 +358,13 @@ are supported: HTTP Streamable (`POST /mcp`) and stdio.
 |--------|------|-------------|
 | `MUSEHUB_READ_TOOLS` | `list[MCPToolDef]` | 15 read-only tool definitions (browsing, search, inspect) |
 | `MUSEHUB_WRITE_TOOLS` | `list[MCPToolDef]` | 12 write tool definitions (create, update, merge, star) |
-| `MUSEHUB_TOOLS` | `list[MCPToolDef]` | Combined catalogue of all 27 `musehub_*` tools |
+| `MUSEHUB_ELICITATION_TOOLS` | `list[MCPToolDef]` | 5 elicitation-powered tool definitions (MCP 2025-11-25) |
+| `MUSEHUB_TOOLS` | `list[MCPToolDef]` | Combined catalogue of all 32 `musehub_*` tools |
 | `MUSEHUB_TOOL_NAMES` | `set[str]` | All tool name strings for fast routing |
-| `MUSEHUB_WRITE_TOOL_NAMES` | `set[str]` | Write-only names; presence triggers JWT auth check |
-| `MCP_TOOLS` | `list[MCPToolDef]` | Full registered tool list (alias of `MUSEHUB_TOOLS`) |
-| `TOOL_CATEGORIES` | `dict[str, str]` | Maps tool name → `"musehub-read"` or `"musehub-write"` |
+| `MUSEHUB_WRITE_TOOL_NAMES` | `set[str]` | Write + interactive names; presence triggers JWT auth check |
+| `MUSEHUB_ELICITATION_TOOL_NAMES` | `set[str]` | Elicitation-powered names; require session |
+| `MCP_TOOLS` | `list[MCPToolDef]` | Full registered tool list |
+| `TOOL_CATEGORIES` | `dict[str, str]` | Maps tool name → `"musehub-read"`, `"musehub-write"`, or `"musehub-elicitation"` |
 
 **Read tools:** `musehub_browse_repo`, `musehub_list_branches`, `musehub_list_commits`,
 `musehub_read_file`, `musehub_get_analysis`, `musehub_search`, `musehub_get_context`,
@@ -303,6 +375,9 @@ are supported: HTTP Streamable (`POST /mcp`) and stdio.
 `musehub_update_issue`, `musehub_create_issue_comment`, `musehub_create_pr`,
 `musehub_merge_pr`, `musehub_create_pr_comment`, `musehub_submit_pr_review`,
 `musehub_create_release`, `musehub_star_repo`, `musehub_create_label`
+
+**Elicitation tools:** `musehub_compose_with_preferences`, `musehub_review_pr_interactive`,
+`musehub_connect_streaming_platform`, `musehub_connect_daw_cloud`, `musehub_create_release_interactive`
 
 ### Resource Catalogue (`mcp/resources.py`)
 
@@ -334,43 +409,65 @@ TypedDicts for workflow-oriented agent guidance.
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `PROMPT_CATALOGUE` | `list[MCPPromptDef]` | 6 workflow prompts |
+| `PROMPT_CATALOGUE` | `list[MCPPromptDef]` | 8 workflow prompts |
 | `PROMPT_NAMES` | `set[str]` | All prompt name strings for fast lookup |
 | `get_prompt(name, arguments)` | `(str, dict[str, str] \| None) → MCPPromptResult \| None` | Assembles a prompt by name with optional argument substitution |
 
 **Prompts:** `musehub/orientation`, `musehub/contribute`, `musehub/compose`,
-`musehub/review_pr`, `musehub/issue_triage`, `musehub/release_prep`
+`musehub/review_pr`, `musehub/issue_triage`, `musehub/release_prep`,
+`musehub/onboard` _(MCP 2025-11-25 elicitation-aware)_,
+`musehub/release_to_world` _(MCP 2025-11-25 elicitation-aware)_
 
 ### Dispatcher (`mcp/dispatcher.py`)
 
 The pure-Python async JSON-RPC 2.0 engine. Receives parsed request dicts,
 routes to tools/resources/prompts, and returns JSON-RPC 2.0 response dicts.
+`ToolCallContext` is threaded into `_dispatch` so elicitation tools get access
+to their session.
 
 | Export | Signature | Description |
 |--------|-----------|-------------|
-| `handle_request(raw, user_id)` | `async (JSONObject, str \| None) → JSONObject \| None` | Handle one JSON-RPC 2.0 message; returns `None` for notifications |
-| `handle_batch(raw, user_id)` | `async (list[JSONValue], str \| None) → list[JSONObject]` | Handle a batch (array) of JSON-RPC messages; filters out notification `None`s |
+| `handle_request(raw, user_id, session)` | `async (JSONObject, str \| None, MCPSession \| None) → JSONObject \| None` | Handle one JSON-RPC 2.0 message; returns `None` for notifications |
+| `handle_batch(raw, user_id, session)` | `async (list[JSONValue], str \| None, MCPSession \| None) → list[JSONObject]` | Handle a batch (array); filters out notification `None`s |
 
 **Supported methods:**
 
 | Method | Auth required | Description |
 |--------|---------------|-------------|
-| `initialize` | No | Server capabilities handshake (MCP 2025-03-26) |
-| `tools/list` | No | Returns all 27 tool definitions |
-| `tools/call` | Write tools only | Routes to read or write executor |
+| `initialize` | No | Handshake; advertises `elicitation` capability (MCP 2025-11-25) |
+| `tools/list` | No | Returns all 32 tool definitions |
+| `tools/call` | Write + elicitation tools only | Routes to read, write, or elicitation executor |
 | `resources/list` | No | Returns 5 static resources |
 | `resources/templates/list` | No | Returns 15 URI templates |
 | `resources/read` | No (visibility checked) | Reads a `musehub://` URI |
-| `prompts/list` | No | Returns 6 prompt definitions |
+| `prompts/list` | No | Returns 8 prompt definitions |
 | `prompts/get` | No | Assembles a named prompt |
+| `notifications/cancelled` | No | Cancels a pending elicitation Future |
+| `notifications/elicitation/complete` | No | Resolves a URL-mode elicitation Future |
 
 ### HTTP Transport (`api/routes/mcp.py`)
 
-`POST /mcp` — HTTP Streamable endpoint. Accepts both single (`object`) and
-batch (`array`) JSON-RPC 2.0 bodies. JWT from `Authorization: Bearer <token>`
-is decoded; the extracted `sub` is passed as `user_id` to the dispatcher.
-Notifications return `202 No Content`. Parse errors return standard
-JSON-RPC error envelopes.
+Full MCP 2025-11-25 Streamable HTTP transport.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /mcp` | Accepts JSON or JSON array. Returns `application/json` or `text/event-stream` for elicitation tools. Validates `Origin`, `Mcp-Session-Id`, and optional `MCP-Protocol-Version`. |
+| `GET /mcp` | Persistent SSE push channel. Requires `Mcp-Session-Id`. Supports `Last-Event-ID` replay from a 50-event ring buffer. |
+| `DELETE /mcp` | Terminates session: drains SSE queues, cancels pending elicitation Futures. Returns `200 OK`. |
+
+### Elicitation UI Routes (`api/routes/musehub/ui_mcp_elicitation.py`)
+
+Browser-facing pages for URL-mode OAuth elicitation flows.
+
+| Route | Description |
+|-------|-------------|
+| `GET /musehub/ui/mcp/connect/{platform_slug}` | OAuth start page for streaming platforms; renders `mcp/elicitation_connect.html` with platform context and permissions. |
+| `GET /musehub/ui/mcp/connect/daw/{service_slug}` | OAuth start page for cloud DAW services. |
+| `GET /musehub/ui/mcp/elicitation/{elicitation_id}/callback` | OAuth redirect target; resolves elicitation Future; renders `mcp/elicitation_callback.html` (auto-close). |
+
+**Templates:**
+- `musehub/templates/mcp/elicitation_connect.html` — OAuth consent / connect page
+- `musehub/templates/mcp/elicitation_callback.html` — Post-OAuth result page (auto-close tab)
 
 ### Stdio Transport (`mcp/stdio_server.py`)
 
@@ -448,7 +545,7 @@ optional claims added by the issuer.
 **Path:** `musehub/protocol/events.py`
 
 Protocol events are Pydantic `CamelModel` subclasses of `MuseEvent`, which
-provides `type`, `seq`, and `protocol_version` on every payload. Muse Hub
+provides `type`, `seq`, and `protocol_version` on every payload. MuseHub
 defines two concrete event types — both in the MCP relay path.
 
 ### Base Class
@@ -511,7 +608,7 @@ All are Pydantic `CamelModel` subclasses. Organized by domain feature.
 | Name | Description |
 |------|-------------|
 | `CreateRepoRequest` | Repository creation wizard body |
-| `RepoResponse` | Wire representation of a Muse Hub repo |
+| `RepoResponse` | Wire representation of a MuseHub repo |
 | `TransferOwnershipRequest` | Transfer repo to another user |
 | `RepoListResponse` | Paginated list of repos |
 | `RepoStatsResponse` | Aggregated commit / branch / release counts |
@@ -687,13 +784,13 @@ All are SQLAlchemy ORM subclasses of a declarative `Base`.
 | `MuseCliCommit` | `muse_commits` | Versioned commit pointing to a snapshot |
 | `MuseCliTag` | `muse_tags` | Music-semantic tag on a CLI commit |
 
-### `db/musehub_models.py` — Muse Hub Core
+### `db/musehub_models.py` — MuseHub Core
 
 | Model | Table | Description |
 |-------|-------|-------------|
 | `MusehubRepo` | `musehub_repos` | Remote repository with music-semantic metadata |
 | `MusehubBranch` | `musehub_branches` | Named branch pointer |
-| `MusehubCommit` | `musehub_commits` | Commit pushed to Muse Hub |
+| `MusehubCommit` | `musehub_commits` | Commit pushed to MuseHub |
 | `MusehubObject` | `musehub_objects` | Content-addressed binary artifact |
 | `MusehubMilestone` | `musehub_milestones` | Milestone grouping issues |
 | `MusehubIssueMilestone` | `musehub_issue_milestones` | Issue ↔ Milestone join table |
@@ -746,7 +843,7 @@ All are SQLAlchemy ORM subclasses of a declarative `Base`.
 ## Entity Hierarchy
 
 ```
-Muse Hub
+MuseHub
 │
 ├── MIDI Type Aliases (contracts/midi_types.py)
 │   ├── MidiPitch, MidiVelocity, MidiChannel, MidiCC, MidiCCValue
@@ -928,7 +1025,7 @@ classDiagram
 
 ### Diagram 2 — MCP Protocol Event Types
 
-The two concrete events Muse Hub relays over SSE — both in the MCP path.
+The two concrete events MuseHub relays over SSE — both in the MCP path.
 `MuseEvent` is the typed base; the event registry maps type strings to
 model classes.
 
@@ -1178,7 +1275,7 @@ classDiagram
 
 ---
 
-### Diagram 7 — Muse Hub Repository Object Graph
+### Diagram 7 — MuseHub Repository Object Graph
 
 The core VCS entity relationships in the database.
 
@@ -1398,9 +1495,13 @@ and executors to the database and back.
 ```mermaid
 classDiagram
     class HTTPTransport {
-        <<api/routes/mcp.py>>
-        +POST /mcp
+        <<api/routes/mcp.py — MCP 2025-11-25>>
+        +POST /mcp  JSON | SSE stream
+        +GET /mcp   SSE push channel
+        +DELETE /mcp  session termination
         +JWT auth (Authorization: Bearer)
+        +Mcp-Session-Id header
+        +Origin validation
         +batch support (array body)
         +202 for notifications
     }
@@ -1410,15 +1511,38 @@ classDiagram
         +stdout JSON-RPC responses
         +Cursor IDE integration
     }
+    class SessionStore {
+        <<mcp/session.py>>
+        +create_session(user_id, caps)
+        +get_session(session_id)
+        +delete_session(session_id)
+        +push_to_session(session, event)
+        +register_sse_queue(session, last_event_id)
+        +create_pending_elicitation(session, id)
+        +resolve_elicitation(session, id, result)
+        +cancel_elicitation(session, id)
+    }
     class MCPDispatcher {
-        <<mcp/dispatcher.py>>
-        +handle_request(raw, user_id) JSONObject|None
-        +handle_batch(raw, user_id) list~JSONObject~
-        -initialize() capabilities
-        -tools_list() 27 tools
-        -tools_call(name, args, user_id)
+        <<mcp/dispatcher.py — 2025-11-25>>
+        +handle_request(raw, user_id, session) JSONObject|None
+        +handle_batch(raw, user_id, session) list~JSONObject~
+        -initialize() elicitation capability
+        -tools_list() 32 tools
+        -tools_call(name, args, ctx)
         -resources_read(uri, user_id)
         -prompts_get(name, args)
+        -notifications_cancelled()
+        -notifications_elicitation_complete()
+    }
+    class ToolCallContext {
+        <<mcp/context.py>>
+        +user_id : str | None
+        +session : MCPSession | None
+        +has_session : bool
+        +has_elicitation : bool
+        +elicit_form(schema, message) dict|None
+        +elicit_url(url, message, id) bool
+        +progress(token, value, total, label)
     }
     class ReadExecutors {
         <<mcp/services/musehub_mcp_executor.py>>
@@ -1446,6 +1570,14 @@ classDiagram
         releases: execute_create_release()
         social: execute_star_repo() execute_create_label()
     }
+    class ElicitationExecutors {
+        <<mcp/write_tools/elicitation_tools.py — MCP 2025-11-25>>
+        execute_compose_with_preferences()
+        execute_review_pr_interactive()
+        execute_connect_streaming_platform()
+        execute_connect_daw_cloud()
+        execute_create_release_interactive()
+    }
     class ResourceHandlers {
         <<mcp/resources.py>>
         read_resource(uri, user_id)
@@ -1458,6 +1590,7 @@ classDiagram
         get_prompt(name, arguments)
         orientation · contribute · compose
         review_pr · issue_triage · release_prep
+        onboard · release_to_world (2025-11-25)
     }
     class MusehubToolResult {
         <<dataclass frozen>>
@@ -1467,10 +1600,15 @@ classDiagram
         +error_message : str | None
     }
 
-    HTTPTransport ..> MCPDispatcher : delegates
-    StdioTransport ..> MCPDispatcher : delegates
+    HTTPTransport ..> SessionStore : Mcp-Session-Id lifecycle
+    HTTPTransport ..> MCPDispatcher : delegates (with session)
+    StdioTransport ..> MCPDispatcher : delegates (no session)
+    MCPDispatcher ..> ToolCallContext : threads into tool calls
     MCPDispatcher ..> ReadExecutors : tools/call (read)
     MCPDispatcher ..> WriteExecutors : tools/call (write, auth required)
+    MCPDispatcher ..> ElicitationExecutors : tools/call (session + auth required)
+    ElicitationExecutors ..> ToolCallContext : uses for elicitation & progress
+    ToolCallContext ..> SessionStore : pushes SSE events, resolves Futures
     MCPDispatcher ..> ResourceHandlers : resources/read
     MCPDispatcher ..> PromptAssembler : prompts/get
     ReadExecutors --> MusehubToolResult : returns

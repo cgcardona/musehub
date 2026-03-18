@@ -1,4 +1,4 @@
-"""Muse Hub Analysis Service — structured musical analysis for agent consumption.
+"""MuseHub Analysis Service — structured musical analysis for agent consumption.
 
 This module is the single orchestration point for all 13 analysis dimensions.
 Route handlers delegate here; no business logic lives in routes.
@@ -606,7 +606,7 @@ def compute_analysis_response(
     This is the primary entry point for the single-dimension endpoint.
 
     Args:
-        repo_id: Muse Hub repo UUID.
+        repo_id: MuseHub repo UUID.
         dimension: Analysis dimension name.
         ref: Muse commit ref.
         track: Optional track filter.
@@ -639,7 +639,7 @@ def compute_form_structure(*, repo_id: str, ref: str) -> FormStructureResponse:
     analysis dimensions.
 
     Args:
-        repo_id: Muse Hub repo UUID (used for logging only).
+        repo_id: MuseHub repo UUID (used for logging only).
         ref: Muse commit ref.
 
     Returns:
@@ -796,7 +796,7 @@ def compute_dynamics_page_data(
     and peak/range metrics for the loudness comparison bar chart.
 
     Args:
-        repo_id: Muse Hub repo UUID.
+        repo_id: MuseHub repo UUID.
         ref: Muse commit ref (branch name, commit ID, or tag).
         track: Optional track filter — if set, only that track is returned.
         section: Optional section filter (recorded in ``filters_applied``).
@@ -844,7 +844,7 @@ def compute_emotion_map(
     arc — the information needed to render line charts and trajectory plots.
 
     Args:
-        repo_id: Muse Hub repo UUID (used for logging).
+        repo_id: MuseHub repo UUID (used for logging).
         ref: Head Muse commit ref (branch name or commit ID).
         track: Optional instrument track filter.
         section: Optional musical section filter.
@@ -993,7 +993,7 @@ def compute_aggregate_analysis(
     musical picture without issuing 13 sequential requests.
 
     Args:
-        repo_id: Muse Hub repo UUID.
+        repo_id: MuseHub repo UUID.
         ref: Muse commit ref.
         track: Optional track filter (applied to all dimensions).
         section: Optional section filter (applied to all dimensions).
@@ -1096,7 +1096,7 @@ def compute_harmony_analysis(
     generic harmony dimension uses, ensuring cross-endpoint consistency.
 
     Args:
-        repo_id: Muse Hub repo UUID (used only for logging).
+        repo_id: MuseHub repo UUID (used only for logging).
         ref: Muse commit ref (seeds the deterministic data).
         track: Optional track filter (recorded in response; stub ignores it).
         section: Optional section filter (recorded in response; stub ignores it).
@@ -1210,7 +1210,7 @@ def compute_arrangement_matrix(*, repo_id: str, ref: str) -> ArrangementMatrixRe
     drawn from realistic ranges for a 6-instrument soul/pop arrangement.
 
     Args:
-        repo_id: Muse Hub repo UUID (used only for logging).
+        repo_id: MuseHub repo UUID (used only for logging).
         ref: Muse commit ref (seeds the deterministic RNG).
 
     Returns:
@@ -1358,7 +1358,7 @@ def compute_recall(
     hashes so agents receive consistent responses across retries.
 
     Args:
-        repo_id: Muse Hub repo UUID (used for scoping and logging).
+        repo_id: MuseHub repo UUID (used for scoping and logging).
         ref: Muse commit ref to scope the search to (only reachable commits).
         query: Natural-language search string, e.g. ``"swing groove with jazz harmony"``.
         limit: Maximum number of matches to return (default 10, max 50).
@@ -1635,7 +1635,7 @@ def compute_emotion_diff(
     need to answer "how did this commit change the emotional character?"
 
     Args:
-        repo_id: Muse Hub repo UUID (used for logging).
+        repo_id: MuseHub repo UUID (used for logging).
         head_ref: The ref being evaluated (the head commit).
         base_ref: The ref used as comparison baseline (e.g. parent commit, ``main``).
 

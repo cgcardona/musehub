@@ -1,10 +1,10 @@
-"""SSR tests for Muse Hub labels management UI — issue #557.
+"""SSR tests for MuseHub labels management UI — issue #557.
 
 Verifies that the labels page renders data server-side in Jinja2 templates
 without requiring JavaScript execution.  Tests assert on HTML content directly
 returned by the server, not on JavaScript rendering logic.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/labels:
+Covers GET /{owner}/{repo_slug}/labels:
 - test_labels_page_renders_label_name_server_side
 - test_labels_page_shows_issue_count_server_side
 - test_labels_page_fragment_on_htmx_request
@@ -82,7 +82,7 @@ async def test_labels_page_renders_label_name_server_side(
     """Label name is present in the HTML returned by the server, not injected by JS."""
     repo_id = await _make_repo(db_session)
     await _make_label(db_session, repo_id, name="needs-arrangement")
-    response = await client.get("/musehub/ui/label_ssr_artist/label-ssr-album/labels")
+    response = await client.get("/label_ssr_artist/label-ssr-album/labels")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "needs-arrangement" in response.text
@@ -96,7 +96,7 @@ async def test_labels_page_shows_issue_count_server_side(
     """Issue count is rendered in the label list HTML by the server."""
     repo_id = await _make_repo(db_session)
     await _make_label(db_session, repo_id, name="enhancement", color="#a2eeef")
-    response = await client.get("/musehub/ui/label_ssr_artist/label-ssr-album/labels")
+    response = await client.get("/label_ssr_artist/label-ssr-album/labels")
     assert response.status_code == 200
     # Label row with zero issues: "0 issues" should appear
     assert "0 issues" in response.text or "issues" in response.text
@@ -111,7 +111,7 @@ async def test_labels_page_fragment_on_htmx_request(
     repo_id = await _make_repo(db_session)
     await _make_label(db_session, repo_id, name="htmx-fragment-label")
     response = await client.get(
-        "/musehub/ui/label_ssr_artist/label-ssr-album/labels",
+        "/label_ssr_artist/label-ssr-album/labels",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -137,7 +137,7 @@ async def test_labels_htmx_create_returns_fragment(
     await _make_repo(db_session)
     htmx_headers = {**auth_headers, "HX-Request": "true"}
     response = await client.post(
-        "/musehub/ui/label_ssr_artist/label-ssr-album/labels",
+        "/label_ssr_artist/label-ssr-album/labels",
         json={"name": "htmx-created-label", "color": "#ff0000"},
         headers=htmx_headers,
     )
@@ -157,7 +157,7 @@ async def test_labels_htmx_delete_returns_fragment(
     label = await _make_label(db_session, repo_id, name="to-be-deleted")
     htmx_headers = {**auth_headers, "HX-Request": "true"}
     response = await client.post(
-        f"/musehub/ui/label_ssr_artist/label-ssr-album/labels/{label.id}/delete",
+        f"/label_ssr_artist/label-ssr-album/labels/{label.id}/delete",
         headers=htmx_headers,
     )
     assert response.status_code == 200
@@ -175,7 +175,7 @@ async def test_labels_htmx_reset_returns_10_defaults(
     await _make_repo(db_session)
     htmx_headers = {**auth_headers, "HX-Request": "true"}
     response = await client.post(
-        "/musehub/ui/label_ssr_artist/label-ssr-album/labels/reset",
+        "/label_ssr_artist/label-ssr-album/labels/reset",
         headers=htmx_headers,
     )
     assert response.status_code == 200

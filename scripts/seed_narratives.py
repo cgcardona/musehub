@@ -151,6 +151,9 @@ async def _seed_bach_remix_war(db: AsyncSession) -> None:
         created_at=_now(days=30),
     ))
 
+    # Flush repos before inserting the fork record (FK dependency)
+    await db.flush()
+
     # Fork record
     db.add(MusehubFork(
         fork_id=_uid("narr-fork-neo-baroque-marcus"),
@@ -330,6 +333,7 @@ async def _seed_chopin_coltrane(db: AsyncSession) -> None:
         tempo_bpm=66,
         created_at=_now(days=55),
     ))
+    await db.flush()
 
     # Original commits by pierre
     nocturne_base: list[dict[str, Any]] = [
@@ -560,6 +564,7 @@ async def _seed_ragtime_edm(db: AsyncSession) -> None:
         tempo_bpm=130,
         created_at=_now(days=40),
     ))
+    await db.flush()
 
     # 8 commits, 3 authors
     ragtime_commits: list[dict[str, Any]] = [
@@ -727,6 +732,7 @@ async def _seed_community_chaos(db: AsyncSession) -> None:
         tempo_bpm=95,
         created_at=_now(days=50),
     ))
+    await db.flush()
 
     # Base commits
     base_commits: list[dict[str, Any]] = [
@@ -944,6 +950,7 @@ async def _seed_goldberg_milestone(db: AsyncSession) -> None:
         tempo_bpm=80,
         created_at=_now(days=120),
     ))
+    await db.flush()
 
     # Base commit — the Aria
     db.add(MusehubCommit(
@@ -1241,7 +1248,7 @@ async def seed_narratives(db: AsyncSession, force: bool = False) -> None:
     print("=" * 72)
     print("🎭  NARRATIVE SCENARIOS — SEEDED")
     print("=" * 72)
-    BASE = "http://localhost:10001/musehub/ui"
+    BASE = "http://localhost:10001"
     print(f"\n1. Bach Remix War:     {BASE}/gabriel/neo-baroque-counterpoint")
     print(f"   Fork (trap):         {BASE}/marcus/neo-baroque-counterpoint")
     print(f"\n2. Chopin+Coltrane:    {BASE}/pierre/nocturne-op9-no2")

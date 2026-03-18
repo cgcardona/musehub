@@ -1,12 +1,12 @@
-"""Muse Hub stash route handlers.
+"""MuseHub stash route handlers.
 
 Endpoint summary:
-  GET /musehub/repos/{repo_id}/stash — list stash entries (auth required)
-  POST /musehub/repos/{repo_id}/stash — push new stash (auth required)
-  GET /musehub/repos/{repo_id}/stash/{stash_id} — get stash detail + entries (auth required)
-  POST /musehub/repos/{repo_id}/stash/{stash_id}/pop — apply + delete stash (auth required)
-  POST /musehub/repos/{repo_id}/stash/{stash_id}/apply — apply stash without deleting (auth required)
-  DELETE /musehub/repos/{repo_id}/stash/{stash_id} — drop a stash entry (auth required)
+  GET /repos/{repo_id}/stash — list stash entries (auth required)
+  POST /repos/{repo_id}/stash — push new stash (auth required)
+  GET /repos/{repo_id}/stash/{stash_id} — get stash detail + entries (auth required)
+  POST /repos/{repo_id}/stash/{stash_id}/pop — apply + delete stash (auth required)
+  POST /repos/{repo_id}/stash/{stash_id}/apply — apply stash without deleting (auth required)
+  DELETE /repos/{repo_id}/stash/{stash_id} — drop a stash entry (auth required)
 
 Maps to CLI commands: muse stash push, list, show, pop, apply, drop.
 Stash entries are scoped per repo+user — users can only see their own stash.

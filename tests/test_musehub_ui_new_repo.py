@@ -1,10 +1,10 @@
-"""Tests for the Muse Hub new-repo creation wizard.
+"""Tests for the MuseHub new-repo creation wizard.
 
 Covers ``musehub/api/routes/musehub/ui_new_repo.py``:
 
-  GET /musehub/ui/new
-  POST /musehub/ui/new
-  GET /musehub/ui/new/check
+  GET /new
+  POST /new
+  GET /new/check
 
 Test matrix:
   test_new_repo_page_returns_200 — GET returns HTTP 200 HTML
@@ -23,7 +23,7 @@ Test matrix:
   test_create_repo_requires_auth — POST without token → 401/403
   test_create_repo_success — POST with valid body → 201 + redirect
   test_create_repo_409_on_duplicate — POST duplicate → 409
-  test_create_repo_redirect_url_format — redirect URL contains /musehub/ui/{owner}/{slug}?welcome=1
+  test_create_repo_redirect_url_format — redirect URL contains /{owner}/{slug}?welcome=1
   test_create_repo_private_default — POST without visibility → defaults to private
   test_create_repo_initializes_repo — POST with initialize=true creates the repo
   test_create_repo_with_license — POST with license field stored correctly
@@ -62,21 +62,21 @@ async def _seed_repo(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/ui/new — HTML wizard
+# GET /new — HTML wizard
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_new_repo_page_returns_200(client: AsyncClient) -> None:
-    """GET /musehub/ui/new returns HTTP 200."""
-    resp = await client.get("/musehub/ui/new")
+    """GET /new returns HTTP 200."""
+    resp = await client.get("/new")
     assert resp.status_code == 200
 
 
 @pytest.mark.anyio
 async def test_new_repo_page_no_auth_required(client: AsyncClient) -> None:
     """The wizard HTML shell is accessible without a JWT — consistent with all other UI pages."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     assert "text/html" in resp.headers.get("content-type", "")
 
@@ -84,7 +84,7 @@ async def test_new_repo_page_no_auth_required(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_new_repo_page_has_form(client: AsyncClient) -> None:
     """The wizard page contains the HTML wizard form."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     html = resp.text
     assert "wizard-form" in html or "new_repo" in html or "Create" in html
@@ -93,7 +93,7 @@ async def test_new_repo_page_has_form(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_new_repo_page_has_owner_input(client: AsyncClient) -> None:
     """The wizard page references the owner input field."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     assert "f-owner" in resp.text
 
@@ -101,7 +101,7 @@ async def test_new_repo_page_has_owner_input(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_new_repo_page_has_visibility_options(client: AsyncClient) -> None:
     """The wizard page has Public/Private visibility toggle."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     assert "Public" in resp.text
     assert "Private" in resp.text
@@ -110,7 +110,7 @@ async def test_new_repo_page_has_visibility_options(client: AsyncClient) -> None
 @pytest.mark.anyio
 async def test_new_repo_page_has_license_options(client: AsyncClient) -> None:
     """The wizard page includes JS LICENSES constant with the expected license names."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     assert "CC0" in resp.text
     assert "CC BY" in resp.text
@@ -120,7 +120,7 @@ async def test_new_repo_page_has_license_options(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_new_repo_page_has_topics_input(client: AsyncClient) -> None:
     """The wizard page contains the topics tag input container."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     # SSR template uses tag-input-container + Alpine.js x-ref for the chip input
     assert "tag-input-container" in resp.text or "topics-container" in resp.text or "topic" in resp.text.lower()
@@ -129,7 +129,7 @@ async def test_new_repo_page_has_topics_input(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_new_repo_page_has_initialize_checkbox(client: AsyncClient) -> None:
     """The wizard page has the 'Initialize this repository' checkbox."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     assert "f-initialize" in resp.text or "initialize" in resp.text.lower()
 
@@ -137,7 +137,7 @@ async def test_new_repo_page_has_initialize_checkbox(client: AsyncClient) -> Non
 @pytest.mark.anyio
 async def test_new_repo_page_has_branch_input(client: AsyncClient) -> None:
     """The wizard page has the default branch name input."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     assert "f-branch" in resp.text
 
@@ -145,13 +145,13 @@ async def test_new_repo_page_has_branch_input(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_new_repo_page_has_template_search(client: AsyncClient) -> None:
     """The wizard page has the template repository search input."""
-    resp = await client.get("/musehub/ui/new")
+    resp = await client.get("/new")
     assert resp.status_code == 200
     assert "template-search-input" in resp.text or "template" in resp.text.lower()
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/ui/new/check — name availability
+# GET /new/check — name availability
 # ---------------------------------------------------------------------------
 
 
@@ -162,7 +162,7 @@ async def test_check_available_returns_true(
 ) -> None:
     """GET /new/check → available=true when no repo exists with that owner+slug."""
     resp = await client.get(
-        "/musehub/ui/new/check",
+        "/new/check",
         params={"owner": "nobody", "slug": "no-such-repo"},
     )
     assert resp.status_code == 200
@@ -177,7 +177,7 @@ async def test_check_taken_returns_false(
     """GET /new/check → available=false when the owner+slug is already taken."""
     await _seed_repo(db_session, owner="wizowner", slug="existing-repo")
     resp = await client.get(
-        "/musehub/ui/new/check",
+        "/new/check",
         params={"owner": "wizowner", "slug": "existing-repo"},
     )
     assert resp.status_code == 200
@@ -187,20 +187,20 @@ async def test_check_taken_returns_false(
 @pytest.mark.anyio
 async def test_check_requires_owner_and_slug(client: AsyncClient) -> None:
     """GET /new/check without required params returns 422."""
-    resp = await client.get("/musehub/ui/new/check")
+    resp = await client.get("/new/check")
     assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/ui/new — repo creation
+# POST /new — repo creation
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_create_repo_requires_auth(client: AsyncClient) -> None:
-    """POST /musehub/ui/new without Authorization header returns 401 or 403."""
+    """POST /new without Authorization header returns 401 or 403."""
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "test-repo",
             "owner": "someowner",
@@ -216,9 +216,9 @@ async def test_create_repo_success(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """POST /musehub/ui/new with valid body returns 201 and a redirect URL."""
+    """POST /new with valid body returns 201 and a redirect URL."""
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "New Composition",
             "owner": "testowner",
@@ -234,7 +234,7 @@ async def test_create_repo_success(
     assert resp.status_code == 201
     data = resp.json()
     assert "redirect" in data
-    assert "musehub/ui" in data["redirect"]
+    assert "welcome=1" in data["redirect"]
 
 
 @pytest.mark.anyio
@@ -243,11 +243,11 @@ async def test_create_repo_409_on_duplicate(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """POST /musehub/ui/new with a duplicate owner+name returns 409."""
+    """POST /new with a duplicate owner+name returns 409."""
     await _seed_repo(db_session, owner="dupowner", slug="dup-repo")
     # 'dup-repo' is the slug generated from the name 'dup-repo'
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "dup-repo",
             "owner": "dupowner",
@@ -266,7 +266,7 @@ async def test_create_repo_redirect_url_format(
 ) -> None:
     """The redirect URL contains owner/slug path and ?welcome=1 query param."""
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "redirect-test",
             "owner": "urlowner",
@@ -278,7 +278,7 @@ async def test_create_repo_redirect_url_format(
     redirect = resp.json()["redirect"]
     assert "urlowner" in redirect
     assert "welcome=1" in redirect
-    assert redirect.startswith("/musehub/ui/")
+    assert redirect.startswith("/")
 
 
 @pytest.mark.anyio
@@ -289,7 +289,7 @@ async def test_create_repo_private_default(
 ) -> None:
     """POST without specifying visibility defaults to 'private'."""
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "private-default-test",
             "owner": "privowner",
@@ -309,7 +309,7 @@ async def test_create_repo_initializes_repo(
 ) -> None:
     """POST with initialize=true creates the repo successfully."""
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "init-repo-test",
             "owner": "initowner",
@@ -333,7 +333,7 @@ async def test_create_repo_with_license(
 ) -> None:
     """POST with a license value is accepted and reflected in the response."""
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "licensed-repo",
             "owner": "licowner",
@@ -353,7 +353,7 @@ async def test_create_repo_with_topics(
 ) -> None:
     """POST with topics results in a 201 and stores tags on the new repo."""
     resp = await client.post(
-        "/musehub/ui/new",
+        "/new",
         json={
             "name": "topical-repo",
             "owner": "topicowner",

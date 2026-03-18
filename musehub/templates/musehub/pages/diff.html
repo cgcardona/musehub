@@ -2,7 +2,7 @@
 
 {% block title %}Diff {{ commit_id[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
   <a href="{{ base_url }}">{{ repo_slug }}</a> /
   <a href="{{ base_url }}/commits/{{ commit_id }}">{{ commit_id[:8] }}</a> /
   diff
@@ -202,7 +202,7 @@ async function loadCommitAudio(cid) {
       return ['mp3','ogg','wav','flac'].includes(ext);
     });
     if (audioObj) {
-      const url = '/api/v1/musehub/repos/' + repoId + '/objects/' + audioObj.objectId + '/content';
+      const url = '/api/v1/repos/' + repoId + '/objects/' + audioObj.objectId + '/content';
       queueAudio(url, shortSha(cid), repoId);
     } else {
       alert('No audio artifacts found for this commit.');

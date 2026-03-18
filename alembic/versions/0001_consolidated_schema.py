@@ -19,7 +19,7 @@ Creates:
     commit-level annotations e.g. tempo_bpm set via ``muse tempo --set``)
   - muse_tags (music-semantic tags attached to commits)
 
-  Muse Hub — remote collaboration backend
+  MuseHub — remote collaboration backend
   - musehub_repos, musehub_branches, musehub_commits, musehub_issues
   - musehub_issue_milestones (many-to-many join: issues ↔ milestones)
   - musehub_pull_requests (PR workflow; merged_at records exact merge timestamp)
@@ -132,7 +132,7 @@ def upgrade() -> None:
     op.create_index("ix_muse_tags_commit_id", "muse_tags", ["commit_id"])
     op.create_index("ix_muse_tags_tag", "muse_tags", ["tag"])
 
-    # ── Muse Hub — remote collaboration backend ───────────────────────────
+    # ── MuseHub — remote collaboration backend ───────────────────────────
     op.create_table(
         "musehub_repos",
         sa.Column("repo_id", sa.String(36), nullable=False),
@@ -187,7 +187,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_commits_branch", "musehub_commits", ["branch"])
     op.create_index("ix_musehub_commits_timestamp", "musehub_commits", ["timestamp"])
 
-    # ── Muse Hub — milestones ─────────────────────────────────────────────
+    # ── MuseHub — milestones ─────────────────────────────────────────────
     op.create_table(
         "musehub_milestones",
         sa.Column("milestone_id", sa.String(36), nullable=False),
@@ -217,7 +217,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_milestones_number", "musehub_milestones", ["number"])
     op.create_index("ix_musehub_milestones_state", "musehub_milestones", ["state"])
 
-    # ── Muse Hub — issue tracking ─────────────────────────────────────────
+    # ── MuseHub — issue tracking ─────────────────────────────────────────
     op.create_table(
         "musehub_issues",
         sa.Column("issue_id", sa.String(36), nullable=False),
@@ -253,7 +253,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_issues_state", "musehub_issues", ["state"])
     op.create_index("ix_musehub_issues_milestone_id", "musehub_issues", ["milestone_id"])
 
-    # ── Muse Hub — issue comments ─────────────────────────────────────────
+    # ── MuseHub — issue comments ─────────────────────────────────────────
     op.create_table(
         "musehub_issue_comments",
         sa.Column("comment_id", sa.String(36), nullable=False),
@@ -285,7 +285,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_issue_comments_parent_id", "musehub_issue_comments", ["parent_id"])
     op.create_index("ix_musehub_issue_comments_created_at", "musehub_issue_comments", ["created_at"])
 
-    # ── Muse Hub — issue-milestone join table ─────────────────────────────
+    # ── MuseHub — issue-milestone join table ─────────────────────────────
     op.create_table(
         "musehub_issue_milestones",
         sa.Column("issue_id", sa.String(36), nullable=False),
@@ -308,7 +308,7 @@ def upgrade() -> None:
         ["milestone_id"],
     )
 
-    # ── Muse Hub — pull requests ──────────────────────────────────────────
+    # ── MuseHub — pull requests ──────────────────────────────────────────
     op.create_table(
         "musehub_pull_requests",
         sa.Column("pr_id", sa.String(36), nullable=False),
@@ -334,7 +334,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_pull_requests_repo_id", "musehub_pull_requests", ["repo_id"])
     op.create_index("ix_musehub_pull_requests_state", "musehub_pull_requests", ["state"])
 
-    # ── Muse Hub — PR review comments ────────────────────────────────────
+    # ── MuseHub — PR review comments ────────────────────────────────────
     op.create_table(
         "musehub_pr_comments",
         sa.Column("comment_id", sa.String(36), nullable=False),
@@ -362,7 +362,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_pr_comments_parent_comment_id", "musehub_pr_comments", ["parent_comment_id"])
     op.create_index("ix_musehub_pr_comments_created_at", "musehub_pr_comments", ["created_at"])
 
-    # ── Muse Hub — binary artifact storage ───────────────────────────────
+    # ── MuseHub — binary artifact storage ───────────────────────────────
     op.create_table(
         "musehub_objects",
         sa.Column("object_id", sa.String(128), nullable=False),
@@ -381,7 +381,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_musehub_objects_repo_id", "musehub_objects", ["repo_id"])
 
-    # ── Muse Hub — repo starring (explore/discover page) ─────────────────
+    # ── MuseHub — repo starring (explore/discover page) ─────────────────
     op.create_table(
         "musehub_stars",
         sa.Column("star_id", sa.String(36), nullable=False),
@@ -400,7 +400,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_stars_repo_id", "musehub_stars", ["repo_id"])
     op.create_index("ix_musehub_stars_user_id", "musehub_stars", ["user_id"])
 
-    # ── Muse Hub — recording sessions ─────────────────────────────────────
+    # ── MuseHub — recording sessions ─────────────────────────────────────
     op.create_table(
         "musehub_sessions",
         sa.Column("session_id", sa.String(36), nullable=False),
@@ -428,7 +428,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_sessions_started_at", "musehub_sessions", ["started_at"])
     op.create_index("ix_musehub_sessions_is_active", "musehub_sessions", ["is_active"])
 
-    # ── Muse Hub — public user profiles ───────────────────────────────────
+    # ── MuseHub — public user profiles ───────────────────────────────────
     op.create_table(
         "musehub_profiles",
         # PK is the JWT sub claim — same value used in musehub_repos.owner_user_id
@@ -465,7 +465,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_profiles_username", "musehub_profiles", ["username"])
     op.create_index("ix_musehub_profiles_is_verified", "musehub_profiles", ["is_verified"])
 
-    # ── Muse Hub — webhook subscriptions ─────────────────────────────────
+    # ── MuseHub — webhook subscriptions ─────────────────────────────────
     op.create_table(
         "musehub_webhooks",
         sa.Column("webhook_id", sa.String(36), nullable=False),
@@ -518,7 +518,7 @@ def upgrade() -> None:
         ["event_type"],
     )
 
-    # ── Muse Hub — releases ───────────────────────────────────────────────
+    # ── MuseHub — releases ───────────────────────────────────────────────
     op.create_table(
         "musehub_releases",
         sa.Column("release_id", sa.String(36), nullable=False),
@@ -545,7 +545,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_releases_repo_id", "musehub_releases", ["repo_id"])
     op.create_index("ix_musehub_releases_tag", "musehub_releases", ["tag"])
 
-    # ── Muse Hub — release assets ─────────────────────────────────────────
+    # ── MuseHub — release assets ─────────────────────────────────────────
     op.create_table(
         "musehub_release_assets",
         sa.Column("asset_id", sa.String(36), nullable=False),
@@ -575,7 +575,7 @@ def upgrade() -> None:
         "ix_musehub_release_assets_repo_id", "musehub_release_assets", ["repo_id"]
     )
 
-    # ── Muse Hub — social layer ────────────────────────────────────────────
+    # ── MuseHub — social layer ────────────────────────────────────────────
     op.create_table(
         "musehub_comments",
         sa.Column("comment_id", sa.String(36), nullable=False),
@@ -696,7 +696,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_download_events_repo_id", "musehub_download_events", ["repo_id"])
     op.create_index("ix_musehub_download_events_created_at", "musehub_download_events", ["created_at"])
 
-    # ── Muse Hub — render pipeline ─────────────────────────────────────────
+    # ── MuseHub — render pipeline ─────────────────────────────────────────
     op.create_table(
         "musehub_render_jobs",
         sa.Column("render_job_id", sa.String(36), nullable=False),
@@ -727,7 +727,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_render_jobs_commit_id", "musehub_render_jobs", ["commit_id"])
     op.create_index("ix_musehub_render_jobs_status", "musehub_render_jobs", ["status"])
 
-    # ── Muse Hub — activity event stream ──────────────────────────────────
+    # ── MuseHub — activity event stream ──────────────────────────────────
     op.create_table(
         "musehub_events",
         sa.Column("event_id", sa.String(36), nullable=False),
@@ -749,7 +749,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_events_event_type", "musehub_events", ["event_type"])
     op.create_index("ix_musehub_events_created_at", "musehub_events", ["created_at"])
 
-    # ── Muse Hub — labels ─────────────────────────────────────────────────
+    # ── MuseHub — labels ─────────────────────────────────────────────────
     op.create_table(
         "musehub_labels",
         sa.Column("id", sa.String(36), nullable=False),
@@ -789,7 +789,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_musehub_pr_labels_label_id", "musehub_pr_labels", ["label_id"])
 
-    # ── Muse Hub — collaborators ──────────────────────────────────────────
+    # ── MuseHub — collaborators ──────────────────────────────────────────
     op.create_table(
         "musehub_collaborators",
         sa.Column("id", sa.String(36), nullable=False),
@@ -813,7 +813,7 @@ def upgrade() -> None:
     op.create_index("ix_musehub_collaborators_repo_id", "musehub_collaborators", ["repo_id"])
     op.create_index("ix_musehub_collaborators_user_id", "musehub_collaborators", ["user_id"])
 
-    # ── Muse Hub — stash ──────────────────────────────────────────────────
+    # ── MuseHub — stash ──────────────────────────────────────────────────
     op.create_table(
         "musehub_stash",
         sa.Column("id", sa.String(36), nullable=False),
@@ -848,7 +848,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_musehub_stash_entries_stash_id", "musehub_stash_entries", ["stash_id"])
 
-    # ── Muse Hub — PR reviews ─────────────────────────────────────────────
+    # ── MuseHub — PR reviews ─────────────────────────────────────────────
     op.create_table(
         "musehub_pr_reviews",
         sa.Column("id", sa.String(36), nullable=False),

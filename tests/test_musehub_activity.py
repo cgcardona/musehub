@@ -1,11 +1,11 @@
 """Tests for the MuseHub activity feed — .
 
 Covers:
-- GET /musehub/repos/{repo_id}/activity returns empty feed on new repo
+- GET /repos/{repo_id}/activity returns empty feed on new repo
 - record_event appends events visible via list_events
 - event_type filter works correctly
 - pagination works correctly (page, page_size)
-- GET /musehub/ui/{owner}/{repo_slug}/activity returns 200 HTML
+- GET /{owner}/{repo_slug}/activity returns 200 HTML
 - 404 for unknown repo on UI route
 """
 from __future__ import annotations
@@ -159,9 +159,9 @@ async def test_get_activity_empty_public_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/repos/{repo_id}/activity returns empty feed for new public repo."""
+    """GET /repos/{repo_id}/activity returns empty feed for new public repo."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "activity-test", "owner": "testuser", "visibility": "public"},
         headers=auth_headers,
     )
@@ -169,7 +169,7 @@ async def test_get_activity_empty_public_repo(
     repo_id = response.json()["repoId"]
 
     activity_response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/activity",
+        f"/api/v1/repos/{repo_id}/activity",
     )
     assert activity_response.status_code == 200
     body = activity_response.json()
@@ -184,8 +184,8 @@ async def test_get_activity_unknown_repo_404(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/repos/{repo_id}/activity returns 404 for unknown repo."""
-    response = await client.get("/api/v1/musehub/repos/nonexistent-id/activity")
+    """GET /repos/{repo_id}/activity returns 404 for unknown repo."""
+    response = await client.get("/api/v1/repos/nonexistent-id/activity")
     assert response.status_code == 404
 
 
@@ -197,7 +197,7 @@ async def test_get_activity_event_type_filter_via_api(
 ) -> None:
     """event_type query param filters events correctly via the HTTP API."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "filter-test", "owner": "testuser2", "visibility": "public"},
         headers=auth_headers,
     )
@@ -216,7 +216,7 @@ async def test_get_activity_event_type_filter_via_api(
     await db_session.commit()
 
     r = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/activity?event_type=commit_pushed",
+        f"/api/v1/repos/{repo_id}/activity?event_type=commit_pushed",
     )
     assert r.status_code == 200
     body = r.json()
@@ -235,13 +235,13 @@ async def test_activity_ui_page_returns_html(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/activity returns 200 HTML."""
+    """GET /{owner}/{slug}/activity returns 200 HTML."""
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "ui-activity", "owner": "uiuser", "visibility": "public"},
         headers=auth_headers,
     )
-    response = await client.get("/musehub/ui/uiuser/ui-activity/activity")
+    response = await client.get("/uiuser/ui-activity/activity")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert b"Activity" in response.content
@@ -249,6 +249,6 @@ async def test_activity_ui_page_returns_html(
 
 @pytest.mark.anyio
 async def test_activity_ui_page_unknown_repo_404(client: AsyncClient) -> None:
-    """GET /musehub/ui/{owner}/{slug}/activity returns 404 for unknown repo."""
-    response = await client.get("/musehub/ui/nobody/no-repo/activity")
+    """GET /{owner}/{slug}/activity returns 404 for unknown repo."""
+    response = await client.get("/nobody/no-repo/activity")
     assert response.status_code == 404

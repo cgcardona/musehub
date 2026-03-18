@@ -3,8 +3,8 @@
 {% block title %}{{ owner }}/{{ repo_slug }} — {{ filename }}{% endblock %}
 
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}/tree/{{ ref }}">{{ ref[:8] }}</a>
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}/tree/{{ ref }}">{{ ref[:8] }}</a>
   {% if file_path %}
     {% set segments = file_path.split('/') %}
     {% set ns = namespace(accumulated='') %}
@@ -14,113 +14,13 @@
       {% else %}
         {% set ns.accumulated = seg %}
       {% endif %}
-      / <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}/tree/{{ ref }}/{{ ns.accumulated }}">{{ seg }}</a>
+      / <a href="/{{ owner }}/{{ repo_slug }}/tree/{{ ref }}/{{ ns.accumulated }}">{{ seg }}</a>
     {% endfor %}
     / {{ filename }}
   {% endif %}
 {% endblock %}
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-/* ── Blob header ─────────────────────────────────────────────────────── */
-.blob-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px;
-  background: #161b22; border: 1px solid #30363d; border-radius: 8px 8px 0 0;
-  border-bottom: none; margin-top: 8px; gap: 12px; flex-wrap: wrap;
-}
-.blob-filename {
-  font-size: 14px; font-weight: 600; color: #c9d1d9;
-  display: flex; align-items: center; gap: 8px;
-}
-.blob-meta {
-  font-size: 12px; color: #8b949e; display: flex; gap: 16px; flex-wrap: wrap;
-}
-.blob-meta span { display: flex; align-items: center; gap: 4px; }
-.blob-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.btn-blob {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 14px; border-radius: 6px; font-size: 13px;
-  text-decoration: none; font-weight: 500; border: 1px solid transparent;
-  cursor: pointer;
-}
-.btn-blob-primary {
-  background: #238636; border-color: #2ea043; color: #ffffff;
-}
-.btn-blob-primary:hover { background: #2ea043; }
-.btn-blob-secondary {
-  background: #21262d; border-color: #30363d; color: #c9d1d9;
-}
-.btn-blob-secondary:hover { background: #30363d; }
-
-/* ── Blob body ───────────────────────────────────────────────────────── */
-.blob-body {
-  background: #0d1117; border: 1px solid #30363d; border-radius: 0 0 8px 8px;
-  min-height: 120px; overflow: hidden;
-}
-.blob-loading { padding: 40px; text-align: center; color: #8b949e; font-size: 14px; }
-.blob-error { padding: 24px; color: #f85149; font-size: 14px; }
-
-/* ── MIDI / piano-roll placeholder ──────────────────────────────────── */
-.blob-midi-banner {
-  padding: 48px 24px; text-align: center; background: #0d1117;
-}
-.blob-midi-icon { font-size: 64px; margin-bottom: 16px; display: block; }
-.blob-midi-title { font-size: 20px; font-weight: 600; color: #c9d1d9; margin-bottom: 8px; }
-.blob-midi-sub { font-size: 14px; color: #8b949e; margin-bottom: 24px; }
-
-/* ── Audio player ─────────────────────────────────────────────────────── */
-.blob-audio-wrap {
-  padding: 40px 24px; text-align: center; background: #0d1117;
-}
-.blob-audio-icon { font-size: 48px; margin-bottom: 16px; display: block; }
-.blob-audio-player {
-  width: 100%; max-width: 560px; margin: 16px auto 0;
-  display: block; accent-color: #58a6ff;
-}
-
-/* ── JSON / XML viewer ─────────────────────────────────────────────────── */
-.blob-code-wrap {
-  overflow: auto; max-height: 680px; border-radius: 0 0 8px 8px;
-}
-.blob-code {
-  margin: 0; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px; line-height: 1.6; color: #c9d1d9;
-  white-space: pre-wrap; word-break: break-word;
-  background: #0d1117; tab-size: 2;
-}
-.blob-code .json-key { color: #79c0ff; }
-.blob-code .json-str { color: #a5d6ff; }
-.blob-code .json-num { color: #f2cc60; }
-.blob-code .json-bool { color: #ff7b72; }
-.blob-code .json-null { color: #8b949e; }
-
-/* ── Image viewer ───────────────────────────────────────────────────────── */
-.blob-img-wrap {
-  padding: 24px; display: flex; justify-content: center; align-items: center;
-  background: repeating-conic-gradient(#161b22 0% 25%, #0d1117 0% 50%) 0 0 / 20px 20px;
-  min-height: 200px; border-radius: 0 0 8px 8px;
-}
-.blob-img { max-width: 100%; max-height: 640px; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.6); }
-
-/* ── Hex dump / binary ─────────────────────────────────────────────────── */
-.blob-hex-wrap { overflow: auto; max-height: 400px; }
-.blob-hex {
-  margin: 0; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px; line-height: 1.7; color: #8b949e;
-  background: #0d1117; white-space: pre;
-}
-.blob-hex .hex-offset { color: #6e7681; margin-right: 12px; }
-.blob-hex .hex-bytes { color: #c9d1d9; margin-right: 12px; }
-.blob-hex .hex-ascii { color: #8b949e; }
-.blob-binary-notice {
-  padding: 24px; text-align: center; color: #8b949e; font-size: 14px;
-  border-top: 1px solid #21262d;
-}
-</style>
-{% endblock %}
 
 {# ── SSR content block ─────────────────────────────────────────────────────── #}
 {# Renders file header and content server-side so the page is useful without JS.
@@ -206,7 +106,7 @@ const filename = {{ filename | tojson }};
 const owner    = {{ owner | tojson }};
 const repoSlug = {{ repo_slug | tojson }};
 const base     = {{ base_url | tojson }};
-const apiBase  = '/api/v1/musehub/repos/' + repoId;
+const apiBase  = '/api/v1/repos/' + repoId;
 // SSR guard: JS skips the API fetch if server already rendered the blob.
 const ssrBlobRendered = {{ 'true' if blob_found else 'false' }};
 {% endblock %}
