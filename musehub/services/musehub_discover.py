@@ -38,7 +38,7 @@ from musehub.models.musehub import (
 
 logger = logging.getLogger(__name__)
 
-SortField = Literal["stars", "activity", "commits", "created"]
+SortField = Literal["stars", "activity", "commits", "created", "trending"]
 
 _PAGE_SIZE_MAX = 100
 
@@ -171,7 +171,16 @@ async def list_public_repos(
         base_q = base_q.order_by(desc("latest_commit"), desc(db.MusehubRepo.created_at))
     elif sort == "commits":
         base_q = base_q.order_by(desc("commit_count"), desc(db.MusehubRepo.created_at))
-    else: # "created"
+    elif sort == "trending":
+        # Composite score: stars carry more weight than raw commit volume,
+        # so a repo with 10 stars + 5 commits outranks one with 0 stars + 100 commits.
+        # star_count_col and commit_count_col are already in the grouped SELECT.
+        base_q = base_q.order_by(
+            desc(star_count_col * 3 + commit_count_col),
+            desc("latest_commit"),
+            desc(db.MusehubRepo.created_at),
+        )
+    else:  # "created"
         base_q = base_q.order_by(desc(db.MusehubRepo.created_at))
 
     rows = (await session.execute(base_q.offset(offset).limit(page_size))).all()

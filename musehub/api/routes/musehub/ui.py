@@ -361,7 +361,7 @@ async def explore_page(
         "stars": "stars",
         "updated": "activity",
         "forks": "commits",
-        "trending": "stars",
+        "trending": "trending",
     }
     effective_sort: musehub_discover.SortField = _sort_map.get(sort, "stars")
 
