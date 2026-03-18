@@ -1883,6 +1883,8 @@ async def divergence_page(  # noqa: C901 (complex but self-contained)
     total_commits: int = len(commits_list)
     total_branches: int = len(branches_list)
     branch_names: list[str] = [b.name for b in branches_list]
+    # Which branches actually have commits — used to disable empty branches in UI
+    branches_with_commits: set[str] = {c.branch for c in commits_list}
     _DEFAULT_NAMES = ("main", "master", "dev", "develop")
     default_branch: str = next(
         (n for n in _DEFAULT_NAMES if n in branch_names),
@@ -2021,6 +2023,7 @@ async def divergence_page(  # noqa: C901 (complex but self-contained)
         "current_page": "analysis",
         # Branches
         "branch_names": branch_names,
+        "branches_with_commits": branches_with_commits,
         "default_branch": default_branch,
         "initial_branch_b": initial_branch_b,
         "total_branches": total_branches,

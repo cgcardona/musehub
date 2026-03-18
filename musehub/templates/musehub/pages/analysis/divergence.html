@@ -261,13 +261,23 @@ window.__analysisCfg = {
         <span class="an-branch-lbl">Compare</span>
         <select id="an-branch-a" class="an-branch-select">
           {% for b in branch_names %}
-          <option value="{{ b }}" {% if b == default_branch %}selected{% endif %}>{{ b }}</option>
+          {% set empty = b not in branches_with_commits %}
+          <option value="{{ b }}"
+                  {% if b == default_branch %}selected{% endif %}
+                  {% if empty %}data-no-commits="true"{% endif %}>
+            {{ b }}{% if empty %} (empty){% endif %}
+          </option>
           {% endfor %}
         </select>
         <span class="an-branch-vs">vs</span>
         <select id="an-branch-b" class="an-branch-select">
           {% for b in branch_names %}
-          <option value="{{ b }}" {% if b == initial_branch_b %}selected{% endif %}>{{ b }}</option>
+          {% set empty = b not in branches_with_commits %}
+          <option value="{{ b }}"
+                  {% if b == initial_branch_b %}selected{% endif %}
+                  {% if empty %}data-no-commits="true"{% endif %}>
+            {{ b }}{% if empty %} (empty){% endif %}
+          </option>
           {% endfor %}
         </select>
         <button id="an-compare-btn" class="an-compare-btn">Compare</button>

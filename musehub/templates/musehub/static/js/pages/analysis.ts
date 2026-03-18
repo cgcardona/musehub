@@ -231,20 +231,44 @@ export function initAnalysis(): void {
   const selA = document.getElementById('an-branch-a') as HTMLSelectElement | null;
   const selB = document.getElementById('an-branch-b') as HTMLSelectElement | null;
 
+  // Returns true when the currently-selected option has commits (no data-no-commits attr).
+  const branchHasCommits = (sel: HTMLSelectElement | null): boolean => {
+    if (!sel) return true;
+    const opt = sel.options[sel.selectedIndex] as HTMLOptionElement | undefined;
+    return opt?.dataset.noCommits !== 'true';
+  };
+
   const doCompare = () => {
     const bA = selA?.value;
     const bB = selB?.value;
-    if (bA && bB) void loadDivergence(bA, bB);
+    if (!bA || !bB) return;
+
+    // Pre-validate client-side — avoids a guaranteed 422 and keeps the console clean.
+    const aOk = branchHasCommits(selA);
+    const bOk = branchHasCommits(selB);
+    if (!aOk || !bOk) {
+      const emptyBranch = escHtml(!aOk ? bA : bB);
+      const cardsEl = document.getElementById('an-dim-cards');
+      if (cardsEl) {
+        cardsEl.innerHTML = `
+          <div class="an-loading-sm" style="text-align:left;padding:16px">
+            Branch <strong>${emptyBranch}</strong> has no commits yet —
+            push at least one commit to that branch to enable divergence analysis.
+          </div>`;
+      }
+      return;
+    }
+
+    void loadDivergence(bA, bB);
   };
 
-  // Attach event listeners via JS — no inline onchange/onclick on the HTML
-  // elements. This prevents Chrome's autofill extension from firing change
-  // events before our handler is ready and accidentally triggering API calls.
+  // Attach listeners via JS — never inline onchange in the HTML.
+  // This prevents Chrome's autofill extension from triggering API calls
+  // by programmatically firing change events on select elements.
   selA?.addEventListener('change', doCompare);
   selB?.addEventListener('change', doCompare);
   document.getElementById('an-compare-btn')?.addEventListener('click', doCompare);
 
-  // Keep window.onBranchChange as a no-op fallback (template may reference it)
   window.onBranchChange = doCompare;
 }
 
