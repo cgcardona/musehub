@@ -14,15 +14,258 @@
  */
 
 /* =========================================================================
-   Activity page
+   Activity page  (.av-* prefix + legacy .activity-* kept for other templates)
    ========================================================================= */
-.activity-row {
+
+/* ── Stats bar ─────────────────────────────────────────────────────────── */
+.av-stats-bar {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-overlay);
   border-bottom: 1px solid var(--border-default);
 }
+.av-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.av-stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.av-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.av-stats-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--border-default);
+}
+
+/* ── Filter pills ──────────────────────────────────────────────────────── */
+.av-filter-bar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-default);
+  flex-wrap: wrap;
+  background: var(--bg-surface);
+}
+.av-filter-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-right: var(--space-1);
+  white-space: nowrap;
+}
+.av-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  &:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  &.av-pill--active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--bg-base);
+    font-weight: var(--font-weight-semibold);
+  }
+}
+.av-pill-count {
+  font-size: 0.65rem;
+  opacity: 0.75;
+  font-family: var(--font-mono);
+}
+
+/* ── Event type icon badges ────────────────────────────────────────────── */
+.av-icon-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+  // per event type
+  &.av-type-commit_pushed    { background: rgba(88,166,255,0.15);  }
+  &.av-type-pr_opened        { background: rgba(63,185,80,0.15);   }
+  &.av-type-pr_merged        { background: rgba(163,113,247,0.15); }
+  &.av-type-pr_closed        { background: rgba(248,81,73,0.12);   }
+  &.av-type-issue_opened     { background: rgba(240,136,62,0.15);  }
+  &.av-type-issue_closed     { background: rgba(63,185,80,0.12);   }
+  &.av-type-branch_created   { background: rgba(88,166,255,0.12);  }
+  &.av-type-branch_deleted   { background: rgba(248,81,73,0.10);   }
+  &.av-type-tag_pushed       { background: rgba(240,136,62,0.12);  }
+  &.av-type-session_started  { background: rgba(63,185,80,0.15);   }
+  &.av-type-session_ended    { background: rgba(139,148,158,0.15); }
+}
+
+/* ── Actor avatar ──────────────────────────────────────────────────────── */
+.av-actor-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--bg-base);
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* ── Date group header ─────────────────────────────────────────────────── */
+.av-date-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-default);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.av-date-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-default);
+}
+
+/* ── Timeline row ──────────────────────────────────────────────────────── */
+.av-row {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-default);
+  transition: background 0.1s;
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--bg-overlay); }
+}
+.av-row-icon-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+}
+.av-row-connector {
+  width: 2px;
+  flex: 1;
+  background: var(--border-default);
+  margin-top: var(--space-2);
+  border-radius: 1px;
+  min-height: 12px;
+}
+.av-row-body {
+  min-width: 0;
+  padding-bottom: var(--space-1);
+}
+.av-row-title {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+  line-height: 1.4;
+  a { color: var(--text-primary); text-decoration: none; &:hover { color: var(--color-accent); } }
+}
+.av-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+.av-actor-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  &:hover { text-decoration: underline; }
+}
+
+/* ── Metadata chips ────────────────────────────────────────────────────── */
+.av-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+  background: var(--bg-overlay);
+  white-space: nowrap;
+  &.av-chip-commit  { color: var(--color-accent); border-color: rgba(88,166,255,0.3); }
+  &.av-chip-branch  { color: var(--text-secondary); }
+  &.av-chip-pr      { color: var(--dim-harmonic); border-color: rgba(163,113,247,0.3); }
+  &.av-chip-tag     { color: var(--color-warning); border-color: rgba(240,136,62,0.3); }
+  &.av-chip-session { color: var(--color-success); border-color: rgba(63,185,80,0.3); }
+}
+
+/* ── Event type label badge ────────────────────────────────────────────── */
+.av-type-label {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Entrance animation ────────────────────────────────────────────────── */
+@keyframes av-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.av-row--hidden       { opacity: 0; }
+.av-row--visible      { animation: av-fade-in 0.25s ease both; }
+
+/* ── Empty + pagination ────────────────────────────────────────────────── */
+.av-empty {
+  text-align: center;
+  padding: var(--space-8) var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Legacy aliases (keep for other templates that may reference them) ── */
+.activity-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border-default); }
 .activity-row:last-child { border-bottom: none; }
 .activity-icon { font-size: 20px; flex-shrink: 0; width: 28px; text-align: center; margin-top: 2px; }
 .activity-body { flex: 1; min-width: 0; }
@@ -32,13 +275,7 @@
 .activity-meta { font-size: 12px; color: var(--text-muted); }
 .activity-actor { color: var(--color-accent); text-decoration: none; font-weight: 600; }
 .activity-actor:hover { text-decoration: underline; }
-.activity-type-badge {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 11px;
-}
+.activity-type-badge { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 4px; padding: 1px 5px; font-size: 11px; }
 
 /* =========================================================================
    Arrange page  (.ar-* prefix)

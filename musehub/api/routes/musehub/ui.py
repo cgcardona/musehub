@@ -4083,37 +4083,111 @@ async def activity_page(
     per_page: int = Query(30, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the repo-level activity feed page with full SSR and HTMX fragment support.
+    """Render the repo-level activity feed with a rich, date-grouped timeline.
 
-    Fetches events server-side and renders them directly, eliminating the
-    client-side JS fetch loop.  HTMX filter and pagination requests receive
-    only the ``activity_rows.html`` fragment; direct browser navigation receives
-    the full page extending ``base.html``.
+    Pre-fetches events, per-type counts, unique actor count, and date range in
+    parallel.  Groups events by calendar date for the template.  HTMX fragment
+    requests receive only the ``activity_rows.html`` fragment (event list +
+    filter pills + pagination); direct browser nav gets the full page.
 
     No JWT required — activity data is publicly readable.
     """
+    from datetime import date as _date, timedelta as _td
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    feed = await musehub_events.list_events(
-        db,
-        repo_id,
-        event_type=event_type or None,
-        page=page,
-        page_size=per_page,
+
+    # ── Parallel queries ────────────────────────────────────────────────────
+    async def _q_feed() -> Any:
+        return await musehub_events.list_events(
+            db, repo_id,
+            event_type=event_type or None,
+            page=page,
+            page_size=per_page,
+        )
+
+    async def _q_type_counts() -> dict[str, int]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubEvent.event_type,
+                func.count().label("cnt"),
+            ).where(musehub_db.MusehubEvent.repo_id == repo_id)
+            .group_by(musehub_db.MusehubEvent.event_type)
+        )).all()
+        return {r.event_type: r.cnt for r in rows}
+
+    async def _q_unique_actors() -> int:
+        return await db.scalar(
+            sa_select(func.count(musehub_db.MusehubEvent.actor.distinct()))
+            .where(musehub_db.MusehubEvent.repo_id == repo_id)
+        ) or 0
+
+    async def _q_date_range() -> tuple[Any, Any]:
+        row = (await db.execute(
+            sa_select(
+                func.min(musehub_db.MusehubEvent.created_at),
+                func.max(musehub_db.MusehubEvent.created_at),
+            ).where(musehub_db.MusehubEvent.repo_id == repo_id)
+        )).first()
+        return (row[0] if row else None, row[1] if row else None)
+
+    feed, type_counts, unique_actors, (first_event_at, last_event_at) = await asyncio.gather(
+        _q_feed(), _q_type_counts(), _q_unique_actors(), _q_date_range(),
     )
+
+    # ── Group events by calendar date ───────────────────────────────────────
+    today     = _date.today()
+    yesterday = today - _td(days=1)
+
+    def _date_label(dt: Any) -> str:
+        d = dt.date() if hasattr(dt, "date") else dt
+        if d == today:
+            return "Today"
+        if d == yesterday:
+            return "Yesterday"
+        return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+    event_groups: list[dict[str, Any]] = []
+    current_label: str | None = None
+    current_group: dict[str, Any] = {}
+    for ev in feed.events:
+        lbl = _date_label(ev.created_at)
+        if lbl != current_label:
+            current_label = lbl
+            current_group = {"label": lbl, "events": []}
+            event_groups.append(current_group)
+        current_group["events"].append(ev)
+
     total_pages = max(1, (feed.total + per_page - 1) // per_page)
-    ctx: dict[str, object] = {
+
+    # Build per-type pill data sorted by count desc
+    type_pills: list[dict[str, Any]] = [
+        {"type": t, "count": type_counts.get(t, 0)}
+        for t in sorted(musehub_events.KNOWN_EVENT_TYPES, key=lambda x: type_counts.get(x, 0), reverse=True)
+    ]
+    total_all = sum(type_counts.values())
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "activity",
+        # Feed
         "events": feed.events,
+        "event_groups": event_groups,
         "total": feed.total,
+        "total_all": total_all,
         "page": page,
         "per_page": per_page,
         "total_pages": total_pages,
+        # Filters
         "event_type": event_type or "",
         "event_types": sorted(musehub_events.KNOWN_EVENT_TYPES),
+        "type_pills": type_pills,
+        # Stats
+        "unique_actors": unique_actors,
+        "first_event_at": first_event_at,
+        "last_event_at": last_event_at,
     }
     ctx.update(nav_ctx)
     return await htmx_fragment_or_full(

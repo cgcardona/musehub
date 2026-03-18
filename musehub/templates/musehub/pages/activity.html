@@ -1,38 +1,61 @@
 {% extends "musehub/base.html" %}
 {% from "musehub/macros/pagination.html" import pagination %}
 
-{% block title %}Activity — {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block title %}Activity · {{ owner }}/{{ repo_slug }}{% endblock %}
+
 {% block breadcrumb %}
   <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / activity
 {% endblock %}
+
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block content %}
-<div class="card" style="padding:0">
-  <div class="card-header" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 20px">
-    <h1 style="margin:0;font-size:18px">Activity</h1>
-    <span class="text-muted" style="font-size:13px">{{ total }} event{{ 's' if total != 1 else '' }}</span>
+{% block page_json %}{"page": "activity"}{% endblock %}
 
-    <form method="get"
-          hx-get="{{ base_url }}/activity"
-          hx-target="#activity-rows"
-          hx-push-url="true"
-          style="margin-left:auto">
-      <select name="event_type" class="filter-select" onchange="this.form.requestSubmit()">
-        <option value="">All events</option>
-        {% for et in event_types %}
-          <option value="{{ et }}" {% if et == event_type %}selected{% endif %}>{{ et | replace('_', ' ') | title }}</option>
-        {% endfor %}
-      </select>
-      {% if event_type %}
-        <a href="{{ base_url }}/activity" class="btn btn-ghost btn-sm" style="margin-left:4px">Clear</a>
-      {% endif %}
-    </form>
+{% block page_data %}
+window.__activityCfg = {
+  base: {{ base_url | tojson }},
+};
+{% endblock %}
+
+{% block content %}
+<div class="content-wide" style="padding:0; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; margin-top:var(--space-4)">
+
+  {# ── Stats bar ──────────────────────────────────────────────────────── #}
+  <div class="av-stats-bar">
+    <div class="av-stat">
+      <span class="av-stat-value">{{ total_all }}</span>
+      <span class="av-stat-label">Total events</span>
+    </div>
+    <div class="av-stats-sep"></div>
+    <div class="av-stat">
+      <span class="av-stat-value">{{ unique_actors }}</span>
+      <span class="av-stat-label">Contributors</span>
+    </div>
+    <div class="av-stats-sep"></div>
+    <div class="av-stat">
+      <span class="av-stat-value">{{ event_types | length }}</span>
+      <span class="av-stat-label">Event types</span>
+    </div>
+    {%- if first_event_at %}
+    <div class="av-stats-sep"></div>
+    <div class="av-stat">
+      <span class="av-stat-value" style="font-size:var(--font-size-sm)">{{ first_event_at | fmtdate }}</span>
+      <span class="av-stat-label">First event</span>
+    </div>
+    {%- endif %}
+    {%- if last_event_at %}
+    <div class="av-stats-sep"></div>
+    <div class="av-stat">
+      <span class="av-stat-value" style="font-size:var(--font-size-sm)">{{ last_event_at | fmtdate }}</span>
+      <span class="av-stat-label">Latest event</span>
+    </div>
+    {%- endif %}
   </div>
 
-  <div id="activity-rows" style="padding:0 20px 20px">
+  {# ── Main feed (HTMX target — includes filter pills + rows) ─────────── #}
+  <div id="av-feed">
     {% include "musehub/fragments/activity_rows.html" %}
   </div>
-</div>
 
+</div>
 {% endblock %}
