@@ -73,11 +73,18 @@
 
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="/static/app.js"></script>
-  {# page_data: backward-compatible JS variable injection for templates not yet on TypeScript modules #}
-  <script>{% block page_data %}{% endblock %}</script>
   {# page_json: JSON data bridge for new TypeScript page modules (read by musehub.ts dispatchPageModule) #}
   <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>
-  {# page_script: legacy inline scripts; prefer page modules via page_json instead #}
-  <script>{% block page_script %}{% endblock %}</script>
+  {#
+    page_data + page_script are combined in a single IIFE so that `const`/`let`
+    declarations are scoped to each navigation and cannot cause
+    "Identifier X has already been declared" SyntaxErrors on HTMX re-navigation.
+    Functions that must be reachable from HTML onclick="" handlers must be
+    explicitly assigned to window (e.g. window.myFn = function() {...}).
+  #}
+  <script>(function () {
+{% block page_data %}{% endblock %}
+{% block page_script %}{% endblock %}
+  })();</script>
 </body>
 </html>

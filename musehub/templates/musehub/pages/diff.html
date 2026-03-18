@@ -193,7 +193,7 @@ async function load() {
   }
 }
 
-async function loadCommitAudio(cid) {
+window.loadCommitAudio = async function(cid) {
   try {
     const data = await apiFetch('/repos/' + repoId + '/objects');
     const objects = data.objects || [];
@@ -210,7 +210,7 @@ async function loadCommitAudio(cid) {
   } catch(e) { alert('Could not load audio: ' + e.message); }
 }
 
-async function loadParentAudio(cid) { await loadCommitAudio(cid); }
+window.loadParentAudio = async function(cid) { await loadCommitAudio(cid); }
 
 load();
 {% endraw %}

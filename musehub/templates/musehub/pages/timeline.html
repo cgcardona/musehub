@@ -270,7 +270,7 @@ function showTip(evt, html) {
 }
 function hideTip() { tip.style.display = 'none'; }
 
-function openAudioModal(commitId, sha) {
+window.openAudioModal = function(commitId, sha) {
   const existing = document.getElementById('audio-modal');
   if (existing) existing.remove();
   const modal = document.createElement('div');
@@ -315,7 +315,7 @@ function toggleLayer(name, checked) {
   renderTimeline();
 }
 
-function setZoom(z) {
+window.setZoom = function(z) {
   zoom = z;
   document.querySelectorAll('.zoom-btn').forEach(b => {
     b.style.background = b.dataset.zoom === z ? '#1f6feb' : '#21262d';

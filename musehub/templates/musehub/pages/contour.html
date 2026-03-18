@@ -72,7 +72,7 @@ function tessituraBar(pitchCurve) {
     </div>`;
 }
 
-async function load(track) {
+window.load = async function load(track) {
   initRepoNav(repoId);
   try {
     let url = '/repos/' + repoId + '/analysis/' + encodeURIComponent(ref) + '/contour';

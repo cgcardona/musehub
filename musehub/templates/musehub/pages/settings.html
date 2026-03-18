@@ -349,7 +349,7 @@ function onTopicKey(e) {
 }
 
 // ── Collaborators helpers ─────────────────────────────────────────────────
-async function inviteCollaborator() {
+window.inviteCollaborator = async function() {
   const username = document.getElementById('invite-username').value.trim();
   const role     = document.getElementById('invite-role').value;
   const msgEl    = document.getElementById('invite-msg');

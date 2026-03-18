@@ -405,13 +405,13 @@ const CLONE_URLS = {
 {% endblock %}
 
 {% block page_script %}
-function switchCloneTab(btn, protocol) {
+window.switchCloneTab = function(btn, protocol) {
   document.querySelectorAll('.clone-tab-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   document.getElementById('clone-input').value = CLONE_URLS[protocol] || '';
-}
+};
 
-function copyClone() {
+window.copyClone = function() {
   var input = document.getElementById('clone-input');
   var btn   = document.getElementById('clone-copy-btn');
   navigator.clipboard.writeText(input.value).then(function() {
@@ -420,5 +420,5 @@ function copyClone() {
     btn.classList.add('clone-copy-flash');
     setTimeout(function() { btn.innerHTML = orig; btn.classList.remove('clone-copy-flash'); }, 1800);
   });
-}
+};
 {% endblock %}

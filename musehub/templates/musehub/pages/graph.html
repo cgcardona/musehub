@@ -126,12 +126,16 @@
 {% endblock %}
 
 {% block page_data %}
-const repoId  = {{ repo_id  | tojson }};
-const baseUrl = {{ base_url | tojson }};
+window.__graphCfg = { repoId: {{ repo_id | tojson }}, baseUrl: {{ base_url | tojson }} };
 {% endblock %}
 
 {% block page_script %}
 {% raw %}
+(function() {
+/* ─── Config (passed via window.__graphCfg from page_data) ───────── */
+const repoId  = (window.__graphCfg || {}).repoId  || '';
+const baseUrl = (window.__graphCfg || {}).baseUrl || '';
+
 /* ─── Design constants ────────────────────────────────────────────── */
 const BRANCH_PALETTE = [
   '#58a6ff','#3fb950','#f0883e','#bc8cff',
@@ -513,9 +517,9 @@ function buildSessionMap(sessions) {
   return map;
 }
 
-/* Exposed for control buttons */
-function zoomGraph(f)  { if (window._zoomGraph) window._zoomGraph(f); }
-function resetView()   { if (window._resetView) window._resetView(); }
+/* Exposed for control buttons — must be on window since they're inside an IIFE */
+window.zoomGraph = function(f) { if (window._zoomGraph) window._zoomGraph(f); };
+window.resetView = function()  { if (window._resetView) window._resetView(); };
 
 /* ─── Bootstrap ───────────────────────────────────────────────────── */
 async function load() {
@@ -537,5 +541,6 @@ async function load() {
 }
 
 load();
+})(); // end IIFE — prevents const/let re-declaration errors on HTMX re-navigation
 {% endraw %}
 {% endblock %}
