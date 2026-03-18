@@ -1847,32 +1847,208 @@ async def compare_page(
     "/{owner}/{repo_slug}/divergence",
     summary="MuseHub divergence visualization page",
 )
-async def divergence_page(
+async def divergence_page(  # noqa: C901 (complex but self-contained)
     request: Request,
     owner: str,
     repo_slug: str,
-    fork_repo_id: str | None = Query(None, description="Fork repo UUID to compare against; omit for self-comparison"),
+    fork_repo_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the divergence visualization — fully SSR.
+    """Render the supercharged Musical Analysis page — fully SSR.
 
-    Calls :func:`musehub_analysis.compute_divergence` server-side so the
-    template receives a populated ``divergence_data`` object containing the
-    overall score and per-dimension breakdown with no client fetch required.
-
-    Optional ``?fork_repo_id=<uuid>`` compares against a specific fork.
-    When omitted the comparison is relative to the repo itself (score=0).
+    Computes composition profile, emotion averages, dimension activity,
+    and pre-runs branch divergence between the default branch and its
+    nearest neighbour so the radar chart renders without any client round-trip.
     """
+    import math as _math
+    import asyncio as _asyncio
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    divergence_data = await musehub_analysis.compute_divergence(db, repo_id, fork_repo_id=fork_repo_id)
+
+    # --- Fetch branches and commits in parallel -------------------------
+    async def _get_branches():
+        return await musehub_repository.list_branches(db, repo_id)
+
+    async def _get_commits():
+        r = await db.execute(
+            sa_select(musehub_db.MusehubCommit)
+            .where(musehub_db.MusehubCommit.repo_id == repo_id)
+            .order_by(musehub_db.MusehubCommit.timestamp.desc())
+            .limit(500)
+        )
+        return list(r.scalars())
+
+    branches_list, commits_list = await _asyncio.gather(_get_branches(), _get_commits())
+
+    total_commits: int = len(commits_list)
+    total_branches: int = len(branches_list)
+    branch_names: list[str] = [b.name for b in branches_list]
+    _DEFAULT_NAMES = ("main", "master", "dev", "develop")
+    default_branch: str = next(
+        (n for n in _DEFAULT_NAMES if n in branch_names),
+        branch_names[0] if branch_names else "main",
+    )
+    other_branches = [b for b in branch_names if b != default_branch]
+    initial_branch_b: str = other_branches[0] if other_branches else default_branch
+
+    # --- Section & track breakdowns from commit messages ---------------
+    _SECTION_KW = [
+        "intro", "verse", "chorus", "bridge", "outro", "hook",
+        "pre-chorus", "breakdown", "drop", "refrain", "coda", "interlude",
+    ]
+    _TRACK_KW = [
+        "bass", "drums", "piano", "guitar", "synth", "pad", "lead",
+        "vocals", "strings", "brass", "flute", "cello", "violin",
+        "organ", "arp", "melody", "kick", "snare", "keys",
+    ]
+    section_counts: dict[str, int] = {}
+    track_counts: dict[str, int] = {}
+    for c in commits_list:
+        m = c.message.lower()
+        for kw in _SECTION_KW:
+            if kw in m:
+                section_counts[kw] = section_counts.get(kw, 0) + 1
+        for kw in _TRACK_KW:
+            if kw in m:
+                track_counts[kw] = track_counts.get(kw, 0) + 1
+
+    top_sections: list[tuple[str, int]] = sorted(
+        section_counts.items(), key=lambda x: -x[1]
+    )[:10]
+    top_tracks: list[tuple[str, int]] = sorted(
+        track_counts.items(), key=lambda x: -x[1]
+    )[:12]
+    max_sec = max((c for _, c in top_sections), default=1)
+    max_trk = max((c for _, c in top_tracks), default=1)
+
+    # --- Dimension activity from commit message classification ----------
+    dim_counts: dict[str, int] = {}
+    for c in commits_list:
+        for dim in musehub_divergence.classify_message(c.message):
+            dim_counts[dim] = dim_counts.get(dim, 0) + 1
+    dim_order = ["melodic", "harmonic", "rhythmic", "structural", "dynamic"]
+    max_dim = max(dim_counts.values(), default=1)
+
+    # --- Emotion averages (deterministic SHA derivation) ---------------
+    def _sha_emo(sha: str) -> tuple[float, float, float]:
+        sha = sha.ljust(12, "0")
+        return (
+            int(sha[0:4], 16) / 0xFFFF,
+            int(sha[4:8], 16) / 0xFFFF,
+            int(sha[8:12], 16) / 0xFFFF,
+        )
+
+    if commits_list:
+        emos = [_sha_emo(c.commit_id) for c in commits_list]
+        avg_valence = round(sum(e[0] for e in emos) / len(emos), 3)
+        avg_energy  = round(sum(e[1] for e in emos) / len(emos), 3)
+        avg_tension = round(sum(e[2] for e in emos) / len(emos), 3)
+    else:
+        avg_valence = avg_energy = avg_tension = 0.5
+
+    # --- Pre-compute branch divergence for initial SSR render ----------
+    _ALL_DIMS = ["melodic", "harmonic", "rhythmic", "structural", "dynamic"]
+    initial_divergence = None
+    radar_score_pts: str = ""
+    radar_ring_25: str = ""
+    radar_ring_50: str = ""
+    radar_ring_75: str = ""
+    radar_ring_100: str = ""
+    radar_axes: list[dict] = []
+    radar_dot_pts: list[dict] = []
+
+    def _make_radar(scores: list[float], r: float = 90.0,
+                    cx: float = 120.0, cy: float = 120.0) -> None:
+        nonlocal radar_score_pts, radar_ring_25, radar_ring_50, radar_ring_75, radar_ring_100, radar_axes, radar_dot_pts
+        n = 5
+        angles = [-_math.pi / 2 + (2 * _math.pi / n) * i for i in range(n)]
+
+        def _ring(pct: float) -> str:
+            rr = r * pct
+            return " ".join(f"{cx + rr * _math.cos(a):.1f},{cy + rr * _math.sin(a):.1f}" for a in angles)
+
+        radar_ring_25  = _ring(0.25)
+        radar_ring_50  = _ring(0.50)
+        radar_ring_75  = _ring(0.75)
+        radar_ring_100 = _ring(1.00)
+        radar_score_pts = " ".join(
+            f"{cx + s * r * _math.cos(a):.1f},{cy + s * r * _math.sin(a):.1f}"
+            for s, a in zip(scores, angles)
+        )
+        LABELS = ["Melodic", "Harmonic", "Rhythmic", "Structural", "Dynamic"]
+        radar_axes = []
+        for i, a in enumerate(angles):
+            x2 = cx + r * _math.cos(a)
+            y2 = cy + r * _math.sin(a)
+            tx = cx + r * 1.28 * _math.cos(a)
+            ty = cy + r * 1.28 * _math.sin(a)
+            anch = "middle" if abs(_math.cos(a)) < 0.2 else ("end" if _math.cos(a) < 0 else "start")
+            radar_axes.append({"x2": round(x2, 1), "y2": round(y2, 1),
+                                "tx": round(tx, 1), "ty": round(ty, 1),
+                                "anchor": anch, "label": LABELS[i]})
+        _LEVEL_COLOR = {"NONE": "#6e7681", "LOW": "#58a6ff", "MED": "#e3b341", "HIGH": "#f85149"}
+        radar_dot_pts = [
+            {
+                "x": round(cx + s * r * _math.cos(a), 1),
+                "y": round(cy + s * r * _math.sin(a), 1),
+                "color": _LEVEL_COLOR.get("NONE", "#6e7681"),
+            }
+            for s, a in zip(scores, angles)
+        ]
+
+    if len(branch_names) >= 2:
+        try:
+            result = await musehub_divergence.compute_hub_divergence(
+                db, repo_id, default_branch, initial_branch_b
+            )
+            initial_divergence = result
+            scores = [d.score for d in result.dimensions]
+            _LEVEL_COLOR_MAP = {"NONE": "#6e7681", "LOW": "#58a6ff", "MED": "#e3b341", "HIGH": "#f85149"}
+            _make_radar(scores)
+            # Patch dot colours with actual levels
+            for i, d in enumerate(result.dimensions):
+                radar_dot_pts[i]["color"] = _LEVEL_COLOR_MAP.get(d.level.value, "#6e7681")
+        except Exception:
+            _make_radar([0.0] * 5)
+    else:
+        _make_radar([0.0] * 5)
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "analysis",
-        "fork_repo_id": fork_repo_id or "",
-        "divergence_data": divergence_data,
+        # Branches
+        "branch_names": branch_names,
+        "default_branch": default_branch,
+        "initial_branch_b": initial_branch_b,
+        "total_branches": total_branches,
+        # Commits
+        "total_commits": total_commits,
+        # Composition profile
+        "top_sections": top_sections,
+        "top_tracks": top_tracks,
+        "max_sec": max_sec,
+        "max_trk": max_trk,
+        # Dimension activity
+        "dim_counts": dim_counts,
+        "dim_order": dim_order,
+        "max_dim": max_dim,
+        # Emotion averages
+        "avg_valence": avg_valence,
+        "avg_energy": avg_energy,
+        "avg_tension": avg_tension,
+        # Pre-computed divergence
+        "initial_divergence": initial_divergence,
+        # Radar SVG geometry (pre-computed Python → Jinja2)
+        "radar_score_pts": radar_score_pts,
+        "radar_ring_25": radar_ring_25,
+        "radar_ring_50": radar_ring_50,
+        "radar_ring_75": radar_ring_75,
+        "radar_ring_100": radar_ring_100,
+        "radar_axes": radar_axes,
+        "radar_dot_pts": radar_dot_pts,
     }
     ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/analysis/divergence.html", ctx)
