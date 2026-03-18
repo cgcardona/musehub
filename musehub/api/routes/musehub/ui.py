@@ -365,14 +365,15 @@ async def explore_page(
     }
     effective_sort: musehub_discover.SortField = _sort_map.get(sort, "stars")
 
-    # Fetch repos server-side for SSR grid.
-    genre_filter = topic[0] if topic else None
+    # Fetch repos server-side for SSR grid, passing all active filters.
     explore = await musehub_discover.list_public_repos(
         db,
         sort=effective_sort,
         page=page,
         page_size=per_page,
-        genre=genre_filter,
+        langs=lang or None,
+        topics=topic or None,
+        license=license_filter or None,
     )
     total_pages = max(1, (explore.total + per_page - 1) // per_page)
 

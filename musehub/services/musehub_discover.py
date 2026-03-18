@@ -25,10 +25,11 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from sqlalchemy import Text, desc, func, outerjoin, select
+from sqlalchemy import Text, desc, func, or_, outerjoin, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.db import musehub_models as db
+from musehub.db import muse_cli_models as cli_db
 from musehub.models.musehub import (
     ExploreRepoResult,
     ExploreResponse,
@@ -50,6 +51,9 @@ async def list_public_repos(
     tempo_min: int | None = None,
     tempo_max: int | None = None,
     instrumentation: str | None = None,
+    langs: list[str] | None = None,
+    topics: list[str] | None = None,
+    license: str | None = None,
     sort: SortField = "created",
     page: int = 1,
     page_size: int = 24,
@@ -68,6 +72,11 @@ async def list_public_repos(
         tempo_max: Include only repos with ``tempo_bpm <= tempo_max``.
         instrumentation: Case-insensitive substring match against tags — used to
                          filter by instrument presence (e.g. "bass", "drums").
+        langs: Multi-select language/instrument chips — repo must have at least one
+               matching tag in the muse_tags table (OR across selections).
+        topics: Multi-select topic chips — repo.tags JSON must contain at least one
+                of the selected values (OR across selections).
+        license: Exact match against ``settings['license']`` (e.g. "CC BY").
         sort: One of "stars", "activity", "commits", "created".
         page: 1-based page number.
         page_size: Number of results per page (clamped to _PAGE_SIZE_MAX).
@@ -126,6 +135,30 @@ async def list_public_repos(
         base_q = base_q.where(db.MusehubRepo.tempo_bpm >= tempo_min)
     if tempo_max is not None:
         base_q = base_q.where(db.MusehubRepo.tempo_bpm <= tempo_max)
+
+    # Multi-select language/instrument chips — filter by muse_tags.tag (OR across values).
+    if langs:
+        lang_subq = (
+            select(cli_db.MuseCliTag.repo_id)
+            .where(func.lower(cli_db.MuseCliTag.tag).in_([v.lower() for v in langs]))
+            .distinct()
+            .scalar_subquery()
+        )
+        base_q = base_q.where(db.MusehubRepo.repo_id.in_(lang_subq))
+
+    # Multi-select topic chips — filter on repo.tags JSON (OR across values).
+    if topics:
+        topic_conditions = [
+            func.cast(db.MusehubRepo.tags, Text).ilike(f"%{t.lower()}%")
+            for t in topics
+        ]
+        base_q = base_q.where(or_(*topic_conditions))
+
+    # License filter — matches settings['license'] key in the repo settings JSON.
+    if license:
+        base_q = base_q.where(
+            func.cast(db.MusehubRepo.settings, Text).ilike(f"%{license}%")
+        )
 
     # Count total results before pagination ──────────────────────────────────
     count_q = select(func.count()).select_from(base_q.subquery())
