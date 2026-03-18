@@ -2,6 +2,12 @@
 
 {% block title %}Insights · {{ owner }}/{{ repo_slug }}{% endblock %}
 
+{% block breadcrumb %}
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / insights
+{% endblock %}
+
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
 {% block page_json %}{"page": "insights"}{% endblock %}
 
 {% block page_data %}
@@ -14,10 +20,7 @@ window.__insightsCfg = {
 {% endblock %}
 
 {% block content %}
-{% include "musehub/partials/repo_nav.html" %}
-{% include "musehub/partials/repo_tabs.html" %}
-
-<div class="repo-content-wide">
+<div class="content-wide">
 
   {# ── Stats bar ──────────────────────────────────────────────────────── #}
   <div class="in-stats-bar">
