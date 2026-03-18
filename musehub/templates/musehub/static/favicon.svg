@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Filled eighth note — solid black, transparent background -->
-  <!-- Note head: slightly tilted filled ellipse -->
-  <ellipse cx="11" cy="23" rx="7" ry="5" transform="rotate(-20 11 23)" fill="#111111"/>
-  <!-- Stem: tall thin rectangle -->
-  <rect x="17.5" y="4" width="3" height="20" fill="#111111"/>
-  <!-- Flag: filled curve from top of stem -->
-  <path d="M20.5 4 Q31 9 27 19 Q22 14 20.5 17 Z" fill="#111111"/>
+  <!-- Dark rounded-square background -->
+  <rect width="32" height="32" rx="7" ry="7" fill="#0d1117"/>
+  <!-- White eighth note (♪): note head + stem + flag -->
+  <!-- Note head: rotated filled ellipse approximated as polygon -->
+  <ellipse cx="12" cy="22" rx="6.5" ry="4.5"
+           transform="rotate(-22 12 22)" fill="white"/>
+  <!-- Stem -->
+  <rect x="17.5" y="5" width="2.5" height="17.5" fill="white"/>
+  <!-- Flag: cubic bezier filled stroke -->
+  <path d="M18.7 5 C27 8 25 18 18.7 16.5" fill="none"
+        stroke="white" stroke-width="3" stroke-linecap="round"/>
 </svg>
