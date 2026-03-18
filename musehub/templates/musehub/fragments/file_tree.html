@@ -1,42 +1,68 @@
-{#  fragments/file_tree.html — bare HTMX fragment: repo root file tree.
+{#  fragments/file_tree.html — HTMX fragment: repo root file tree.
 
-    This template is intentionally minimal — no <html>, no <head>, no nav.
-    It is rendered in two contexts:
+    Rendered in two contexts:
+    1. Full-page load: included inline by repo_home.html inside #file-tree.
+    2. HTMX partial swap: returned when HX-Request: true (branch switching).
 
-    1. Full-page load: included inline by musehub/pages/repo_home.html inside
-       the ``<div id="file-tree">`` target container.
-
-    2. HTMX partial swap: returned directly when the handler detects
-       ``HX-Request: true`` (e.g. branch-picker selection), replacing only
-       the ``#file-tree`` container.
-
-    Required context variables
-    --------------------------
-    tree      : list[TreeEntryResponse]  — root-level entries (dirs first, then files)
-    ref       : str                      — current branch name or commit SHA
-    base_url  : str                      — repo base URL, e.g. /owner/slug
+    Required context: tree, ref, base_url
 #}
 {% from "musehub/macros/empty_state.html" import empty_state %}
+
+{# SVG icon helpers — Lucide icon set, color-coded by file type #}
+{% macro folder_icon() %}
+<span class="file-icon file-icon-folder">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+</span>
+{% endmacro %}
+
+{% macro file_icon(name) %}
+{% set ext = name.rsplit('.', 1)[-1].lower() if '.' in name else '' %}
+{% if ext in ['mid', 'midi'] %}
+<span class="file-icon file-icon-midi">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+</span>
+{% elif ext in ['mp3', 'wav', 'ogg', 'flac', 'aiff', 'aif', 'm4a'] %}
+<span class="file-icon file-icon-audio">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+</span>
+{% elif ext in ['abc', 'musicxml', 'mxl', 'xml', 'ly', 'lilypond'] %}
+<span class="file-icon file-icon-score">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+</span>
+{% elif ext in ['json', 'yaml', 'yml', 'toml'] %}
+<span class="file-icon file-icon-data">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+</span>
+{% elif ext in ['txt', 'md', 'rst', 'pdf'] %}
+<span class="file-icon file-icon-text">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+</span>
+{% else %}
+<span class="file-icon file-icon-default">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+</span>
+{% endif %}
+{% endmacro %}
+
 {% if tree %}
-<table class="file-tree-table" style="width:100%">
+<table class="file-tree-table">
   <tbody>
   {% for entry in tree %}
-  <tr class="file-tree-row">
-    <td style="padding:6px 8px">
+  <tr class="file-tree-row {% if entry.type == 'dir' %}file-tree-dir{% endif %}">
+    <td class="file-tree-cell-name">
       {% if entry.type == 'dir' %}
-      <a href="{{ base_url }}/tree/{{ ref }}/{{ entry.name }}" style="display:flex;align-items:center;gap:6px">
-        <span>📁</span> <strong>{{ entry.name }}</strong>
+      <a href="{{ base_url }}/tree/{{ ref }}/{{ entry.name }}" class="file-tree-link">
+        {{ folder_icon() }}
+        <span class="file-tree-name">{{ entry.name }}</span>
       </a>
       {% else %}
-      <a href="{{ base_url }}/blob/{{ ref }}/{{ entry.name }}" style="display:flex;align-items:center;gap:6px">
-        <span>{% if entry.name.endswith('.mid') or entry.name.endswith('.midi') %}🎵
-              {% elif entry.name.endswith('.mp3') or entry.name.endswith('.wav') %}🔊
-              {% else %}📄{% endif %}</span>
-        {{ entry.name }}
+      <a href="{{ base_url }}/blob/{{ ref }}/{{ entry.name }}" class="file-tree-link">
+        {{ file_icon(entry.name) }}
+        <span class="file-tree-name">{{ entry.name }}</span>
       </a>
       {% endif %}
     </td>
-    <td style="padding:6px 8px;text-align:right;color:#8b949e;font-size:11px">
+    <td class="file-tree-cell-size">
       {% if entry.type != 'dir' and entry.size_bytes %}{{ entry.size_bytes | filesizeformat }}{% endif %}
     </td>
   </tr>
@@ -44,5 +70,9 @@
   </tbody>
 </table>
 {% else %}
-  {{ empty_state("📦", "Empty repository", "Push your first commit to see files here.") }}
+  {{ empty_state(
+    title="Empty repository",
+    desc="Push your first commit to see files here.",
+    icon="package"
+  ) }}
 {% endif %}

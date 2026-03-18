@@ -1,5 +1,4 @@
 {% extends "musehub/base.html" %}
-{% from "musehub/macros/commit.html" import commit_row %}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
 {% block jsonld %}{% if jsonld_script %}{{ jsonld_script | safe }}{% endif %}{% endblock %}
@@ -12,51 +11,141 @@
 
 {% block container_extra_class %}-wide{% endblock %}
 
-{% block content %}
-<div style="display:grid;grid-template-columns:1fr 260px;gap:var(--space-4);align-items:start">
+{#
+  Parse repo.tags into display groups.
+  Tags may be prefixed (genre:baroque, emotion:melancholic, stage:rough-mix, ref:beethoven, key:c)
+  or bare (jazz, piano, polyrhythm).
+#}
+{% set genre_tags   = [] %}
+{% set emotion_tags = [] %}
+{% set stage_tags   = [] %}
+{% set ref_tags     = [] %}
+{% set bare_tags    = [] %}
+{% for tag in repo.tags %}
+  {% if tag.startswith('genre:') %}
+    {% set _ = genre_tags.append(tag[6:]) %}
+  {% elif tag.startswith('emotion:') %}
+    {% set _ = emotion_tags.append(tag[8:]) %}
+  {% elif tag.startswith('stage:') %}
+    {% set _ = stage_tags.append(tag[6:]) %}
+  {% elif tag.startswith('ref:') %}
+    {% set _ = ref_tags.append(tag[4:]) %}
+  {% elif not tag.startswith('key:') %}
+    {% set _ = bare_tags.append(tag) %}
+  {% endif %}
+{% endfor %}
 
-  {# ── Main column ── #}
+{# repo_license is injected by the route handler from orm_repo.settings #}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 300px;gap:var(--space-4);align-items:start">
+
+  {# ──────────────────────────────────────────────────────── Main column #}
   <main>
 
-    {# Hero: repo name, visibility, description #}
-    <div class="card card-accent-top" style="margin-bottom:var(--space-4);padding:var(--space-5)">
-      <p class="eyebrow" style="margin-bottom:var(--space-1)">Repository</p>
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap">
+    {# ── Hero card ──────────────────────────────────────────────────── #}
+    <div class="repo-hero">
+      <div class="repo-hero-top">
         <div style="flex:1;min-width:0">
-          <h1 style="margin:0 0 var(--space-2) 0;font-size:22px">
-            <a href="/{{ owner }}" class="text-muted" style="font-weight:400;color:var(--text-muted)">{{ owner }}</a>
-            <span style="color:var(--text-muted)"> / </span>
-            <span style="color:var(--text-primary)">{{ repo_slug }}</span>
+          <h1 class="repo-hero-title">
+            <a href="/{{ owner }}" class="repo-hero-owner">{{ owner }}</a>
+            <span class="repo-hero-sep">/</span>
+            <a href="{{ base_url }}" class="repo-hero-slug">{{ repo_slug }}</a>
             {% if repo.visibility == 'public' %}
-              <span class="badge badge-active" style="font-size:10px;vertical-align:middle;margin-left:6px">public</span>
+              <span class="badge badge-active" style="font-size:10px;vertical-align:middle">public</span>
             {% else %}
-              <span class="badge badge-inactive" style="font-size:10px;vertical-align:middle;margin-left:6px">private</span>
+              <span class="badge badge-inactive" style="font-size:10px;vertical-align:middle">private</span>
             {% endif %}
           </h1>
           {% if repo.description %}
-          <p style="font-size:14px;color:var(--text-muted);margin:0 0 var(--space-3) 0;line-height:1.6">{{ repo.description }}</p>
+          <p class="repo-hero-desc">{{ repo.description }}</p>
           {% endif %}
-          <div style="display:flex;flex-wrap:wrap;gap:var(--space-1)">
+
+          {# Music identity pills #}
+          <div class="repo-hero-meta">
             {% if repo.key_signature %}
-            <span class="nav-meta-pill">&#9837; {{ repo.key_signature }}</span>
+            <span class="repo-meta-pill repo-meta-key">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              {{ repo.key_signature }}
+            </span>
             {% endif %}
             {% if repo.tempo_bpm %}
-            <span class="nav-meta-pill">&#9834; {{ repo.tempo_bpm }} BPM</span>
+            <span class="repo-meta-pill repo-meta-tempo">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              {{ repo.tempo_bpm }} BPM
+            </span>
             {% endif %}
-            {% for tag in repo.tags %}
-            <a href="/topics/{{ tag }}" class="tag-pill">{{ tag }}</a>
+            {% if repo_license %}
+            <span class="repo-meta-pill repo-meta-license">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              {{ repo_license }}
+            </span>
+            {% endif %}
+          </div>
+
+          {# Categorized tag chips #}
+          {% if genre_tags or emotion_tags or stage_tags or ref_tags or bare_tags %}
+          <div class="repo-tags-row">
+            {% for t in genre_tags %}
+            <a href="/topics/genre:{{ t }}" class="tag-chip tag-chip-genre">{{ t }}</a>
+            {% endfor %}
+            {% for t in emotion_tags %}
+            <a href="/topics/emotion:{{ t }}" class="tag-chip tag-chip-emotion">{{ t }}</a>
+            {% endfor %}
+            {% for t in stage_tags %}
+            <span class="tag-chip tag-chip-stage">{{ t }}</span>
+            {% endfor %}
+            {% for t in ref_tags %}
+            <span class="tag-chip tag-chip-ref">{{ t }}</span>
+            {% endfor %}
+            {% for t in bare_tags %}
+            <a href="/topics/{{ t }}" class="tag-chip tag-chip-neutral">{{ t }}</a>
             {% endfor %}
           </div>
+          {% endif %}
         </div>
-        <div style="display:flex;gap:var(--space-2);flex-shrink:0">
-          <a href="{{ base_url }}/sessions" class="btn btn-secondary btn-sm">Sessions</a>
-          <a href="{{ base_url }}/insights" class="btn btn-secondary btn-sm">Insights</a>
+
+        {# Action cluster #}
+        <div class="repo-hero-actions">
+          <button class="btn btn-star btn-sm" id="nav-star-btn"
+                  onclick="toggleStar()" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span id="nav-star-count">0</span>
+          </button>
+          <a href="{{ base_url }}/listen/HEAD" class="btn btn-listen btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Listen
+          </a>
+          <a href="{{ base_url }}/arrange/HEAD" class="btn btn-secondary btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="18" y="5" width="4" height="16"/></svg>
+            Arrange
+          </a>
         </div>
       </div>
     </div>
 
-    {# Branch picker + quick stats bar #}
-    <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);flex-wrap:wrap">
+    {# ── Stats bar ──────────────────────────────────────────────────── #}
+    <div class="stat-bar">
+      <a href="{{ base_url }}/commits" class="stat-card">
+        <span class="stat-card-value">{{ commits | length }}</span>
+        <span class="stat-card-label">Commits</span>
+      </a>
+      <a href="{{ base_url }}/branches" class="stat-card">
+        <span class="stat-card-value">{{ branches | length }}</span>
+        <span class="stat-card-label">Branches</span>
+      </a>
+      <a href="{{ base_url }}/releases" class="stat-card">
+        <span class="stat-card-value">{{ tags_count }}</span>
+        <span class="stat-card-label">Releases</span>
+      </a>
+      <a href="#" class="stat-card" id="stat-stars" onclick="toggleStar(); return false;">
+        <span class="stat-card-value" id="stat-star-count" style="color:var(--color-warning)">—</span>
+        <span class="stat-card-label">Stars</span>
+      </a>
+    </div>
+
+    {# ── Branch picker + file tree ──────────────────────────────────── #}
+    <div class="branch-bar">
       <form method="get"
             hx-get="{{ base_url }}"
             hx-target="#file-tree"
@@ -64,8 +153,7 @@
             style="display:inline">
         <select name="ref" class="filter-select" onchange="this.form.requestSubmit()">
           {% for branch in branches %}
-          <option value="{{ branch.name }}"
-                  {% if branch.name == ref %}selected{% endif %}>
+          <option value="{{ branch.name }}" {% if branch.name == ref %}selected{% endif %}>
             &#127807; {{ branch.name }}
           </option>
           {% endfor %}
@@ -74,109 +162,265 @@
           {% endif %}
         </select>
       </form>
-      <a href="{{ base_url }}/commits" style="font-size:12px;color:#8b949e">
-        {{ commits | length }} recent commit{{ 's' if commits | length != 1 else '' }}
-      </a>
-      <span style="font-size:12px;color:#8b949e">
-        {{ branches | length }} branch{{ 'es' if branches | length != 1 else '' }}
-      </span>
-      <span style="font-size:12px;color:#8b949e">
-        {{ tags_count }} tag{{ 's' if tags_count != 1 else '' }}
-      </span>
+      <div class="branch-bar-stats">
+        <a href="{{ base_url }}/commits" class="branch-bar-stat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+          {{ commits | length }} commit{{ 's' if commits | length != 1 else '' }}
+        </a>
+        <span class="branch-bar-stat" style="cursor:default">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+          {{ branches | length }} branch{{ 'es' if branches | length != 1 else '' }}
+        </span>
+        <a href="{{ base_url }}/releases" class="branch-bar-stat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          {{ tags_count }} release{{ 's' if tags_count != 1 else '' }}
+        </a>
+      </div>
     </div>
 
-    {# File tree — HTMX target for branch switching #}
-    <div class="card" style="margin-bottom:var(--space-3)">
+    <div class="card file-tree-card">
       <div id="file-tree">
         {% include "musehub/fragments/file_tree.html" %}
       </div>
     </div>
 
-    {# Clone widget #}
-    <div class="card" style="margin-bottom:var(--space-3)">
-      <p class="sidebar-section-title" style="margin-bottom:var(--space-2)">Clone</p>
-      <div class="clone-row">
-        <div>
-          <p class="clone-label">MuseHub</p>
-          <div class="clone-input-wrap">
-            <input type="text" class="clone-input" readonly value="{{ clone_url_musehub }}">
-            <button class="btn btn-secondary btn-sm clone-copy-btn"
-                    onclick="navigator.clipboard.writeText('{{ clone_url_musehub }}')">Copy</button>
-          </div>
-        </div>
-        <div>
-          <p class="clone-label">HTTPS</p>
-          <div class="clone-input-wrap">
-            <input type="text" class="clone-input" readonly value="{{ clone_url_https }}">
-            <button class="btn btn-secondary btn-sm clone-copy-btn"
-                    onclick="navigator.clipboard.writeText('{{ clone_url_https }}')">Copy</button>
-          </div>
-        </div>
-        <div>
-          <p class="clone-label">SSH</p>
-          <div class="clone-input-wrap">
-            <input type="text" class="clone-input" readonly value="{{ clone_url_ssh }}">
-            <button class="btn btn-secondary btn-sm clone-copy-btn"
-                    onclick="navigator.clipboard.writeText('{{ clone_url_ssh }}')">Copy</button>
-          </div>
-        </div>
+    {# ── Recent commits ─────────────────────────────────────────────── #}
+    <div class="card commit-list-card">
+      <div class="commit-list-header">
+        <h3 class="commit-list-title">Recent Commits</h3>
+        <a href="{{ base_url }}/commits" style="font-size:11px;color:var(--color-accent)">View all →</a>
       </div>
+      {% if commits %}
+        {% for commit in commits %}
+        <div class="commit-card-row">
+          <div class="commit-author-avatar">{{ commit.author[0] if commit.author else '?' }}</div>
+          <div class="commit-card-body">
+            <a href="{{ base_url }}/commits/{{ commit.commitId }}" class="commit-card-msg">
+              {{ commit.message | truncate(80, True, '…') }}
+            </a>
+            <div class="commit-card-meta">
+              <span class="commit-card-author">{{ commit.author }}</span>
+              <span class="commit-card-time">{{ commit.timestamp | fmtrelative }}</span>
+            </div>
+          </div>
+          <a href="{{ base_url }}/commits/{{ commit.commitId }}" class="commit-card-sha">
+            {{ commit.commitId | shortsha }}
+          </a>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="padding:var(--space-5);text-align:center;color:var(--text-muted);font-size:13px">
+          No commits yet — push your first commit.
+        </div>
+      {% endif %}
     </div>
 
   </main>
 
-  {# ── Right sidebar ── #}
+  {# ──────────────────────────────────────────────────────── Right sidebar #}
   <aside>
 
-    {# About #}
-    <div class="sidebar-section">
-      <p class="sidebar-section-title">About</p>
-      {% if repo.description %}
-      <p style="font-size:13px;margin-bottom:var(--space-2)">{{ repo.description }}</p>
-      {% endif %}
+    {# ── Musical Identity ───────────────────────────────────────────── #}
+    <div class="card musical-identity-card">
+      <div class="sidebar-card-header">
+        <h3 class="sidebar-card-title">Musical Identity</h3>
+      </div>
+
       {% if repo.key_signature %}
-      <p style="font-size:12px;color:#8b949e">&#9837; {{ repo.key_signature }}</p>
+      <div class="musical-identity-row">
+        <span class="musical-identity-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        </span>
+        <div>
+          <div class="musical-identity-label">Key</div>
+          <div class="musical-identity-value">{{ repo.key_signature }}</div>
+        </div>
+      </div>
       {% endif %}
+
       {% if repo.tempo_bpm %}
-      <p style="font-size:12px;color:#8b949e">&#9834; {{ repo.tempo_bpm }} BPM</p>
+      <div class="musical-identity-row">
+        <span class="musical-identity-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </span>
+        <div>
+          <div class="musical-identity-label">Tempo</div>
+          <div class="musical-identity-value">{{ repo.tempo_bpm }} BPM</div>
+        </div>
+      </div>
       {% endif %}
-      {% if repo.tags %}
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:var(--space-2)">
-        {% for tag in repo.tags %}
-        <a href="/topics/{{ tag }}" class="badge">{{ tag }}</a>
-        {% endfor %}
+
+      {% if repo_license %}
+      <div class="musical-identity-row">
+        <span class="musical-identity-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </span>
+        <div>
+          <div class="musical-identity-label">License</div>
+          <div class="musical-identity-value">{{ repo_license }}</div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Tag groups #}
+      {% if genre_tags %}
+      <div class="tag-group">
+        <div class="tag-group-label">Genre</div>
+        <div class="tag-group-chips">
+          {% for t in genre_tags %}
+          <a href="/topics/genre:{{ t }}" class="tag-chip tag-chip-genre">{{ t }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if emotion_tags %}
+      <div class="tag-group">
+        <div class="tag-group-label">Mood</div>
+        <div class="tag-group-chips">
+          {% for t in emotion_tags %}
+          <a href="/topics/emotion:{{ t }}" class="tag-chip tag-chip-emotion">{{ t }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if stage_tags %}
+      <div class="tag-group">
+        <div class="tag-group-label">Stage</div>
+        <div class="tag-group-chips">
+          {% for t in stage_tags %}
+          <span class="tag-chip tag-chip-stage">{{ t }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if ref_tags %}
+      <div class="tag-group">
+        <div class="tag-group-label">Influences</div>
+        <div class="tag-group-chips">
+          {% for t in ref_tags %}
+          <span class="tag-chip tag-chip-ref">{{ t }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if bare_tags %}
+      <div class="tag-group">
+        <div class="tag-group-label">Topics</div>
+        <div class="tag-group-chips">
+          {% for t in bare_tags %}
+          <a href="/topics/{{ t }}" class="tag-chip tag-chip-neutral">{{ t }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if not (repo.key_signature or repo.tempo_bpm or repo_license or genre_tags or emotion_tags or stage_tags or ref_tags or bare_tags) %}
+      <div style="padding:var(--space-4);color:var(--text-muted);font-size:12px;text-align:center">
+        No metadata yet.
       </div>
       {% endif %}
     </div>
 
-    {# Recent commits #}
-    <div class="sidebar-section">
-      <p class="sidebar-section-title">Recent Commits</p>
-      {% if commits %}
-        {% for commit in commits %}
-          {{ commit_row(commit, base_url=base_url) }}
-        {% endfor %}
-        <a href="{{ base_url }}/commits" style="font-size:11px;color:var(--color-accent)">View all commits →</a>
-      {% else %}
-        <p style="font-size:12px;color:#8b949e">No commits yet.</p>
-      {% endif %}
+    {# ── Muse Dimensions ───────────────────────────────────────────── #}
+    <div class="card" style="margin-bottom:var(--space-3)">
+      <div class="sidebar-card-header">
+        <h3 class="sidebar-card-title">Explore</h3>
+      </div>
+      <div class="muse-dimension-grid">
+        <a href="{{ base_url }}/listen/HEAD" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--dim-rhythmic)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </span>
+          Listen
+        </a>
+        <a href="{{ base_url }}/arrange/HEAD" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-harmonic)"><rect x="2" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="18" y="5" width="4" height="16"/></svg>
+          </span>
+          Arrange
+        </a>
+        <a href="{{ base_url }}/analysis/HEAD" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-melodic)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </span>
+          Analysis
+        </a>
+        <a href="{{ base_url }}/timeline" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-structural)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </span>
+          Timeline
+        </a>
+        <a href="{{ base_url }}/groove-check" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-dynamic)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          </span>
+          Groove Check
+        </a>
+        <a href="{{ base_url }}/insights" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
+          Insights
+        </a>
+      </div>
     </div>
 
-    {# Quick links #}
-    <div class="sidebar-section">
-      <p class="sidebar-section-title">Explore</p>
-      <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px">
-        <li><a href="{{ base_url }}/commits" style="font-size:12px">&#128218; Commits</a></li>
-        <li><a href="{{ base_url }}/issues" style="font-size:12px">&#128203; Issues</a></li>
-        <li><a href="{{ base_url }}/pulls" style="font-size:12px">&#10145; Pull Requests</a></li>
-        <li><a href="{{ base_url }}/releases" style="font-size:12px">&#127381; Releases</a></li>
-        <li><a href="{{ base_url }}/insights" style="font-size:12px">&#128200; Insights</a></li>
-        <li><a href="{{ base_url }}/analysis/HEAD" style="font-size:12px">&#127926; Analysis</a></li>
-        <li><a href="{{ base_url }}/listen/HEAD" style="font-size:12px">&#127925; Listen</a></li>
-      </ul>
+    {# ── Clone widget ───────────────────────────────────────────────── #}
+    <div class="card clone-widget">
+      <div class="sidebar-card-header">
+        <h3 class="sidebar-card-title">Clone</h3>
+      </div>
+      <div style="padding:0 var(--space-4) var(--space-3)">
+        <div class="clone-tabs">
+          <button class="clone-tab-btn active" onclick="switchCloneTab(this,'musehub')">MuseHub</button>
+          <button class="clone-tab-btn" onclick="switchCloneTab(this,'https')">HTTPS</button>
+          <button class="clone-tab-btn" onclick="switchCloneTab(this,'ssh')">SSH</button>
+        </div>
+        <div class="clone-input-wrap">
+          <input type="text" class="clone-input" id="clone-input" readonly
+                 value="{{ clone_url_musehub }}">
+          <button class="btn btn-secondary btn-sm clone-copy-btn"
+                  id="clone-copy-btn"
+                  onclick="copyClone()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
+        </div>
+      </div>
     </div>
 
   </aside>
 </div>
 {% endblock %}
 
+{% block page_data %}
+const CLONE_URLS = {
+  musehub: {{ clone_url_musehub | tojson }},
+  https:   {{ clone_url_https   | tojson }},
+  ssh:     {{ clone_url_ssh     | tojson }},
+};
+{% endblock %}
+
+{% block page_script %}
+function switchCloneTab(btn, protocol) {
+  document.querySelectorAll('.clone-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('clone-input').value = CLONE_URLS[protocol] || '';
+}
+
+function copyClone() {
+  var input = document.getElementById('clone-input');
+  var btn   = document.getElementById('clone-copy-btn');
+  navigator.clipboard.writeText(input.value).then(function() {
+    var orig = btn.innerHTML;
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    btn.classList.add('clone-copy-flash');
+    setTimeout(function() { btn.innerHTML = orig; btn.classList.remove('clone-copy-flash'); }, 1800);
+  });
+}
+{% endblock %}

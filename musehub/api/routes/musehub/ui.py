@@ -512,6 +512,12 @@ async def repo_page(
     releases = await musehub_releases.list_releases(db, repo_id)
     tags_count = len(releases)
 
+    # Fetch settings from ORM (not on RepoResponse wire model) for license display.
+    orm_repo = await db.get(musehub_db.MusehubRepo, repo_id)
+    repo_license: str = ""
+    if orm_repo and orm_repo.settings and isinstance(orm_repo.settings, dict):
+        repo_license = orm_repo.settings.get("license", "") or ""
+
     page_url = str(request.url)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -520,6 +526,7 @@ async def repo_page(
         "base_url": base_url,
         "current_page": "home",
         "repo": repo,
+        "repo_license": repo_license,
         "ref": ref,
         "tree": tree_response.entries,
         # commit_row macro expects camelCase keys (commitId, etc.)
