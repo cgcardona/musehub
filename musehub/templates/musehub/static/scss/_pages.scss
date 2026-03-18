@@ -387,17 +387,396 @@ body.compare-mode .compare-check { display: block; }
 .avatar-badge { display: inline-flex; width: 24px; height: 24px; border-radius: 50%; background: var(--bg-overlay); border: 1px solid var(--border-default); align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text-muted); vertical-align: middle; margin-right: 6px; }
 
 /* =========================================================================
-   Global search page
+   Search pages  (.sr-* prefix)
    ========================================================================= */
-.search-bar { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); flex-wrap: wrap; }
-.search-bar input[type="search"] { flex: 1; min-width: 200px; }
-.search-result-repo { border: 1px solid var(--border-default); border-radius: 6px; padding: var(--space-3); margin-bottom: var(--space-3); background: var(--bg-surface); }
-.search-result-repo h3 { margin: 0 0 var(--space-2) 0; font-size: 16px; }
-.commit-row { display: flex; gap: var(--space-2); align-items: baseline; padding: var(--space-1) 0; border-top: 1px solid var(--border-default); font-size: 13px; }
+
+/* ── Search hero (in-repo search) ──────────────────────────────────────── */
+.sr-hero {
+  margin-bottom: var(--space-5);
+}
+.sr-hero-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-4);
+}
+.sr-input-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  &:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+  }
+}
+.sr-input-icon {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.sr-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: var(--space-3) var(--space-2);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  min-width: 0;
+  &::placeholder { color: var(--text-muted); }
+}
+.sr-submit-btn {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: var(--bg-base);
+  border: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  &:hover { opacity: 0.88; }
+}
+
+/* ── Mode pills ─────────────────────────────────────────────────────────── */
+.sr-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  flex-wrap: wrap;
+}
+.sr-mode-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-right: var(--space-1);
+}
+.sr-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  &:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  &.sr-mode-pill--active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--bg-base);
+    font-weight: var(--font-weight-semibold);
+  }
+}
+
+/* ── Type tabs ──────────────────────────────────────────────────────────── */
+.sr-type-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.sr-type-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s;
+  margin-bottom: -1px;
+  &:hover { color: var(--text-primary); }
+  &.sr-type-tab--active {
+    color: var(--text-primary);
+    border-bottom-color: var(--color-accent);
+    font-weight: var(--font-weight-semibold);
+  }
+}
+.sr-type-count {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  background: var(--bg-overlay);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.sr-type-tab--active .sr-type-count {
+  background: var(--color-accent);
+  color: var(--bg-base);
+}
+
+/* ── Results meta ───────────────────────────────────────────────────────── */
+.sr-results-meta {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.sr-results-meta strong { color: var(--text-primary); }
+
+/* ── Section headers ────────────────────────────────────────────────────── */
+.sr-section {
+  margin-bottom: var(--space-5);
+}
+.sr-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-default);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+/* ── Result cards ───────────────────────────────────────────────────────── */
+.sr-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  margin-bottom: var(--space-2);
+  transition: border-color 0.12s, box-shadow 0.12s;
+  text-decoration: none;
+  color: inherit;
+  &:hover {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent);
+  }
+  &:last-child { margin-bottom: 0; }
+}
+.sr-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  &.sr-icon-commit   { background: rgba(88,166,255,0.12); }
+  &.sr-icon-issue    { background: rgba(63,185,80,0.12);  }
+  &.sr-icon-pr       { background: rgba(163,113,247,0.12); }
+  &.sr-icon-release  { background: rgba(248,113,113,0.12); }
+  &.sr-icon-session  { background: rgba(251,191,36,0.12); }
+}
+.sr-card-body {
+  min-width: 0;
+}
+.sr-card-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  a {
+    color: inherit;
+    text-decoration: none;
+    &:hover { color: var(--color-accent); }
+  }
+}
+.sr-card-meta {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.sr-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+.sr-badge {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  white-space: nowrap;
+  &.sr-badge-open     { background: rgba(63,185,80,0.15);  color: var(--color-success); border: 1px solid var(--color-success); }
+  &.sr-badge-closed   { background: rgba(248,81,73,0.12);  color: var(--color-danger);  border: 1px solid var(--color-danger); }
+  &.sr-badge-merged   { background: rgba(163,113,247,0.15); color: var(--dim-harmonic); border: 1px solid var(--dim-harmonic); }
+  &.sr-badge-stable   { background: rgba(63,185,80,0.12);  color: var(--color-success); border: 1px solid var(--color-success); }
+  &.sr-badge-pre      { background: rgba(240,136,62,0.15); color: var(--color-warning); border: 1px solid var(--color-warning); }
+  &.sr-badge-draft    { background: var(--bg-overlay); color: var(--text-muted); border: 1px solid var(--border-default); }
+  &.sr-badge-active   { background: rgba(63,185,80,0.12);  color: var(--color-success); border: 1px solid var(--color-success); }
+  &.sr-badge-keyword  { background: rgba(88,166,255,0.1);  color: var(--color-accent);  border: 1px solid var(--color-accent); }
+}
+.sr-sha {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  background: var(--bg-overlay);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+.sr-score {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.sr-branch-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  background: var(--bg-overlay);
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ── Search term highlight ──────────────────────────────────────────────── */
+mark.sr-hl {
+  background: rgba(255, 220, 60, 0.28);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ── Empty / tips states ────────────────────────────────────────────────── */
+.sr-tips {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+}
+.sr-tips-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: var(--space-3);
+}
+.sr-tips-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+.sr-tips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  text-align: left;
+}
+.sr-tip-card {
+  background: var(--bg-overlay);
+  border-radius: var(--radius-base);
+  padding: var(--space-3);
+}
+.sr-tip-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
+}
+.sr-tip-example {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-accent);
+}
+.sr-tip-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.sr-no-results {
+  text-align: center;
+  padding: var(--space-6);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Global search — repo group cards ──────────────────────────────────── */
+.sr-repo-group {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+  overflow: hidden;
+}
+.sr-repo-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border-default);
+  gap: var(--space-3);
+}
+.sr-repo-group-name {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  a { color: inherit; text-decoration: none; &:hover { color: var(--color-accent); } }
+}
+.sr-repo-group-meta {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sr-repo-group-body {
+  padding: var(--space-3) var(--space-4);
+}
+.sr-pagination {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Legacy aliases (keep commit-row for other templates that use it) ───── */
+.commit-row  { display: flex; gap: var(--space-2); align-items: baseline; padding: var(--space-1) 0; border-top: 1px solid var(--border-default); font-size: 13px; }
 .commit-row:first-child { border-top: none; }
 .commit-msg  { flex: 1; color: var(--text-primary); }
 .commit-meta { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 .more-note   { font-size: 12px; color: var(--text-muted); margin-top: var(--space-1); }
+.search-bar { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); flex-wrap: wrap; }
+.search-bar input[type="search"] { flex: 1; min-width: 200px; }
+.search-result-repo { border: 1px solid var(--border-default); border-radius: 6px; padding: var(--space-3); margin-bottom: var(--space-3); background: var(--bg-surface); }
+.search-result-repo h3 { margin: 0 0 var(--space-2) 0; font-size: 16px; }
 
 /* =========================================================================
    Groove check page

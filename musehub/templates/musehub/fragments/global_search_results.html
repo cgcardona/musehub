@@ -1,75 +1,115 @@
-{#  fragments/global_search_results.html — bare HTMX fragment: global search results.
+{#
+  fragments/global_search_results.html — HTMX fragment: global search results.
 
-    Rendered in two contexts:
-    1. Full-page load: included inline by musehub/pages/global_search.html inside
-       the ``<div id="search-results">`` target container.
-    2. HTMX partial swap: returned directly when the handler detects
-       ``HX-Request: true``, replacing only the ``#search-results`` container.
-
-    Required context variables
-    --------------------------
-    query   : str                          — current search query (may be empty)
-    result  : GlobalSearchResult | None    — search result or None when q < 2 chars
+  Required context variables:
+    query   : str                        — current search query (may be empty)
+    mode    : str                        — keyword | pattern
+    result  : GlobalSearchResult | None
+    page    : int
+    page_size: int
 #}
-{% from "musehub/macros/empty_state.html" import empty_state %}
 
-{% if not query or query | length < 2 %}
-  <p style="color:#8b949e;text-align:center;padding:var(--space-4) 0">
-    Enter at least 2 characters to search.
-  </p>
-{% elif result and result.groups %}
-  <p style="color:#8b949e;margin-bottom:var(--space-2)">
-    {{ result.groups | length }} repo{{ 's' if result.groups | length != 1 else '' }} with matches
-    &mdash; {{ result.total_repos_searched }} public repo{{ 's' if result.total_repos_searched != 1 else '' }} searched
-    (page {{ result.page }})
-    for "<strong>{{ query }}</strong>"
-  </p>
+{%- set sq = query | default('') %}
 
-  {% for group in result.groups %}
-  <div class="search-result-repo">
-    <h3>
+{%- if not sq or sq | length < 2 %}
+<div class="sr-tips">
+  <div class="sr-tips-icon">🌐</div>
+  <div class="sr-tips-title">Search across all public MuseHub repos</div>
+  <p style="font-size:var(--font-size-sm);color:var(--text-muted);margin:0">
+    Find commits, tracks, and musical ideas shared by the community.
+  </p>
+  <div class="sr-tips-grid">
+    <div class="sr-tip-card">
+      <div class="sr-tip-label">Keyword</div>
+      <div class="sr-tip-example">piano arpeggio</div>
+      <div class="sr-tip-desc">Find commits mentioning all terms</div>
+    </div>
+    <div class="sr-tip-card">
+      <div class="sr-tip-label">Pattern</div>
+      <div class="sr-tip-example">feat: reverb</div>
+      <div class="sr-tip-desc">Substring match across message and branch</div>
+    </div>
+  </div>
+</div>
+
+{%- elif result and result.groups %}
+
+<div class="sr-results-meta">
+  <strong>{{ result.groups | length }}</strong> repo{{ '' if result.groups | length == 1 else 's' }} with matches
+  &bull;
+  <strong>{{ result.total_repos_searched }}</strong> public repo{{ '' if result.total_repos_searched == 1 else 's' }} searched
+  &bull; page {{ result.page }}
+  &bull; query "<strong>{{ sq }}</strong>"
+</div>
+
+{%- for group in result.groups %}
+<div class="sr-repo-group">
+  <div class="sr-repo-group-header">
+    <div class="sr-repo-group-name">
       <a href="/{{ group.repo_owner }}/{{ group.repo_slug }}">
-        {{ group.repo_owner }}/{{ group.repo_name }}
+        {{ group.repo_owner }} / {{ group.repo_name }}
       </a>
-      <span class="badge badge-open" style="font-size:11px;margin-left:var(--space-1)">
+    </div>
+    <div class="sr-repo-group-meta">
+      <span class="sr-badge sr-badge-{{ 'open' if group.repo_visibility == 'public' else 'draft' }}">
         {{ group.repo_visibility }}
       </span>
-    </h3>
-
-    {% for match in group.matches %}
-    <div class="commit-row">
-      <a class="commit-sha"
-         href="/{{ group.repo_owner }}/{{ group.repo_slug }}/commits/{{ match.commit_id }}">
-        {{ match.commit_id[:7] }}
-      </a>
-      <span class="commit-msg">{{ match.message }}</span>
-      <span class="commit-meta">{{ match.author }} &bull; {{ match.timestamp | fmtdate }}</span>
+      <span>{{ group.total_matches }} match{{ '' if group.total_matches == 1 else 'es' }}</span>
     </div>
-    {% endfor %}
-
-    {% if group.total_matches > group.matches | length %}
-    <p class="more-note">
-      Showing {{ group.matches | length }} of {{ group.total_matches }} matches in this repo.
+  </div>
+  <div class="sr-repo-group-body">
+    {%- for m in group.matches %}
+    <a class="sr-card" href="/{{ group.repo_owner }}/{{ group.repo_slug }}/commits/{{ m.commit_id }}">
+      <div class="sr-card-icon sr-icon-commit">📝</div>
+      <div class="sr-card-body">
+        <div class="sr-card-title" data-highlight="{{ sq }}">{{ m.message | truncate(120) }}</div>
+        <div class="sr-card-meta">
+          <span>{{ m.author }}</span>
+          &bull;
+          <span class="sr-branch-pill">⑂ {{ m.branch }}</span>
+          &bull;
+          <span>{{ m.timestamp | fmtdate }}</span>
+        </div>
+      </div>
+      <div class="sr-card-side">
+        <span class="sr-sha">{{ m.commit_id[:7] }}</span>
+      </div>
+    </a>
+    {%- endfor %}
+    {%- if group.total_matches > (group.matches | length) %}
+    <p class="more-note" style="margin-top:var(--space-2)">
+      Showing {{ group.matches | length }} of {{ group.total_matches }} matches — visit the repo to see all.
     </p>
-    {% endif %}
+    {%- endif %}
   </div>
-  {% endfor %}
+</div>
+{%- endfor %}
 
-  {# Pagination controls #}
-  {% if result.page > 1 or result.groups | length == result.page_size %}
-  <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3)">
-    {% if result.page > 1 %}
-    <a class="btn btn-secondary" href="?q={{ query | urlencode }}&mode={{ result.mode }}&page={{ result.page - 1 }}">
-      &larr; Prev
-    </a>
-    {% endif %}
-    {% if result.groups | length == result.page_size %}
-    <a class="btn btn-secondary" href="?q={{ query | urlencode }}&mode={{ result.mode }}&page={{ result.page + 1 }}">
-      Next &rarr;
-    </a>
-    {% endif %}
-  </div>
-  {% endif %}
-{% else %}
-  {{ empty_state("🔍", "No results", "Try different search terms or check your spelling.") }}
-{% endif %}
+<div class="sr-pagination">
+  {%- if result.page > 1 %}
+  <a class="btn btn-secondary"
+     hx-get="/search?q={{ sq | urlencode }}&mode={{ result.mode }}&page={{ result.page - 1 }}"
+     hx-target="#sr-global-results"
+     href="/search?q={{ sq | urlencode }}&mode={{ result.mode }}&page={{ result.page - 1 }}">
+    ← Previous
+  </a>
+  {%- endif %}
+  {%- if (result.groups | length) == page_size %}
+  <a class="btn btn-secondary"
+     hx-get="/search?q={{ sq | urlencode }}&mode={{ result.mode }}&page={{ result.page + 1 }}"
+     hx-target="#sr-global-results"
+     href="/search?q={{ sq | urlencode }}&mode={{ result.mode }}&page={{ result.page + 1 }}">
+    Next →
+  </a>
+  {%- endif %}
+</div>
+
+{%- else %}
+<div class="sr-tips">
+  <div class="sr-tips-icon">🔇</div>
+  <div class="sr-tips-title">No results for "{{ sq }}"</div>
+  <p style="font-size:var(--font-size-sm);color:var(--text-muted);margin:0">
+    Try different keywords or switch to Pattern mode for partial matches.
+  </p>
+</div>
+{%- endif %}

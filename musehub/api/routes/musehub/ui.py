@@ -1712,37 +1712,139 @@ async def search_page(
     repo_slug: str,
     q: str = Query("", description="Search query"),
     mode: str = Query("keyword", description="Search mode: keyword | pattern | ask"),
+    search_type: str = Query("all", description="Result type filter: all | commits | issues | prs | releases | sessions"),
     limit: int = Query(20, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the in-repo search page with SSR results.
+    """Render the in-repo multi-type search page with SSR results.
 
-    Simple keyword / pattern / ask modes are run server-side when ``q`` is
-    provided and at least 2 characters long.  The Musical Properties mode
-    (``mode=property``) keeps its JS-driven form because its multi-field
-    filter UI is not expressible as a single query param — that panel degrades
-    gracefully to a submit-button form when JS is unavailable.
+    Searches commits, issues, pull requests, releases, and sessions in
+    parallel.  The ``type`` param filters which category is shown; the
+    ``mode`` param (keyword/pattern/ask) applies only to commit search.
 
-    HTMX live-search swaps only the ``#repo-search-results`` fragment on
-    debounced input, avoiding a full-page reload for subsequent queries.
+    HTMX live-search swaps only the ``#sr-results`` fragment on debounced
+    input, avoiding a full-page reload for subsequent queries.
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     safe_mode = mode if mode in ("keyword", "pattern", "ask") else "keyword"
-    search_result = None
-    if q and len(q.strip()) >= 2 and safe_mode != "property":
-        if safe_mode == "keyword":
-            search_result = await musehub_search.search_by_keyword(
-                db, repo_id=repo_id, keyword=q, limit=limit
-            )
-        elif safe_mode == "ask":
-            search_result = await musehub_search.search_by_ask(
-                db, repo_id=repo_id, question=q, limit=limit
-            )
-        elif safe_mode == "pattern":
-            search_result = await musehub_search.search_by_pattern(
+    safe_type = search_type if search_type in ("all", "commits", "issues", "prs", "releases", "sessions") else "all"
+
+    commit_result = None
+    issue_hits: list[Any] = []
+    pr_hits: list[Any] = []
+    release_hits: list[Any] = []
+    session_hits: list[Any] = []
+
+    if q and len(q.strip()) >= 2:
+        q_lower = q.strip().lower()
+
+        async def _search_commits() -> Any:
+            if safe_mode == "keyword":
+                return await musehub_search.search_by_keyword(
+                    db, repo_id=repo_id, keyword=q, limit=limit
+                )
+            if safe_mode == "ask":
+                return await musehub_search.search_by_ask(
+                    db, repo_id=repo_id, question=q, limit=limit
+                )
+            return await musehub_search.search_by_pattern(
                 db, repo_id=repo_id, pattern=q, limit=limit
             )
-    ctx: dict[str, object] = {
+
+        async def _search_issues() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubIssue.issue_id,
+                    musehub_db.MusehubIssue.number,
+                    musehub_db.MusehubIssue.title,
+                    musehub_db.MusehubIssue.state,
+                    musehub_db.MusehubIssue.author,
+                    musehub_db.MusehubIssue.labels,
+                    musehub_db.MusehubIssue.created_at,
+                ).where(
+                    musehub_db.MusehubIssue.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubIssue.title).contains(q_lower),
+                ).order_by(musehub_db.MusehubIssue.created_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        async def _search_prs() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubPullRequest.pr_id,
+                    musehub_db.MusehubPullRequest.title,
+                    musehub_db.MusehubPullRequest.state,
+                    musehub_db.MusehubPullRequest.author,
+                    musehub_db.MusehubPullRequest.from_branch,
+                    musehub_db.MusehubPullRequest.to_branch,
+                    musehub_db.MusehubPullRequest.created_at,
+                ).where(
+                    musehub_db.MusehubPullRequest.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubPullRequest.title).contains(q_lower),
+                ).order_by(musehub_db.MusehubPullRequest.created_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        async def _search_releases() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubRelease.release_id,
+                    musehub_db.MusehubRelease.tag,
+                    musehub_db.MusehubRelease.title,
+                    musehub_db.MusehubRelease.is_prerelease,
+                    musehub_db.MusehubRelease.is_draft,
+                    musehub_db.MusehubRelease.created_at,
+                ).where(
+                    musehub_db.MusehubRelease.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubRelease.title).contains(q_lower)
+                    | func.lower(musehub_db.MusehubRelease.tag).contains(q_lower),
+                ).order_by(musehub_db.MusehubRelease.created_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        async def _search_sessions() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubSession.session_id,
+                    musehub_db.MusehubSession.intent,
+                    musehub_db.MusehubSession.location,
+                    musehub_db.MusehubSession.participants,
+                    musehub_db.MusehubSession.is_active,
+                    musehub_db.MusehubSession.started_at,
+                ).where(
+                    musehub_db.MusehubSession.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubSession.intent).contains(q_lower)
+                    | func.lower(musehub_db.MusehubSession.location).contains(q_lower),
+                ).order_by(musehub_db.MusehubSession.started_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        (
+            commit_result,
+            issue_hits,
+            pr_hits,
+            release_hits,
+            session_hits,
+        ) = await asyncio.gather(
+            _search_commits(),
+            _search_issues(),
+            _search_prs(),
+            _search_releases(),
+            _search_sessions(),
+        )
+
+    commit_count  = len(commit_result.matches) if commit_result else 0
+    issue_count   = len(issue_hits)
+    pr_count      = len(pr_hits)
+    release_count = len(release_hits)
+    session_count = len(session_hits)
+    total_count   = commit_count + issue_count + pr_count + release_count + session_count
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
@@ -1750,9 +1852,22 @@ async def search_page(
         "current_page": "search",
         "query": q,
         "mode": safe_mode,
+        "search_type": safe_type,
         "limit": limit,
-        "search_result": search_result,
-        "modes": ["keyword", "pattern", "ask"],
+        # Commit search result
+        "search_result": commit_result,
+        # Multi-type hits
+        "issue_hits": issue_hits,
+        "pr_hits": pr_hits,
+        "release_hits": release_hits,
+        "session_hits": session_hits,
+        # Counts (for type tabs)
+        "commit_count": commit_count,
+        "issue_count": issue_count,
+        "pr_count": pr_count,
+        "release_count": release_count,
+        "session_count": session_count,
+        "total_count": total_count,
     }
     ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
