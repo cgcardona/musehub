@@ -2,7 +2,7 @@
  * audio-player.js — MuseHub advanced audio player component.
  *
  * Wraps the vendored WaveSurfer implementation
- * (/musehub/static/vendor/wavesurfer.min.js) to provide:
+ * (/static/vendor/wavesurfer.min.js) to provide:
  *
  *   - Waveform visualization via canvas with seek-on-click
  *   - A/B loop region (Shift+drag on waveform, or programmatic)

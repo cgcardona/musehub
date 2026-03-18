@@ -3932,7 +3932,7 @@ def _print_urls(
     release_tags: dict[str, list[str]] | None = None,
 ) -> None:
     """Print all seeded MuseHub URLs to stdout for manual browser verification."""
-    BASE = "http://localhost:10001/musehub/ui"
+    BASE = "http://localhost:10001"
     print()
     print("=" * 72)
     print("🎵  MUSEHUB — ALL URLs (localhost:10001)")

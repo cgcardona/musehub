@@ -7,84 +7,6 @@
 
 {% block container_extra_class %}-wide{% endblock %}
 
-{% block extra_css %}
-<style>
-  .explore-layout {
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: var(--space-5);
-    align-items: start;
-  }
-  @media (max-width: 768px) {
-    .explore-layout { grid-template-columns: 1fr; }
-    .explore-sidebar { display: none; }
-    .explore-sidebar.open { display: block; }
-    .mobile-filter-toggle { display: block; }
-  }
-  .explore-sidebar {
-    position: sticky;
-    top: 72px;
-  }
-  .sidebar-section { margin-bottom: var(--space-4); }
-  .sidebar-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin: 0 0 var(--space-2) 0;
-  }
-  .filter-chip {
-    display: inline-block;
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-    background: var(--bg-overlay);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-default);
-    cursor: pointer;
-    margin: 2px 3px 2px 0;
-    text-decoration: none;
-    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
-  }
-  .filter-chip:hover { background: var(--bg-hover); color: var(--text-primary); text-decoration: none; }
-  .filter-chip.active {
-    background: rgba(88, 166, 255, 0.15);
-    color: var(--color-accent);
-    border-color: rgba(88, 166, 255, 0.35);
-  }
-  .sidebar-select {
-    width: 100%;
-    padding: 6px var(--space-2);
-    border-radius: var(--radius-base);
-    background: var(--bg-overlay);
-    color: var(--text-primary);
-    border: 1px solid var(--border-default);
-    font-size: var(--font-size-sm);
-    font-family: var(--font-sans);
-    cursor: pointer;
-  }
-  .sidebar-sort-option {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 4px 0;
-  }
-  .sidebar-sort-option input[type="radio"] { accent-color: var(--color-accent); }
-  .clear-filters-link {
-    font-size: var(--font-size-xs);
-    color: var(--color-accent);
-    text-decoration: none;
-    opacity: 0.8;
-  }
-  .clear-filters-link:hover { opacity: 1; text-decoration: underline; }
-  .mobile-filter-toggle { display: none; margin-bottom: var(--space-3); }
-</style>
-{% endblock %}
-
 {% block token_form %}
   <button class="btn btn-secondary btn-sm mobile-filter-toggle"
           onclick="document.querySelector('.explore-sidebar').classList.toggle('open')">
@@ -93,12 +15,12 @@
 
   <div class="explore-layout">
     <!-- ── Filter sidebar ─────────────────────────────────── -->
-    <aside class="explore-sidebar card" style="padding:var(--space-4)">
-      <form id="filter-form" method="GET" action="/musehub/ui/explore"
-            hx-get="/musehub/ui/explore" hx-target="#repo-grid" hx-push-url="true">
+    <aside class="explore-sidebar card card-accent-top" style="padding:var(--space-4)">
+      <form id="filter-form" method="GET" action="/explore"
+            hx-get="/explore" hx-target="#repo-grid" hx-push-url="true">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
           <strong style="font-size:14px">Filters</strong>
-          <a href="/musehub/ui/explore" class="clear-filters-link">Clear filters</a>
+          <a href="/explore" class="clear-filters-link">Clear filters</a>
         </div>
 
         <!-- Sort -->
@@ -174,7 +96,10 @@
     <!-- ── Repo grid (HTMX target) ───────────────────────── -->
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
-        <h2 style="margin:0">Explore Music</h2>
+        <div>
+          <p class="eyebrow" style="margin-bottom:4px">Music</p>
+          <h2 style="margin:0">Explore Repositories</h2>
+        </div>
         <span style="color:#8b949e">{{ total }} repositories</span>
       </div>
 

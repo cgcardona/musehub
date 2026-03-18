@@ -16,7 +16,7 @@
 {% block title %}Motifs — {{ owner }}/{{ repo_slug }} @ {{ ref[:8] }}{% endblock %}
 
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
   <a href="{{ base_url }}">{{ repo_slug }}</a> /
   <a href="{{ base_url }}/analysis/{{ ref }}">analysis</a> /
   motifs

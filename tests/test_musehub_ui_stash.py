@@ -1,6 +1,6 @@
-"""Tests for Muse Hub stash UI endpoints.
+"""Tests for MuseHub stash UI endpoints.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/stash:
+Covers GET /{owner}/{repo_slug}/stash:
 - test_stash_list_page_auth_required                 — unauthenticated GET → 401
 - test_stash_list_page_returns_200_with_token        — authenticated GET → 200 HTML
 - test_stash_list_page_shows_ref_labels              — HTML includes stash@{0} refs
@@ -13,17 +13,17 @@ Covers GET /musehub/ui/{owner}/{repo_slug}/stash:
 - test_stash_list_isolates_by_user                   — only caller's stash is shown
 - test_stash_list_pagination_query_params            — page/page_size accepted without error
 
-Covers POST /musehub/ui/{owner}/{repo_slug}/stash/{stash_ref}/apply:
+Covers POST /{owner}/{repo_slug}/stash/{stash_ref}/apply:
 - test_stash_apply_auth_required — unauthenticated POST → 401
 - test_stash_apply_redirects_to_stash_list — authenticated POST → 303 redirect
 - test_stash_apply_preserves_stash_entry — stash entry still exists after apply
 
-Covers POST /musehub/ui/{owner}/{repo_slug}/stash/{stash_ref}/pop:
+Covers POST /{owner}/{repo_slug}/stash/{stash_ref}/pop:
 - test_stash_pop_auth_required — unauthenticated POST → 401
 - test_stash_pop_redirects_to_stash_list — authenticated POST → 303 redirect
 - test_stash_pop_deletes_stash_entry — stash entry removed after pop
 
-Covers POST /musehub/ui/{owner}/{repo_slug}/stash/{stash_ref}/drop:
+Covers POST /{owner}/{repo_slug}/stash/{stash_ref}/drop:
 - test_stash_drop_auth_required — unauthenticated POST → 401
 - test_stash_drop_redirects_to_stash_list — authenticated POST → 303 redirect
 - test_stash_drop_deletes_stash_entry — stash entry removed after drop
@@ -111,7 +111,7 @@ async def test_stash_list_page_auth_required(
 ) -> None:
     """Unauthenticated GET returns 401 — stash is always private."""
     await _make_repo(db_session)
-    response = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/stash")
+    response = await client.get(f"/{_OWNER}/{_SLUG}/stash")
     assert response.status_code == 401
 
 
@@ -125,7 +125,7 @@ async def test_stash_list_page_returns_200_with_token(
     """Authenticated GET returns 200 HTML."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash",
+        f"/{_OWNER}/{_SLUG}/stash",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -143,7 +143,7 @@ async def test_stash_list_page_shows_ref_labels(
     repo_id = await _make_repo(db_session)
     await _make_stash(db_session, repo_id)
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash",
+        f"/{_OWNER}/{_SLUG}/stash",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -161,7 +161,7 @@ async def test_stash_list_page_action_buttons_present(
     repo_id = await _make_repo(db_session)
     await _make_stash(db_session, repo_id)
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash",
+        f"/{_OWNER}/{_SLUG}/stash",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -182,7 +182,7 @@ async def test_stash_list_page_drop_confirm_present(
     repo_id = await _make_repo(db_session)
     await _make_stash(db_session, repo_id)
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash",
+        f"/{_OWNER}/{_SLUG}/stash",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -201,7 +201,7 @@ async def test_stash_list_page_json_response(
     await _make_stash(db_session, repo_id)
     headers = {**auth_headers, "Content-Type": "application/json"}
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash?format=json",
+        f"/{_OWNER}/{_SLUG}/stash?format=json",
         headers=headers,
     )
     assert response.status_code == 200
@@ -219,7 +219,7 @@ async def test_stash_list_page_json_fields(
     repo_id = await _make_repo(db_session)
     await _make_stash(db_session, repo_id, branch="feat/bass", message="WIP brass", num_entries=3)
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash?format=json",
+        f"/{_OWNER}/{_SLUG}/stash?format=json",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -245,7 +245,7 @@ async def test_stash_list_page_empty_stash(
     """Stash list page with no entries returns 200 and total=0."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash?format=json",
+        f"/{_OWNER}/{_SLUG}/stash?format=json",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -263,7 +263,7 @@ async def test_stash_list_unknown_repo_404(
 ) -> None:
     """Unknown owner/slug returns 404."""
     response = await client.get(
-        "/musehub/ui/nobody/nonexistent/stash",
+        "/nobody/nonexistent/stash",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -297,7 +297,7 @@ async def test_stash_list_isolates_by_user(
     await db_session.commit()
 
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash?format=json",
+        f"/{_OWNER}/{_SLUG}/stash?format=json",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -316,7 +316,7 @@ async def test_stash_list_pagination_query_params(
     """page and page_size query params are accepted without error."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash?page=1&page_size=10",
+        f"/{_OWNER}/{_SLUG}/stash?page=1&page_size=10",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -336,7 +336,7 @@ async def test_stash_apply_auth_required(
     repo_id = await _make_repo(db_session)
     stash = await _make_stash(db_session, repo_id)
     response = await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash.id}/apply",
+        f"/{_OWNER}/{_SLUG}/stash/{stash.id}/apply",
         follow_redirects=False,
     )
     assert response.status_code == 401
@@ -353,12 +353,12 @@ async def test_stash_apply_redirects_to_stash_list(
     repo_id = await _make_repo(db_session)
     stash = await _make_stash(db_session, repo_id)
     response = await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash.id}/apply",
+        f"/{_OWNER}/{_SLUG}/stash/{stash.id}/apply",
         headers=auth_headers,
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"] == f"/musehub/ui/{_OWNER}/{_SLUG}/stash"
+    assert response.headers["location"] == f"/{_OWNER}/{_SLUG}/stash"
 
 
 @pytest.mark.anyio
@@ -374,7 +374,7 @@ async def test_stash_apply_preserves_stash_entry(
     stash_id = stash.id
 
     await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash_id}/apply",
+        f"/{_OWNER}/{_SLUG}/stash/{stash_id}/apply",
         headers=auth_headers,
         follow_redirects=False,
     )
@@ -402,7 +402,7 @@ async def test_stash_pop_auth_required(
     repo_id = await _make_repo(db_session)
     stash = await _make_stash(db_session, repo_id)
     response = await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash.id}/pop",
+        f"/{_OWNER}/{_SLUG}/stash/{stash.id}/pop",
         follow_redirects=False,
     )
     assert response.status_code == 401
@@ -419,12 +419,12 @@ async def test_stash_pop_redirects_to_stash_list(
     repo_id = await _make_repo(db_session)
     stash = await _make_stash(db_session, repo_id)
     response = await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash.id}/pop",
+        f"/{_OWNER}/{_SLUG}/stash/{stash.id}/pop",
         headers=auth_headers,
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"] == f"/musehub/ui/{_OWNER}/{_SLUG}/stash"
+    assert response.headers["location"] == f"/{_OWNER}/{_SLUG}/stash"
 
 
 @pytest.mark.anyio
@@ -440,7 +440,7 @@ async def test_stash_pop_deletes_stash_entry(
     stash_id = stash.id
 
     await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash_id}/pop",
+        f"/{_OWNER}/{_SLUG}/stash/{stash_id}/pop",
         headers=auth_headers,
         follow_redirects=False,
     )
@@ -469,7 +469,7 @@ async def test_stash_drop_auth_required(
     repo_id = await _make_repo(db_session)
     stash = await _make_stash(db_session, repo_id)
     response = await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash.id}/drop",
+        f"/{_OWNER}/{_SLUG}/stash/{stash.id}/drop",
         follow_redirects=False,
     )
     assert response.status_code == 401
@@ -486,12 +486,12 @@ async def test_stash_drop_redirects_to_stash_list(
     repo_id = await _make_repo(db_session)
     stash = await _make_stash(db_session, repo_id)
     response = await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash.id}/drop",
+        f"/{_OWNER}/{_SLUG}/stash/{stash.id}/drop",
         headers=auth_headers,
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"] == f"/musehub/ui/{_OWNER}/{_SLUG}/stash"
+    assert response.headers["location"] == f"/{_OWNER}/{_SLUG}/stash"
 
 
 @pytest.mark.anyio
@@ -507,7 +507,7 @@ async def test_stash_drop_deletes_stash_entry(
     stash_id = stash.id
 
     await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{stash_id}/drop",
+        f"/{_OWNER}/{_SLUG}/stash/{stash_id}/drop",
         headers=auth_headers,
         follow_redirects=False,
     )
@@ -550,7 +550,7 @@ async def test_stash_drop_wrong_user_404(
     await db_session.commit()
 
     response = await client.post(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash/{other_stash_id}/drop",
+        f"/{_OWNER}/{_SLUG}/stash/{other_stash_id}/drop",
         headers=auth_headers,
         follow_redirects=False,
     )

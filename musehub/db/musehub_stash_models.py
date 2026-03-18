@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for Muse Hub stash — a temporary shelf for uncommitted changes.
+"""SQLAlchemy ORM models for MuseHub stash — a temporary shelf for uncommitted changes.
 
 Analogous to git stash: musicians can save in-progress work, switch context,
 and pop the stash later to resume. Each stash record captures the branch it

@@ -1,6 +1,6 @@
-"""Tests for Muse Hub milestones UI endpoints.
+"""Tests for MuseHub milestones UI endpoints.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/milestones:
+Covers GET /{owner}/{repo_slug}/milestones:
 - test_milestones_list_page_returns_200 — page renders without auth
 - test_milestones_list_no_auth_required — no JWT needed for HTML shell
 - test_milestones_list_has_progress_bar_js — progress bar rendering present
@@ -11,7 +11,7 @@ Covers GET /musehub/ui/{owner}/{repo_slug}/milestones:
 - test_milestones_list_unknown_repo_404 — unknown owner/slug → 404
 - test_milestones_list_shows_base_url_not_repo_id — base_url uses owner/slug pattern
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/milestones/{number}:
+Covers GET /{owner}/{repo_slug}/milestones/{number}:
 - test_milestone_detail_page_returns_200 — page renders without auth
 - test_milestone_detail_no_auth_required — no JWT needed for HTML shell
 - test_milestone_detail_has_progress_bar — progress bar JS present
@@ -116,9 +116,9 @@ async def test_milestones_list_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/milestones returns 200 HTML."""
+    """GET /{owner}/{slug}/milestones returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/album-one/milestones")
+    response = await client.get("/artist/album-one/milestones")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -130,7 +130,7 @@ async def test_milestones_list_no_auth_required(
 ) -> None:
     """Milestones list page is accessible without a JWT token."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/album-one/milestones")
+    response = await client.get("/artist/album-one/milestones")
     assert response.status_code == 200
 
 
@@ -141,7 +141,7 @@ async def test_milestones_list_has_progress_bar_js(
 ) -> None:
     """Page HTML contains progress bar rendering logic."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/album-one/milestones")
+    response = await client.get("/artist/album-one/milestones")
     assert response.status_code == 200
     assert "progress-bar" in response.text
 
@@ -153,7 +153,7 @@ async def test_milestones_list_has_state_tabs_js(
 ) -> None:
     """Milestones list page has open/closed/all state filter tabs."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/album-one/milestones")
+    response = await client.get("/artist/album-one/milestones")
     assert response.status_code == 200
     body = response.text
     assert "state-tabs" in body or "state-tab" in body
@@ -168,7 +168,7 @@ async def test_milestones_list_has_sort_controls_js(
 ) -> None:
     """Milestones list page exposes due_on / title / completeness sort controls."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/album-one/milestones")
+    response = await client.get("/artist/album-one/milestones")
     assert response.status_code == 200
     body = response.text
     assert "due_on" in body or "completeness" in body
@@ -182,7 +182,7 @@ async def test_milestones_list_json_response(
     """?format=json returns JSON with HTTP 200."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, title="Mix Revision 2")
-    response = await client.get("/musehub/ui/artist/album-one/milestones?format=json")
+    response = await client.get("/artist/album-one/milestones?format=json")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")
 
@@ -195,7 +195,7 @@ async def test_milestones_list_json_has_milestones_key(
     """JSON response contains a milestones array."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, title="Album v1.0")
-    response = await client.get("/musehub/ui/artist/album-one/milestones?format=json&state=all")
+    response = await client.get("/artist/album-one/milestones?format=json&state=all")
     assert response.status_code == 200
     data = response.json()
     assert "milestones" in data
@@ -209,7 +209,7 @@ async def test_milestones_list_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug returns 404."""
-    response = await client.get("/musehub/ui/nobody/nonexistent/milestones")
+    response = await client.get("/nobody/nonexistent/milestones")
     assert response.status_code == 404
 
 
@@ -220,9 +220,9 @@ async def test_milestones_list_shows_base_url_not_repo_id(
 ) -> None:
     """HTML page uses owner/slug base_url pattern, not raw repo_id UUID."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/album-one/milestones")
+    response = await client.get("/artist/album-one/milestones")
     assert response.status_code == 200
-    assert "/musehub/ui/artist/album-one" in response.text
+    assert "/artist/album-one" in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -235,10 +235,10 @@ async def test_milestone_detail_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/milestones/{number} returns 200 HTML."""
+    """GET /{owner}/{slug}/milestones/{number} returns 200 HTML."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, number=1)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1")
+    response = await client.get("/artist/album-one/milestones/1")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -251,7 +251,7 @@ async def test_milestone_detail_no_auth_required(
     """Milestone detail page is accessible without a JWT token."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, number=1)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1")
+    response = await client.get("/artist/album-one/milestones/1")
     assert response.status_code == 200
 
 
@@ -263,7 +263,7 @@ async def test_milestone_detail_has_progress_bar(
     """Milestone detail page contains progress bar element."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, number=1)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1")
+    response = await client.get("/artist/album-one/milestones/1")
     assert response.status_code == 200
     assert "progress-bar" in response.text
 
@@ -276,7 +276,7 @@ async def test_milestone_detail_has_linked_issues_js(
     """Milestone detail page has JavaScript to render linked issues."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, number=1)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1")
+    response = await client.get("/artist/album-one/milestones/1")
     assert response.status_code == 200
     body = response.text
     assert "issue-rows" in body or "renderIssueRows" in body
@@ -290,7 +290,7 @@ async def test_milestone_detail_has_state_filter_tabs(
     """Milestone detail page has open/closed/all tabs to filter linked issues."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, number=1)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1")
+    response = await client.get("/artist/album-one/milestones/1")
     assert response.status_code == 200
     body = response.text
     assert "state-tabs" in body or "state-tab" in body
@@ -304,7 +304,7 @@ async def test_milestone_detail_json_response(
     """?format=json returns JSON with HTTP 200."""
     repo_id = await _make_repo(db_session)
     await _make_milestone(db_session, repo_id, number=1)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1?format=json")
+    response = await client.get("/artist/album-one/milestones/1?format=json")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")
 
@@ -318,7 +318,7 @@ async def test_milestone_detail_json_has_linked_issues(
     repo_id = await _make_repo(db_session)
     ms = await _make_milestone(db_session, repo_id, number=1, title="Album v1.0")
     await _make_issue(db_session, repo_id, number=1, milestone_id=str(ms.milestone_id))
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1?format=json")
+    response = await client.get("/artist/album-one/milestones/1?format=json")
     assert response.status_code == 200
     data = response.json()
     assert "title" in data
@@ -334,7 +334,7 @@ async def test_milestone_detail_unknown_number_404(
 ) -> None:
     """Non-existent milestone number returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/999")
+    response = await client.get("/artist/album-one/milestones/999")
     assert response.status_code == 404
 
 
@@ -344,7 +344,7 @@ async def test_milestone_detail_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug returns 404 for detail page."""
-    response = await client.get("/musehub/ui/nobody/nonexistent/milestones/1")
+    response = await client.get("/nobody/nonexistent/milestones/1")
     assert response.status_code == 404
 
 
@@ -361,7 +361,7 @@ async def test_milestone_detail_json_issue_counts(
     await _make_issue(db_session, repo_id, number=1, state="open", milestone_id=ms_id)
     await _make_issue(db_session, repo_id, number=2, state="open", milestone_id=ms_id)
     await _make_issue(db_session, repo_id, number=3, state="closed", milestone_id=ms_id)
-    response = await client.get("/musehub/ui/artist/album-one/milestones/1?format=json")
+    response = await client.get("/artist/album-one/milestones/1?format=json")
     assert response.status_code == 200
     data = response.json()
     assert data.get("openIssues") == 2

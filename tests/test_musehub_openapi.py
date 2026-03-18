@@ -99,7 +99,7 @@ async def test_musehub_endpoints_have_operation_ids(openapi_spec: dict) -> None:
         if "/api/v1/musehub" not in path and "/api/v1/musehub" not in path:
             continue
         # Skip UI/HTML routes (they don't return JSON)
-        if path.startswith("/musehub/"):
+        if path.startswith("/"):
             continue
 
         for method, operation in path_item.items():

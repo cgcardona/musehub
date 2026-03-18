@@ -1,4 +1,4 @@
-"""Muse Hub persistence adapter — single point of DB access for Hub entities.
+"""MuseHub persistence adapter — single point of DB access for Hub entities.
 
 This module is the ONLY place that touches the musehub_* tables.
 Route handlers delegate here; no business logic lives in routes.
@@ -221,7 +221,7 @@ async def create_repo(
         await session.flush()
 
     logger.info(
-        "✅ Created Muse Hub repo %s (%s/%s) for user %s (initialize=%s)",
+        "✅ Created MuseHub repo %s (%s/%s) for user %s (initialize=%s)",
         repo.repo_id, owner, slug, owner_user_id, initialize,
     )
     return _to_repo_response(repo)
@@ -247,7 +247,7 @@ async def delete_repo(session: AsyncSession, repo_id: str) -> bool:
         return False
     row.deleted_at = datetime.now(timezone.utc)
     await session.flush()
-    logger.info("✅ Soft-deleted Muse Hub repo %s", repo_id)
+    logger.info("✅ Soft-deleted MuseHub repo %s", repo_id)
     return True
 
 
@@ -269,7 +269,7 @@ async def transfer_repo_ownership(
     row.owner_user_id = new_owner_user_id
     await session.flush()
     await session.refresh(row)
-    logger.info("✅ Transferred Muse Hub repo %s ownership to user %s", repo_id, new_owner_user_id)
+    logger.info("✅ Transferred MuseHub repo %s ownership to user %s", repo_id, new_owner_user_id)
     return _to_repo_response(row)
 
 
@@ -816,7 +816,7 @@ async def global_search(
     page: int = 1,
     page_size: int = 10,
 ) -> GlobalSearchResult:
-    """Search commit messages across all public Muse Hub repos.
+    """Search commit messages across all public MuseHub repos.
 
     Only ``visibility='public'`` repos are searched — private repos are never
     exposed regardless of caller identity. This enforces the public-only
@@ -1239,7 +1239,7 @@ async def get_context_for_commit(
         )
 
     logger.info(
-        "✅ Muse Hub context built for repo %s commit %s (tracks=%d)",
+        "✅ MuseHub context built for repo %s commit %s (tracks=%d)",
         repo_id[:8],
         ref[:8],
         len(active_tracks),

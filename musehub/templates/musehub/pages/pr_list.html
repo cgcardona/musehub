@@ -3,57 +3,14 @@
 
 {% block title %}Pull Requests — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / pulls
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / pulls
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block page_data %}
 const repoId = {{ repo_id | tojson }};
 const base   = {{ base_url | tojson }};
-{% endblock %}
-
-{% block extra_css %}
-<style>
-/* ── PR list layout ─────────────────────────────────────────────────────── */
-.pr-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.pr-row:last-child { border-bottom: none; }
-
-.branch-pill {
-  display: inline-block;
-  padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-family: monospace;
-  background: var(--color-surface-2, #161b22);
-  border: 1px solid var(--color-border);
-  color: var(--color-fg, #e6edf3);
-}
-
-.pr-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-top: 4px;
-  font-size: 12px;
-  color: #8b949e;
-}
-
-/* ── Sort bar ────────────────────────────────────────────────────────────── */
-.sort-btn { font-size: 12px; padding: 3px 10px; }
-.sort-active {
-  background: var(--color-accent, #1f6feb) !important;
-  color: #fff !important;
-  border-color: var(--color-accent, #1f6feb) !important;
-}
-</style>
 {% endblock %}
 
 {% block content %}

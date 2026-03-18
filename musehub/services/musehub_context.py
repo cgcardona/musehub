@@ -1,4 +1,4 @@
-"""Muse Hub agent context aggregation service.
+"""MuseHub agent context aggregation service.
 
 This is the canonical read-path for AI composition agents. ``build_agent_context``
 aggregates musical state, commit history, analysis highlights, open PRs, and open

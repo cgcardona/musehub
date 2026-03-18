@@ -1,6 +1,6 @@
-"""SSR tests for the Muse Hub stash page (issue #556).
+"""SSR tests for the MuseHub stash page (issue #556).
 
-Verifies that ``GET /musehub/ui/{owner}/{repo_slug}/stash`` renders stash
+Verifies that ``GET /{owner}/{repo_slug}/stash`` renders stash
 data server-side rather than relying on client-side JavaScript fetches.
 
 Tests:
@@ -105,7 +105,7 @@ async def test_stash_page_renders_stash_entry_server_side(
     repo_id = await _make_repo(db_session)
     await _make_stash(db_session, repo_id, branch="feat/ssr-stash")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/stash", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -125,7 +125,7 @@ async def test_stash_page_shows_total_count(
     await _make_stash(db_session, repo_id)
     await _make_stash(db_session, repo_id, branch="feat/second")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/stash", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -143,7 +143,7 @@ async def test_stash_page_apply_form_uses_post(
     repo_id = await _make_repo(db_session)
     await _make_stash(db_session, repo_id)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/stash", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -162,7 +162,7 @@ async def test_stash_page_drop_has_hx_confirm(
     repo_id = await _make_repo(db_session)
     await _make_stash(db_session, repo_id)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/stash", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -186,7 +186,7 @@ async def test_stash_page_htmx_request_returns_fragment(
     await _make_stash(db_session, repo_id, branch="htmx-branch")
     htmx_headers = {**auth_headers, "HX-Request": "true"}
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash", headers=htmx_headers
+        f"/{_OWNER}/{_SLUG}/stash", headers=htmx_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -205,7 +205,7 @@ async def test_stash_page_empty_state_when_no_stashes(
     """Empty stash list renders an empty-state component server-side (no JS fetch needed)."""
     await _make_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/stash", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/stash", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text

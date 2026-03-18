@@ -65,7 +65,7 @@ async def test_compare_page_renders_dimension_table(
     values before any client-side JavaScript executes.
     """
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/compare/main...feature")
+    response = await client.get("/artist/my-track/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Melodic" in body
@@ -85,7 +85,7 @@ async def test_compare_page_shows_positive_delta(
     This verifies the Jinja2 conditional colour logic executes server-side.
     """
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/compare/main...feature")
+    response = await client.get("/artist/my-track/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     # At least one row should have the success colour (deterministic stubs guarantee variance)
@@ -99,7 +99,7 @@ async def test_compare_page_shows_negative_delta(
 ) -> None:
     """Negative delta rows include the danger color variable in their style attribute."""
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/compare/main...feature")
+    response = await client.get("/artist/my-track/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "var(--color-danger)" in body or "%" in body
@@ -112,7 +112,7 @@ async def test_compare_page_shows_base_and_head_refs(
 ) -> None:
     """Both base and head ref names appear in the server-rendered HTML."""
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/compare/alpha...beta")
+    response = await client.get("/artist/my-track/compare/alpha...beta")
     assert response.status_code == 200
     body = response.text
     assert "alpha" in body
@@ -126,7 +126,7 @@ async def test_compare_page_invalid_refs_returns_404(
 ) -> None:
     """A refs path without the ... separator returns 404."""
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/compare/mainonly")
+    response = await client.get("/artist/my-track/compare/mainonly")
     assert response.status_code == 404
 
 
@@ -136,7 +136,7 @@ async def test_compare_page_unknown_repo_returns_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug returns 404 before any service call."""
-    response = await client.get("/musehub/ui/ghost/nonexistent/compare/a...b")
+    response = await client.get("/ghost/nonexistent/compare/a...b")
     assert response.status_code == 404
 
 
@@ -156,7 +156,7 @@ async def test_divergence_page_renders_score_server_side(
     the server response body, confirming SSR delivery.
     """
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/divergence")
+    response = await client.get("/artist/my-track/divergence")
     assert response.status_code == 200
     body = response.text
     assert "conic-gradient" in body
@@ -170,7 +170,7 @@ async def test_divergence_page_renders_dimension_bars(
 ) -> None:
     """Per-dimension divergence bars are rendered server-side."""
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/divergence")
+    response = await client.get("/artist/my-track/divergence")
     assert response.status_code == 200
     body = response.text
     # All five musical dimensions must appear
@@ -190,7 +190,7 @@ async def test_divergence_page_with_fork_repo_id(
     await _make_repo(db_session, owner="artist", slug="my-track")
     fake_fork_id = "aabbccdd-1234-5678-9012-abcdef012345"
     response = await client.get(
-        f"/musehub/ui/artist/my-track/divergence?fork_repo_id={fake_fork_id}"
+        f"/artist/my-track/divergence?fork_repo_id={fake_fork_id}"
     )
     assert response.status_code == 200
     body = response.text
@@ -212,7 +212,7 @@ async def test_context_page_renders_summary(
     The summary paragraph must appear in the HTML body before any JS runs.
     """
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/context/abc12345")
+    response = await client.get("/artist/my-track/context/abc12345")
     assert response.status_code == 200
     body = response.text
     assert "context-summary" in body
@@ -226,7 +226,7 @@ async def test_context_page_renders_missing_elements(
 ) -> None:
     """Missing elements list is rendered server-side in the context card."""
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/context/abc12345")
+    response = await client.get("/artist/my-track/context/abc12345")
     assert response.status_code == 200
     body = response.text
     assert "context-missing" in body
@@ -240,7 +240,7 @@ async def test_context_page_renders_suggestions(
 ) -> None:
     """Suggestion cards are rendered server-side from the suggestions dict."""
     await _make_repo(db_session, owner="artist", slug="my-track")
-    response = await client.get("/musehub/ui/artist/my-track/context/abc12345")
+    response = await client.get("/artist/my-track/context/abc12345")
     assert response.status_code == 200
     body = response.text
     assert "suggestion-card" in body
@@ -253,5 +253,5 @@ async def test_context_page_unknown_repo_returns_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug returns 404 on the context page."""
-    response = await client.get("/musehub/ui/ghost/nonexistent/context/main")
+    response = await client.get("/ghost/nonexistent/context/main")
     assert response.status_code == 404

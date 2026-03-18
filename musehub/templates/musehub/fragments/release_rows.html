@@ -14,7 +14,7 @@
     releases      : list[ReleaseResponse] — current page of releases
     page          : int                   — current page number (1-based)
     total_pages   : int                   — total number of pages
-    base_url      : str                   — repo base URL, e.g. /musehub/ui/owner/slug
+    base_url      : str                   — repo base URL, e.g. /owner/slug
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
 {% from "musehub/macros/empty_state.html" import empty_state %}

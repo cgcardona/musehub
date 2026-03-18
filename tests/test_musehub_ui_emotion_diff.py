@@ -1,4 +1,4 @@
-"""Tests for the Muse Hub emotion-diff UI page.
+"""Tests for the MuseHub emotion-diff UI page.
 
 Covers:
 - test_emotion_diff_page_renders — GET /{owner}/{repo}/emotion-diff/{base}...{head} returns 200 HTML
@@ -44,7 +44,7 @@ async def _make_repo(db_session: AsyncSession) -> str:
     return str(repo.repo_id)
 
 
-_BASE_URL = "/musehub/ui/testuser/test-beats/emotion-diff/main...feature"
+_BASE_URL = "/testuser/test-beats/emotion-diff/main...feature"
 
 
 # ---------------------------------------------------------------------------
@@ -57,13 +57,13 @@ async def test_emotion_diff_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/emotion-diff/{base}...{head} returns 200 HTML."""
+    """GET /{owner}/{slug}/emotion-diff/{base}...{head} returns 200 HTML."""
     await _make_repo(db_session)
     response = await client.get(_BASE_URL)
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "main" in body
     assert "feature" in body
 
@@ -86,7 +86,7 @@ async def test_emotion_diff_page_invalid_ref_404(
 ) -> None:
     """Emotion-diff path without '...' separator returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/emotion-diff/mainfeature")
+    response = await client.get("/testuser/test-beats/emotion-diff/mainfeature")
     assert response.status_code == 404
 
 
@@ -95,7 +95,7 @@ async def test_emotion_diff_page_unknown_owner_404(
     client: AsyncClient,
 ) -> None:
     """Unknown owner/slug combination returns 404 on emotion-diff page."""
-    response = await client.get("/musehub/ui/nobody/norepo/emotion-diff/main...feature")
+    response = await client.get("/nobody/norepo/emotion-diff/main...feature")
     assert response.status_code == 404
 
 
@@ -106,7 +106,7 @@ async def test_emotion_diff_page_empty_base_ref_404(
 ) -> None:
     """Emotion-diff path with empty base ref (starts with '...') returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/emotion-diff/...feature")
+    response = await client.get("/testuser/test-beats/emotion-diff/...feature")
     assert response.status_code == 404
 
 
@@ -117,7 +117,7 @@ async def test_emotion_diff_page_empty_head_ref_404(
 ) -> None:
     """Emotion-diff path with empty head ref (ends with '...') returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/emotion-diff/main...")
+    response = await client.get("/testuser/test-beats/emotion-diff/main...")
     assert response.status_code == 404
 
 
@@ -213,7 +213,7 @@ async def test_emotion_diff_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/emotion-diff/{refs}?format=json returns EmotionDiffResponse."""
+    """GET /{owner}/{slug}/emotion-diff/{refs}?format=json returns EmotionDiffResponse."""
     await _make_repo(db_session)
     response = await client.get(f"{_BASE_URL}?format=json")
     assert response.status_code == 200

@@ -1,14 +1,14 @@
-"""Muse Hub label management UI route handlers — SSR with HTMX fragments.
+"""MuseHub label management UI route handlers — SSR with HTMX fragments.
 
 Serves server-rendered HTML for the labels management page and handles label
 mutations (create, edit, delete, reset) via HTMX form submissions.
 
 Endpoint summary:
-  GET  /musehub/ui/{owner}/{repo_slug}/labels                          — SSR label list page (public)
-  POST /musehub/ui/{owner}/{repo_slug}/labels                          — create label (auth required)
-  POST /musehub/ui/{owner}/{repo_slug}/labels/{label_id}/edit          — update label (auth required)
-  POST /musehub/ui/{owner}/{repo_slug}/labels/{label_id}/delete        — delete label (auth required)
-  POST /musehub/ui/{owner}/{repo_slug}/labels/reset                    — reset to 10 defaults (auth required)
+  GET  /{owner}/{repo_slug}/labels                          — SSR label list page (public)
+  POST /{owner}/{repo_slug}/labels                          — create label (auth required)
+  POST /{owner}/{repo_slug}/labels/{label_id}/edit          — update label (auth required)
+  POST /{owner}/{repo_slug}/labels/{label_id}/delete        — delete label (auth required)
+  POST /{owner}/{repo_slug}/labels/reset                    — reset to 10 defaults (auth required)
 
 Auth policy:
   GET: no authentication required — public repos are readable without a token.
@@ -53,7 +53,7 @@ from musehub.services import musehub_repository
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ class _LabelActionResponse(BaseModel):
 
 def _base_url(owner: str, repo_slug: str) -> str:
     """Return the canonical UI base URL for a repo."""
-    return f"/musehub/ui/{owner}/{repo_slug}"
+    return f"/{owner}/{repo_slug}"
 
 
 async def _resolve_repo(
@@ -280,7 +280,7 @@ async def _assert_label_exists(
 
 @router.get(
     "/{owner}/{repo_slug}/labels",
-    summary="Muse Hub label list page — view and manage repo labels",
+    summary="MuseHub label list page — view and manage repo labels",
 )
 async def labels_page(
     request: Request,
@@ -325,7 +325,7 @@ async def labels_page(
         "labels": labels,
         "total": len(labels),
         "breadcrumb_data": [
-            {"label": owner, "url": f"/musehub/ui/{owner}"},
+            {"label": owner, "url": f"/{owner}"},
             {"label": repo_slug, "url": base_url},
             {"label": "Labels", "url": ""},
         ],
@@ -349,7 +349,7 @@ async def labels_page(
 
 @router.post(
     "/{owner}/{repo_slug}/labels",
-    summary="Create a new label in a Muse Hub repo",
+    summary="Create a new label in a MuseHub repo",
     status_code=http_status.HTTP_201_CREATED,
 )
 async def create_label(
@@ -443,7 +443,7 @@ async def edit_label(
     JSON confirmation for direct API calls.
 
     Path uses ``/edit`` suffix to distinguish from the delete action, matching
-    the HTML form-action convention used across the Muse Hub UI.
+    the HTML form-action convention used across the MuseHub UI.
     """
     body = await _parse_label_edit_body(request)
     repo_id, base_url = await _resolve_repo(owner, repo_slug, db)
@@ -514,7 +514,7 @@ async def edit_label(
 
 @router.post(
     "/{owner}/{repo_slug}/labels/{label_id}/delete",
-    summary="Delete a label from a Muse Hub repo",
+    summary="Delete a label from a MuseHub repo",
 )
 async def delete_label(
     request: Request,

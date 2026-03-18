@@ -1,4 +1,4 @@
-"""Muse Hub release packager — builds download package URL maps for releases.
+"""MuseHub release packager — builds download package URL maps for releases.
 
 A release exposes music files in multiple formats so musicians and listeners
 can download the composition in their preferred format:
@@ -42,7 +42,7 @@ def build_download_urls(
     the pinned commit.
 
     Args:
-        repo_id: The UUID of the Muse Hub repo.
+        repo_id: The UUID of the MuseHub repo.
         release_id: The UUID of the release row.
         has_midi: True if a full MIDI bundle is available.
         has_stems: True if per-track stem files are available.

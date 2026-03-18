@@ -1,17 +1,17 @@
-"""SSR tests for Muse Hub search pages — issue #577.
+"""SSR tests for MuseHub search pages — issue #577.
 
 Verifies that global_search_page() and search_page() render results
 server-side in Jinja2 templates without requiring JavaScript execution.
 Tests assert on HTML content directly returned by the server.
 
-Covers GET /musehub/ui/search (global search):
+Covers GET /search (global search):
 - test_global_search_renders_results_server_side
 - test_global_search_no_results_shows_empty_state
 - test_global_search_short_query_shows_prompt
 - test_global_search_htmx_fragment_path
 - test_global_search_empty_query_shows_prompt
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/search (repo-scoped search):
+Covers GET /{owner}/{repo_slug}/search (repo-scoped search):
 - test_repo_search_form_populated_server_side
 - test_repo_search_short_query_shows_prompt
 - test_repo_search_htmx_fragment_returns_no_html
@@ -125,7 +125,7 @@ async def _make_cli_commit(
 
 
 # ---------------------------------------------------------------------------
-# Global search — GET /musehub/ui/search
+# Global search — GET /search
 # ---------------------------------------------------------------------------
 
 
@@ -142,7 +142,7 @@ async def test_global_search_renders_results_server_side(
         commit_id="aabbccddeeff00112233445566778899aabbccd1",
         message="beatbox groove pattern in D minor",
     )
-    response = await client.get("/musehub/ui/search?q=beatbox")
+    response = await client.get("/search?q=beatbox")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "beatbox" in response.text
@@ -155,7 +155,7 @@ async def test_global_search_no_results_shows_empty_state(
 ) -> None:
     """A query with no matches renders the empty-state block."""
     await _make_repo(db_session, owner="search_noresult", slug="noresult-album")
-    response = await client.get("/musehub/ui/search?q=zzznomatch")
+    response = await client.get("/search?q=zzznomatch")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "No results" in response.text
@@ -167,7 +167,7 @@ async def test_global_search_short_query_shows_prompt(
     db_session: AsyncSession,
 ) -> None:
     """A single-character query renders the 'Enter at least 2 characters' prompt."""
-    response = await client.get("/musehub/ui/search?q=a")
+    response = await client.get("/search?q=a")
     assert response.status_code == 200
     assert "Enter at least 2 characters" in response.text
 
@@ -178,7 +178,7 @@ async def test_global_search_empty_query_shows_prompt(
     db_session: AsyncSession,
 ) -> None:
     """An empty query renders the prompt without running any DB search."""
-    response = await client.get("/musehub/ui/search")
+    response = await client.get("/search")
     assert response.status_code == 200
     assert "Enter at least 2 characters" in response.text
 
@@ -197,7 +197,7 @@ async def test_global_search_htmx_fragment_path(
         message="funky bassline in Eb",
     )
     response = await client.get(
-        "/musehub/ui/search?q=funky",
+        "/search?q=funky",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -206,7 +206,7 @@ async def test_global_search_htmx_fragment_path(
 
 
 # ---------------------------------------------------------------------------
-# Repo-scoped search — GET /musehub/ui/{owner}/{repo_slug}/search
+# Repo-scoped search — GET /{owner}/{repo_slug}/search
 # ---------------------------------------------------------------------------
 
 
@@ -218,7 +218,7 @@ async def test_repo_search_form_populated_server_side(
     """The query value is rendered server-side into the search form input (not by JS)."""
     await _make_repo(db_session, owner="repo_search_artist", slug="repo-search-album")
     response = await client.get(
-        "/musehub/ui/repo_search_artist/repo-search-album/search?q=jazzcore"
+        "/repo_search_artist/repo-search-album/search?q=jazzcore"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -236,7 +236,7 @@ async def test_repo_search_short_query_shows_prompt(
         db_session, owner="repo_search_short", slug="repo-search-short-album"
     )
     response = await client.get(
-        "/musehub/ui/repo_search_short/repo-search-short-album/search?q=x"
+        "/repo_search_short/repo-search-short-album/search?q=x"
     )
     assert response.status_code == 200
     assert "Enter at least 2 characters" in response.text
@@ -252,7 +252,7 @@ async def test_repo_search_htmx_fragment_returns_no_html(
         db_session, owner="htmx_repo_search", slug="htmx-repo-search-album"
     )
     response = await client.get(
-        "/musehub/ui/htmx_repo_search/htmx-repo-search-album/search?q=zzznomatch",
+        "/htmx_repo_search/htmx-repo-search-album/search?q=zzznomatch",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -271,7 +271,7 @@ async def test_repo_search_no_results_shows_empty_state(
         db_session, owner="repo_search_empty", slug="repo-search-empty-album"
     )
     response = await client.get(
-        "/musehub/ui/repo_search_empty/repo-search-empty-album/search?q=zzznomatch"
+        "/repo_search_empty/repo-search-empty-album/search?q=zzznomatch"
     )
     assert response.status_code == 200
     assert "No results" in response.text
@@ -292,7 +292,7 @@ async def test_repo_search_results_rendered_server_side(
         message="soulful groove rhythm section unique term",
     )
     response = await client.get(
-        "/musehub/ui/repo_search_ssr/repo-search-ssr-album/search?q=soulful+groove"
+        "/repo_search_ssr/repo-search-ssr-album/search?q=soulful+groove"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]

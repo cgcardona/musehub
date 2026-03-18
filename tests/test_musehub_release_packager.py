@@ -14,7 +14,7 @@ from musehub.services.musehub_release_packager import (
 
 REPO_ID = "repo-abc123"
 RELEASE_ID = "rel-xyz789"
-BASE = f"/api/v1/musehub/repos/{REPO_ID}/releases/{RELEASE_ID}/packages"
+BASE = f"/api/v1/repos/{REPO_ID}/releases/{RELEASE_ID}/packages"
 
 
 class TestBuildDownloadUrls:

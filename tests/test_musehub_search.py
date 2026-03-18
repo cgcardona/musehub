@@ -1,7 +1,7 @@
 """Tests for MuseHub search endpoints.
 
 Covers cross-repo global search:
-- test_global_search_page_renders — GET /musehub/ui/search returns 200 HTML
+- test_global_search_page_renders — GET /search returns 200 HTML
 - test_global_search_results_grouped — JSON results are grouped by repo
 - test_global_search_public_only — private repos are excluded
 - test_global_search_json — JSON content-type returned
@@ -12,7 +12,7 @@ Covers cross-repo global search:
 - test_global_search_pagination — page/page_size params respected
 
 Covers in-repo search:
-- test_search_page_renders — GET /musehub/ui/{repo_id}/search → 200 HTML
+- test_search_page_renders — GET /{repo_id}/search → 200 HTML
 - test_search_keyword_mode — keyword search returns matching commits
 - test_search_keyword_empty_query — empty keyword query returns empty matches
 - test_search_musical_property — musical property filter works
@@ -150,13 +150,13 @@ async def test_global_search_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/search returns 200 HTML with a search form (no auth required)."""
-    response = await client.get("/musehub/ui/search")
+    """GET /search returns 200 HTML with a search form (no auth required)."""
+    response = await client.get("/search")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "Global Search" in body
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert 'name="q"' in body
     assert 'name="mode"' in body
 
@@ -166,8 +166,8 @@ async def test_global_search_page_pre_fills_query(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/search?q=jazz pre-fills the search form with 'jazz'."""
-    response = await client.get("/musehub/ui/search?q=jazz&mode=keyword")
+    """GET /search?q=jazz pre-fills the search form with 'jazz'."""
+    response = await client.get("/search?q=jazz&mode=keyword")
     assert response.status_code == 200
     body = response.text
     assert "jazz" in body
@@ -527,13 +527,13 @@ async def test_search_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/search returns 200 HTML with mode dropdown."""
+    """GET /{repo_id}/search returns 200 HTML with mode dropdown."""
     repo_id = await _make_search_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/search-test-repo/search")
+    response = await client.get("/testuser/search-test-repo/search")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Search Commits" in body
     assert 'name="q"' in body
     assert 'name="mode"' in body
@@ -547,7 +547,7 @@ async def test_search_page_no_auth_required(
 ) -> None:
     """Search UI page is accessible without a JWT (HTML shell, JS handles auth)."""
     repo_id = await _make_search_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/search-test-repo/search")
+    response = await client.get("/testuser/search-test-repo/search")
     assert response.status_code == 200
 
 
@@ -561,9 +561,9 @@ async def test_search_requires_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/search returns 401 without a token."""
+    """GET /api/v1/repos/{repo_id}/search returns 401 without a token."""
     repo_id = await _make_search_repo(db_session)
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/search?mode=keyword&q=jazz")
+    response = await client.get(f"/api/v1/repos/{repo_id}/search?mode=keyword&q=jazz")
     assert response.status_code == 401
 
 
@@ -573,9 +573,9 @@ async def test_search_unknown_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/search returns 404."""
+    """GET /api/v1/repos/{unknown}/search returns 404."""
     response = await client.get(
-        "/api/v1/musehub/repos/does-not-exist/search?mode=keyword&q=test",
+        "/api/v1/repos/does-not-exist/search?mode=keyword&q=test",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -590,7 +590,7 @@ async def test_search_invalid_mode(
     """GET search with an unknown mode returns 422."""
     repo_id = await _make_search_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=badmode&q=x",
+        f"/api/v1/repos/{repo_id}/search?mode=badmode&q=x",
         headers=auth_headers,
     )
     assert response.status_code == 422
@@ -617,7 +617,7 @@ async def test_search_keyword_mode(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=keyword&q=jazz+bassline",
+        f"/api/v1/repos/{repo_id}/search?mode=keyword&q=jazz+bassline",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -640,7 +640,7 @@ async def test_search_keyword_empty_query(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=keyword&q=",
+        f"/api/v1/repos/{repo_id}/search?mode=keyword&q=",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -662,7 +662,7 @@ async def test_search_json_response(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=keyword&q=piano",
+        f"/api/v1/repos/{repo_id}/search?mode=keyword&q=piano",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -705,7 +705,7 @@ async def test_search_musical_property(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=property&harmony=Eb",
+        f"/api/v1/repos/{repo_id}/search?mode=property&harmony=Eb",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -735,7 +735,7 @@ async def test_search_natural_language(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=ask&q=what+tempo+changes+did+I+make",
+        f"/api/v1/repos/{repo_id}/search?mode=ask&q=what+tempo+changes+did+I+make",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -764,7 +764,7 @@ async def test_search_pattern_message(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=pattern&q=Cm7",
+        f"/api/v1/repos/{repo_id}/search?mode=pattern&q=Cm7",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -794,7 +794,7 @@ async def test_search_pattern_branch(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=pattern&q=hip-hop",
+        f"/api/v1/repos/{repo_id}/search?mode=pattern&q=hip-hop",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -827,7 +827,7 @@ async def test_search_date_range_since(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=keyword&q=jazz&since=2025-06-01T00:00:00Z",
+        f"/api/v1/repos/{repo_id}/search?mode=keyword&q=jazz&since=2025-06-01T00:00:00Z",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -854,7 +854,7 @@ async def test_search_date_range_until(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=keyword&q=piano&until=2025-06-01T00:00:00Z",
+        f"/api/v1/repos/{repo_id}/search?mode=keyword&q=piano&until=2025-06-01T00:00:00Z",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -883,7 +883,7 @@ async def test_search_limit_respected(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/search?mode=keyword&q=bass&limit=3",
+        f"/api/v1/repos/{repo_id}/search?mode=keyword&q=bass&limit=3",
         headers=auth_headers,
     )
     assert response.status_code == 200

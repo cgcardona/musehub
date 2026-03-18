@@ -1,4 +1,4 @@
-"""Muse Hub Notation Service — MIDI-to-standard-notation conversion.
+"""MuseHub Notation Service — MIDI-to-standard-notation conversion.
 
 Converts MIDI note data (as stored in Muse commits) into quantized, structured
 notation data suitable for rendering as sheet music. The output is a typed

@@ -1,4 +1,4 @@
-"""Muse Hub export service — format conversion and ZIP packaging.
+"""MuseHub export service — format conversion and ZIP packaging.
 
 Resolves a repo ref (commit ID or branch name) and packages stored artifacts
 into a downloadable payload. The export is deterministic for a given
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExportFormat(str, Enum):
-    """Supported export formats for a Muse Hub repo snapshot.
+    """Supported export formats for a MuseHub repo snapshot.
 
     midi — Audio MIDI (.mid); the native Muse format.
     json — Commit metadata + object index; machine-readable for agents.
@@ -226,7 +226,7 @@ async def export_repo_at_ref(
 
     Args:
         session: Active async DB session.
-        repo_id: Target Muse Hub repository ID.
+        repo_id: Target MuseHub repository ID.
         ref: Commit ID or branch name to export from.
         format: Output format (ExportFormat enum).
         split_tracks: When True, always bundle into a ZIP even for a single artifact.

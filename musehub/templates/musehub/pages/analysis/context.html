@@ -3,7 +3,7 @@
 {% block title %}Musical Context {{ ref[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
   context / {{ ref[:8] }}
 {% endblock %}
 

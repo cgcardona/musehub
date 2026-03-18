@@ -1,4 +1,4 @@
-"""Muse Hub listen-page audio scanning service.
+"""MuseHub listen-page audio scanning service.
 
 Single source of truth for the audio-track scanning and ``TrackListingResponse``
 construction logic shared between:

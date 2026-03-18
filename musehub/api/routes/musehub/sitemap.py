@@ -1,4 +1,4 @@
-"""Muse Hub sitemap.xml and robots.txt generation.
+"""MuseHub sitemap.xml and robots.txt generation.
 
 Endpoint summary:
   GET /sitemap.xml — XML sitemap of all public MuseHub content (repos, users, topics, releases)
@@ -51,9 +51,9 @@ _SITEMAP_URL_LIMIT = 50_000
 # Static pages always present in the sitemap regardless of DB content.
 _STATIC_PAGES: list[tuple[str, str, str]] = [
     # (path, changefreq, priority)
-    ("/musehub/ui/explore", "daily", "0.9"),
-    ("/musehub/ui/trending", "daily", "0.9"),
-    ("/musehub/ui/topics", "weekly", "0.6"),
+    ("/explore", "daily", "0.9"),
+    ("/trending", "daily", "0.9"),
+    ("/topics", "weekly", "0.6"),
 ]
 
 # Agents known to index content for discovery — granted explicit Allow in robots.txt.
@@ -190,7 +190,7 @@ async def _fetch_sitemap_entries(
         lastmod = _to_date(activity_ts)
         entries.append(
             {
-                "loc": f"{base_url}/musehub/ui/{owner}/{slug}",
+                "loc": f"{base_url}/{owner}/{slug}",
                 "lastmod": lastmod,
                 "changefreq": changefreq,
                 "priority": "0.8",
@@ -198,7 +198,7 @@ async def _fetch_sitemap_entries(
         )
         entries.append(
             {
-                "loc": f"{base_url}/musehub/ui/{owner}/{slug}/commits",
+                "loc": f"{base_url}/{owner}/{slug}/commits",
                 "lastmod": lastmod,
                 "changefreq": changefreq,
                 "priority": "0.7",
@@ -206,7 +206,7 @@ async def _fetch_sitemap_entries(
         )
         entries.append(
             {
-                "loc": f"{base_url}/musehub/ui/{owner}/{slug}/issues",
+                "loc": f"{base_url}/{owner}/{slug}/issues",
                 "lastmod": lastmod,
                 "changefreq": "weekly",
                 "priority": "0.5",
@@ -223,7 +223,7 @@ async def _fetch_sitemap_entries(
         profile_count += 1
         entries.append(
             {
-                "loc": f"{base_url}/musehub/ui/users/{username}",
+                "loc": f"{base_url}/users/{username}",
                 "lastmod": _to_date(updated_at),
                 "changefreq": "weekly",
                 "priority": "0.7",
@@ -241,7 +241,7 @@ async def _fetch_sitemap_entries(
                 seen_topics.add(t)
                 entries.append(
                     {
-                        "loc": f"{base_url}/musehub/ui/topics/{t}",
+                        "loc": f"{base_url}/topics/{t}",
                         "changefreq": "weekly",
                         "priority": "0.6",
                     }
@@ -263,7 +263,7 @@ async def _fetch_sitemap_entries(
     for owner, slug, tag, created_at in release_rows:
         entries.append(
             {
-                "loc": f"{base_url}/musehub/ui/{owner}/{slug}/releases/{tag}",
+                "loc": f"{base_url}/{owner}/{slug}/releases/{tag}",
                 "lastmod": _to_date(created_at),
                 "changefreq": "monthly",
                 "priority": "0.5",
@@ -345,9 +345,9 @@ async def get_robots_txt(request: Request) -> PlainTextResponse:
 
     body = f"""\
 User-agent: *
-Allow: /musehub/ui/
-Disallow: /musehub/ui/*/settings
-Disallow: /musehub/ui/notifications
+Allow: /
+Disallow: /*/settings
+Disallow: /notifications
 Disallow: /api/
 
 {agent_allows}

@@ -1,4 +1,4 @@
-"""SSR tests for the Muse Hub fork network page (issue #561).
+"""SSR tests for the MuseHub fork network page (issue #561).
 
 Verifies that the fork table is rendered server-side (HTML in the initial
 response body) and that the SVG DAG container and window.__forkNetwork data
@@ -93,13 +93,13 @@ async def test_forks_page_renders_fork_owner_server_side(
     source_id = await _make_repo(db_session)
     await _make_fork(db_session, source_id, fork_owner="alice", fork_slug="bass-project")
 
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     body = response.text
     # Fork owner must appear in server-rendered HTML (table row), not just in JS data
     assert "alice" in body
     # The fork link href must be a server-rendered anchor tag
-    assert "/musehub/ui/alice/bass-project" in body
+    assert "/alice/bass-project" in body
 
 
 @pytest.mark.anyio
@@ -116,7 +116,7 @@ async def test_forks_page_shows_total_count(
     await _make_fork(db_session, source_id, fork_owner="bob", fork_slug="bass-project")
     await _make_fork(db_session, source_id, fork_owner="carol", fork_slug="bass-project")
 
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     body = response.text
     # Both the count and the word "fork" must appear in the SSR page
@@ -136,7 +136,7 @@ async def test_forks_page_empty_state_when_no_forks(
     """
     await _make_repo(db_session)
 
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     body = response.text
     # Empty-state copy must be present server-side
@@ -158,7 +158,7 @@ async def test_forks_page_dag_container_present(
     """
     await _make_repo(db_session)
 
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     body = response.text
     # Either the named container or the SVG element itself must be present
@@ -178,7 +178,7 @@ async def test_forks_page_fork_network_json_in_html(
     source_id = await _make_repo(db_session)
     await _make_fork(db_session, source_id, fork_owner="dave", fork_slug="bass-project")
 
-    response = await client.get("/musehub/ui/upstream/bass-project/forks")
+    response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     body = response.text
     assert "window.__forkNetwork" in body

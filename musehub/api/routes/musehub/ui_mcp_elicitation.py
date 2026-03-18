@@ -6,15 +6,15 @@ This router provides the landing pages that receive those redirects.
 
 Endpoints:
 
-  GET /musehub/ui/mcp/connect/{platform}?elicitation_id=...
+  GET /mcp/connect/{platform}?elicitation_id=...
     Landing page for streaming platform OAuth start. Verifies the user's
     MuseHub session, then redirects to the platform's OAuth page.
     On return, the callback signals elicitation completion to the agent.
 
-  GET /musehub/ui/mcp/connect/daw/{service}?elicitation_id=...
+  GET /mcp/connect/daw/{service}?elicitation_id=...
     Same pattern for cloud DAW / mastering service connections (LANDR, Splice, etc.).
 
-  GET /musehub/ui/mcp/elicitation/{elicitation_id}/callback?status=accepted|declined
+  GET /mcp/elicitation/{elicitation_id}/callback?status=accepted|declined
     OAuth redirect target. Resolves the pending elicitation Future in the
     active MCP session and pushes a ``notifications/elicitation/complete``
     event to the agent's SSE stream.
@@ -87,7 +87,7 @@ def _get_musehub_user_id(request: Request) -> str | None:
 
 
 @router.get(
-    "/musehub/ui/mcp/connect/{platform_slug}",
+    "/mcp/connect/{platform_slug}",
     operation_id="mcpElicitationPlatformConnect",
     summary="MCP URL Elicitation — streaming platform OAuth start",
     response_class=HTMLResponse,
@@ -115,7 +115,7 @@ async def platform_connect_start(
     user_id = _get_musehub_user_id(request)
     if user_id is None:
         callback = request.url
-        return RedirectResponse(url=f"/musehub/login?next={callback}", status_code=302)
+        return RedirectResponse(url=f"/login?next={callback}", status_code=302)
 
     oauth_url = _PLATFORM_OAUTH_URLS.get(platform, "#")
     callback_url = str(request.url_for(
@@ -141,7 +141,7 @@ async def platform_connect_start(
 
 
 @router.get(
-    "/musehub/ui/mcp/connect/daw/{service_slug}",
+    "/mcp/connect/daw/{service_slug}",
     operation_id="mcpElicitationDawConnect",
     summary="MCP URL Elicitation — cloud DAW OAuth start",
     response_class=HTMLResponse,
@@ -165,7 +165,7 @@ async def daw_connect_start(
     user_id = _get_musehub_user_id(request)
     if user_id is None:
         callback = request.url
-        return RedirectResponse(url=f"/musehub/login?next={callback}", status_code=302)
+        return RedirectResponse(url=f"/login?next={callback}", status_code=302)
 
     oauth_url = _DAW_OAUTH_URLS.get(service, "#")
     callback_url = str(request.url_for(
@@ -190,7 +190,7 @@ async def daw_connect_start(
 
 
 @router.get(
-    "/musehub/ui/mcp/elicitation/{elicitation_id}/callback",
+    "/mcp/elicitation/{elicitation_id}/callback",
     operation_id="mcpElicitationCallback",
     summary="MCP URL Elicitation — OAuth callback and completion signal",
     response_class=HTMLResponse,
@@ -283,6 +283,6 @@ h1{{color:#e11d48;}}a{{color:#7c3aed;}}</style></head>
 <body>
 <h1>Elicitation Error</h1>
 <p>{message}</p>
-<p><a href="/musehub">← Back to MuseHub</a></p>
+<p><a href="/">← Back to MuseHub</a></p>
 </body>
 </html>"""

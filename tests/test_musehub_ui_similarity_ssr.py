@@ -44,8 +44,8 @@ async def _make_repo(db_session: AsyncSession) -> str:
     return str(repo.repo_id)
 
 
-_SIM_URL = "/musehub/ui/ssruser/ssr-test-beats/similarity/main...feature"
-_EDIFF_URL = "/musehub/ui/ssruser/ssr-test-beats/emotion-diff/main...feature"
+_SIM_URL = "/ssruser/ssr-test-beats/similarity/main...feature"
+_EDIFF_URL = "/ssruser/ssr-test-beats/emotion-diff/main...feature"
 
 
 # ---------------------------------------------------------------------------

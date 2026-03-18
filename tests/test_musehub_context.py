@@ -1,7 +1,7 @@
-"""Tests for the agent context endpoint (GET /musehub/repos/{repo_id}/context).
+"""Tests for the agent context endpoint (GET /repos/{repo_id}/context).
 
 Covers every acceptance criterion:
-- GET /musehub/repos/{repo_id}/context returns all required sections
+- GET /repos/{repo_id}/context returns all required sections
 - Musical state section is present (active_tracks, key, tempo, etc.)
 - History section includes recent commits
 - Active PRs section lists open PRs
@@ -102,13 +102,13 @@ async def test_context_endpoint_returns_all_sections(
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/repos/{repo_id}/context returns all required top-level sections."""
+    """GET /repos/{repo_id}/context returns all required top-level sections."""
     repo_id = await _create_repo(client, auth_headers)
     await _seed_repo_with_commits(db_session, repo_id)
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context",
+        f"/api/v1/repos/{repo_id}/context",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -145,7 +145,7 @@ async def test_context_includes_musical_state(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context",
+        f"/api/v1/repos/{repo_id}/context",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -178,7 +178,7 @@ async def test_context_includes_history(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context",
+        f"/api/v1/repos/{repo_id}/context",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -235,7 +235,7 @@ async def test_context_includes_active_prs(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context",
+        f"/api/v1/repos/{repo_id}/context",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -267,7 +267,7 @@ async def test_context_brief_depth(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context?depth=brief",
+        f"/api/v1/repos/{repo_id}/context?depth=brief",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -295,7 +295,7 @@ async def test_context_standard_depth(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context?depth=standard",
+        f"/api/v1/repos/{repo_id}/context?depth=standard",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -335,7 +335,7 @@ async def test_context_verbose_depth_includes_issue_bodies(
 
     # brief: body should be empty string
     brief_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context?depth=brief",
+        f"/api/v1/repos/{repo_id}/context?depth=brief",
         headers=auth_headers,
     )
     assert brief_resp.status_code == 200
@@ -345,7 +345,7 @@ async def test_context_verbose_depth_includes_issue_bodies(
 
     # verbose: body should be included
     verbose_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context?depth=verbose",
+        f"/api/v1/repos/{repo_id}/context?depth=verbose",
         headers=auth_headers,
     )
     assert verbose_resp.status_code == 200
@@ -371,7 +371,7 @@ async def test_context_yaml_format(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context?format=yaml",
+        f"/api/v1/repos/{repo_id}/context?format=yaml",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -395,9 +395,9 @@ async def test_context_unknown_repo_404(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /musehub/repos/{unknown_id}/context returns 404 for a non-existent repo."""
+    """GET /repos/{unknown_id}/context returns 404 for a non-existent repo."""
     response = await client.get(
-        "/api/v1/musehub/repos/nonexistent-repo-id/context",
+        "/api/v1/repos/nonexistent-repo-id/context",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -419,7 +419,7 @@ async def test_context_ref_not_found_404(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context?ref=nonexistent-branch",
+        f"/api/v1/repos/{repo_id}/context?ref=nonexistent-branch",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -435,13 +435,13 @@ async def test_context_nonexistent_repo_returns_404_without_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/repos/{repo_id}/context returns 404 for a non-existent repo without auth.
+    """GET /repos/{repo_id}/context returns 404 for a non-existent repo without auth.
 
     Context endpoint uses optional_token — auth check is visibility-based,
     so a missing repo returns 404 before the auth check fires.
     """
     response = await client.get(
-        "/api/v1/musehub/repos/non-existent-repo-id/context",
+        "/api/v1/repos/non-existent-repo-id/context",
     )
     assert response.status_code == 404
 
@@ -463,7 +463,7 @@ async def test_context_default_ref_resolves_to_latest_commit(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context",
+        f"/api/v1/repos/{repo_id}/context",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -490,7 +490,7 @@ async def test_context_branch_ref_resolution(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context?ref=main",
+        f"/api/v1/repos/{repo_id}/context?ref=main",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -515,7 +515,7 @@ async def test_context_suggestions_generated(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context",
+        f"/api/v1/repos/{repo_id}/context",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -563,7 +563,7 @@ async def test_context_open_issues_excluded_when_closed(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context",
+        f"/api/v1/repos/{repo_id}/context",
         headers=auth_headers,
     )
     assert response.status_code == 200

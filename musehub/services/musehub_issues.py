@@ -1,4 +1,4 @@
-"""Muse Hub issue persistence adapter — single point of DB access for issues.
+"""MuseHub issue persistence adapter — single point of DB access for issues.
 
 This module is the ONLY place that touches the ``musehub_issues``,
 ``musehub_issue_comments``, and ``musehub_milestones`` tables.

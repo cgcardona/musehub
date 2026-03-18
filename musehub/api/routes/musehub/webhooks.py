@@ -1,11 +1,11 @@
-"""Muse Hub webhook subscription route handlers.
+"""MuseHub webhook subscription route handlers.
 
 Endpoint summary:
-  POST /musehub/repos/{repo_id}/webhooks — register a webhook
-  GET /musehub/repos/{repo_id}/webhooks — list webhooks
-  DELETE /musehub/repos/{repo_id}/webhooks/{webhook_id} — remove a webhook
-  GET /musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries — delivery history
-  POST /musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver — retry a delivery
+  POST /repos/{repo_id}/webhooks — register a webhook
+  GET /repos/{repo_id}/webhooks — list webhooks
+  DELETE /repos/{repo_id}/webhooks/{webhook_id} — remove a webhook
+  GET /repos/{repo_id}/webhooks/{webhook_id}/deliveries — delivery history
+  POST /repos/{repo_id}/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver — retry a delivery
 
 All endpoints require a valid JWT Bearer token.
 No business logic lives here — all persistence is delegated to

@@ -1,12 +1,12 @@
-"""Muse Hub fork network UI route — interactive DAG of a repo's fork tree.
+"""MuseHub fork network UI route — interactive DAG of a repo's fork tree.
 
-Serves the fork network page for any public Muse Hub repo. The page renders
+Serves the fork network page for any public MuseHub repo. The page renders
 an interactive SVG directed acyclic graph (DAG) where each node is a fork and
 each edge is coloured by the divergence (commits ahead) between the fork and
 its parent.
 
 Endpoint:
-  GET /musehub/ui/{owner}/{repo_slug}/forks — fork network page
+  GET /{owner}/{repo_slug}/forks — fork network page
 
 Content negotiation (one URL, two audiences):
   HTML (default) — interactive SVG DAG rendered via Jinja2.
@@ -39,7 +39,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 
@@ -60,7 +60,7 @@ async def _resolve_repo(owner: str, repo_slug: str, db_session: AsyncSession) ->
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    return str(row.repo_id), f"/musehub/ui/{owner}/{repo_slug}"
+    return str(row.repo_id), f"/{owner}/{repo_slug}"
 
 
 async def _count_commits(db_session: AsyncSession, repo_id: str) -> int:
@@ -149,7 +149,7 @@ async def _build_fork_network(
 
 @router.get(
     "/{owner}/{repo_slug}/forks",
-    summary="Muse Hub fork network — interactive SVG DAG of repo forks",
+    summary="MuseHub fork network — interactive SVG DAG of repo forks",
 )
 async def forks_page(
     request: Request,
@@ -209,7 +209,7 @@ async def forks_page(
             "forks": fork_nodes,
             "fork_network_json": fork_network_json,
             "breadcrumb_data": [
-                {"label": owner, "url": f"/musehub/ui/{owner}"},
+                {"label": owner, "url": f"/{owner}"},
                 {"label": repo_slug, "url": base_url},
                 {"label": "forks", "url": ""},
             ],

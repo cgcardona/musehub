@@ -1,4 +1,4 @@
-"""Tests for Muse Hub object endpoints — (piano roll / MIDI parsing).
+"""Tests for MuseHub object endpoints — (piano roll / MIDI parsing).
 
 Covers:
 - test_parse_midi_bytes_basic — parser returns MidiParseResult shape
@@ -235,7 +235,7 @@ async def test_parse_midi_object_endpoint_unknown_repo_404(
 ) -> None:
     """GET /parse-midi for an unknown repo_id returns 404."""
     response = await client.get(
-        "/api/v1/musehub/repos/unknown-repo/objects/unknown-obj/parse-midi",
+        "/api/v1/repos/unknown-repo/objects/unknown-obj/parse-midi",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -250,7 +250,7 @@ async def test_parse_midi_object_endpoint_unknown_object_404(
     """GET /parse-midi for a missing object_id returns 404."""
     repo_id, _ = await _seed_repo_and_obj(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/objects/missing-object-id/parse-midi",
+        f"/api/v1/repos/{repo_id}/objects/missing-object-id/parse-midi",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -267,7 +267,7 @@ async def test_parse_midi_object_non_midi_404(
         db_session, path="tracks/audio.mp3"
     )
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/objects/{obj_id}/parse-midi",
+        f"/api/v1/repos/{repo_id}/objects/{obj_id}/parse-midi",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -285,7 +285,7 @@ async def test_parse_midi_object_missing_disk_file_410(
         db_session, disk_path="/nonexistent/missing.mid", path="missing.mid"
     )
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/objects/{obj_id}/parse-midi",
+        f"/api/v1/repos/{repo_id}/objects/{obj_id}/parse-midi",
         headers=auth_headers,
     )
     assert response.status_code == 410
@@ -308,7 +308,7 @@ async def test_parse_midi_object_returns_valid_result(
             db_session, disk_path=tmp_path, path="track.mid"
         )
         response = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/objects/{obj_id}/parse-midi",
+            f"/api/v1/repos/{repo_id}/objects/{obj_id}/parse-midi",
             headers=auth_headers,
         )
         assert response.status_code == 200

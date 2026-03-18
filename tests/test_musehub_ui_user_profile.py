@@ -1,7 +1,7 @@
-"""Tests for the enhanced Muse Hub user profile page.
+"""Tests for the enhanced MuseHub user profile page.
 
 Covers:
-- test_profile_page_html_returns_200 — GET /musehub/ui/users/{username} returns 200 HTML
+- test_profile_page_html_returns_200 — GET /users/{username} returns 200 HTML
 - test_profile_page_no_auth_required — accessible without JWT
 - test_profile_page_unknown_user_still_renders — unknown username still returns 200 HTML shell
 - test_profile_page_html_contains_heatmap_js — page includes heatmap rendering JavaScript
@@ -86,9 +86,9 @@ async def test_profile_page_html_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/users/{username} returns 200 HTML for any username."""
+    """GET /users/{username} returns 200 HTML for any username."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser")
+    response = await client.get("/users/testuser")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -100,7 +100,7 @@ async def test_profile_page_no_auth_required(
 ) -> None:
     """Profile page is publicly accessible without a JWT token."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser")
+    response = await client.get("/users/testuser")
     assert response.status_code == 200
 
 
@@ -109,7 +109,7 @@ async def test_profile_page_unknown_user_still_renders(
     client: AsyncClient,
 ) -> None:
     """HTML shell renders even for unknown users — data fetched client-side."""
-    response = await client.get("/musehub/ui/users/nobody-exists-xyzzy")
+    response = await client.get("/users/nobody-exists-xyzzy")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -121,7 +121,7 @@ async def test_profile_page_html_contains_heatmap_js(
 ) -> None:
     """HTML includes heatmap rendering JavaScript."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser")
+    response = await client.get("/users/testuser")
     assert response.status_code == 200
     body = response.text
     assert "renderHeatmap" in body
@@ -135,7 +135,7 @@ async def test_profile_page_html_contains_badge_js(
 ) -> None:
     """HTML includes badge rendering JavaScript."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser")
+    response = await client.get("/users/testuser")
     assert response.status_code == 200
     body = response.text
     assert "renderBadges" in body
@@ -149,7 +149,7 @@ async def test_profile_page_html_contains_pinned_js(
 ) -> None:
     """HTML includes pinned repos rendering JavaScript."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser")
+    response = await client.get("/users/testuser")
     assert response.status_code == 200
     body = response.text
     assert "renderPinned" in body
@@ -163,7 +163,7 @@ async def test_profile_page_html_contains_activity_tab(
 ) -> None:
     """HTML includes a fourth Activity tab in the tab navigation."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser")
+    response = await client.get("/users/testuser")
     assert response.status_code == 200
     body = response.text
     assert "Activity" in body
@@ -180,9 +180,9 @@ async def test_profile_page_json_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/users/{username}?format=json returns 200 JSON."""
+    """GET /users/{username}?format=json returns 200 JSON."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser?format=json")
+    response = await client.get("/users/testuser?format=json")
     assert response.status_code == 200
     assert "application/json" in response.headers["content-type"]
 
@@ -192,7 +192,7 @@ async def test_profile_page_json_unknown_user_404(
     client: AsyncClient,
 ) -> None:
     """?format=json returns 404 for an unknown username."""
-    response = await client.get("/musehub/ui/users/nobody-exists-xyzzy?format=json")
+    response = await client.get("/users/nobody-exists-xyzzy?format=json")
     assert response.status_code == 404
 
 
@@ -203,7 +203,7 @@ async def test_profile_page_json_heatmap_structure(
 ) -> None:
     """JSON response contains heatmap with days list and aggregate stats."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser?format=json")
+    response = await client.get("/users/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -232,7 +232,7 @@ async def test_profile_page_json_badges_structure(
 ) -> None:
     """JSON response contains exactly 8 badges with required fields."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser?format=json")
+    response = await client.get("/users/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -263,7 +263,7 @@ async def test_profile_page_json_pinned_repos(
     db_session.add(profile)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/users/testuser?format=json")
+    response = await client.get("/users/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -284,7 +284,7 @@ async def test_profile_page_json_activity_empty(
 ) -> None:
     """JSON response returns empty activity list for a new user with no events."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser?format=json")
+    response = await client.get("/users/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -302,7 +302,7 @@ async def test_profile_page_json_activity_filter(
 ) -> None:
     """?tab=commits filters activity response to commits-only event types."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser?format=json&tab=commits")
+    response = await client.get("/users/testuser?format=json&tab=commits")
     assert response.status_code == 200
     body = response.json()
     assert body["activityFilter"] == "commits"
@@ -332,7 +332,7 @@ async def test_profile_page_json_badge_first_commit_earned(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/users/testuser?format=json")
+    response = await client.get("/users/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -348,7 +348,7 @@ async def test_profile_page_json_camel_case_keys(
 ) -> None:
     """JSON response uses camelCase keys throughout (no snake_case at top level)."""
     await _make_profile(db_session)
-    response = await client.get("/musehub/ui/users/testuser?format=json")
+    response = await client.get("/users/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -472,7 +472,7 @@ async def test_profile_page_json_includes_verified_and_license(
     db_session.add(profile)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/users/kai_engel_test?format=json")
+    response = await client.get("/users/kai_engel_test?format=json")
     assert response.status_code == 200
     body = response.json()
 

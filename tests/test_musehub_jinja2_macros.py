@@ -215,21 +215,21 @@ class _FakeIssue:
 def test_issue_row_macro_renders_title(jinja_env: Environment) -> None:
     tmpl = jinja_env.get_template("musehub/macros/issue.html")
     macro = tmpl.module.issue_row  # type: ignore[attr-defined]
-    html = macro(_FakeIssue(), base_url="/musehub/ui/alice/myrepo")
+    html = macro(_FakeIssue(), base_url="/alice/myrepo")
     assert "Fix timing issue in drum track" in html
 
 
 def test_issue_row_macro_renders_issue_number(jinja_env: Environment) -> None:
     tmpl = jinja_env.get_template("musehub/macros/issue.html")
     macro = tmpl.module.issue_row  # type: ignore[attr-defined]
-    html = macro(_FakeIssue(), base_url="/musehub/ui/alice/myrepo")
+    html = macro(_FakeIssue(), base_url="/alice/myrepo")
     assert "#42" in html
 
 
 def test_issue_row_macro_renders_date(jinja_env: Environment) -> None:
     tmpl = jinja_env.get_template("musehub/macros/issue.html")
     macro = tmpl.module.issue_row  # type: ignore[attr-defined]
-    html = macro(_FakeIssue(), base_url="/musehub/ui/alice/myrepo")
+    html = macro(_FakeIssue(), base_url="/alice/myrepo")
     assert "Jan 15, 2025" in html
 
 
@@ -241,7 +241,7 @@ def test_issue_row_macro_renders_date(jinja_env: Environment) -> None:
 def test_pagination_macro_renders_prev_next(jinja_env: Environment) -> None:
     tmpl = jinja_env.get_template("musehub/macros/pagination.html")
     macro = tmpl.module.pagination  # type: ignore[attr-defined]
-    html = macro(page=2, total_pages=5, url="/musehub/ui/alice/myrepo/issues")
+    html = macro(page=2, total_pages=5, url="/alice/myrepo/issues")
     assert "Prev" in html
     assert "Next" in html
     assert "Page 2 of 5" in html
@@ -250,14 +250,14 @@ def test_pagination_macro_renders_prev_next(jinja_env: Environment) -> None:
 def test_pagination_macro_hidden_on_single_page(jinja_env: Environment) -> None:
     tmpl = jinja_env.get_template("musehub/macros/pagination.html")
     macro = tmpl.module.pagination  # type: ignore[attr-defined]
-    html = macro(page=1, total_pages=1, url="/musehub/ui/alice/myrepo/issues")
+    html = macro(page=1, total_pages=1, url="/alice/myrepo/issues")
     assert html.strip() == ""
 
 
 def test_pagination_macro_no_prev_on_first_page(jinja_env: Environment) -> None:
     tmpl = jinja_env.get_template("musehub/macros/pagination.html")
     macro = tmpl.module.pagination  # type: ignore[attr-defined]
-    html = macro(page=1, total_pages=3, url="/musehub/ui/alice/myrepo/issues")
+    html = macro(page=1, total_pages=3, url="/alice/myrepo/issues")
     assert "Prev" not in html
     assert "Next" in html
 

@@ -1,4 +1,4 @@
-"""JSON-LD structured data helpers for Muse Hub UI pages.
+"""JSON-LD structured data helpers for MuseHub UI pages.
 
 Produces machine-readable schema.org metadata for repo landing pages
 (MusicComposition) and release detail pages (MusicRecording). Injecting
@@ -27,7 +27,7 @@ _SCHEMA_CONTEXT = "https://schema.org"
 def jsonld_repo(repo: RepoResponse, page_url: str) -> dict[str, object]:
     """Return a schema.org/MusicComposition JSON-LD dict for a repo.
 
-    MusicComposition maps well to a Muse Hub repo because a repo represents
+    MusicComposition maps well to a MuseHub repo because a repo represents
     a versioned musical work — it has a name, creator, genre tags, and a
     creation date. Search engines and music discovery bots index this data
     to surface repos in relevant queries.
@@ -35,7 +35,7 @@ def jsonld_repo(repo: RepoResponse, page_url: str) -> dict[str, object]:
     Args:
         repo: Full repo response model (owner, name, description, tags, etc.).
         page_url: Canonical absolute URL of the repo landing page,
-                  e.g. ``https://musehub.app/musehub/ui/miles/kind-of-blue``.
+                  e.g. ``https://musehub.app/miles/kind-of-blue``.
 
     Returns:
         JSON-LD dict ready for ``json.dumps()`` and embedding in a
@@ -74,7 +74,7 @@ def jsonld_release(
     """Return a schema.org/MusicRecording JSON-LD dict for a release.
 
     MusicRecording represents a specific recorded version of a composition
-    analogous to a Muse Hub release (a tagged snapshot with download packages).
+    analogous to a MuseHub release (a tagged snapshot with download packages).
     Linking MusicRecording back to its parent MusicComposition (the repo) lets
     indexers understand the work hierarchy.
 
@@ -82,7 +82,7 @@ def jsonld_release(
         release: Full release response model (tag, title, body, author, etc.).
         repo: Parent repo (used to populate ``inAlbum`` and ``byArtist``).
         page_url: Canonical absolute URL of the release detail page,
-                  e.g. ``https://musehub.app/musehub/ui/miles/kind-of-blue/releases/v1.0``.
+                  e.g. ``https://musehub.app/miles/kind-of-blue/releases/v1.0``.
 
     Returns:
         JSON-LD dict ready for ``json.dumps()`` and embedding in a

@@ -1,5 +1,5 @@
 /*
- * Muse Hub Component Classes
+ * MuseHub Component Classes
  *
  * Reusable UI components built on top of the design tokens in tokens.css.
  * Every selector here uses var(--*) tokens exclusively — no hardcoded colors.
@@ -56,7 +56,7 @@ body {
  * Links
  * ------------------------------------------------------------------------- */
 a {
-  color: var(--color-accent);
+  color: var(--color-accent-link);
   text-decoration: none;
 }
 
@@ -68,21 +68,23 @@ a:hover {
  * Headings
  * ------------------------------------------------------------------------- */
 h1 {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
+  font-size: 26px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.5px;
   color: var(--text-primary);
   margin-bottom: var(--space-3);
 }
 
 h2 {
-  font-size: var(--font-size-md);
+  font-size: 20px;
   font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.3px;
   color: var(--text-primary);
   margin-bottom: var(--space-2);
 }
 
 h3 {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   margin-bottom: var(--space-1);
@@ -95,10 +97,12 @@ h3 {
   display: inline-block;
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
   white-space: nowrap;
+  letter-spacing: 0.3px;
 }
 
 .badge-open    { background: var(--color-accent-muted);  color: var(--text-primary); }
@@ -145,6 +149,18 @@ h3 {
 }
 
 .btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+
+  &:not(:disabled):hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+}
+
+.btn-create {
   background: var(--color-success-bg);
   color: #fff;
   border-color: var(--color-success-bg);
@@ -261,6 +277,7 @@ h3 {
   position: relative;
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
+  border-top: 3px solid var(--color-accent);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   cursor: pointer;
@@ -273,9 +290,8 @@ h3 {
   color: inherit;
 
   &:hover {
-    border-color: var(--color-accent);
     box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     text-decoration: none;
     color: inherit;
   }
@@ -322,6 +338,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 8px;
   border-radius: var(--radius-full);
@@ -333,12 +350,13 @@ h3 {
 .tag-pill {
   display: inline-flex;
   align-items: center;
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 8px;
   border-radius: var(--radius-full);
-  background: rgba(88, 166, 255, 0.1);
-  color: var(--color-accent);
-  border: 1px solid rgba(88, 166, 255, 0.2);
+  background: rgba(79, 142, 247, 0.08);
+  color: var(--color-accent-link);
+  border: 1px solid rgba(79, 142, 247, 0.25);
 }
 
 .tag-pill-more {
@@ -579,7 +597,7 @@ textarea:focus {
 
 .tab.is-active {
   color: var(--text-primary);
-  border-bottom-color: var(--color-orange);
+  border-bottom-color: var(--color-accent);
 }
 
 .tab-panel {
@@ -941,7 +959,7 @@ textarea:focus {
  * Code blocks
  * ------------------------------------------------------------------------- */
 pre {
-  background: var(--bg-base);
+  background: var(--code-output-bg);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-base);
   padding: var(--space-3);
@@ -950,20 +968,25 @@ pre {
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
+  color: #abb2bf;
+  line-height: 1.65;
 }
 
 code {
   font-family: var(--font-mono);
-  font-size: 0.9em;
+  font-size: 0.88em;
   background: var(--bg-overlay);
-  padding: 1px 4px;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 pre code {
   background: transparent;
+  border: none;
   padding: 0;
   font-size: inherit;
+  color: inherit;
 }
 
 /* -------------------------------------------------------------------------
@@ -1117,10 +1140,12 @@ pre code {
 }
 
 .stat-card .stat-value {
+  font-family: var(--font-mono);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
+  color: var(--color-accent);
   display: block;
+  line-height: 1.1;
 }
 
 .stat-card .stat-label {
@@ -1155,83 +1180,6 @@ pre code {
 .heatmap-day[data-count="3"] { background: var(--dim-rhythmic); }
 .heatmap-day[data-count="4"] { background: var(--color-success); }
 
-/* explore page cards */
-.repo-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-base);
-  padding: var(--space-4);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-
-.repo-card:hover {
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-md);
-}
-
-.repo-card-header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.repo-card-name {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  font-size: var(--font-size-base);
-  flex: 1;
-}
-
-.repo-card-desc {
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-  margin-bottom: var(--space-3);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.repo-card-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-  flex-wrap: wrap;
-}
-
-.repo-card-tags {
-  display: flex;
-  gap: var(--space-1);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-2);
-}
-
-.repo-card-play {
-  position: absolute;
-  bottom: var(--space-3);
-  right: var(--space-3);
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius-full);
-  width: 32px;
-  height: 32px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.repo-card:hover .repo-card-play {
-  display: flex;
-}
 
 /* social / comments */
 .comment-thread {
@@ -1428,8 +1376,8 @@ pre code {
 }
 
 .reaction-btn--active {
-  background: rgba(88, 166, 255, 0.15);
-  border-color: var(--color-accent, #58a6ff);
+  background: rgba(79, 142, 247, 0.15);
+  border-color: var(--color-accent);
 }
 
 .reaction-count {
@@ -1449,3 +1397,392 @@ pre code {
    request and removes it on completion. */
 .htmx-request #htmx-loading { display: block !important; }
 .htmx-request.htmx-indicator { display: block !important; }
+
+/* =========================================================================
+ * Muse protocol design language components
+ * ========================================================================= */
+
+/* -------------------------------------------------------------------------
+ * Top-accent cards
+ * Cards with a 3px colored top border, mirroring the capability showcase
+ * cards from the Muse protocol site. Works on top of .card or standalone.
+ *
+ * Usage: <div class="card card-accent-top">…</div>
+ *   or with a specific dimension color:
+ *        <div class="card card-accent-harmonic">…</div>
+ *
+ * The .card-accent-{color} classes also set a matching subtle background
+ * tint via a translucent overlay so the color reads without being garish.
+ * ------------------------------------------------------------------------- */
+.card-accent-top        { border-top: 3px solid var(--color-accent); }
+.card-accent-success    { border-top: 3px solid var(--color-success); }
+.card-accent-warning    { border-top: 3px solid var(--color-warning); }
+.card-accent-danger     { border-top: 3px solid var(--color-danger); }
+.card-accent-purple     { border-top: 3px solid var(--color-purple); }
+.card-accent-orange     { border-top: 3px solid var(--color-orange); }
+.card-accent-harmonic   { border-top: 3px solid var(--dim-harmonic); }
+.card-accent-rhythmic   { border-top: 3px solid var(--dim-rhythmic); }
+.card-accent-melodic    { border-top: 3px solid var(--dim-melodic); }
+.card-accent-structural { border-top: 3px solid var(--dim-structural); }
+.card-accent-dynamic    { border-top: 3px solid var(--dim-dynamic); }
+
+/* Hover lift — matches the Muse site card hover transform */
+.card-hover {
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+/* -------------------------------------------------------------------------
+ * CTA button — Muse blue accent, for marketing/landing-style actions.
+ * Distinct from .btn-primary (green = create/confirm) which retains its
+ * GitHub-inspired semantic meaning.
+ * ------------------------------------------------------------------------- */
+.btn-cta {
+  background: #4f8ef7;
+  color: #fff;
+  border-color: #4f8ef7;
+  font-weight: var(--font-weight-semibold);
+
+  &:not(:disabled):hover {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    opacity: 0.9;
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+}
+
+/* -------------------------------------------------------------------------
+ * Monospaced eyebrow badge — small monospace chip used beside headings,
+ * table headers, and capability cards.
+ * Usage: <span class="mono-badge">active</span>
+ * ------------------------------------------------------------------------- */
+.mono-badge {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  padding: 2px var(--space-2);
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-overlay);
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.mono-badge-accent {
+  color: var(--color-accent);
+  background: rgba(79, 142, 247, 0.08);
+  border-color: rgba(79, 142, 247, 0.25);
+}
+
+.mono-badge-success {
+  color: var(--color-success);
+  background: rgba(63, 185, 80, 0.08);
+  border-color: rgba(63, 185, 80, 0.25);
+}
+
+/* -------------------------------------------------------------------------
+ * Ticker / scrolling marquee chip — for domain/tag horizontal scroll strips.
+ * Matches the .ticker-item pattern from the Muse protocol hero section.
+ * ------------------------------------------------------------------------- */
+.ticker-chip {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 4px var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.ticker-chip.active {
+  border-color: rgba(79, 142, 247, 0.5);
+  color: var(--color-accent);
+  background: rgba(79, 142, 247, 0.08);
+}
+
+/* -------------------------------------------------------------------------
+ * Stat cells — large number + small label, styled like the protocol stat
+ * strip on the Muse site (e.g. "6 methods to implement").
+ * Usage: <div class="stat-cell"><span class="stat-num">6</span><span class="stat-lbl">methods</span></div>
+ * ------------------------------------------------------------------------- */
+.stat-cell-muse {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  text-align: center;
+  background: var(--bg-surface);
+}
+
+.stat-num-muse {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent);
+  line-height: 1.1;
+  display: block;
+}
+
+.stat-lbl-muse {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+  line-height: 1.3;
+}
+
+/* -------------------------------------------------------------------------
+ * Shared page components — extracted from inline <style> blocks
+ * These are used on 2+ pages and must live here so they are available
+ * regardless of HTMX navigation direction.
+ * ------------------------------------------------------------------------- */
+
+/* ── Sidebar sections (explore, repo_home, issue_list, issue_detail) ────── */
+.sidebar-section {
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-default);
+}
+.sidebar-section:last-child { border-bottom: none; }
+.sidebar-section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin: 0 0 var(--space-2) 0;
+}
+
+/* ── Form fields (new_repo, settings) ───────────────────────────────────── */
+.form-group { margin-bottom: var(--space-4); }
+.form-label {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+  color: var(--text-primary);
+}
+.form-label .required { color: #f85149; margin-left: 2px; }
+.form-description { font-size: var(--font-size-xs); color: var(--text-muted); margin-bottom: var(--space-2); }
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+.form-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+}
+.form-checkbox-row input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
+.form-checkbox-label { font-size: var(--font-size-sm); font-weight: 600; color: var(--text-primary); }
+.form-checkbox-desc  { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 2px; }
+
+/* ── Tag pill input widget (new_repo, settings) ─────────────────────────── */
+.tag-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  min-height: 38px;
+  cursor: text;
+}
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.tag-pill-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}
+.tag-pill-remove:hover { color: #f85149; }
+.tag-text-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  min-width: 80px;
+  flex: 1;
+}
+
+/* ── Branch pill (pr_list, pr_detail) ───────────────────────────────────── */
+.branch-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+}
+
+/* ── Sort button (pr_list, milestones_list, commits) ────────────────────── */
+.sort-btn {
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-overlay);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sort-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.sort-btn.sort-active,
+.sort-active {
+  background: var(--color-accent) !important;
+  color: #fff !important;
+  border-color: var(--color-accent) !important;
+}
+
+/* ── HTMX indicator (new_repo, settings) ────────────────────────────────── */
+.htmx-indicator { opacity: 0; transition: opacity 0.2s ease; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { opacity: 1; }
+
+/* ── Comment system — full threaded (commit page) ───────────────────────── */
+.comment-thread { margin-bottom: var(--space-4); }
+.comment-thread:last-child { margin-bottom: 0; }
+.comment-row { display: flex; gap: var(--space-3); align-items: flex-start; }
+.comment-reply-row { margin-top: var(--space-3); }
+.comment-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  background: var(--bg-overlay);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.comment-body-col { flex: 1; min-width: 0; }
+.comment-meta { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: var(--space-1); }
+.comment-author { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--text-primary); }
+.comment-ts    { font-size: var(--font-size-xs); color: var(--text-muted); }
+.comment-date  { font-size: var(--font-size-xs); color: var(--text-muted); margin-left: auto; }
+.comment-text  {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+.comment-body {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+.comment-actions { display: flex; gap: var(--space-1); margin-top: var(--space-1); }
+.comment-delete-btn { color: var(--color-danger, #f87171); }
+.comment-replies {
+  margin-top: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.comment-reply { margin-bottom: 0 !important; }
+.reply-form { margin-top: var(--space-2); }
+.comment-textarea { width: 100%; font-family: var(--font-sans); font-size: var(--font-size-sm); }
+.comment-form-actions { display: flex; gap: var(--space-2); margin-top: var(--space-1); }
+
+/* ── Comment block — PR style (pr_detail) ───────────────────────────────── */
+.comment-block {
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+.comment-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  font-size: 13px;
+}
+.comment-body-text {
+  padding: var(--space-3);
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Diff stats (pr_detail) ─────────────────────────────────────────────── */
+.diff-stat { display: flex; gap: var(--space-3); font-size: 13px; flex-wrap: wrap; }
+.diff-stat-additions { color: var(--color-success, #3fb950); font-weight: 600; }
+.diff-stat-deletions { color: var(--color-danger, #f85149); font-weight: 600; }
+.diff-stat-files     { color: var(--text-muted); }
+
+/* ── Explore filter chip (explore, used in several sidebars) ────────────── */
+.filter-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--bg-overlay);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  margin: 2px 3px 2px 0;
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.filter-chip:hover { background: var(--bg-hover, var(--bg-overlay)); color: var(--text-primary); text-decoration: none; }
+.filter-chip.active {
+  background: rgba(79, 142, 247, 0.12);
+  color: var(--color-accent);
+  border-color: rgba(79, 142, 247, 0.4);
+}

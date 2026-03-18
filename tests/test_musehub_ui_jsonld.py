@@ -59,7 +59,7 @@ def _make_repo(
         slug="kind-of-blue",
         visibility="public",
         owner_user_id="user-uuid-123",
-        clone_url="https://musehub.app/api/v1/musehub/repos/aabbccdd",
+        clone_url="https://musehub.app/api/v1/repos/aabbccdd",
         description=description,
         tags=tags or [],
         key_signature=key_signature,
@@ -96,7 +96,7 @@ def _make_release(
 def test_jsonld_repo_returns_music_composition_type() -> None:
     """JSON-LD for a repo always declares @type MusicComposition."""
     repo = _make_repo()
-    data = jsonld_repo(repo, "https://example.com/musehub/ui/miles/kind-of-blue")
+    data = jsonld_repo(repo, "https://example.com/miles/kind-of-blue")
     assert data["@type"] == "MusicComposition"
     assert data["@context"] == "https://schema.org"
 
@@ -104,7 +104,7 @@ def test_jsonld_repo_returns_music_composition_type() -> None:
 def test_jsonld_repo_includes_required_fields() -> None:
     """Repo JSON-LD includes name, description, url, dateCreated, creator."""
     repo = _make_repo()
-    url = "https://example.com/musehub/ui/miles/kind-of-blue"
+    url = "https://example.com/miles/kind-of-blue"
     data = jsonld_repo(repo, url)
 
     assert data["name"] == "Kind of Blue"
@@ -171,7 +171,7 @@ def test_jsonld_release_includes_required_fields() -> None:
     """Release JSON-LD includes name, description, url, datePublished, byArtist, inAlbum."""
     release = _make_release()
     repo = _make_repo()
-    url = "https://example.com/musehub/ui/miles/kind-of-blue/releases/v1.0"
+    url = "https://example.com/miles/kind-of-blue/releases/v1.0"
     data = jsonld_release(release, repo, url)
 
     assert data["name"] == "First Release"

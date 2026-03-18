@@ -27,7 +27,7 @@ async def test_oembed_endpoint(client: AsyncClient) -> None:
     """GET /oembed with a valid embed URL returns 200 JSON with oEmbed fields."""
     repo_id = "aaaabbbb-cccc-dddd-eeee-ffff00001111"
     ref = "abc1234567890"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}")
     assert response.status_code == 200
@@ -55,14 +55,14 @@ async def test_oembed_iframe_content(client: AsyncClient) -> None:
     """The HTML field returned by /oembed is an <iframe> pointing to the embed route."""
     repo_id = "11112222-3333-4444-5555-666677778888"
     ref = "deadbeef1234"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}")
     assert response.status_code == 200
 
     html = response.json()["html"]
     assert "<iframe" in html
-    assert f"/musehub/ui/{repo_id}/embed/{ref}" in html
+    assert f"/{repo_id}/embed/{ref}" in html
     assert "</iframe>" in html
 
 
@@ -71,7 +71,7 @@ async def test_oembed_respects_maxwidth(client: AsyncClient) -> None:
     """maxwidth query parameter is reflected as the iframe width attribute."""
     repo_id = "aaaabbbb-1111-2222-3333-ccccddddeeee"
     ref = "cafebabe"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}&maxwidth=400")
     assert response.status_code == 200
@@ -86,7 +86,7 @@ async def test_oembed_xml_format_501(client: AsyncClient) -> None:
     """Requesting XML format returns 501 Not Implemented."""
     repo_id = "aaaabbbb-cccc-dddd-eeee-000011112222"
     ref = "feedface"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}&format=xml")
     assert response.status_code == 501
@@ -97,7 +97,7 @@ async def test_oembed_no_auth_required(client: AsyncClient) -> None:
     """oEmbed endpoint must not require a JWT — CMS platforms call it unauthenticated."""
     repo_id = "bbbbcccc-dddd-eeee-ffff-000011112222"
     ref = "aabbccdd"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}")
     assert response.status_code != 401
@@ -109,7 +109,7 @@ async def test_oembed_title_contains_short_ref(client: AsyncClient) -> None:
     """oEmbed title includes the first 8 characters of the ref for human readability."""
     repo_id = "ccccdddd-eeee-ffff-0000-111122223333"
     ref = "1234567890abcdef"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}")
     assert response.status_code == 200
@@ -123,7 +123,7 @@ async def test_oembed_musehub_extension_fields(client: AsyncClient) -> None:
     """Response includes all musehub:* extension fields defined."""
     repo_id = "ddddeeee-ffff-0000-1111-222233334444"
     ref = "beefcafe1234"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}")
     assert response.status_code == 200
@@ -156,7 +156,7 @@ async def test_oembed_standard_fields_complete(client: AsyncClient) -> None:
     """Response contains the full set of standard oEmbed rich-type fields."""
     repo_id = "eeeeffff-0000-1111-2222-333344445555"
     ref = "d00dcafe"
-    embed_url = f"/musehub/ui/{repo_id}/embed/{ref}"
+    embed_url = f"/{repo_id}/embed/{ref}"
 
     response = await client.get(f"/oembed?url={embed_url}")
     assert response.status_code == 200
@@ -183,7 +183,7 @@ async def test_oembed_commit_endpoint(client: AsyncClient) -> None:
     """GET /oembed/commit returns 200 JSON for a valid commit URL."""
     repo_id = "aaaabbbb-cccc-dddd-eeee-111122223333"
     sha = "abc1234567890def"
-    commit_url = f"/musehub/ui/{repo_id}/commit/{sha}"
+    commit_url = f"/{repo_id}/commit/{sha}"
 
     response = await client.get(f"/oembed/commit?url={commit_url}")
     assert response.status_code == 200
@@ -210,7 +210,7 @@ async def test_oembed_commit_iframe_uses_sha(client: AsyncClient) -> None:
     """The /oembed/commit endpoint's iframe src contains the commit SHA as the ref."""
     repo_id = "bbbbcccc-dddd-eeee-ffff-111122223333"
     sha = "deadbeefcafe0001"
-    commit_url = f"/musehub/ui/{repo_id}/commit/{sha}"
+    commit_url = f"/{repo_id}/commit/{sha}"
 
     response = await client.get(f"/oembed/commit?url={commit_url}")
     assert response.status_code == 200
@@ -218,7 +218,7 @@ async def test_oembed_commit_iframe_uses_sha(client: AsyncClient) -> None:
     html = response.json()["html"]
     # The embed player uses the full SHA as the ref so the snapshot is pinned
     assert sha in html
-    assert f"/musehub/ui/{repo_id}/embed/{sha}" in html
+    assert f"/{repo_id}/embed/{sha}" in html
 
 
 @pytest.mark.anyio
@@ -226,7 +226,7 @@ async def test_oembed_commit_xml_format_501(client: AsyncClient) -> None:
     """/oembed/commit returns 501 for non-JSON format requests."""
     repo_id = "ccccdddd-eeee-ffff-0000-111122223333"
     sha = "cafebabe12345678"
-    commit_url = f"/musehub/ui/{repo_id}/commit/{sha}"
+    commit_url = f"/{repo_id}/commit/{sha}"
 
     response = await client.get(f"/oembed/commit?url={commit_url}&format=xml")
     assert response.status_code == 501

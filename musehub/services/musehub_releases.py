@@ -1,4 +1,4 @@
-"""Muse Hub release persistence adapter — single point of DB access for releases.
+"""MuseHub release persistence adapter — single point of DB access for releases.
 
 This module is the ONLY place that touches the ``musehub_releases`` table.
 Route handlers delegate here; no business logic lives in routes.

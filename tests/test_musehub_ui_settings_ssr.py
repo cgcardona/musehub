@@ -1,4 +1,4 @@
-"""SSR-specific tests for the Muse Hub repo settings page.
+"""SSR-specific tests for the MuseHub repo settings page.
 
 Verifies that the settings page uses server-side rendering (Jinja2 templates)
 rather than a client-side JS shell. The handler passes ``RepoSettingsResponse``
@@ -66,7 +66,7 @@ async def test_settings_page_renders_repo_name_server_side(
     repo = await _make_repo(
         db_session, owner="ssrname", slug="my-ssr-repo", name="my-ssr-repo"
     )
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "my-ssr-repo" in resp.text
 
@@ -83,7 +83,7 @@ async def test_settings_page_general_form_has_hx_patch(
 ) -> None:
     """General settings form uses ``hx-patch`` for HTMX section-save."""
     repo = await _make_repo(db_session, owner="htmxpatch", slug="htmx-patch-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "hx-patch" in resp.text
 
@@ -95,7 +95,7 @@ async def test_settings_page_danger_zone_has_hx_delete(
 ) -> None:
     """Danger Zone delete form uses ``hx-delete`` for HTMX repo deletion."""
     repo = await _make_repo(db_session, owner="htmxdel", slug="htmx-delete-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     assert "hx-delete" in resp.text
 
@@ -116,7 +116,7 @@ async def test_settings_page_section_nav_present(
     a server round-trip, and ``:class`` binding to highlight the active link.
     """
     repo = await _make_repo(db_session, owner="secnav", slug="sec-nav-repo")
-    resp = await client.get(f"/musehub/ui/{repo.owner}/{repo.slug}/settings")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/settings")
     assert resp.status_code == 200
     html = resp.text
     assert "settings-nav-link" in html
@@ -141,5 +141,5 @@ async def test_settings_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """GET settings for an unknown repo/slug returns 404."""
-    resp = await client.get("/musehub/ui/nobody/nonexistent-repo-ssr/settings")
+    resp = await client.get("/nobody/nonexistent-repo-ssr/settings")
     assert resp.status_code == 404

@@ -30,7 +30,7 @@ function actorAvatar(actor) {
  * Build a profile-page link for the actor.
  */
 function actorLink(actor) {
-  return `<a href="/musehub/ui/users/${encodeURIComponent(actor)}" style="color:var(--text-primary);font-weight:600">${escHtml(actor)}</a>`;
+  return `<a href="/${encodeURIComponent(actor)}" style="color:var(--text-primary);font-weight:600">${escHtml(actor)}</a>`;
 }
 
 /**
@@ -41,7 +41,7 @@ function repoLink(repoId) {
   if (!repoId) return '';
   const parts = repoId.split('/');
   const label = parts.length >= 2 ? escHtml(parts[1]) : escHtml(repoId);
-  return `<a href="/musehub/ui/${encodeURIComponent(repoId)}" style="color:var(--color-accent)">${label}</a>`;
+  return `<a href="/${encodeURIComponent(repoId)}" style="color:var(--color-accent)">${label}</a>`;
 }
 
 const EVENT_META = {
@@ -176,7 +176,7 @@ async function load() {
           <div class="empty-icon">&#127926;</div>
           <p class="empty-title">Your feed is empty</p>
           <p class="empty-desc">Follow musicians and watch repos to see their activity here.</p>
-          <a href="/musehub/ui/explore" class="btn btn-primary">Explore repos</a>
+          <a href="/explore" class="btn btn-primary">Explore repos</a>
         </div>`;
       return;
     }

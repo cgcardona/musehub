@@ -1,12 +1,12 @@
-"""Muse Hub new repo creation wizard — SSR migration (#562).
+"""MuseHub new repo creation wizard — SSR migration (#562).
 
-Serves the repository creation wizard at /musehub/ui/new.
+Serves the repository creation wizard at /new.
 
 Routes:
-  GET  /musehub/ui/new        — SSR creation wizard form (Jinja2 template)
-  POST /musehub/ui/new        — create repo (JSON body, auth required), returns
+  GET  /new        — SSR creation wizard form (Jinja2 template)
+  POST /new        — create repo (JSON body, auth required), returns
                                 redirect URL for JS navigation
-  GET  /musehub/ui/new/check  — name availability check; returns HTML fragment
+  GET  /new/check  — name availability check; returns HTML fragment
                                 when requested by HTMX, JSON otherwise
 
 Auth contract:
@@ -14,7 +14,7 @@ Auth contract:
   rendered server-side; client JS (Alpine.js) handles the visibility toggle
   and topics tag input only.
 - POST requires a valid JWT in the Authorization header. Returns
-  ``{"redirect": "/musehub/ui/{owner}/{slug}?welcome=1"}`` on success so the
+  ``{"redirect": "/{owner}/{slug}?welcome=1"}`` on success so the
   JS can navigate; returns 409 on slug collision.
 - GET /new/check is unauthenticated — slug availability is not secret.
   When called by HTMX (``HX-Request: true``), returns an HTML fragment
@@ -44,7 +44,7 @@ from musehub.services import musehub_repository
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui-new-repo"])
+router = APIRouter(prefix="", tags=["musehub-ui-new-repo"])
 
 # Licence options surfaced in the wizard dropdown.
 _LICENSES: list[tuple[str, str]] = [
@@ -97,7 +97,7 @@ async def create_repo_wizard(
     localStorage, not in a cookie or form field, so keeping the submission
     client-side avoids requiring a hidden token field or session cookie.
 
-    On success, returns 201 + ``{"redirect": "/musehub/ui/{owner}/{slug}?welcome=1"}``
+    On success, returns 201 + ``{"redirect": "/{owner}/{slug}?welcome=1"}``
     so the client-side JS can navigate to the new repo. On slug collision,
     returns 409 so the wizard can surface a friendly error without a full reload.
     """
@@ -126,7 +126,7 @@ async def create_repo_wizard(
             status_code=http_status.HTTP_409_CONFLICT,
             detail="A repository with this owner and name already exists.",
         )
-    redirect_url = f"/musehub/ui/{repo.owner}/{repo.slug}?welcome=1"
+    redirect_url = f"/{repo.owner}/{repo.slug}?welcome=1"
     logger.info(
         "✅ New repo created via wizard: %s/%s (id=%s)",
         repo.owner,

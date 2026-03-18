@@ -1,6 +1,6 @@
-"""Muse Hub milestones UI route handlers — SSR with HTMX fragments.
+"""MuseHub milestones UI route handlers — SSR with HTMX fragments.
 
-Serves server-rendered HTML pages for the milestones section of a Muse Hub
+Serves server-rendered HTML pages for the milestones section of a MuseHub
 repo — analogous to GitHub's Milestones tab but for music projects.
 
 Data is fetched from the DB in the route handler and placed in the Jinja2
@@ -9,8 +9,8 @@ first load; HTMX handles subsequent tab/sort switches by requesting only
 the rows fragment.
 
 Endpoint summary:
-  GET /musehub/ui/{owner}/{repo_slug}/milestones          — SSR milestones list
-  GET /musehub/ui/{owner}/{repo_slug}/milestones/{number} — SSR milestone detail
+  GET /{owner}/{repo_slug}/milestones          — SSR milestones list
+  GET /{owner}/{repo_slug}/milestones/{number} — SSR milestone detail
 
 HTMX partial updates:
   Both endpoints detect the ``HX-Request: true`` header.  When present they
@@ -44,7 +44,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 
@@ -55,7 +55,7 @@ router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
 
 def _base_url(owner: str, repo_slug: str) -> str:
     """Return the canonical UI base URL for a repo."""
-    return f"/musehub/ui/{owner}/{repo_slug}"
+    return f"/{owner}/{repo_slug}"
 
 
 def _breadcrumbs(*segments: tuple[str, str]) -> list[dict[str, str]]:
@@ -86,7 +86,7 @@ async def _resolve_repo(
 
 @router.get(
     "/{owner}/{repo_slug}/milestones",
-    summary="Muse Hub milestones list page with progress bars",
+    summary="MuseHub milestones list page with progress bars",
 )
 async def milestones_list_page(
     request: Request,
@@ -140,7 +140,7 @@ async def milestones_list_page(
         "open_count": open_count,
         "closed_count": closed_count,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("milestones", ""),
         ),
@@ -169,7 +169,7 @@ async def milestones_list_page(
 
 @router.get(
     "/{owner}/{repo_slug}/milestones/{number}",
-    summary="Muse Hub milestone detail page with linked issues",
+    summary="MuseHub milestone detail page with linked issues",
 )
 async def milestone_detail_page(
     request: Request,
@@ -246,7 +246,7 @@ async def milestone_detail_page(
         "current_page": "milestones",
         "issue_state": issue_state,
         "breadcrumb_data": _breadcrumbs(
-            (owner, f"/musehub/ui/{owner}"),
+            (owner, f"/{owner}"),
             (repo_slug, base_url),
             ("milestones", f"{base_url}/milestones"),
             (f"#{number}", ""),

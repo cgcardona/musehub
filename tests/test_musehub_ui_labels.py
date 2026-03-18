@@ -1,6 +1,6 @@
-"""Tests for Muse Hub label management UI endpoints.
+"""Tests for MuseHub label management UI endpoints.
 
-Covers GET /musehub/ui/{owner}/{repo_slug}/labels:
+Covers GET /{owner}/{repo_slug}/labels:
 - test_labels_page_returns_200 — page renders without auth
 - test_labels_page_no_auth_required — GET needs no JWT
 - test_labels_page_unknown_repo_404 — unknown owner/slug → 404
@@ -11,26 +11,26 @@ Covers GET /musehub/ui/{owner}/{repo_slug}/labels:
 - test_labels_page_shows_issue_count — issue counts included in JSON response
 - test_labels_page_base_url_uses_slug — base_url in context uses owner/slug not repo_id
 
-Covers POST /musehub/ui/{owner}/{repo_slug}/labels:
+Covers POST /{owner}/{repo_slug}/labels:
 - test_create_label_success — 201 + label_id returned
 - test_create_label_requires_auth — 401 without Bearer token
 - test_create_label_duplicate_name_409 — duplicate name → 409
 - test_create_label_invalid_color_422 — bad hex color → 422
 - test_create_label_unknown_repo_404 — unknown repo → 404
 
-Covers POST /musehub/ui/{owner}/{repo_slug}/labels/{label_id}/edit:
+Covers POST /{owner}/{repo_slug}/labels/{label_id}/edit:
 - test_edit_label_success — 200 + updated values
 - test_edit_label_requires_auth — 401 without token
 - test_edit_label_unknown_label_404 — unknown label_id → 404
 - test_edit_label_name_conflict_409 — name collision → 409
 - test_edit_label_partial_update — partial body updates only supplied fields
 
-Covers POST /musehub/ui/{owner}/{repo_slug}/labels/{label_id}/delete:
+Covers POST /{owner}/{repo_slug}/labels/{label_id}/delete:
 - test_delete_label_success — 200 ok=True
 - test_delete_label_requires_auth — 401 without token
 - test_delete_label_unknown_label_404 — unknown label_id → 404
 
-Covers POST /musehub/ui/{owner}/{repo_slug}/labels/reset:
+Covers POST /{owner}/{repo_slug}/labels/reset:
 - test_reset_labels_success — 200 + 10 defaults seeded
 - test_reset_labels_requires_auth — 401 without token
 - test_reset_labels_wipes_custom_labels — existing labels replaced
@@ -92,7 +92,7 @@ async def _make_label(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/ui/{owner}/{repo_slug}/labels — label list page
+# GET /{owner}/{repo_slug}/labels — label list page
 # ---------------------------------------------------------------------------
 
 
@@ -100,9 +100,9 @@ async def _make_label(
 async def test_labels_page_returns_200(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/labels returns 200 HTML."""
+    """GET /{owner}/{slug}/labels returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels")
+    response = await client.get("/beatmaker/deep-cuts/labels")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -113,7 +113,7 @@ async def test_labels_page_no_auth_required(
 ) -> None:
     """Label list page is publicly accessible — no JWT required."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels")
+    response = await client.get("/beatmaker/deep-cuts/labels")
     assert response.status_code == 200
 
 
@@ -122,7 +122,7 @@ async def test_labels_page_unknown_repo_404(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     """Unknown owner/slug combination → 404."""
-    response = await client.get("/musehub/ui/nobody/nonexistent/labels")
+    response = await client.get("/nobody/nonexistent/labels")
     assert response.status_code == 404
 
 
@@ -132,7 +132,7 @@ async def test_labels_page_has_color_picker_js(
 ) -> None:
     """The labels page HTML includes a colour picker for creating labels."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels")
+    response = await client.get("/beatmaker/deep-cuts/labels")
     assert response.status_code == 200
     body = response.text
     assert 'type="color"' in body or "color-picker" in body or "input" in body
@@ -144,7 +144,7 @@ async def test_labels_page_has_label_list_js(
 ) -> None:
     """The labels page contains JavaScript to render the label list."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels")
+    response = await client.get("/beatmaker/deep-cuts/labels")
     assert response.status_code == 200
     body = response.text
     assert "renderLabel" in body or "label-list" in body or "label-row" in body
@@ -156,7 +156,7 @@ async def test_labels_page_json_format(
 ) -> None:
     """?format=json returns a JSON response with a 200 status."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels?format=json")
+    response = await client.get("/beatmaker/deep-cuts/labels?format=json")
     assert response.status_code == 200
     assert "application/json" in response.headers["content-type"]
 
@@ -168,7 +168,7 @@ async def test_labels_page_json_has_items_key(
     """JSON response contains 'labels' and 'total' keys."""
     repo_id = await _make_repo(db_session)
     await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels?format=json")
+    response = await client.get("/beatmaker/deep-cuts/labels?format=json")
     assert response.status_code == 200
     data = response.json()
     assert "labels" in data
@@ -183,7 +183,7 @@ async def test_labels_page_shows_issue_count(
     """JSON response includes issue_count for each label."""
     repo_id = await _make_repo(db_session)
     await _make_label(db_session, repo_id, name="enhancement", color="#a2eeef")
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels?format=json")
+    response = await client.get("/beatmaker/deep-cuts/labels?format=json")
     assert response.status_code == 200
     data = response.json()
     labels = data["labels"]
@@ -198,7 +198,7 @@ async def test_labels_page_base_url_uses_slug(
 ) -> None:
     """The HTML page embeds the owner/slug base URL, not the repo UUID."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/deep-cuts/labels")
+    response = await client.get("/beatmaker/deep-cuts/labels")
     assert response.status_code == 200
     body = response.text
     assert "beatmaker" in body
@@ -206,7 +206,7 @@ async def test_labels_page_base_url_uses_slug(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/ui/{owner}/{repo_slug}/labels — create label
+# POST /{owner}/{repo_slug}/labels — create label
 # ---------------------------------------------------------------------------
 
 
@@ -219,7 +219,7 @@ async def test_create_label_success(
     """POST /labels with valid body + auth returns 201 with label_id."""
     await _make_repo(db_session)
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels",
+        "/beatmaker/deep-cuts/labels",
         json={"name": "needs-arrangement", "color": "#e4e669", "description": "Track needs arrangement"},
         headers=auth_headers,
     )
@@ -237,7 +237,7 @@ async def test_create_label_requires_auth(
     """POST /labels without a JWT returns 401 or 403."""
     await _make_repo(db_session)
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels",
+        "/beatmaker/deep-cuts/labels",
         json={"name": "bug", "color": "#d73a4a"},
     )
     assert response.status_code in (401, 403)
@@ -253,7 +253,7 @@ async def test_create_label_duplicate_name_409(
     repo_id = await _make_repo(db_session)
     await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels",
+        "/beatmaker/deep-cuts/labels",
         json={"name": "bug", "color": "#ff0000"},
         headers=auth_headers,
     )
@@ -269,7 +269,7 @@ async def test_create_label_invalid_color_422(
     """A malformed hex colour string → 422 validation error."""
     await _make_repo(db_session)
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels",
+        "/beatmaker/deep-cuts/labels",
         json={"name": "test", "color": "not-a-color"},
         headers=auth_headers,
     )
@@ -284,7 +284,7 @@ async def test_create_label_unknown_repo_404(
 ) -> None:
     """Creating a label on a nonexistent repo → 404."""
     response = await client.post(
-        "/musehub/ui/nobody/ghost-repo/labels",
+        "/nobody/ghost-repo/labels",
         json={"name": "bug", "color": "#d73a4a"},
         headers=auth_headers,
     )
@@ -292,7 +292,7 @@ async def test_create_label_unknown_repo_404(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/ui/{owner}/{repo_slug}/labels/{label_id}/edit
+# POST /{owner}/{repo_slug}/labels/{label_id}/edit
 # ---------------------------------------------------------------------------
 
 
@@ -306,7 +306,7 @@ async def test_edit_label_success(
     repo_id = await _make_repo(db_session)
     label = await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
     response = await client.post(
-        f"/musehub/ui/beatmaker/deep-cuts/labels/{label.id}/edit",
+        f"/beatmaker/deep-cuts/labels/{label.id}/edit",
         json={"name": "critical-bug", "color": "#ff0000"},
         headers=auth_headers,
     )
@@ -324,7 +324,7 @@ async def test_edit_label_requires_auth(
     repo_id = await _make_repo(db_session)
     label = await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
     response = await client.post(
-        f"/musehub/ui/beatmaker/deep-cuts/labels/{label.id}/edit",
+        f"/beatmaker/deep-cuts/labels/{label.id}/edit",
         json={"name": "new-name"},
     )
     assert response.status_code in (401, 403)
@@ -339,7 +339,7 @@ async def test_edit_label_unknown_label_404(
     """Editing a non-existent label_id → 404."""
     await _make_repo(db_session)
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels/00000000-0000-0000-0000-000000000000/edit",
+        "/beatmaker/deep-cuts/labels/00000000-0000-0000-0000-000000000000/edit",
         json={"name": "x"},
         headers=auth_headers,
     )
@@ -357,7 +357,7 @@ async def test_edit_label_name_conflict_409(
     await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
     label_b = await _make_label(db_session, repo_id, name="enhancement", color="#a2eeef")
     response = await client.post(
-        f"/musehub/ui/beatmaker/deep-cuts/labels/{label_b.id}/edit",
+        f"/beatmaker/deep-cuts/labels/{label_b.id}/edit",
         json={"name": "bug"},
         headers=auth_headers,
     )
@@ -374,7 +374,7 @@ async def test_edit_label_partial_update(
     repo_id = await _make_repo(db_session)
     label = await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
     response = await client.post(
-        f"/musehub/ui/beatmaker/deep-cuts/labels/{label.id}/edit",
+        f"/beatmaker/deep-cuts/labels/{label.id}/edit",
         json={"color": "#ff6600"},
         headers=auth_headers,
     )
@@ -386,7 +386,7 @@ async def test_edit_label_partial_update(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/ui/{owner}/{repo_slug}/labels/{label_id}/delete
+# POST /{owner}/{repo_slug}/labels/{label_id}/delete
 # ---------------------------------------------------------------------------
 
 
@@ -400,7 +400,7 @@ async def test_delete_label_success(
     repo_id = await _make_repo(db_session)
     label = await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
     response = await client.post(
-        f"/musehub/ui/beatmaker/deep-cuts/labels/{label.id}/delete",
+        f"/beatmaker/deep-cuts/labels/{label.id}/delete",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -416,7 +416,7 @@ async def test_delete_label_requires_auth(
     repo_id = await _make_repo(db_session)
     label = await _make_label(db_session, repo_id, name="bug", color="#d73a4a")
     response = await client.post(
-        f"/musehub/ui/beatmaker/deep-cuts/labels/{label.id}/delete",
+        f"/beatmaker/deep-cuts/labels/{label.id}/delete",
     )
     assert response.status_code in (401, 403)
 
@@ -430,14 +430,14 @@ async def test_delete_label_unknown_label_404(
     """Deleting a non-existent label_id → 404."""
     await _make_repo(db_session)
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels/00000000-0000-0000-0000-000000000000/delete",
+        "/beatmaker/deep-cuts/labels/00000000-0000-0000-0000-000000000000/delete",
         headers=auth_headers,
     )
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/ui/{owner}/{repo_slug}/labels/reset
+# POST /{owner}/{repo_slug}/labels/reset
 # ---------------------------------------------------------------------------
 
 
@@ -452,7 +452,7 @@ async def test_reset_labels_success(
 
     await _make_repo(db_session)
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels/reset",
+        "/beatmaker/deep-cuts/labels/reset",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -467,7 +467,7 @@ async def test_reset_labels_requires_auth(
 ) -> None:
     """POST /labels/reset without JWT → 401 or 403."""
     await _make_repo(db_session)
-    response = await client.post("/musehub/ui/beatmaker/deep-cuts/labels/reset")
+    response = await client.post("/beatmaker/deep-cuts/labels/reset")
     assert response.status_code in (401, 403)
 
 
@@ -485,14 +485,14 @@ async def test_reset_labels_wipes_custom_labels(
     await _make_label(db_session, repo_id, name="my-custom-label", color="#123456")
 
     response = await client.post(
-        "/musehub/ui/beatmaker/deep-cuts/labels/reset",
+        "/beatmaker/deep-cuts/labels/reset",
         headers=auth_headers,
     )
     assert response.status_code == 200
 
     # After reset, the JSON endpoint should return exactly the defaults.
     list_response = await client.get(
-        "/musehub/ui/beatmaker/deep-cuts/labels?format=json"
+        "/beatmaker/deep-cuts/labels?format=json"
     )
     assert list_response.status_code == 200
     data = list_response.json()
@@ -511,7 +511,7 @@ async def test_reset_labels_unknown_repo_404(
 ) -> None:
     """POST /labels/reset on nonexistent repo → 404."""
     response = await client.post(
-        "/musehub/ui/nobody/ghost-repo/labels/reset",
+        "/nobody/ghost-repo/labels/reset",
         headers=auth_headers,
     )
     assert response.status_code == 404

@@ -63,7 +63,7 @@ async def test_get_repo_response_shape(
     )
     repo_id = create.json()["repoId"]
 
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}", headers=auth_headers)
+    resp = await client.get(f"/api/v1/repos/{repo_id}", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
 
@@ -88,7 +88,7 @@ async def test_update_repo_settings_returns_updated_fields(
     repo_id = create.json()["repoId"]
 
     patch_resp = await client.patch(
-        f"/api/v1/musehub/repos/{repo_id}/settings",
+        f"/api/v1/repos/{repo_id}/settings",
         json={"description": "Updated description", "visibility": "public"},
         headers=auth_headers,
     )
@@ -115,7 +115,7 @@ async def test_list_branches_envelope(
     await create_branch(db_session, repo_id=str(repo.repo_id), name="feature-x")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/branches",
+        f"/api/v1/repos/{repo.repo_id}/branches",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -140,7 +140,7 @@ async def test_branch_names_are_correct(
     await create_branch(db_session, repo_id=str(repo.repo_id), name="develop")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/branches",
+        f"/api/v1/repos/{repo.repo_id}/branches",
         headers=auth_headers,
     )
     names = [b["name"] for b in resp.json()["branches"]]
@@ -163,7 +163,7 @@ async def test_list_commits_envelope(
     await create_commit(db_session, str(repo.repo_id), message="feat: second commit")
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/commits",
+        f"/api/v1/repos/{repo.repo_id}/commits",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -190,7 +190,7 @@ async def test_commit_fields(
     )
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo.repo_id}/commits",
+        f"/api/v1/repos/{repo.repo_id}/commits",
         headers=auth_headers,
     )
     commits = resp.json()["commits"]
@@ -224,7 +224,7 @@ async def test_create_issue_response_shape(
     repo_id = create_repo_resp.json()["repoId"]
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": "Bug: tempo drift", "body": "The tempo drifts by 3 BPM"},
         headers=auth_headers,
     )
@@ -255,13 +255,13 @@ async def test_list_issues_returns_open_issues(
 
     for i in range(3):
         await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/issues",
+            f"/api/v1/repos/{repo_id}/issues",
             json={"title": f"Issue {i}"},
             headers=auth_headers,
         )
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -290,14 +290,14 @@ async def test_close_issue_changes_status(
     repo_id = create_repo_resp.json()["repoId"]
 
     issue_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues",
+        f"/api/v1/repos/{repo_id}/issues",
         json={"title": "Close me"},
         headers=auth_headers,
     )
     number = issue_resp.json()["number"]
 
     close_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/issues/{number}/close",
+        f"/api/v1/repos/{repo_id}/issues/{number}/close",
         headers=auth_headers,
     )
     assert close_resp.status_code == 200

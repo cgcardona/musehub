@@ -28,7 +28,7 @@
   {% for group in result.groups %}
   <div class="search-result-repo">
     <h3>
-      <a href="/musehub/ui/{{ group.repo_owner }}/{{ group.repo_slug }}">
+      <a href="/{{ group.repo_owner }}/{{ group.repo_slug }}">
         {{ group.repo_owner }}/{{ group.repo_name }}
       </a>
       <span class="badge badge-open" style="font-size:11px;margin-left:var(--space-1)">
@@ -39,7 +39,7 @@
     {% for match in group.matches %}
     <div class="commit-row">
       <a class="commit-sha"
-         href="/musehub/ui/{{ group.repo_owner }}/{{ group.repo_slug }}/commits/{{ match.commit_id }}">
+         href="/{{ group.repo_owner }}/{{ group.repo_slug }}/commits/{{ match.commit_id }}">
         {{ match.commit_id[:7] }}
       </a>
       <span class="commit-msg">{{ match.message }}</span>

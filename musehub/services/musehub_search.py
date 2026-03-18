@@ -1,4 +1,4 @@
-"""Muse Hub in-repo search service.
+"""MuseHub in-repo search service.
 
 Provides four search modes over a repo's commit history, all operating on the
 shared ``muse_cli_commits`` table and scoped to a single ``repo_id``.

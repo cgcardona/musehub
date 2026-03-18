@@ -2,7 +2,7 @@
 
 {% block title %}Groove {{ ref[:8] }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
   analysis / {{ ref[:8] }} / groove
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}

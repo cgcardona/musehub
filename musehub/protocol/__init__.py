@@ -1,4 +1,4 @@
-"""Muse Hub Protocol — single source of truth for the wire contract.
+"""MuseHub Protocol — single source of truth for the wire contract.
 
 Public re-exports:
 

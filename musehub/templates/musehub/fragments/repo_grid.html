@@ -10,11 +10,13 @@
 {% from "musehub/macros/pagination.html" import pagination %}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
+{% set dim_colors = ['--dim-harmonic', '--dim-rhythmic', '--dim-melodic', '--dim-structural', '--dim-dynamic'] %}
 {% if repos %}
 <div class="repo-card-grid">
   {% for repo in repos %}
-  <a href="/musehub/ui/{{ repo.owner | urlencode }}/{{ repo.slug | urlencode }}"
-     class="repo-card">
+  <a href="/{{ repo.owner | urlencode }}/{{ repo.slug | urlencode }}"
+     class="repo-card"
+     style="border-top-color: var({{ dim_colors[loop.index0 % 5] }})">
     <div class="repo-card-header">
       <span class="repo-card-name">{{ repo.owner }}<span class="repo-card-sep">/</span>{{ repo.slug }}</span>
     </div>

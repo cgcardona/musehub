@@ -85,7 +85,7 @@ async def test_listen_page_renders_track_list_server_side(
             ("tracks/keys.mp3", 61440),
         ],
     )
-    response = await client.get("/musehub/ui/testuser/ssr-tracks/listen/main")
+    response = await client.get("/testuser/ssr-tracks/listen/main")
     assert response.status_code == 200
     body = response.text
     # Track names are derived from file basenames (without extension)
@@ -104,7 +104,7 @@ async def test_listen_page_track_items_have_data_track_url(
         slug="data-attr-repo",
         tracks=[("tracks/drum.mp3", 32768)],
     )
-    response = await client.get("/musehub/ui/testuser/data-attr-repo/listen/main")
+    response = await client.get("/testuser/data-attr-repo/listen/main")
     assert response.status_code == 200
     body = response.text
     assert "data-track-url" in body
@@ -117,7 +117,7 @@ async def test_listen_page_waveform_div_present(
 ) -> None:
     """The waveform container must be present in the server-rendered HTML for WaveSurfer."""
     await _make_repo_with_tracks(db_session, slug="waveform-repo")
-    response = await client.get("/musehub/ui/testuser/waveform-repo/listen/main")
+    response = await client.get("/testuser/waveform-repo/listen/main")
     assert response.status_code == 200
     body = response.text
     # WaveSurfer target element or reference must be present
@@ -135,7 +135,7 @@ async def test_listen_page_transport_bar_present(
         slug="transport-repo",
         tracks=[("tracks/lead.mp3", 20480)],
     )
-    response = await client.get("/musehub/ui/testuser/transport-repo/listen/main")
+    response = await client.get("/testuser/transport-repo/listen/main")
     assert response.status_code == 200
     body = response.text
     assert "play-btn" in body or "play" in body.lower()
@@ -148,7 +148,7 @@ async def test_listen_page_no_tracks_shows_message(
 ) -> None:
     """A repo with no audio tracks must render an informative empty-state message."""
     await _make_repo_with_tracks(db_session, slug="empty-audio-repo", tracks=[])
-    response = await client.get("/musehub/ui/testuser/empty-audio-repo/listen/main")
+    response = await client.get("/testuser/empty-audio-repo/listen/main")
     assert response.status_code == 200
     body = response.text
     # Empty state — no audio tracks
@@ -171,7 +171,7 @@ async def test_listen_page_playlist_json_injected(
         slug="playlist-repo",
         tracks=[("tracks/synth.mp3", 40960)],
     )
-    response = await client.get("/musehub/ui/testuser/playlist-repo/listen/main")
+    response = await client.get("/testuser/playlist-repo/listen/main")
     assert response.status_code == 200
     body = response.text
     assert "window.__playlist" in body
@@ -193,7 +193,7 @@ async def test_embed_page_renders_track_name(
         slug="embed-audio",
         tracks=[("mix/full_mix.mp3", 204800)],
     )
-    response = await client.get("/musehub/ui/testuser/embed-audio/embed/main")
+    response = await client.get("/testuser/embed-audio/embed/main")
     assert response.status_code == 200
     body = response.text
     # Track name derived from filename (without extension)
@@ -211,7 +211,7 @@ async def test_embed_page_sets_embed_track_url_js_global(
         slug="embed-url-repo",
         tracks=[("tracks/lead.mp3", 20480)],
     )
-    response = await client.get("/musehub/ui/testuser/embed-url-repo/embed/main")
+    response = await client.get("/testuser/embed-url-repo/embed/main")
     assert response.status_code == 200
     body = response.text
     assert "window.__embedTrackUrl" in body
@@ -224,7 +224,7 @@ async def test_embed_page_no_audio_url_hides_player(
 ) -> None:
     """Embed page for a repo with no audio tracks must NOT set window.__embedTrackUrl."""
     await _make_repo_with_tracks(db_session, slug="embed-empty", tracks=[])
-    response = await client.get("/musehub/ui/testuser/embed-empty/embed/main")
+    response = await client.get("/testuser/embed-empty/embed/main")
     assert response.status_code == 200
     body = response.text
     # No audio resolved → no __embedTrackUrl global injected

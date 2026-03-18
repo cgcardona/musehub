@@ -4,7 +4,7 @@
   Required Jinja2 variables (passed from ui.py → page template):
     owner       str  — repo owner username
     repo_slug   str  — repo slug
-    base_url    str  — canonical UI base URL (/musehub/ui/{owner}/{repo_slug})
+    base_url    str  — canonical UI base URL (/{owner}/{repo_slug})
     current_page str — active tab key:
                        commits | graph | pulls | issues | branches | tags | releases |
                        sessions | timeline | analysis | credits | search | insights
@@ -18,7 +18,7 @@
 <div class="repo-header" id="repo-header">
   <div class="repo-header-inner">
     <div class="repo-header-identity">
-      <a href="/musehub/ui/{{ owner }}" class="repo-header-owner">{{ owner }}</a>
+      <a href="/{{ owner }}" class="repo-header-owner">{{ owner }}</a>
       <span class="repo-header-sep">/</span>
       <a href="{{ base_url }}" class="repo-header-name">{{ repo_slug }}</a>
       <span class="badge repo-visibility-badge" id="nav-visibility-badge">…</span>

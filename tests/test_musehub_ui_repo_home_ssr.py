@@ -1,6 +1,6 @@
 """SSR tests for the MuseHub repo home page (issue #575).
 
-Covers GET /musehub/ui/{owner}/{repo_slug} after SSR migration:
+Covers GET /{owner}/{repo_slug} after SSR migration:
 
 - test_repo_home_renders_repo_description_server_side
     Seed repo with description, GET home, assert description in HTML body.
@@ -104,7 +104,7 @@ async def test_repo_home_renders_repo_description_server_side(
     description = "Jazz standards arranged for modern quartet"
     await _make_repo(db_session, description=description)
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}")
     assert resp.status_code == 200
     assert description in resp.text
 
@@ -121,7 +121,7 @@ async def test_repo_home_renders_file_tree_server_side(
     repo_id = await _make_repo(db_session)
     await _add_object(db_session, repo_id, "bass_line.mid")
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}")
     assert resp.status_code == 200
     assert "bass_line.mid" in resp.text
 
@@ -137,7 +137,7 @@ async def test_repo_home_branch_picker_has_hx_get(
     """
     await _make_repo(db_session)
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}")
     assert resp.status_code == 200
     assert "hx-get" in resp.text
 
@@ -155,7 +155,7 @@ async def test_repo_home_htmx_fragment_on_branch_switch(
     await _add_object(db_session, repo_id, "melody.mid")
 
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}",
+        f"/{_OWNER}/{_SLUG}",
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200
@@ -176,7 +176,7 @@ async def test_repo_home_shows_tempo_bpm(
     """
     await _make_repo(db_session, tempo_bpm=132)
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}")
     assert resp.status_code == 200
     assert "132" in resp.text
     assert "BPM" in resp.text
@@ -193,7 +193,7 @@ async def test_repo_home_empty_tree_shows_empty_state(
     """
     await _make_repo(db_session)
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}")
     assert resp.status_code == 200
     # empty_state macro renders an icon + "Empty repository" message
     assert "Empty repository" in resp.text
@@ -211,7 +211,7 @@ async def test_repo_home_json_format_returns_json(
     description = "Jazz standards for JSON test"
     await _make_repo(db_session, description=description)
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}?format=json")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}?format=json")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/json")
     data = resp.json()

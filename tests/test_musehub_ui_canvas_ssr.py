@@ -77,7 +77,7 @@ async def test_piano_roll_page_renders_track_name_server_side(
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/bass.mid")
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/piano-roll/main/tracks/bass.mid"
+        "/canvasuser/canvas-test-beats/piano-roll/main/tracks/bass.mid"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -95,7 +95,7 @@ async def test_piano_roll_page_renders_instrument_sidebar(
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/keys.mid")
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/piano-roll/main"
+        "/canvasuser/canvas-test-beats/piano-roll/main"
     )
     assert response.status_code == 200
     body = response.text
@@ -111,7 +111,7 @@ async def test_piano_roll_page_canvas_has_data_midi_url(
     """Piano roll canvas element carries a data-midi-url attribute for JS."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/piano-roll/main"
+        "/canvasuser/canvas-test-beats/piano-roll/main"
     )
     assert response.status_code == 200
     assert "data-midi-url" in response.text
@@ -125,7 +125,7 @@ async def test_piano_roll_page_transport_bar_present(
     """Piano roll page SSR includes the transport bar (#transport-bar)."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/piano-roll/main"
+        "/canvasuser/canvas-test-beats/piano-roll/main"
     )
     assert response.status_code == 200
     assert "transport-bar" in response.text
@@ -140,7 +140,7 @@ async def test_piano_roll_track_page_canvas_has_data_instruments(
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/guitar.mid")
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/piano-roll/main/tracks/guitar.mid"
+        "/canvasuser/canvas-test-beats/piano-roll/main/tracks/guitar.mid"
     )
     assert response.status_code == 200
     body = response.text
@@ -161,7 +161,7 @@ async def test_score_page_renders_title_server_side(
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/melody.mid")
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/score/main/tracks/melody.mid"
+        "/canvasuser/canvas-test-beats/score/main/tracks/melody.mid"
     )
     assert response.status_code == 200
     body = response.text
@@ -177,7 +177,7 @@ async def test_score_page_score_container_has_data_abc_url(
     """Score page includes a #score-container with a data-abc-url for JS."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/score/main"
+        "/canvasuser/canvas-test-beats/score/main"
     )
     assert response.status_code == 200
     body = response.text
@@ -198,7 +198,7 @@ async def test_score_page_no_blank_shell(
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/piano.mid")
     response = await client.get(
-        "/musehub/ui/canvasuser/canvas-test-beats/score/main"
+        "/canvasuser/canvas-test-beats/score/main"
     )
     assert response.status_code == 200
     body = response.text

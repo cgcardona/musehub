@@ -120,7 +120,7 @@ async def _get_detail(
 ) -> tuple[int, str]:
     """Fetch the commit detail page; return (status_code, body_text)."""
     resp = await client.get(
-        f"/musehub/ui/{owner}/{slug}/commits/{commit_id}",
+        f"/{owner}/{slug}/commits/{commit_id}",
         headers=headers or {},
     )
     return resp.status_code, resp.text
@@ -154,7 +154,7 @@ async def test_commit_detail_unknown_sha_404(
     """A non-existent commit SHA returns 404."""
     await _make_repo(db_session)
 
-    resp = await client.get("/musehub/ui/beatmaker/jazz-project/commits/deadbeef00000000")
+    resp = await client.get("/beatmaker/jazz-project/commits/deadbeef00000000")
     assert resp.status_code == 404
 
 

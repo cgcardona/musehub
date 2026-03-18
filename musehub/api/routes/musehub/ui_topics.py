@@ -1,10 +1,10 @@
-"""Muse Hub topics browsing UI pages.
+"""MuseHub topics browsing UI pages.
 
 Serves two routes from a single module — both render the same template with a
 ``mode`` switch that distinguishes the index view from the per-tag detail view:
 
-  GET /musehub/ui/topics — topics index (grid + curated groups + search)
-  GET /musehub/ui/topics/{tag} — single topic detail (featured repos + repo grid)
+  GET /topics — topics index (grid + curated groups + search)
+  GET /topics/{tag} — single topic detail (featured repos + repo grid)
 
 Content negotiation (one URL, two audiences):
   HTML (default) — rendered via Jinja2 using ``musehub/pages/topics.html``.
@@ -14,9 +14,9 @@ Content negotiation (one URL, two audiences):
 Auth: no JWT required — topics pages are public read-only surfaces.
 
 Agent use case:
-  Call ``GET /musehub/ui/topics?format=json`` to get a ranked list of all
+  Call ``GET /topics?format=json`` to get a ranked list of all
   topics with repo counts, plus curated Genres/Instruments/Eras groupings.
-  Call ``GET /musehub/ui/topics/{tag}?format=json`` to get the paginated repo
+  Call ``GET /topics/{tag}?format=json`` to get the paginated repo
   list for a specific tag — same contract as the API endpoint but accessible
   from the UI URL for agents that read the human-facing surface.
 """
@@ -41,7 +41,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ class CuratedGroup(CamelModel):
 
 
 class TopicsIndexResponse(CamelModel):
-    """JSON response for GET /musehub/ui/topics.
+    """JSON response for GET /topics.
 
     ``all_topics`` is the full ranked list of every topic that exists on at
     least one public repo, sorted by popularity (repo_count desc).
@@ -240,7 +240,7 @@ async def _fetch_topic_repos(
 
 @router.get(
     "/topics",
-    summary="Muse Hub topics index — grid of all topics with curated groups and search",
+    summary="MuseHub topics index — grid of all topics with curated groups and search",
 )
 async def topics_index_page(
     request: Request,
@@ -284,7 +284,7 @@ async def topics_index_page(
         context={
             "mode": "index",
             "current_page": "topics",
-            "breadcrumb_items": [{"label": "Topics", "url": "/musehub/ui/topics"}],
+            "breadcrumb_items": [{"label": "Topics", "url": "/topics"}],
         },
         templates=templates,
         json_data=json_data,
@@ -294,7 +294,7 @@ async def topics_index_page(
 
 @router.get(
     "/topics/{tag}",
-    summary="Muse Hub single topic page — featured repos and paginated repo grid",
+    summary="MuseHub single topic page — featured repos and paginated repo grid",
 )
 async def topic_detail_page(
     request: Request,
@@ -360,7 +360,7 @@ async def topic_detail_page(
             "page_size": page_size,
             "current_page": "topics",
             "breadcrumb_items": [
-                {"label": "Topics", "url": "/musehub/ui/topics"},
+                {"label": "Topics", "url": "/topics"},
                 {"label": f"#{tag.lower()}", "url": ""},
             ],
         },

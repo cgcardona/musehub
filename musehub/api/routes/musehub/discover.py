@@ -1,9 +1,9 @@
-"""Muse Hub discover/explore API route handlers.
+"""MuseHub discover/explore API route handlers.
 
 Endpoint summary:
   GET /api/v1/musehub/discover/repos — list public repos (no auth required)
-  POST /api/v1/musehub/repos/{repo_id}/star — star a repo (idempotent add, auth required)
-  DELETE /api/v1/musehub/repos/{repo_id}/star — unstar a repo (auth required)
+  POST /api/v1/repos/{repo_id}/star — star a repo (idempotent add, auth required)
+  DELETE /api/v1/repos/{repo_id}/star — unstar a repo (auth required)
 
 The browse endpoint is intentionally unauthenticated so that anyone can discover
 public compositions without creating an account — matching the HuggingFace model
@@ -34,10 +34,10 @@ _VALID_SORTS = {"stars", "activity", "commits", "created"}
 
 
 @router.get(
-    "/musehub/discover/repos",
+    "/discover/repos",
     response_model=ExploreResponse,
     operation_id="listPublicRepos",
-    summary="Browse public Muse Hub repos with optional filters and sorting",
+    summary="Browse public MuseHub repos with optional filters and sorting",
 )
 async def list_public_repos(
     genre: str | None = Query(None, description="Filter by genre tag (e.g. 'jazz', 'lo-fi')"),
@@ -60,7 +60,7 @@ async def list_public_repos(
     No authentication required — public repos are discoverable by anyone.
 
     Content negotiation: this endpoint always returns JSON. The explore page HTML
-    shell (``GET /musehub/ui/explore``) calls this endpoint from the browser.
+    shell (``GET /explore``) calls this endpoint from the browser.
     """
     if sort not in _VALID_SORTS:
         raise HTTPException(
@@ -82,11 +82,11 @@ async def list_public_repos(
 
 
 @star_router.post(
-    "/musehub/repos/{repo_id}/star",
+    "/repos/{repo_id}/star",
     response_model=StarResponse,
     status_code=status.HTTP_200_OK,
     operation_id="starRepo",
-    summary="Star a public Muse Hub repo (idempotent)",
+    summary="Star a public MuseHub repo (idempotent)",
 )
 async def star_repo(
     repo_id: str,
@@ -110,11 +110,11 @@ async def star_repo(
 
 
 @star_router.delete(
-    "/musehub/repos/{repo_id}/star",
+    "/repos/{repo_id}/star",
     response_model=StarResponse,
     status_code=status.HTTP_200_OK,
     operation_id="unstarRepo",
-    summary="Unstar a Muse Hub repo",
+    summary="Unstar a MuseHub repo",
 )
 async def unstar_repo(
     repo_id: str,

@@ -1,7 +1,7 @@
 {% extends "musehub/base.html" %}
 
 {% block title %}@{{ username }}{% endblock %}
-{% block breadcrumb %}<a href="/musehub/ui/users/{{ username }}">@{{ username }}</a>{% endblock %}
+{% block breadcrumb %}<a href="/{{ username }}">@{{ username }}</a>{% endblock %}
 
 {% block page_data %}
 const username        = {{ username | tojson }};
@@ -51,7 +51,7 @@ function buildContribGraph(graph) {
 function repoCardHtml(r) {
   const lastAct = r.lastActivityAt ? fmtDate(r.lastActivityAt) : 'No commits yet';
   return `<div class="repo-card">
-    <h3><a href="/musehub/ui/${r.owner}/${r.slug}">${escHtml(r.name)}</a></h3>
+    <h3><a href="/${r.owner}/${r.slug}">${escHtml(r.name)}</a></h3>
     <div class="repo-meta">
       <span class="badge badge-${r.visibility}">${r.visibility}</span>
       &bull; Last activity: ${lastAct}
@@ -61,9 +61,9 @@ function repoCardHtml(r) {
 
 function forkedRepoCardHtml(entry) {
   const r = entry.forkRepo;
-  const sourceLink = `/musehub/ui/${escHtml(entry.sourceOwner)}/${escHtml(entry.sourceSlug)}`;
+  const sourceLink = `/${escHtml(entry.sourceOwner)}/${escHtml(entry.sourceSlug)}`;
   return `<div class="repo-card">
-    <h3><a href="/musehub/ui/${escHtml(r.owner)}/${escHtml(r.slug)}">${escHtml(r.name)}</a></h3>
+    <h3><a href="/${escHtml(r.owner)}/${escHtml(r.slug)}">${escHtml(r.name)}</a></h3>
     <div class="repo-meta">
       <span class="badge badge-${r.visibility}">${r.visibility}</span>
       &bull; forked from <a href="${sourceLink}">${escHtml(entry.sourceOwner)}/${escHtml(entry.sourceSlug)}</a>
@@ -78,7 +78,7 @@ function starredRepoCardHtml(entry) {
   const meta = [key, bpm].filter(Boolean).join(' &bull; ');
   const starCount = typeof r.starCount !== 'undefined' ? r.starCount : '';
   return `<div class="repo-card">
-    <h3><a href="/musehub/ui/${escHtml(r.owner)}/${escHtml(r.slug)}">${escHtml(r.owner)}/${escHtml(r.name)}</a></h3>
+    <h3><a href="/${escHtml(r.owner)}/${escHtml(r.slug)}">${escHtml(r.owner)}/${escHtml(r.name)}</a></h3>
     ${r.description ? `<p style="font-size:13px;color:var(--fg-muted);margin:4px 0">${escHtml(r.description)}</p>` : ''}
     <div class="repo-meta">
       <span class="badge badge-${r.visibility}">${r.visibility}</span>
@@ -175,9 +175,9 @@ function userCardHtml(u) {
     ? `<img src="${escHtml(u.avatarUrl)}" alt="${escHtml(u.username)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" />`
     : `<div style="width:40px;height:40px;border-radius:50%;background:hsl(${hue},55%,45%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex-shrink:0">${initial}</div>`;
   return `<div class="user-card" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--border)">
-    <a href="/musehub/ui/users/${escHtml(u.username)}" style="flex-shrink:0">${avatar}</a>
+    <a href="/${escHtml(u.username)}" style="flex-shrink:0">${avatar}</a>
     <div style="flex:1;min-width:0">
-      <a href="/musehub/ui/users/${escHtml(u.username)}" style="font-weight:600">@${escHtml(u.username)}</a>
+      <a href="/${escHtml(u.username)}" style="font-weight:600">@${escHtml(u.username)}</a>
       ${bio ? `<p style="margin:2px 0 0;font-size:13px;color:var(--fg-muted)">${bio}</p>` : ''}
     </div>
   </div>`;

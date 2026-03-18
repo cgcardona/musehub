@@ -1,4 +1,4 @@
-"""Muse Hub Divergence Engine — musical divergence between two remote branches.
+"""MuseHub Divergence Engine — musical divergence between two remote branches.
 
 Computes per-dimension divergence scores by comparing the commit history on
 two branches since their common ancestor (merge base), using commit message
@@ -130,7 +130,7 @@ class MuseHubDimensionDivergence:
 
 @dataclass(frozen=True)
 class MuseHubDivergenceResult:
-    """Full musical divergence report between two Muse Hub branches.
+    """Full musical divergence report between two MuseHub branches.
 
     Attributes:
         repo_id: Repository ID.
@@ -362,7 +362,7 @@ async def compute_hub_divergence(
     branch_a: str,
     branch_b: str,
 ) -> MuseHubDivergenceResult:
-    """Compute musical divergence between two Muse Hub branches.
+    """Compute musical divergence between two MuseHub branches.
 
     Finds the common ancestor, collects each branch's commits since that point,
     classifies commit messages into musical dimensions, and computes a

@@ -1,11 +1,11 @@
-"""Tests for Muse Hub webhook subscription endpoints and dispatch.
+"""Tests for MuseHub webhook subscription endpoints and dispatch.
 
 Covers every acceptance criterion:
-- POST /musehub/repos/{repo_id}/webhooks registers a webhook with URL and events
-- GET /musehub/repos/{repo_id}/webhooks lists registered webhooks
-- DELETE /musehub/repos/{repo_id}/webhooks/{webhook_id} removes a webhook
-- GET /musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries lists delivery history
-- POST /musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries/{id}/redeliver retries delivery
+- POST /repos/{repo_id}/webhooks registers a webhook with URL and events
+- GET /repos/{repo_id}/webhooks lists registered webhooks
+- DELETE /repos/{repo_id}/webhooks/{webhook_id} removes a webhook
+- GET /repos/{repo_id}/webhooks/{webhook_id}/deliveries lists delivery history
+- POST /repos/{repo_id}/webhooks/{webhook_id}/deliveries/{id}/redeliver retries delivery
 - HMAC-SHA256 signature computation is correct
 - Webhook dispatch fires for matching events
 - Delivery logging records success/failure per attempt
@@ -60,7 +60,7 @@ async def _create_webhook(
     secret: str = "",
 ) -> dict[str, Any]:
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks",
+        f"/api/v1/repos/{repo_id}/webhooks",
         json={"url": url, "events": events or ["push"], "secret": secret},
         headers=auth_headers,
     )
@@ -70,7 +70,7 @@ async def _create_webhook(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/webhooks
+# POST /repos/{repo_id}/webhooks
 # ---------------------------------------------------------------------------
 
 
@@ -82,7 +82,7 @@ async def test_create_webhook_returns_201(
     """POST /webhooks registers a webhook subscription and returns 201."""
     repo_id = await _create_repo(client, auth_headers, "create-wh-repo")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks",
+        f"/api/v1/repos/{repo_id}/webhooks",
         json={"url": "https://example.com/hook", "events": ["push", "issue"]},
         headers=auth_headers,
     )
@@ -103,7 +103,7 @@ async def test_create_webhook_unknown_event_type_returns_422(
     """POST /webhooks with an unknown event type is rejected with 422."""
     repo_id = await _create_repo(client, auth_headers, "bad-event-repo")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks",
+        f"/api/v1/repos/{repo_id}/webhooks",
         json={"url": "https://example.com/hook", "events": ["not_a_real_event"]},
         headers=auth_headers,
     )
@@ -117,7 +117,7 @@ async def test_create_webhook_unknown_repo_returns_404(
 ) -> None:
     """POST /webhooks for a non-existent repo returns 404."""
     resp = await client.post(
-        "/api/v1/musehub/repos/does-not-exist/webhooks",
+        "/api/v1/repos/does-not-exist/webhooks",
         json={"url": "https://example.com/hook", "events": ["push"]},
         headers=auth_headers,
     )
@@ -125,7 +125,7 @@ async def test_create_webhook_unknown_repo_returns_404(
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/webhooks
+# GET /repos/{repo_id}/webhooks
 # ---------------------------------------------------------------------------
 
 
@@ -140,7 +140,7 @@ async def test_list_webhooks_returns_registered_webhooks(
     await _create_webhook(client, auth_headers, repo_id, url="https://b.example.com/hook", events=["issue"])
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks",
+        f"/api/v1/repos/{repo_id}/webhooks",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -158,7 +158,7 @@ async def test_list_webhooks_empty_repo(
     """GET /webhooks for a repo with no webhooks returns an empty list."""
     repo_id = await _create_repo(client, auth_headers, "empty-wh-repo")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks",
+        f"/api/v1/repos/{repo_id}/webhooks",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -166,7 +166,7 @@ async def test_list_webhooks_empty_repo(
 
 
 # ---------------------------------------------------------------------------
-# DELETE /musehub/repos/{repo_id}/webhooks/{webhook_id}
+# DELETE /repos/{repo_id}/webhooks/{webhook_id}
 # ---------------------------------------------------------------------------
 
 
@@ -181,14 +181,14 @@ async def test_delete_webhook_removes_subscription(
     webhook_id = wh["webhookId"]
 
     resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}",
         headers=auth_headers,
     )
     assert resp.status_code == 204
 
     # Verify it's gone
     list_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks",
+        f"/api/v1/repos/{repo_id}/webhooks",
         headers=auth_headers,
     )
     assert list_resp.json()["webhooks"] == []
@@ -202,14 +202,14 @@ async def test_delete_webhook_not_found_returns_404(
     """DELETE /webhooks/{id} for a non-existent webhook returns 404."""
     repo_id = await _create_repo(client, auth_headers, "del-missing-wh-repo")
     resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/does-not-exist",
+        f"/api/v1/repos/{repo_id}/webhooks/does-not-exist",
         headers=auth_headers,
     )
     assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries
+# GET /repos/{repo_id}/webhooks/{webhook_id}/deliveries
 # ---------------------------------------------------------------------------
 
 
@@ -224,7 +224,7 @@ async def test_list_deliveries_empty_on_new_webhook(
     webhook_id = wh["webhookId"]
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -239,7 +239,7 @@ async def test_list_deliveries_not_found_webhook_returns_404(
     """GET /deliveries for a non-existent webhook returns 404."""
     repo_id = await _create_repo(client, auth_headers, "deliveries-404-repo")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/missing-id/deliveries",
+        f"/api/v1/repos/{repo_id}/webhooks/missing-id/deliveries",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -258,7 +258,7 @@ async def test_create_webhook_requires_auth(
     """POST /webhooks without JWT returns 401."""
     repo_id = await _create_repo(client, auth_headers, "auth-wh-repo")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks",
+        f"/api/v1/repos/{repo_id}/webhooks",
         json={"url": "https://example.com/hook", "events": ["push"]},
     )
     assert resp.status_code == 401
@@ -271,7 +271,7 @@ async def test_list_webhooks_requires_auth(
 ) -> None:
     """GET /webhooks without JWT returns 401."""
     repo_id = await _create_repo(client, auth_headers, "auth-list-wh-repo")
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/webhooks")
+    resp = await client.get(f"/api/v1/repos/{repo_id}/webhooks")
     assert resp.status_code == 401
 
 
@@ -284,7 +284,7 @@ async def test_delete_webhook_requires_auth(
     repo_id = await _create_repo(client, auth_headers, "auth-del-wh-repo")
     wh = await _create_webhook(client, auth_headers, repo_id)
     resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{wh['webhookId']}",
+        f"/api/v1/repos/{repo_id}/webhooks/{wh['webhookId']}",
     )
     assert resp.status_code == 401
 
@@ -657,7 +657,7 @@ async def test_list_deliveries_via_api_after_dispatch(
         )
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -750,7 +750,7 @@ def test_decrypt_plaintext_secret_returns_value_when_key_set() -> None:
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries/{id}/redeliver
+# POST /repos/{repo_id}/webhooks/{webhook_id}/deliveries/{id}/redeliver
 # ---------------------------------------------------------------------------
 
 
@@ -797,7 +797,7 @@ async def test_redeliver_delivery_succeeds(
 
     # Get the first (failed) delivery ID.
     deliveries_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
         headers=auth_headers,
     )
     assert deliveries_resp.status_code == 200
@@ -821,7 +821,7 @@ async def test_redeliver_delivery_succeeds(
         mock_cls2.return_value = mock_client2
 
         redeliver_resp = await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver",
+            f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver",
             headers=auth_headers,
         )
 
@@ -844,7 +844,7 @@ async def test_redeliver_delivery_not_found_returns_404(
     webhook_id = wh_data["webhookId"]
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries/does-not-exist/redeliver",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries/does-not-exist/redeliver",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -858,7 +858,7 @@ async def test_redeliver_delivery_wrong_webhook_returns_404(
     """POST /redeliver with a wrong webhook_id returns 404."""
     repo_id = await _create_repo(client, auth_headers, "redeliver-wrong-wh-repo")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/no-such-webhook/deliveries/some-delivery/redeliver",
+        f"/api/v1/repos/{repo_id}/webhooks/no-such-webhook/deliveries/some-delivery/redeliver",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -875,7 +875,7 @@ async def test_redeliver_delivery_requires_auth(
     webhook_id = wh_data["webhookId"]
 
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries/some-id/redeliver",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries/some-id/redeliver",
     )
     assert resp.status_code == 401
 
@@ -921,7 +921,7 @@ async def test_redeliver_delivery_stores_new_delivery_row(
     await db_session.commit()
 
     deliveries_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
         headers=auth_headers,
     )
     delivery_id = deliveries_resp.json()["deliveries"][0]["deliveryId"]
@@ -934,7 +934,7 @@ async def test_redeliver_delivery_stores_new_delivery_row(
         mock_client2.__aexit__ = AsyncMock(return_value=False)
         mock_cls2.return_value = mock_client2
         await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver",
+            f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver",
             headers=auth_headers,
         )
 
@@ -995,7 +995,7 @@ async def test_list_deliveries_includes_payload_field(
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
+        f"/api/v1/repos/{repo_id}/webhooks/{webhook_id}/deliveries",
         headers=auth_headers,
     )
     assert resp.status_code == 200

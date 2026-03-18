@@ -2,137 +2,10 @@
 
 {% block title %}Fork Network — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / forks
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / forks
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-/* ── Fork network SVG canvas ────────────────────────────────────────────── */
-#fork-canvas {
-  width: 100%;
-  overflow-x: auto;
-  background: var(--bg-canvas, #0d1117);
-  border: 1px solid var(--border, #30363d);
-  border-radius: 8px;
-  padding: 16px;
-  min-height: 220px;
-}
-.fork-svg {
-  display: block;
-  overflow: visible;
-}
-
-/* Nodes */
-.fork-node-label {
-  font-family: ui-monospace, monospace;
-  font-size: 11px;
-  fill: var(--text-primary, #e6edf3);
-  text-anchor: middle;
-  dominant-baseline: middle;
-  pointer-events: none;
-}
-.fork-node-sub {
-  font-size: 10px;
-  fill: var(--text-muted, #8b949e);
-  text-anchor: middle;
-  dominant-baseline: middle;
-  pointer-events: none;
-}
-
-/* Legend */
-.legend {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: var(--text-muted, #8b949e);
-  align-items: center;
-}
-.legend-swatch {
-  display: inline-block;
-  width: 28px;
-  height: 4px;
-  border-radius: 2px;
-  vertical-align: middle;
-  margin-right: 4px;
-}
-
-/* Detail panel */
-#fork-detail { margin-top: 16px; display: none; }
-.fork-card {
-  background: var(--bg-overlay, #161b22);
-  border: 1px solid var(--border, #30363d);
-  border-radius: 8px;
-  padding: 16px 20px;
-}
-.fork-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text-primary, #e6edf3);
-}
-.fork-card-meta {
-  font-size: 12px;
-  color: var(--text-muted, #8b949e);
-  margin-bottom: 12px;
-}
-.fork-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* Stats bar */
-.stats-bar {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: var(--text-secondary, #c9d1d9);
-}
-.stat { display: flex; align-items: center; gap: 4px; }
-.stat-count { font-weight: 600; color: var(--text-primary, #e6edf3); }
-
-/* Fork table */
-.fork-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  margin-top: 16px;
-}
-.fork-table th {
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border, #30363d);
-  color: var(--text-muted, #8b949e);
-  font-weight: 500;
-  font-size: 12px;
-}
-.fork-table td {
-  padding: 10px;
-  border-bottom: 1px solid var(--border, #21262d);
-  color: var(--text-secondary, #c9d1d9);
-  vertical-align: middle;
-}
-.fork-table tr:last-child td { border-bottom: none; }
-.fork-table tr:hover td { background: rgba(255,255,255,0.03); }
-.avatar-badge {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--bg-overlay, #161b22);
-  border: 1px solid var(--border, #30363d);
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted, #8b949e);
-  vertical-align: middle;
-  margin-right: 6px;
-}
-</style>
-{% endblock %}
 
 {% block page_data %}
 const repoId   = {{ repo_id | tojson }};
@@ -273,7 +146,7 @@ function showDetail(node, isRoot) {
   const ahead   = node.divergenceCommits || 0;
   const col     = divColour(ahead);
   const initial = (node.owner || '?').charAt(0).toUpperCase();
-  const repoHref = `/musehub/ui/${escHtml(node.owner)}/${escHtml(node.repoSlug)}`;
+  const repoHref = `/${escHtml(node.owner)}/${escHtml(node.repoSlug)}`;
   const compareHref  = `${base}/compare/${encodeURIComponent(node.repoSlug)}`;
   const prHref = `${base}/pulls/new?head=${encodeURIComponent(node.owner + ':main')}`;
 
@@ -363,7 +236,7 @@ load();
     <tbody>
       {% for fork in forks %}
       {% set ahead = fork.divergence_commits | default(0) %}
-      {% set repo_href = "/musehub/ui/" ~ fork.owner ~ "/" ~ fork.repo_slug %}
+      {% set repo_href = "/" ~ fork.owner ~ "/" ~ fork.repo_slug %}
       {% set cmp_href = base_url ~ "/compare/" ~ fork.repo_slug %}
       {% set pr_href = base_url ~ "/pulls/new?head=" ~ fork.owner ~ ":main" %}
       <tr>

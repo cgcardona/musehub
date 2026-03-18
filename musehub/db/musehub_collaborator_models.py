@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM model for Muse Hub collaborators.
+"""SQLAlchemy ORM model for MuseHub collaborators.
 
 Collaborators are users granted explicit push/admin access to a repo beyond
 the owner. Permission levels: read | write | admin (default: write).

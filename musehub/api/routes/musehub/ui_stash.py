@@ -1,13 +1,13 @@
-"""Muse Hub stash UI route handlers.
+"""MuseHub stash UI route handlers.
 
-Serves browser-readable HTML pages for the stash section of a Muse Hub repo
+Serves browser-readable HTML pages for the stash section of a MuseHub repo
 analogous to ``git stash list`` but rendered as a rich, interactive page.
 
 Endpoint summary:
-  GET /musehub/ui/{owner}/{repo_slug}/stash — stash list page
-  POST /musehub/ui/{owner}/{repo_slug}/stash/{stash_ref}/apply — apply stash (no delete)
-  POST /musehub/ui/{owner}/{repo_slug}/stash/{stash_ref}/pop — apply + delete stash
-  POST /musehub/ui/{owner}/{repo_slug}/stash/{stash_ref}/drop — delete stash without applying
+  GET /{owner}/{repo_slug}/stash — stash list page
+  POST /{owner}/{repo_slug}/stash/{stash_ref}/apply — apply stash (no delete)
+  POST /{owner}/{repo_slug}/stash/{stash_ref}/pop — apply + delete stash
+  POST /{owner}/{repo_slug}/stash/{stash_ref}/drop — delete stash without applying
 
 Auth:
   All four endpoints require a valid JWT Bearer token. Stash data is always
@@ -24,8 +24,8 @@ Content negotiation (GET only):
 POST responses:
   Always redirect back to the stash list page after a successful action.
   JavaScript callers that prefer JSON should call the JSON API directly:
-    POST /api/v1/musehub/repos/{repo_id}/stash/{stash_id}/apply|pop
-    DELETE /api/v1/musehub/repos/{repo_id}/stash/{stash_id}
+    POST /api/v1/repos/{repo_id}/stash/{stash_id}/apply|pop
+    DELETE /api/v1/repos/{repo_id}/stash/{stash_id}
 
 Auto-discovered by ``musehub.api.routes.musehub.__init__`` because this module
 exposes a ``router`` attribute. No changes to ``__init__.py`` are needed.
@@ -53,7 +53,7 @@ from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui-stash"])
+router = APIRouter(prefix="", tags=["musehub-ui-stash"])
 
 
 
@@ -130,7 +130,7 @@ async def _resolve_repo(owner: str, repo_slug: str, db: AsyncSession) -> tuple[s
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Repo '{owner}/{repo_slug}' not found",
         )
-    base_url = f"/musehub/ui/{owner}/{repo_slug}"
+    base_url = f"/{owner}/{repo_slug}"
     return str(row.repo_id), base_url
 
 
@@ -235,7 +235,7 @@ async def _delete_stash(db: AsyncSession, stash_id: str) -> None:
 
 @router.get(
     "/{owner}/{repo_slug}/stash",
-    summary="Stash list page for a Muse Hub repo",
+    summary="Stash list page for a MuseHub repo",
 )
 async def stash_list_page(
     request: Request,
@@ -282,7 +282,7 @@ async def stash_list_page(
         "total": total,
         "stashes": [s.model_dump(by_alias=False, mode="json") for s in stashes],
         "breadcrumb_data": [
-            {"label": owner, "url": f"/musehub/ui/{owner}"},
+            {"label": owner, "url": f"/{owner}"},
             {"label": repo_slug, "url": base_url},
             {"label": "stash", "url": ""},
         ],

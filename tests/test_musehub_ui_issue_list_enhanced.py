@@ -168,7 +168,7 @@ async def _get_page(
     **params: str,
 ) -> str:
     """Fetch the issue list page and return its text body."""
-    resp = await client.get(f"/musehub/ui/{owner}/{slug}/issues", params=params)
+    resp = await client.get(f"/{owner}/{slug}/issues", params=params)
     assert resp.status_code == 200
     return resp.text
 
@@ -183,9 +183,9 @@ async def test_issue_list_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/issues returns 200 HTML."""
+    """GET /{owner}/{slug}/issues returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/grooves/issues")
+    response = await client.get("/beatmaker/grooves/issues")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -197,7 +197,7 @@ async def test_issue_list_no_auth_required(
 ) -> None:
     """Issue list page renders without a JWT token."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/beatmaker/grooves/issues")
+    response = await client.get("/beatmaker/grooves/issues")
     assert response.status_code == 200
 
 
@@ -207,7 +207,7 @@ async def test_issue_list_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug returns 404."""
-    response = await client.get("/musehub/ui/nobody/norepo/issues")
+    response = await client.get("/nobody/norepo/issues")
     assert response.status_code == 404
 
 
@@ -334,7 +334,7 @@ async def test_issue_list_htmx_request_returns_fragment(
     """HX-Request: true returns a bare fragment — no <html> wrapper."""
     await _make_repo(db_session)
     resp = await client.get(
-        "/musehub/ui/beatmaker/grooves/issues",
+        "/beatmaker/grooves/issues",
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200
@@ -350,7 +350,7 @@ async def test_issue_list_fragment_contains_issue_title(
     repo_id = await _make_repo(db_session)
     await _make_issue(db_session, repo_id, title="Synth pad too bright")
     resp = await client.get(
-        "/musehub/ui/beatmaker/grooves/issues",
+        "/beatmaker/grooves/issues",
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200
@@ -366,7 +366,7 @@ async def test_issue_list_fragment_empty_state_when_no_issues(
     repo_id = await _make_repo(db_session)
     await _make_issue(db_session, repo_id, number=1, title="Open issue", state="open")
     resp = await client.get(
-        "/musehub/ui/beatmaker/grooves/issues",
+        "/beatmaker/grooves/issues",
         params={"state": "closed"},
         headers={"HX-Request": "true"},
     )
@@ -818,6 +818,6 @@ async def test_issue_list_full_page_contains_html_wrapper(
 ) -> None:
     """Direct browser navigation (no HX-Request) returns a full HTML page with <html> tag."""
     await _make_repo(db_session)
-    resp = await client.get("/musehub/ui/beatmaker/grooves/issues")
+    resp = await client.get("/beatmaker/grooves/issues")
     assert resp.status_code == 200
     assert "<html" in resp.text

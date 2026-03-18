@@ -1,11 +1,11 @@
-"""Muse Hub milestones route handlers.
+"""MuseHub milestones route handlers.
 
 Endpoint summary:
-  GET /musehub/repos/{repo_id}/milestones — list milestones (public)
-  POST /musehub/repos/{repo_id}/milestones — create milestone (auth required)
-  GET /musehub/repos/{repo_id}/milestones/{number} — get single milestone (public)
-  PATCH /musehub/repos/{repo_id}/milestones/{number} — update milestone (auth required)
-  DELETE /musehub/repos/{repo_id}/milestones/{number} — delete milestone (auth required)
+  GET /repos/{repo_id}/milestones — list milestones (public)
+  POST /repos/{repo_id}/milestones — create milestone (auth required)
+  GET /repos/{repo_id}/milestones/{number} — get single milestone (public)
+  PATCH /repos/{repo_id}/milestones/{number} — update milestone (auth required)
+  DELETE /repos/{repo_id}/milestones/{number} — delete milestone (auth required)
 
 Read endpoints use optional_token — unauthenticated access is allowed for public repos.
 Write endpoints always require a valid JWT Bearer token.
@@ -42,7 +42,7 @@ router = APIRouter()
 
 
 class MilestoneUpdate(CamelModel):
-    """Body for PATCH /musehub/repos/{repo_id}/milestones/{number}.
+    """Body for PATCH /repos/{repo_id}/milestones/{number}.
 
     All fields are optional — send only the fields you want to change.
     ``state`` must be ``"open"`` or ``"closed"`` if provided.
@@ -108,7 +108,7 @@ async def _get_issue_counts(
     "/repos/{repo_id}/milestones",
     response_model=MilestoneListResponse,
     operation_id="listMilestones",
-    summary="List milestones for a Muse Hub repo",
+    summary="List milestones for a MuseHub repo",
 )
 async def list_milestones(
     repo_id: str,
@@ -149,7 +149,7 @@ async def list_milestones(
     response_model=MilestoneResponse,
     status_code=status.HTTP_201_CREATED,
     operation_id="createMilestone",
-    summary="Create a milestone for a Muse Hub repo",
+    summary="Create a milestone for a MuseHub repo",
 )
 async def create_milestone(
     repo_id: str,

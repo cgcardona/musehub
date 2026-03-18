@@ -1,4 +1,4 @@
-"""Tests for the Muse Hub blame API endpoint.
+"""Tests for the MuseHub blame API endpoint.
 
 Tests cover:
 - 404 when repo does not exist

@@ -3,7 +3,7 @@
 
 {% block title %}Credits — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / credits
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / credits
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
@@ -37,7 +37,7 @@
         </div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <a href="/musehub/ui/users/{{ contrib.author | urlencode }}"
+            <a href="/{{ contrib.author | urlencode }}"
                style="font-size:15px;color:#e6edf3;font-weight:600;text-decoration:none;"
                onmouseover="this.style.textDecoration='underline'"
                onmouseout="this.style.textDecoration='none'">{{ contrib.author }}</a>

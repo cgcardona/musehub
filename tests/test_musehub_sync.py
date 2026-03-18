@@ -1,4 +1,4 @@
-"""Tests for Muse Hub push/pull sync protocol.
+"""Tests for MuseHub push/pull sync protocol.
 
 Covers every acceptance criterion:
 - POST /push stores commits and objects (upsert)
@@ -118,7 +118,7 @@ async def test_push_stores_commits_and_objects(
                 ],
             )
             resp = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=payload,
                 headers=auth_headers,
             )
@@ -130,7 +130,7 @@ async def test_push_stores_commits_and_objects(
 
     # Commits visible via list endpoint
     commits_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits",
+        f"/api/v1/repos/{repo_id}/commits",
         headers=auth_headers,
     )
     assert commits_resp.status_code == 200
@@ -157,13 +157,13 @@ async def test_push_updates_branch_head(
             mock_cfg.musehub_objects_dir = tmp
 
             await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=_push_payload(head_commit_id="c001"),
                 headers=auth_headers,
             )
 
     branches_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/branches",
+        f"/api/v1/repos/{repo_id}/branches",
         headers=auth_headers,
     )
     assert branches_resp.status_code == 200
@@ -193,7 +193,7 @@ async def test_push_non_fast_forward_returns_409(
 
             # First push — sets remote head to c001
             r1 = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=_push_payload(head_commit_id="c001"),
                 headers=auth_headers,
             )
@@ -201,7 +201,7 @@ async def test_push_non_fast_forward_returns_409(
 
             # Second push — diverges: c002 does NOT descend from c001
             r2 = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=_push_payload(
                     head_commit_id="c002",
                     commits=[
@@ -234,13 +234,13 @@ async def test_push_force_allows_non_fast_forward(
             mock_cfg.musehub_objects_dir = tmp
 
             await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=_push_payload(head_commit_id="c001"),
                 headers=auth_headers,
             )
 
             r = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=_push_payload(
                     head_commit_id="c002",
                     commits=[
@@ -280,7 +280,7 @@ async def test_pull_returns_missing_commits(
 
             # Push two commits
             await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=_push_payload(
                     head_commit_id="c002",
                     commits=[
@@ -303,7 +303,7 @@ async def test_pull_returns_missing_commits(
 
             # Pull with c001 already known
             pull_resp = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/pull",
+                f"/api/v1/repos/{repo_id}/pull",
                 json=_pull_payload(have_commits=["c001"]),
                 headers=auth_headers,
             )
@@ -336,7 +336,7 @@ async def test_pull_returns_missing_objects(
 
             # Push two objects
             await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=_push_payload(
                     head_commit_id="c001",
                     objects=[
@@ -357,7 +357,7 @@ async def test_pull_returns_missing_objects(
 
             # Pull with sha256:aaa already known
             pull_resp = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/pull",
+                f"/api/v1/repos/{repo_id}/pull",
                 json=_pull_payload(have_objects=["sha256:aaa"]),
                 headers=auth_headers,
             )
@@ -406,14 +406,14 @@ async def test_push_then_pull_roundtrip(
                 ],
             )
             push_resp = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/push",
+                f"/api/v1/repos/{repo_id}/push",
                 json=push_payload,
                 headers=auth_headers,
             )
             assert push_resp.status_code == 200
 
             pull_resp = await client.post(
-                f"/api/v1/musehub/repos/{repo_id}/pull",
+                f"/api/v1/repos/{repo_id}/pull",
                 json=_pull_payload(),
                 headers=auth_headers,
             )
@@ -440,7 +440,7 @@ async def test_push_then_pull_roundtrip(
 async def test_push_requires_auth(client: AsyncClient) -> None:
     """POST /push returns 401 without a Bearer token."""
     resp = await client.post(
-        "/api/v1/musehub/repos/any-repo/push",
+        "/api/v1/repos/any-repo/push",
         json=_push_payload(),
     )
     assert resp.status_code == 401
@@ -450,7 +450,7 @@ async def test_push_requires_auth(client: AsyncClient) -> None:
 async def test_pull_requires_auth(client: AsyncClient) -> None:
     """POST /pull returns 401 without a Bearer token."""
     resp = await client.post(
-        "/api/v1/musehub/repos/any-repo/pull",
+        "/api/v1/repos/any-repo/pull",
         json=_pull_payload(),
     )
     assert resp.status_code == 401
@@ -468,7 +468,7 @@ async def test_push_unknown_repo_returns_404(
 ) -> None:
     """POST /push returns 404 when the repo does not exist."""
     resp = await client.post(
-        "/api/v1/musehub/repos/ghost-repo/push",
+        "/api/v1/repos/ghost-repo/push",
         json=_push_payload(),
         headers=auth_headers,
     )
@@ -482,7 +482,7 @@ async def test_pull_unknown_repo_returns_404(
 ) -> None:
     """POST /pull returns 404 when the repo does not exist."""
     resp = await client.post(
-        "/api/v1/musehub/repos/ghost-repo/pull",
+        "/api/v1/repos/ghost-repo/pull",
         json=_pull_payload(),
         headers=auth_headers,
     )
@@ -509,14 +509,14 @@ async def test_push_idempotent_commits(
 
             for _ in range(2):
                 r = await client.post(
-                    f"/api/v1/musehub/repos/{repo_id}/push",
+                    f"/api/v1/repos/{repo_id}/push",
                     json=_push_payload(head_commit_id="c001"),
                     headers=auth_headers,
                 )
                 assert r.status_code == 200
 
     commits_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits",
+        f"/api/v1/repos/{repo_id}/commits",
         headers=auth_headers,
     )
     commit_ids = [c["commitId"] for c in commits_resp.json()["commits"]]

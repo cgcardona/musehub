@@ -1,7 +1,7 @@
-"""Tests for Muse Hub pull request endpoints.
+"""Tests for MuseHub pull request endpoints.
 
 Covers every acceptance criterion from issues #41, #215:
-- POST /musehub/repos/{repo_id}/pull-requests creates PR in open state
+- POST /repos/{repo_id}/pull-requests creates PR in open state
 - 422 when from_branch == to_branch
 - 404 when from_branch does not exist
 - GET /pull-requests returns all PRs (open + merged + closed)
@@ -91,7 +91,7 @@ async def _create_pr(
     body: str = "",
 ) -> dict[str, object]:
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         json={
             "title": title,
             "fromBranch": from_branch,
@@ -105,7 +105,7 @@ async def _create_pr(
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/pull-requests
+# POST /repos/{repo_id}/pull-requests
 # ---------------------------------------------------------------------------
 
 
@@ -120,7 +120,7 @@ async def test_create_pr_returns_open_state(
     await _push_branch(db_session, repo_id, "feature")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         json={
             "title": "Add neo-soul keys variation",
             "fromBranch": "feature",
@@ -151,7 +151,7 @@ async def test_create_pr_same_branch_returns_422(
     repo_id = await _create_repo(client, auth_headers, "same-branch-repo")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         json={"title": "Bad PR", "fromBranch": "main", "toBranch": "main"},
         headers=auth_headers,
     )
@@ -168,7 +168,7 @@ async def test_create_pr_missing_from_branch_returns_404(
     repo_id = await _create_repo(client, auth_headers, "no-branch-repo")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         json={"title": "Ghost PR", "fromBranch": "nonexistent", "toBranch": "main"},
         headers=auth_headers,
     )
@@ -180,14 +180,14 @@ async def test_create_pr_missing_from_branch_returns_404(
 async def test_create_pr_requires_auth(client: AsyncClient) -> None:
     """POST /pull-requests returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos/any-id/pull-requests",
+        "/api/v1/repos/any-id/pull-requests",
         json={"title": "Unauthorized", "fromBranch": "feat", "toBranch": "main"},
     )
     assert response.status_code == 401
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/pull-requests
+# GET /repos/{repo_id}/pull-requests
 # ---------------------------------------------------------------------------
 
 
@@ -212,13 +212,13 @@ async def test_list_prs_returns_all_states(
 
     # Merge pr_b
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_b['prId']}/merge",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_b['prId']}/merge",
         json={"mergeStrategy": "merge_commit"},
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -246,13 +246,13 @@ async def test_list_prs_filter_by_open(
         client, auth_headers, repo_id, title="Will merge", from_branch="feat-merge"
     )
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_to_merge['prId']}/merge",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_to_merge['prId']}/merge",
         json={"mergeStrategy": "merge_commit"},
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests?state=open",
+        f"/api/v1/repos/{repo_id}/pull-requests?state=open",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -267,12 +267,12 @@ async def test_list_prs_nonexistent_repo_returns_404_without_auth(client: AsyncC
 
     Uses optional_token — auth is visibility-based; missing repo → 404.
     """
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo-id/pull-requests")
+    response = await client.get("/api/v1/repos/non-existent-repo-id/pull-requests")
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# GET /musehub/repos/{repo_id}/pull-requests/{pr_id}
+# GET /repos/{repo_id}/pull-requests/{pr_id}
 # ---------------------------------------------------------------------------
 
 
@@ -296,7 +296,7 @@ async def test_get_pr_returns_full_detail(
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{created['prId']}",
+        f"/api/v1/repos/{repo_id}/pull-requests/{created['prId']}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -316,7 +316,7 @@ async def test_get_pr_unknown_id_returns_404(
     repo_id = await _create_repo(client, auth_headers, "get-404-repo")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/does-not-exist",
+        f"/api/v1/repos/{repo_id}/pull-requests/does-not-exist",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -328,12 +328,12 @@ async def test_get_pr_nonexistent_returns_404_without_auth(client: AsyncClient) 
 
     Uses optional_token — auth is visibility-based; missing repo/PR → 404.
     """
-    response = await client.get("/api/v1/musehub/repos/non-existent-repo/pull-requests/non-existent-pr")
+    response = await client.get("/api/v1/repos/non-existent-repo/pull-requests/non-existent-pr")
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# POST /musehub/repos/{repo_id}/pull-requests/{pr_id}/merge
+# POST /repos/{repo_id}/pull-requests/{pr_id}/merge
 # ---------------------------------------------------------------------------
 
 
@@ -353,7 +353,7 @@ async def test_merge_pr_creates_merge_commit(
     )
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr['prId']}/merge",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr['prId']}/merge",
         json={"mergeStrategy": "merge_commit"},
         headers=auth_headers,
     )
@@ -366,7 +366,7 @@ async def test_merge_pr_creates_merge_commit(
 
     # Verify PR state changed to merged
     detail = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr['prId']}",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr['prId']}",
         headers=auth_headers,
     )
     assert detail.json()["state"] == "merged"
@@ -390,7 +390,7 @@ async def test_merge_already_merged_returns_409(
 
     # First merge succeeds
     first = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr['prId']}/merge",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr['prId']}/merge",
         json={"mergeStrategy": "merge_commit"},
         headers=auth_headers,
     )
@@ -398,7 +398,7 @@ async def test_merge_already_merged_returns_409(
 
     # Second merge must 409
     second = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr['prId']}/merge",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr['prId']}/merge",
         json={"mergeStrategy": "merge_commit"},
         headers=auth_headers,
     )
@@ -409,7 +409,7 @@ async def test_merge_already_merged_returns_409(
 async def test_merge_pr_requires_auth(client: AsyncClient) -> None:
     """POST /pull-requests/{pr_id}/merge returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos/r/pull-requests/p/merge",
+        "/api/v1/repos/r/pull-requests/p/merge",
         json={"mergeStrategy": "merge_commit"},
     )
     assert response.status_code == 401
@@ -430,7 +430,7 @@ async def test_create_pr_author_in_response(
     repo_id = await _create_repo(client, auth_headers, "author-pr-repo")
     await _push_branch(db_session, repo_id, "feat/author-test")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         json={
             "title": "Author field regression",
             "body": "",
@@ -455,7 +455,7 @@ async def test_create_pr_author_persisted_in_list(
     repo_id = await _create_repo(client, auth_headers, "author-pr-list-repo")
     await _push_branch(db_session, repo_id, "feat/author-list-test")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         json={
             "title": "Authored PR",
             "body": "",
@@ -465,7 +465,7 @@ async def test_create_pr_author_persisted_in_list(
         headers=auth_headers,
     )
     list_response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests",
+        f"/api/v1/repos/{repo_id}/pull-requests",
         headers=auth_headers,
     )
     assert list_response.status_code == 200
@@ -488,7 +488,7 @@ async def test_pr_diff_endpoint_returns_five_dimensions(
     pr_id = pr_resp["prId"]
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/diff",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/diff",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -523,7 +523,7 @@ async def test_pr_diff_endpoint_404_for_unknown_pr(
     """GET /pull-requests/{pr_id}/diff returns 404 when the PR does not exist."""
     repo_id = await _create_repo(client, auth_headers, "diff-404-repo")
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/nonexistent-pr-id/diff",
+        f"/api/v1/repos/{repo_id}/pull-requests/nonexistent-pr-id/diff",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -581,7 +581,7 @@ async def test_pr_diff_endpoint_graceful_when_no_commits(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/diff",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/diff",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -608,7 +608,7 @@ async def test_pr_merge_strategy_squash_accepted(
     pr_id = pr_resp["prId"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/merge",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/merge",
         json={"mergeStrategy": "squash"},
         headers=auth_headers,
     )
@@ -632,7 +632,7 @@ async def test_pr_merge_strategy_rebase_accepted(
     pr_id = pr_resp["prId"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/merge",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/merge",
         json={"mergeStrategy": "rebase"},
         headers=auth_headers,
     )
@@ -657,7 +657,7 @@ async def test_create_pr_comment(
     pr = await _create_pr(client, auth_headers, repo_id, from_branch="feat/comment-test")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr['prId']}/comments",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr['prId']}/comments",
         json={"body": "The bass line feels stiff — add swing.", "targetType": "general"},
         headers=auth_headers,
     )
@@ -687,7 +687,7 @@ async def test_list_pr_comments_threaded(
 
     # Create a top-level comment
     create_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/comments",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/comments",
         json={"body": "Top-level comment.", "targetType": "general"},
         headers=auth_headers,
     )
@@ -696,7 +696,7 @@ async def test_list_pr_comments_threaded(
 
     # Reply to it
     reply_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/comments",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/comments",
         json={"body": "A reply.", "targetType": "general", "parentCommentId": parent_id},
         headers=auth_headers,
     )
@@ -704,7 +704,7 @@ async def test_list_pr_comments_threaded(
 
     # Fetch threaded list
     list_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/comments",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/comments",
         headers=auth_headers,
     )
     assert list_resp.status_code == 200
@@ -729,7 +729,7 @@ async def test_comment_targets_track(
     pr = await _create_pr(client, auth_headers, repo_id, from_branch="feat/track-comment")
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr['prId']}/comments",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr['prId']}/comments",
         json={
             "body": "Beats 16-24 on bass feel rushed.",
             "targetType": "region",
@@ -751,7 +751,7 @@ async def test_comment_targets_track(
 async def test_comment_requires_auth(client: AsyncClient) -> None:
     """POST /pull-requests/{pr_id}/comments returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos/r/pull-requests/p/comments",
+        "/api/v1/repos/r/pull-requests/p/comments",
         json={"body": "Unauthorized attempt."},
     )
     assert response.status_code == 401
@@ -770,14 +770,14 @@ async def test_reply_to_comment(
     pr_id = pr["prId"]
 
     parent_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/comments",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/comments",
         json={"body": "Original comment.", "targetType": "general"},
         headers=auth_headers,
     )
     parent_id = parent_resp.json()["comments"][0]["commentId"]
 
     reply_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/comments",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/comments",
         json={"body": "Reply here.", "targetType": "general", "parentCommentId": parent_id},
         headers=auth_headers,
     )
@@ -925,7 +925,7 @@ async def test_request_reviewers_creates_pending_rows(
     pr_id = pr["prId"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
         json={"reviewers": ["alice", "bob"]},
         headers=auth_headers,
     )
@@ -953,13 +953,13 @@ async def test_request_reviewers_idempotent(
     pr_id = pr["prId"]
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
         json={"reviewers": ["alice"]},
         headers=auth_headers,
     )
     # Second request for the same reviewer
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
         json={"reviewers": ["alice"]},
         headers=auth_headers,
     )
@@ -971,7 +971,7 @@ async def test_request_reviewers_idempotent(
 async def test_request_reviewers_requires_auth(client: AsyncClient) -> None:
     """POST /reviewers returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos/r/pull-requests/p/reviewers",
+        "/api/v1/repos/r/pull-requests/p/reviewers",
         json={"reviewers": ["alice"]},
     )
     assert response.status_code == 401
@@ -990,13 +990,13 @@ async def test_remove_reviewer_deletes_pending_row(
     pr_id = pr["prId"]
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
         json={"reviewers": ["alice", "bob"]},
         headers=auth_headers,
     )
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers/alice",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers/alice",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1018,7 +1018,7 @@ async def test_remove_reviewer_not_found_returns_404(
     pr_id = pr["prId"]
 
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers/nobody",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers/nobody",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -1041,7 +1041,7 @@ async def test_list_reviews_empty_for_new_pr(
     pr_id = pr["prId"]
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1063,13 +1063,13 @@ async def test_list_reviews_filter_by_state(
     pr_id = pr["prId"]
 
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers",
         json={"reviewers": ["alice", "bob"]},
         headers=auth_headers,
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews?state=pending",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews?state=pending",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1092,7 +1092,7 @@ async def test_submit_review_approve(
     pr_id = pr["prId"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         json={"event": "approve", "body": "Sounds great — the harmonic transitions are perfect."},
         headers=auth_headers,
     )
@@ -1116,7 +1116,7 @@ async def test_submit_review_request_changes(
     pr_id = pr["prId"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         json={"event": "request_changes", "body": "The bridge needs more harmonic tension."},
         headers=auth_headers,
     )
@@ -1140,14 +1140,14 @@ async def test_submit_review_updates_existing_row(
 
     # First: request changes
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         json={"event": "request_changes", "body": "Not happy with the bridge."},
         headers=auth_headers,
     )
 
     # After author fixes, reviewer now approves
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         json={"event": "approve", "body": "Looks good now!"},
         headers=auth_headers,
     )
@@ -1157,7 +1157,7 @@ async def test_submit_review_updates_existing_row(
 
     # Only one review row should exist
     list_resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         headers=auth_headers,
     )
     assert list_resp.json()["total"] == 1
@@ -1185,7 +1185,7 @@ async def test_remove_reviewer_after_submit_returns_409(
 
     # Submit a review — this creates an "approved" row for the JWT sub
     submit_resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         json={"event": "approve", "body": "Approved"},
         headers=auth_headers,
     )
@@ -1193,7 +1193,7 @@ async def test_remove_reviewer_after_submit_returns_409(
 
     # Attempting to remove the reviewer whose row is already approved must return 409
     response = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviewers/{test_jwt_sub}",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviewers/{test_jwt_sub}",
         headers=auth_headers,
     )
     assert response.status_code == 409
@@ -1212,7 +1212,7 @@ async def test_submit_review_invalid_event_returns_422(
     pr_id = pr["prId"]
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/reviews",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/reviews",
         json={"event": "INVALID", "body": ""},
         headers=auth_headers,
     )

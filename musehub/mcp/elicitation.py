@@ -379,11 +379,11 @@ def oauth_connect_url(platform: str, elicitation_id: str, base_url: str = "") ->
     """
     base = base_url.rstrip("/") or "https://musehub.app"
     slug = platform.lower().replace(" ", "-")
-    return f"{base}/musehub/ui/mcp/connect/{slug}?elicitation_id={elicitation_id}"
+    return f"{base}/mcp/connect/{slug}?elicitation_id={elicitation_id}"
 
 
 def daw_cloud_connect_url(service: str, elicitation_id: str, base_url: str = "") -> str:
     """Build the MuseHub URL for a cloud DAW OAuth start page."""
     base = base_url.rstrip("/") or "https://musehub.app"
     slug = service.lower().replace(" ", "-")
-    return f"{base}/musehub/ui/mcp/connect/daw/{slug}?elicitation_id={elicitation_id}"
+    return f"{base}/mcp/connect/daw/{slug}?elicitation_id={elicitation_id}"

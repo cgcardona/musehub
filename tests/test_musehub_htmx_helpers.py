@@ -176,7 +176,7 @@ def test_htmx_trigger_sets_header_with_none_detail() -> None:
 
 
 def test_htmx_redirect_sets_hx_redirect_header() -> None:
-    response = htmx_redirect("/musehub/ui/owner/repo")
+    response = htmx_redirect("/owner/repo")
 
     assert response.status_code == 200
-    assert response.headers["HX-Redirect"] == "/musehub/ui/owner/repo"
+    assert response.headers["HX-Redirect"] == "/owner/repo"

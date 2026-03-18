@@ -35,7 +35,7 @@ from musehub.db.musehub_models import MusehubRepo
 _ANALYSIS_REF = "cafebeef00112233"
 _OWNER = "harmonyuser"
 _SLUG = "harmony-test-repo"
-_BASE = f"/musehub/ui/{_OWNER}/{_SLUG}"
+_BASE = f"/{_OWNER}/{_SLUG}"
 _HARMONY_URL = f"{_BASE}/analysis/{_ANALYSIS_REF}/harmony"
 
 

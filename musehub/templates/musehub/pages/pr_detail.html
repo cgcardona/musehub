@@ -2,8 +2,8 @@
 
 {% block title %}PR {{ pr.pr_id[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
   <a href="{{ base_url }}/pulls">pulls</a> / {{ pr.pr_id[:8] }}
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
@@ -13,98 +13,6 @@ const repoId = {{ repo_id | tojson }};
 const prId   = {{ pr_id | tojson }};
 const base   = {{ base_url | tojson }};
 const apiBase = '/api/v1/musehub/repos/' + repoId;
-{% endblock %}
-
-{% block extra_css %}
-<style>
-/* ── PR detail layout ───────────────────────────────────────────────────── */
-.pr-detail-layout {
-  display: grid;
-  grid-template-columns: 1fr 240px;
-  gap: var(--space-4);
-  align-items: start;
-}
-@media (max-width: 768px) {
-  .pr-detail-layout { grid-template-columns: 1fr; }
-  .pr-sidebar { display: none; }
-}
-
-/* ── Branch pills ────────────────────────────────────────────────────────── */
-.branch-pill {
-  display: inline-block;
-  padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-family: monospace;
-  background: var(--color-surface-2, #161b22);
-  border: 1px solid var(--color-border);
-  color: var(--color-fg, #e6edf3);
-}
-
-/* ── Diff stats ──────────────────────────────────────────────────────────── */
-.diff-stat { display: flex; gap: var(--space-3); font-size: 13px; flex-wrap: wrap; }
-.diff-stat-additions { color: #3fb950; font-weight: 600; }
-.diff-stat-deletions { color: #f85149; font-weight: 600; }
-.diff-stat-files     { color: #8b949e; }
-
-/* ── Review chips ────────────────────────────────────────────────────────── */
-.reviewer-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 4px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-2, #161b22);
-}
-.reviewer-chip--approved       { border-color: #3fb95055; }
-.reviewer-chip--changes        { border-color: #f0883e55; }
-.reviewer-chip--pending        { border-color: #8b949e33; }
-
-/* ── Comments ────────────────────────────────────────────────────────────── */
-.comment-block {
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: var(--space-3);
-}
-.comment-header-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface-2, #161b22);
-  border-bottom: 1px solid var(--color-border);
-  font-size: 13px;
-}
-.comment-body-text {
-  padding: var(--space-3);
-  font-size: 13px;
-  color: var(--color-fg, #e6edf3);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.comment-reply {
-  margin-left: var(--space-4);
-  border-top: 1px solid var(--color-border);
-}
-
-/* ── Merge button states ─────────────────────────────────────────────────── */
-.merge-btn-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.merge-warning {
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: #341a00;
-  border: 1px solid #f0883e44;
-  font-size: 13px;
-  color: #f0883e;
-  margin-bottom: var(--space-3);
-}
-</style>
 {% endblock %}
 
 {% block content %}

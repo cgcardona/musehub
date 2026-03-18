@@ -1,4 +1,4 @@
-"""Muse Hub repo settings page routes.
+"""MuseHub repo settings page routes.
 
 Serves the repository settings UI at ``/{owner}/{repo_slug}/settings``.
 The page is split into four sidebar sections:
@@ -12,7 +12,7 @@ Content negotiation:
 - HTML (default): full interactive settings page via Jinja2 template.
 - JSON (``Accept: application/json`` or ``?format=json``): returns
   ``RepoSettingsResponse`` — same model as the API endpoint
-  ``GET /api/v1/musehub/repos/{repo_id}/settings``.
+  ``GET /api/v1/repos/{repo_id}/settings``.
 
 Auth contract:
 - The HTML shell requires no JWT to render. Client-side JavaScript reads the
@@ -37,18 +37,18 @@ from musehub.api.routes.musehub._templates import templates as _templates
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui-settings"])
+router = APIRouter(prefix="", tags=["musehub-ui-settings"])
 
 
 
 def _base_url(owner: str, repo_slug: str) -> str:
     """Return the canonical UI base URL for a repo."""
-    return f"/musehub/ui/{owner}/{repo_slug}"
+    return f"/{owner}/{repo_slug}"
 
 
 @router.get(
     "/{owner}/{repo_slug}/settings",
-    summary="Muse Hub repo settings page",
+    summary="MuseHub repo settings page",
 )
 async def settings_page(
     request: Request,
@@ -79,8 +79,8 @@ async def settings_page(
 
     Content negotiation:
     - HTML (default): interactive settings shell; JS fetches
-      ``GET /api/v1/musehub/repos/{repo_id}/settings`` and patches via
-      ``PATCH /api/v1/musehub/repos/{repo_id}/settings``.
+      ``GET /api/v1/repos/{repo_id}/settings`` and patches via
+      ``PATCH /api/v1/repos/{repo_id}/settings``.
     - JSON (``Accept: application/json`` or ``?format=json``): returns the
       current ``RepoSettingsResponse`` for programmatic inspection.
 
@@ -116,7 +116,7 @@ async def settings_page(
             "current_page": "settings",
             "settings": settings,
             "breadcrumb_data": [
-                {"label": owner, "url": f"/musehub/ui/{owner}"},
+                {"label": owner, "url": f"/{owner}"},
                 {"label": repo_slug, "url": base_url},
                 {"label": "Settings", "url": ""},
             ],

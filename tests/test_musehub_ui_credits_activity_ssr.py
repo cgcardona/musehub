@@ -1,7 +1,7 @@
-"""SSR tests for the Muse Hub credits and activity pages (issue #574).
+"""SSR tests for the MuseHub credits and activity pages (issue #574).
 
-Verifies that ``GET /musehub/ui/{owner}/{repo_slug}/credits`` and
-``GET /musehub/ui/{owner}/{repo_slug}/activity`` render data server-side
+Verifies that ``GET /{owner}/{repo_slug}/credits`` and
+``GET /{owner}/{repo_slug}/activity`` render data server-side
 rather than relying on client-side JavaScript fetches.
 
 Tests:
@@ -120,7 +120,7 @@ async def test_credits_page_renders_contributor_name_server_side(
     repo_id = await _make_repo(db_session)
     await _make_commit(db_session, repo_id, author="charlie-contributor")
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/credits")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/credits")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "charlie-contributor" in resp.text
@@ -137,7 +137,7 @@ async def test_credits_page_shows_total_contributors(
     await _make_commit(db_session, repo_id, author="alice")
     await _make_commit(db_session, repo_id, author="bob")
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/credits")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/credits")
     assert resp.status_code == 200
     # The template renders e.g. "2 contributors"
     assert "2 contributor" in resp.text
@@ -167,7 +167,7 @@ async def test_activity_page_renders_event_server_side(
         description="Pushed feat/synth-bass",
     )
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/activity")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/activity")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "Pushed feat/synth-bass" in resp.text
@@ -182,7 +182,7 @@ async def test_activity_page_filter_form_has_hx_get(
     """The event-type filter form has hx-get for HTMX partial updates."""
     await _make_repo(db_session)
 
-    resp = await client.get(f"/musehub/ui/{_OWNER}/{_SLUG}/activity")
+    resp = await client.get(f"/{_OWNER}/{_SLUG}/activity")
     assert resp.status_code == 200
     assert "hx-get" in resp.text
 
@@ -207,7 +207,7 @@ async def test_activity_page_htmx_fragment_path(
     )
 
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/activity",
+        f"/{_OWNER}/{_SLUG}/activity",
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200
@@ -239,7 +239,7 @@ async def test_activity_page_event_type_filter(
     )
 
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/activity",
+        f"/{_OWNER}/{_SLUG}/activity",
         params={"event_type": "commit_pushed"},
     )
     assert resp.status_code == 200

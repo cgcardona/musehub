@@ -1,4 +1,4 @@
-"""SSR-specific tests for the Muse Hub blame page (issue #566).
+"""SSR-specific tests for the MuseHub blame page (issue #566).
 
 Verifies that blame data is rendered server-side — file path, commit SHA,
 author, and note rows appear in the initial HTML without a client-side fetch.
@@ -88,7 +88,7 @@ async def test_blame_page_renders_file_path_server_side(
 ) -> None:
     """The MIDI file path must appear in the server-rendered HTML."""
     await _seed_repo(db_session)
-    url = f"/musehub/ui/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
+    url = f"/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
     response = await client.get(url)
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -108,7 +108,7 @@ async def test_blame_page_renders_commit_sha_server_side(
     """Short commit SHA must appear server-side when a commit is seeded."""
     repo_id = await _seed_repo(db_session)
     await _seed_commit(db_session, repo_id)
-    url = f"/musehub/ui/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
+    url = f"/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
     response = await client.get(url)
     assert response.status_code == 200
     body = response.text
@@ -124,7 +124,7 @@ async def test_blame_page_renders_author_server_side(
     """Commit author must appear in the SSR blame table when entries are present."""
     repo_id = await _seed_repo(db_session)
     await _seed_commit(db_session, repo_id, author="jazzmaster")
-    url = f"/musehub/ui/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
+    url = f"/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
     response = await client.get(url)
     assert response.status_code == 200
     body = response.text
@@ -140,7 +140,7 @@ async def test_blame_page_renders_note_rows_server_side(
     """When blame entries are generated, the SSR table contains note data rows."""
     repo_id = await _seed_repo(db_session)
     await _seed_commit(db_session, repo_id)
-    url = f"/musehub/ui/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
+    url = f"/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
     response = await client.get(url)
     assert response.status_code == 200
     body = response.text
@@ -155,7 +155,7 @@ async def test_blame_page_unknown_repo_returns_404(
     db_session: AsyncSession,
 ) -> None:
     """Unknown owner/slug must return 404 — the repo lookup fails before rendering."""
-    url = f"/musehub/ui/nobody/no-such-repo/blame/{_REF}/{_PATH}"
+    url = f"/nobody/no-such-repo/blame/{_REF}/{_PATH}"
     response = await client.get(url)
     assert response.status_code == 404
 
@@ -167,7 +167,7 @@ async def test_blame_page_empty_entries_shows_empty_state(
 ) -> None:
     """A repo with no commits must render the empty-state message (not a table)."""
     await _seed_repo(db_session)
-    url = f"/musehub/ui/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
+    url = f"/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
     response = await client.get(url)
     assert response.status_code == 200
     body = response.text
@@ -182,7 +182,7 @@ async def test_blame_page_filter_form_preserves_track(
 ) -> None:
     """Track filter param must pre-select the correct <option> in the SSR form."""
     await _seed_repo(db_session)
-    url = f"/musehub/ui/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}?track=piano"
+    url = f"/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}?track=piano"
     response = await client.get(url)
     assert response.status_code == 200
     body = response.text
@@ -197,7 +197,7 @@ async def test_blame_page_filter_form_is_htmx_capable(
 ) -> None:
     """Filter form must carry hx-get attribute so HTMX can swap content inline."""
     await _seed_repo(db_session)
-    url = f"/musehub/ui/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
+    url = f"/{_OWNER}/{_SLUG}/blame/{_REF}/{_PATH}"
     response = await client.get(url)
     assert response.status_code == 200
     body = response.text

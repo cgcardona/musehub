@@ -250,8 +250,8 @@ async def test_none_alg_token_rejected(client: AsyncClient, db_session: AsyncSes
 @pytest.mark.anyio
 @pytest.mark.parametrize("endpoint,method,body", [
     ("/api/v1/musehub/repos", "POST", {"name": "x", "owner": "y"}),
-    ("/api/v1/musehub/repos/fake-id/issues", "POST", {"title": "t"}),
-    ("/api/v1/musehub/repos/fake-id/issues/1/close", "POST", {}),
+    ("/api/v1/repos/fake-id/issues", "POST", {"title": "t"}),
+    ("/api/v1/repos/fake-id/issues/1/close", "POST", {}),
 ])
 async def test_missing_auth_header_returns_401(
     client: AsyncClient,

@@ -1,22 +1,22 @@
-"""Muse Hub repo, branch, commit, credits, and agent context route handlers.
+"""MuseHub repo, branch, commit, credits, and agent context route handlers.
 
 Endpoint summary:
   POST /musehub/repos — create a new remote repo
-  GET /musehub/repos/{repo_id} — get repo metadata (by internal UUID)
-  DELETE /musehub/repos/{repo_id} — soft-delete a repo (owner only)
-  POST /musehub/repos/{repo_id}/transfer — transfer repo ownership (owner only)
+  GET /repos/{repo_id} — get repo metadata (by internal UUID)
+  DELETE /repos/{repo_id} — soft-delete a repo (owner only)
+  POST /repos/{repo_id}/transfer — transfer repo ownership (owner only)
   GET /musehub/{owner}/{repo_slug} — get repo metadata (by owner/slug)
-  GET /musehub/repos/{repo_id}/branches — list all branches
-  GET /musehub/repos/{repo_id}/commits — list commits (newest first)
-  GET /musehub/repos/{repo_id}/commits/{sha}/render-status — render job status for a commit
-  GET /musehub/repos/{repo_id}/credits — aggregated contributor credits
-  GET /musehub/repos/{repo_id}/context — agent context briefing
-  GET /musehub/repos/{repo_id}/timeline — chronological timeline with emotion/section/track layers
-  GET /musehub/repos/{repo_id}/form-structure/{ref} — form and structure analysis
-  POST /musehub/repos/{repo_id}/sessions — push a recording session
-  GET /musehub/repos/{repo_id}/sessions — list recording sessions
-  GET /musehub/repos/{repo_id}/sessions/{session_id} — get a single session
-  GET /musehub/repos/{repo_id}/arrange/{ref} — arrangement matrix (instrument × section grid)
+  GET /repos/{repo_id}/branches — list all branches
+  GET /repos/{repo_id}/commits — list commits (newest first)
+  GET /repos/{repo_id}/commits/{sha}/render-status — render job status for a commit
+  GET /repos/{repo_id}/credits — aggregated contributor credits
+  GET /repos/{repo_id}/context — agent context briefing
+  GET /repos/{repo_id}/timeline — chronological timeline with emotion/section/track layers
+  GET /repos/{repo_id}/form-structure/{ref} — form and structure analysis
+  POST /repos/{repo_id}/sessions — push a recording session
+  GET /repos/{repo_id}/sessions — list recording sessions
+  GET /repos/{repo_id}/sessions/{session_id} — get a single session
+  GET /repos/{repo_id}/arrange/{ref} — arrangement matrix (instrument × section grid)
 
 All endpoints require a valid JWT Bearer token.
 No business logic lives here — all persistence is delegated to
@@ -146,7 +146,7 @@ async def create_repo(
     db: AsyncSession = Depends(get_db),
     claims: TokenClaims = Depends(require_valid_token),
 ) -> RepoResponse:
-    """Create a new remote Muse Hub repository owned by the authenticated user.
+    """Create a new remote MuseHub repository owned by the authenticated user.
 
     ``slug`` is auto-generated from ``name``. Returns 409 if the ``(owner, slug)``
     pair already exists — the musician must rename the repo to get a distinct slug.
@@ -555,7 +555,7 @@ async def get_timeline(
     - ``sections``: section-change events parsed from commit messages
     - ``tracks``: track add/remove events parsed from commit messages
 
-    Content negotiation: the UI page at ``GET /musehub/ui/{repo_id}/timeline``
+    Content negotiation: the UI page at ``GET /{repo_id}/timeline``
     fetches this endpoint for its layered visualisation. AI agents call this
     endpoint directly to understand the creative arc of a project.
     """
@@ -587,7 +587,7 @@ async def get_divergence(
     expressed in [0.0, 1.0]. Multiply by 100 for a percentage display.
 
     Content negotiation: this endpoint always returns JSON. The UI page at
-    ``GET /musehub/ui/{repo_id}/divergence`` renders the radar chart.
+    ``GET /{repo_id}/divergence`` renders the radar chart.
 
     Returns:
         DivergenceResponse with per-dimension scores and overall score.
@@ -777,7 +777,7 @@ async def get_commit_dag(
     Nodes are ordered oldest→newest (Kahn's topological sort). Edges express
     child→parent relationships (``source`` = child commit, ``target`` = parent
     commit). This endpoint is the data source for the interactive DAG graph UI
-    at ``GET /musehub/ui/{repo_id}/graph``.
+    at ``GET /{repo_id}/graph``.
 
     Content negotiation: always returns JSON. The UI page fetches this endpoint
     with the stored JWT and renders it client-side with an SVG-based renderer.
@@ -953,7 +953,7 @@ async def get_repo_stats(
     """Return aggregated statistics for a repo: commit count, branch count, release count.
 
     This lightweight endpoint powers the stats bar on the repo home page and
-    the JSON content-negotiation response from ``GET /musehub/ui/{owner}/{slug}``.
+    the JSON content-negotiation response from ``GET /{owner}/{slug}``.
     All counts are 0 when the repo has no data yet.
 
     Returns 404 if the repo does not exist.
@@ -1174,7 +1174,7 @@ async def compare_refs(
     # repo is guaranteed non-None here — _guard_visibility raised 404 otherwise.
     assert repo is not None
     create_pr_url = (
-        f"/musehub/ui/{repo.owner}/{repo.slug}/pulls/new"
+        f"/{repo.owner}/{repo.slug}/pulls/new"
         f"?base={base}&head={head}"
     )
 
@@ -1204,7 +1204,7 @@ async def get_arrangement_matrix(
     db: AsyncSession = Depends(get_db),
     claims: TokenClaims | None = Depends(optional_token),
 ) -> ArrangementMatrixResponse:
-    """Return the arrangement matrix for a Muse Hub commit ref.
+    """Return the arrangement matrix for a MuseHub commit ref.
 
     The matrix encodes note density for every (instrument, section) pair so
     the arrangement page can render a colour-coded grid. Row and column
@@ -1265,7 +1265,7 @@ async def list_stargazers(
     "/repos/{repo_id}/activity",
     response_model=ActivityFeedResponse,
     operation_id="getRepoActivityFeed",
-    summary="Get paginated activity feed for a Muse Hub repo",
+    summary="Get paginated activity feed for a MuseHub repo",
     tags=["Repos"],
 )
 async def get_repo_activity(
@@ -1331,7 +1331,7 @@ async def delete_repo(
     db: AsyncSession = Depends(get_db),
     claims: TokenClaims = Depends(require_valid_token),
 ) -> Response:
-    """Soft-delete a Muse Hub repo.
+    """Soft-delete a MuseHub repo.
 
     Marks the repo as deleted by recording a ``deleted_at`` timestamp; all
     data is retained in the database for audit purposes. Subsequent reads
@@ -1375,7 +1375,7 @@ async def transfer_repo_ownership(
     db: AsyncSession = Depends(get_db),
     claims: TokenClaims = Depends(require_valid_token),
 ) -> RepoResponse:
-    """Transfer ownership of a Muse Hub repo to another user.
+    """Transfer ownership of a MuseHub repo to another user.
 
     Updates ``owner_user_id`` on the repo record. After a successful transfer
     the calling user loses owner privileges; the new owner gains them

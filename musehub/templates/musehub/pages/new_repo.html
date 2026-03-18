@@ -2,187 +2,7 @@
 
 {% block title %}Create a new repository{% endblock %}
 
-{% block breadcrumb %}<a href="/musehub/ui/explore">Explore</a> / New repository{% endblock %}
-
-{% block extra_css %}
-<style>
-.wizard-layout {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: var(--space-5) 0;
-}
-.wizard-header {
-  margin-bottom: var(--space-5);
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: var(--space-4);
-}
-.wizard-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-2) 0;
-}
-.wizard-subtitle {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin: 0;
-}
-.form-group {
-  margin-bottom: var(--space-4);
-}
-.form-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: var(--space-1);
-  color: var(--text-primary);
-}
-.form-label .required {
-  color: #f85149;
-  margin-left: 2px;
-}
-.form-description {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: var(--space-2);
-}
-.form-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 6px 10px;
-  background: var(--bg-surface, #0d1117);
-  border: 1px solid var(--border-default, #30363d);
-  border-radius: var(--radius-md, 6px);
-  color: var(--text-primary);
-  font-size: 13px;
-}
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
-}
-.owner-name-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.owner-sep {
-  font-size: 20px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.owner-input { flex: 0 0 220px; }
-.name-input  { flex: 1; }
-.name-check-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-#name-check {
-  font-size: 12px;
-  min-height: 16px;
-}
-.htmx-indicator {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-.htmx-request .htmx-indicator,
-.htmx-request.htmx-indicator {
-  opacity: 1;
-}
-.visibility-row {
-  display: flex;
-  gap: var(--space-3);
-}
-.visibility-card {
-  flex: 1;
-  padding: var(--space-3);
-  border: 2px solid var(--border-default, #30363d);
-  border-radius: var(--radius-md, 6px);
-  cursor: pointer;
-  background: var(--bg-surface);
-  transition: border-color 0.15s;
-}
-.visibility-card.selected,
-.visibility-card[aria-checked="true"] {
-  border-color: var(--color-accent, #58a6ff);
-}
-.visibility-card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.visibility-card-desc  { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-.visibility-icon { font-size: 18px; margin-bottom: 4px; }
-.form-checkbox-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--bg-surface, #0d1117);
-  border: 1px solid var(--border-subtle, #21262d);
-  border-radius: var(--radius-md, 6px);
-  margin-bottom: var(--space-2);
-}
-.form-checkbox-row input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
-.form-checkbox-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.form-checkbox-desc  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-.branch-row { margin-top: var(--space-3); }
-.tag-input-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 8px;
-  background: var(--bg-surface, #0d1117);
-  border: 1px solid var(--border-default, #30363d);
-  border-radius: var(--radius-md, 6px);
-  min-height: 38px;
-  cursor: text;
-}
-.tag-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--bg-overlay);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  padding: 2px 8px;
-  font-size: 12px;
-  color: var(--text-primary);
-}
-.tag-pill-remove {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 14px;
-  padding: 0;
-  line-height: 1;
-}
-.tag-pill-remove:hover { color: #f85149; }
-.tag-text-input {
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 13px;
-  min-width: 100px;
-  flex: 1;
-}
-.wizard-divider {
-  border: none;
-  border-top: 1px solid var(--border-subtle);
-  margin: var(--space-5) 0;
-}
-.wizard-actions {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  margin-top: var(--space-5);
-}
-.submit-error {
-  color: #f85149;
-  font-size: 13px;
-}
-</style>
-{% endblock %}
+{% block breadcrumb %}<a href="/explore">Explore</a> / New repository{% endblock %}
 
 {% block content %}
 <div class="wizard-layout" x-data="{
@@ -227,7 +47,7 @@
         <input class="form-input name-input" id="f-name" name="name" type="text"
                placeholder="my-composition"
                required maxlength="255"
-               hx-get="/musehub/ui/new/check"
+               hx-get="/new/check"
                hx-trigger="input changed delay:300ms"
                hx-target="#name-check"
                hx-indicator="#name-check-indicator"
@@ -258,7 +78,7 @@
                  style="display:none"/>
           <div class="visibility-icon">🌍</div>
           <div class="visibility-card-title">Public</div>
-          <div class="visibility-card-desc">Anyone on Muse Hub can view this repository.</div>
+          <div class="visibility-card-desc">Anyone on MuseHub can view this repository.</div>
         </label>
         <label class="visibility-card selected"
                :class="{ selected: visibility === 'private' }">
@@ -328,7 +148,7 @@
       <button class="btn btn-primary" type="submit" id="submit-btn">
         Create repository
       </button>
-      <a class="btn btn-secondary" href="/musehub/ui/explore">Cancel</a>
+      <a class="btn btn-secondary" href="/explore">Cancel</a>
       <span class="submit-error" id="submit-error" style="display:none"></span>
     </div>
   </form>
@@ -365,7 +185,7 @@ async function submitWizard(e) {
       if (typeof showTokenForm === 'function') showTokenForm('Sign in to create a repository.');
       return;
     }
-    const res = await fetch('/musehub/ui/new', {
+    const res = await fetch('/new', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ owner, name, description: desc, visibility: vis, license,

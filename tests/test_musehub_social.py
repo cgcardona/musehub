@@ -1,4 +1,4 @@
-"""Tests for Muse Hub social layer endpoints (social.py).
+"""Tests for MuseHub social layer endpoints (social.py).
 
 Covers all endpoint groups introduced in PR #318:
   - Comments: list, create, soft-delete (owner guard, auth guard)
@@ -95,7 +95,7 @@ async def test_list_comments_empty_on_new_repo(
     """GET /repos/{id}/comments returns empty list when no comments exist."""
     repo_id = await _make_repo(client, auth_headers, name="comment-empty")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         params={"target_type": "repo", "target_id": repo_id},
         headers=auth_headers,
     )
@@ -111,7 +111,7 @@ async def test_list_comments_on_private_repo_requires_auth(
     """GET /repos/{id}/comments returns 401 for private repo without auth."""
     repo_id = await _make_private_repo(db_session, name="comment-private")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         params={"target_type": "repo", "target_id": repo_id},
     )
     assert resp.status_code == 401
@@ -124,7 +124,7 @@ async def test_list_comments_not_found_returns_404(
 ) -> None:
     """GET /repos/{id}/comments returns 404 for unknown repo."""
     resp = await client.get(
-        "/api/v1/musehub/repos/no-such-repo/comments",
+        "/api/v1/repos/no-such-repo/comments",
         params={"target_type": "repo", "target_id": "anything"},
         headers=auth_headers,
     )
@@ -144,7 +144,7 @@ async def test_create_comment_returns_201(
     """POST /repos/{id}/comments creates a comment and returns 201 with required fields."""
     repo_id = await _make_repo(client, auth_headers, name="comment-create")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         json={"target_type": "repo", "target_id": repo_id, "body": "Great track!"},
         headers=auth_headers,
     )
@@ -164,7 +164,7 @@ async def test_create_comment_requires_auth(
     """POST /repos/{id}/comments returns 401 without Bearer token."""
     repo_id = await _make_repo(client, auth_headers, name="comment-auth")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         json={"target_type": "repo", "target_id": repo_id, "body": "hi"},
     )
     assert resp.status_code == 401
@@ -178,12 +178,12 @@ async def test_created_comment_appears_in_list(
     """A posted comment is returned by the list endpoint."""
     repo_id = await _make_repo(client, auth_headers, name="comment-roundtrip")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         json={"target_type": "repo", "target_id": repo_id, "body": "Hello world"},
         headers=auth_headers,
     )
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         params={"target_type": "repo", "target_id": repo_id},
         headers=auth_headers,
     )
@@ -202,7 +202,7 @@ async def test_create_comment_with_release_target_type_returns_201(
     repo_id = await _make_repo(client, auth_headers, name="comment-release")
     release_id = "v1.0"
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         json={"target_type": "release", "target_id": release_id, "body": "Amazing release!"},
         headers=auth_headers,
     )
@@ -226,13 +226,13 @@ async def test_delete_comment_soft_deletes(
     """DELETE /repos/{id}/comments/{cid} soft-deletes and returns 204."""
     repo_id = await _make_repo(client, auth_headers, name="comment-delete")
     create = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         json={"target_type": "repo", "target_id": repo_id, "body": "To be deleted"},
         headers=auth_headers,
     )
     comment_id = create.json()["comment_id"]
     resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/comments/{comment_id}",
+        f"/api/v1/repos/{repo_id}/comments/{comment_id}",
         headers=auth_headers,
     )
     assert resp.status_code == 204
@@ -246,13 +246,13 @@ async def test_delete_comment_requires_auth(
     """DELETE /repos/{id}/comments/{cid} returns 401 without token."""
     repo_id = await _make_repo(client, auth_headers, name="comment-del-auth")
     create = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         json={"target_type": "repo", "target_id": repo_id, "body": "Keep this"},
         headers=auth_headers,
     )
     comment_id = create.json()["comment_id"]
     resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/comments/{comment_id}",
+        f"/api/v1/repos/{repo_id}/comments/{comment_id}",
     )
     assert resp.status_code == 401
 
@@ -279,7 +279,7 @@ async def test_delete_comment_forbidden_for_non_owner(
 
     # Post a comment as the primary test user
     create = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/comments",
+        f"/api/v1/repos/{repo_id}/comments",
         json={"target_type": "repo", "target_id": repo_id, "body": "Mine"},
         headers=auth_headers,
     )
@@ -287,7 +287,7 @@ async def test_delete_comment_forbidden_for_non_owner(
 
     # Try to delete as the other user
     resp = await client.delete(
-        f"/api/v1/musehub/repos/{repo_id}/comments/{comment_id}",
+        f"/api/v1/repos/{repo_id}/comments/{comment_id}",
         headers=other_headers,
     )
     assert resp.status_code == 403
@@ -306,7 +306,7 @@ async def test_list_reactions_empty_on_new_repo(
     """GET /repos/{id}/reactions returns empty list when no reactions exist."""
     repo_id = await _make_repo(client, auth_headers, name="reaction-empty")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/reactions",
+        f"/api/v1/repos/{repo_id}/reactions",
         params={"target_type": "repo", "target_id": repo_id},
         headers=auth_headers,
     )
@@ -327,7 +327,7 @@ async def test_toggle_reaction_adds_on_first_call(
     """First POST /repos/{id}/reactions call adds the reaction (added=True)."""
     repo_id = await _make_repo(client, auth_headers, name="reaction-add")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/reactions",
+        f"/api/v1/repos/{repo_id}/reactions",
         json={"target_type": "repo", "target_id": repo_id, "emoji": "👍"},
         headers=auth_headers,
     )
@@ -345,8 +345,8 @@ async def test_toggle_reaction_removes_on_second_call(
     """Second POST with same emoji removes the reaction (added=False) — idempotent toggle."""
     repo_id = await _make_repo(client, auth_headers, name="reaction-toggle")
     payload = {"target_type": "repo", "target_id": repo_id, "emoji": "❤️"}
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/reactions", json=payload, headers=auth_headers)
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/reactions", json=payload, headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/reactions", json=payload, headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/reactions", json=payload, headers=auth_headers)
     assert resp.status_code == 201
     assert resp.json()["added"] is False
 
@@ -359,12 +359,12 @@ async def test_toggle_reaction_reflects_in_list(
     """Reaction count increments after toggle-add and reacted_by_me is True."""
     repo_id = await _make_repo(client, auth_headers, name="reaction-list")
     await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/reactions",
+        f"/api/v1/repos/{repo_id}/reactions",
         json={"target_type": "repo", "target_id": repo_id, "emoji": "🔥"},
         headers=auth_headers,
     )
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/reactions",
+        f"/api/v1/repos/{repo_id}/reactions",
         params={"target_type": "repo", "target_id": repo_id},
         headers=auth_headers,
     )
@@ -384,7 +384,7 @@ async def test_toggle_reaction_invalid_emoji_returns_400(
     """POST /repos/{id}/reactions with an unsupported emoji returns 400."""
     repo_id = await _make_repo(client, auth_headers, name="reaction-bad-emoji")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/reactions",
+        f"/api/v1/repos/{repo_id}/reactions",
         json={"target_type": "repo", "target_id": repo_id, "emoji": "🤡"},
         headers=auth_headers,
     )
@@ -399,7 +399,7 @@ async def test_toggle_reaction_requires_auth(
     """POST /repos/{id}/reactions returns 401 without token."""
     repo_id = await _make_repo(client, auth_headers, name="reaction-no-auth")
     resp = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/reactions",
+        f"/api/v1/repos/{repo_id}/reactions",
         json={"target_type": "repo", "target_id": repo_id, "emoji": "👍"},
     )
     assert resp.status_code == 401
@@ -516,7 +516,7 @@ async def test_get_watches_returns_zero_for_new_repo(
 ) -> None:
     """GET /repos/{id}/watches returns 0 for a new repo."""
     repo_id = await _make_repo(client, auth_headers, name="watch-empty")
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/watches")
+    resp = await client.get(f"/api/v1/repos/{repo_id}/watches")
     assert resp.status_code == 200
     assert resp.json()["watch_count"] == 0
     assert resp.json()["watching"] is False
@@ -534,7 +534,7 @@ async def test_watch_repo_returns_201(
 ) -> None:
     """POST /repos/{id}/watch returns 201 and watching=True."""
     repo_id = await _make_repo(client, auth_headers, name="watch-add")
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/watch", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/watch", headers=auth_headers)
     assert resp.status_code == 201
     assert resp.json()["watching"] is True
 
@@ -546,8 +546,8 @@ async def test_watch_repo_idempotent(
 ) -> None:
     """Watching the same repo twice does not raise an error (idempotent)."""
     repo_id = await _make_repo(client, auth_headers, name="watch-idempotent")
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/watch", headers=auth_headers)
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/watch", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/watch", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/watch", headers=auth_headers)
     assert resp.status_code == 201
 
 
@@ -558,7 +558,7 @@ async def test_watch_requires_auth(
 ) -> None:
     """POST /repos/{id}/watch returns 401 without token."""
     repo_id = await _make_repo(client, auth_headers, name="watch-no-auth")
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/watch")
+    resp = await client.post(f"/api/v1/repos/{repo_id}/watch")
     assert resp.status_code == 401
 
 
@@ -569,8 +569,8 @@ async def test_watch_increments_count(
 ) -> None:
     """Watch count is 1 after a successful watch."""
     repo_id = await _make_repo(client, auth_headers, name="watch-count")
-    await client.post(f"/api/v1/musehub/repos/{repo_id}/watch", headers=auth_headers)
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/watches", headers=auth_headers)
+    await client.post(f"/api/v1/repos/{repo_id}/watch", headers=auth_headers)
+    resp = await client.get(f"/api/v1/repos/{repo_id}/watches", headers=auth_headers)
     assert resp.json()["watch_count"] == 1
     assert resp.json()["watching"] is True
 
@@ -587,7 +587,7 @@ async def test_unwatch_repo_returns_204(
 ) -> None:
     """DELETE /repos/{id}/watch returns 204 (no-op if not watching)."""
     repo_id = await _make_repo(client, auth_headers, name="unwatch-noop")
-    resp = await client.delete(f"/api/v1/musehub/repos/{repo_id}/watch", headers=auth_headers)
+    resp = await client.delete(f"/api/v1/repos/{repo_id}/watch", headers=auth_headers)
     assert resp.status_code == 204
 
 
@@ -598,7 +598,7 @@ async def test_unwatch_requires_auth(
 ) -> None:
     """DELETE /repos/{id}/watch returns 401 without token."""
     repo_id = await _make_repo(client, auth_headers, name="unwatch-no-auth")
-    resp = await client.delete(f"/api/v1/musehub/repos/{repo_id}/watch")
+    resp = await client.delete(f"/api/v1/repos/{repo_id}/watch")
     assert resp.status_code == 401
 
 
@@ -794,7 +794,7 @@ async def test_list_forks_empty_on_new_repo(
 ) -> None:
     """GET /repos/{id}/forks returns empty list when repo has no forks."""
     repo_id = await _make_repo(client, auth_headers, name="fork-list-empty")
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/forks", headers=auth_headers)
+    resp = await client.get(f"/api/v1/repos/{repo_id}/forks", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -806,7 +806,7 @@ async def test_list_forks_private_repo_requires_auth(
 ) -> None:
     """GET /repos/{id}/forks returns 401 for private repo without auth."""
     repo_id = await _make_private_repo(db_session, name="fork-priv-list")
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/forks")
+    resp = await client.get(f"/api/v1/repos/{repo_id}/forks")
     assert resp.status_code == 401
 
 
@@ -818,10 +818,10 @@ async def test_list_forks_contains_fork_record(
 ) -> None:
     """GET /repos/{id}/forks lists a fork after it has been created."""
     repo_id = await _make_repo(client, auth_headers, name="forkable")
-    fork_resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/fork", headers=auth_headers)
+    fork_resp = await client.post(f"/api/v1/repos/{repo_id}/fork", headers=auth_headers)
     assert fork_resp.status_code == 201
 
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/forks", headers=auth_headers)
+    resp = await client.get(f"/api/v1/repos/{repo_id}/forks", headers=auth_headers)
     assert resp.status_code == 200
     forks = resp.json()
     assert len(forks) == 1
@@ -840,7 +840,7 @@ async def test_fork_public_repo_returns_201(
 ) -> None:
     """POST /repos/{id}/fork forks a public repo and returns 201 with fork fields."""
     repo_id = await _make_repo(client, auth_headers, name="public-fork-src")
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/fork", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/fork", headers=auth_headers)
     assert resp.status_code == 201
     body = resp.json()
     assert body["source_repo_id"] == repo_id
@@ -857,7 +857,7 @@ async def test_fork_private_repo_returns_403(
 ) -> None:
     """POST /repos/{id}/fork returns 403 when source repo is private."""
     repo_id = await _make_private_repo(db_session, name="private-fork-src")
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/fork", headers=auth_headers)
+    resp = await client.post(f"/api/v1/repos/{repo_id}/fork", headers=auth_headers)
     assert resp.status_code == 403
 
 
@@ -868,7 +868,7 @@ async def test_fork_requires_auth(
 ) -> None:
     """POST /repos/{id}/fork returns 401 without token."""
     repo_id = await _make_repo(client, auth_headers, name="fork-no-auth")
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/fork")
+    resp = await client.post(f"/api/v1/repos/{repo_id}/fork")
     assert resp.status_code == 401
 
 
@@ -878,7 +878,7 @@ async def test_fork_nonexistent_repo_returns_404(
     auth_headers: dict[str, str],
 ) -> None:
     """POST /repos/{id}/fork returns 404 when source repo does not exist."""
-    resp = await client.post("/api/v1/musehub/repos/no-such-repo/fork", headers=auth_headers)
+    resp = await client.post("/api/v1/repos/no-such-repo/fork", headers=auth_headers)
     assert resp.status_code == 404
 
 
@@ -894,7 +894,7 @@ async def test_record_view_returns_204(
 ) -> None:
     """POST /repos/{id}/view returns 204 on success."""
     repo_id = await _make_repo(client, auth_headers, name="view-record")
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/view")
+    resp = await client.post(f"/api/v1/repos/{repo_id}/view")
     assert resp.status_code == 204
 
 
@@ -923,7 +923,7 @@ async def test_record_view_debounce_no_duplicate(
     await db_session.commit()
 
     # Posting again should silently no-op, not 500
-    resp = await client.post(f"/api/v1/musehub/repos/{repo_id}/view")
+    resp = await client.post(f"/api/v1/repos/{repo_id}/view")
     assert resp.status_code == 204
 
 
@@ -939,7 +939,7 @@ async def test_get_analytics_public_repo(
 ) -> None:
     """GET /repos/{id}/analytics returns view/download counts for a public repo."""
     repo_id = await _make_repo(client, auth_headers, name="analytics-pub")
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/analytics", headers=auth_headers)
+    resp = await client.get(f"/api/v1/repos/{repo_id}/analytics", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
     assert body["repo_id"] == repo_id
@@ -954,7 +954,7 @@ async def test_get_analytics_private_repo_requires_auth(
 ) -> None:
     """GET /repos/{id}/analytics returns 401 for private repo without auth."""
     repo_id = await _make_private_repo(db_session, name="analytics-priv")
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/analytics")
+    resp = await client.get(f"/api/v1/repos/{repo_id}/analytics")
     assert resp.status_code == 401
 
 
@@ -964,7 +964,7 @@ async def test_get_analytics_not_found_returns_404(
     auth_headers: dict[str, str],
 ) -> None:
     """GET /repos/{id}/analytics returns 404 for unknown repo."""
-    resp = await client.get("/api/v1/musehub/repos/ghost-repo/analytics", headers=auth_headers)
+    resp = await client.get("/api/v1/repos/ghost-repo/analytics", headers=auth_headers)
     assert resp.status_code == 404
 
 
@@ -986,7 +986,7 @@ async def test_get_analytics_view_count_after_record(
     )
     await db_session.commit()
 
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/analytics", headers=auth_headers)
+    resp = await client.get(f"/api/v1/repos/{repo_id}/analytics", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["view_count"] == 1
 
@@ -1004,7 +1004,7 @@ async def test_get_view_analytics_empty(
     """GET /repos/{id}/analytics/views returns empty list for repo with no views."""
     repo_id = await _make_repo(client, auth_headers, name="daily-empty")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analytics/views", headers=auth_headers
+        f"/api/v1/repos/{repo_id}/analytics/views", headers=auth_headers
     )
     assert resp.status_code == 200
     assert resp.json() == []
@@ -1041,7 +1041,7 @@ async def test_get_view_analytics_aggregates_by_day(
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analytics/views?days=90",
+        f"/api/v1/repos/{repo_id}/analytics/views?days=90",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1128,7 +1128,7 @@ async def test_get_social_analytics_empty_public_repo(
     """GET /repos/{id}/analytics/social returns zero totals for a new public repo."""
     repo_id = await _make_repo(client, auth_headers, name="social-analytics-empty")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analytics/social",
+        f"/api/v1/repos/{repo_id}/analytics/social",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1147,7 +1147,7 @@ async def test_get_social_analytics_not_found_returns_404(
 ) -> None:
     """GET /repos/{id}/analytics/social returns 404 for an unknown repo."""
     resp = await client.get(
-        "/api/v1/musehub/repos/does-not-exist/analytics/social",
+        "/api/v1/repos/does-not-exist/analytics/social",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1160,7 +1160,7 @@ async def test_get_social_analytics_private_repo_requires_auth(
 ) -> None:
     """GET /repos/{id}/analytics/social returns 401 for a private repo without auth."""
     repo_id = await _make_private_repo(db_session, name="social-analytics-priv")
-    resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/analytics/social")
+    resp = await client.get(f"/api/v1/repos/{repo_id}/analytics/social")
     assert resp.status_code == 401
 
 
@@ -1193,7 +1193,7 @@ async def test_get_social_analytics_counts_seeded_rows(
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analytics/social?days=90",
+        f"/api/v1/repos/{repo_id}/analytics/social?days=90",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1211,7 +1211,7 @@ async def test_get_social_analytics_trend_spans_full_window(
     """GET /repos/{id}/analytics/social trend list spans exactly 'days' entries."""
     repo_id = await _make_repo(client, auth_headers, name="social-analytics-window")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analytics/social?days=30",
+        f"/api/v1/repos/{repo_id}/analytics/social?days=30",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1256,7 +1256,7 @@ async def test_get_social_analytics_forks_detail_includes_forked_by(
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analytics/social",
+        f"/api/v1/repos/{repo_id}/analytics/social",
         headers=auth_headers,
     )
     assert resp.status_code == 200

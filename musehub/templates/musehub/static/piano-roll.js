@@ -1,11 +1,11 @@
 /**
- * piano-roll.js — Canvas-based MIDI piano roll renderer for Muse Hub.
+ * piano-roll.js — Canvas-based MIDI piano roll renderer for MuseHub.
  *
  * Renders a MidiParseResult (from /objects/{id}/parse-midi) into an interactive
  * piano roll.  Features:
  *   - Piano keyboard on the left Y-axis (pitch labels)
  *   - Beat grid on the X-axis with configurable beat-line density
- *   - Per-track colour coding using the Muse Hub design token palette
+ *   - Per-track colour coding using the MuseHub design token palette
  *   - Velocity mapped to rectangle opacity (soft notes appear lighter)
  *   - Zoom: horizontal (beats per screen) and vertical (pixels per pitch row)
  *   - Pan: click-drag on the canvas

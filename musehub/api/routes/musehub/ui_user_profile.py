@@ -1,4 +1,4 @@
-"""Enhanced Muse Hub user profile page — .
+"""Enhanced MuseHub user profile page — .
 
 Replaces the stub profile handler in ui.py with a full-featured profile page:
   - 52×7 GitHub-style contribution heatmap (green intensity by commit count)
@@ -7,7 +7,7 @@ Replaces the stub profile handler in ui.py with a full-featured profile page:
   - Activity feed tab with All / Commits / PRs / Issues / Stars filter
 
 Endpoint summary:
-  GET /musehub/ui/users/{username}
+  GET /{username}
     HTML (default) → rich profile shell; JavaScript hydrates from ?format=json.
     JSON → EnhancedProfileResponse (badges, heatmap stats, pinned repos,
                       paginated activity feed). Agents use this for machine-readable
@@ -39,7 +39,7 @@ from musehub.models.base import CamelModel
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/musehub/ui", tags=["musehub-ui"])
+router = APIRouter(prefix="", tags=["musehub-ui"])
 
 # ---------------------------------------------------------------------------
 # Response models
@@ -101,7 +101,7 @@ class ActivityEvent(CamelModel):
 
 
 class EnhancedProfileResponse(CamelModel):
-    """Full structured response for GET /musehub/ui/users/{username}?format=json.
+    """Full structured response for GET /users/{username}?format=json.
 
     Agents consume this to inspect a user's contribution history, badges, and
     recent activity without navigating the HTML profile page.
@@ -214,7 +214,7 @@ async def _build_heatmap(session: AsyncSession, user_id: str) -> HeatmapStats:
 # ---------------------------------------------------------------------------
 
 _BADGE_DEFS: list[tuple[str, str, str, str]] = [
-    ("first_commit", "First Commit", "Made your first commit to Muse Hub", "🎵"),
+    ("first_commit", "First Commit", "Made your first commit to MuseHub", "🎵"),
     ("genre_pioneer", "Genre Pioneer", "Explored 3+ distinct tags across your repos", "🎸"),
     ("100_commits", "100 Commits", "Reached 100 cumulative commits — serious dedication", "💯"),
     ("collaborator", "Collaborator", "Contributed to 3+ repos you don't own", "🤝"),
@@ -584,8 +584,8 @@ _EVENT_ICONS: dict[str, str] = {
 
 
 @router.get(
-    "/users/{username}",
-    summary="Enhanced Muse Hub user profile — heatmap, badges, pinned repos, activity feed",
+    "/{username}",
+    summary="Enhanced MuseHub user profile — heatmap, badges, pinned repos, activity feed",
 )
 async def profile_page(
     request: Request,
@@ -596,12 +596,12 @@ async def profile_page(
     per_page: int = Query(20, ge=1, le=100, description="Activity events per page"),
     db: AsyncSession = Depends(get_db),
 ) -> StarletteResponse:
-    """Render the enhanced Muse Hub user profile page or return structured JSON.
+    """Render the enhanced MuseHub user profile page or return structured JSON.
 
     HTML (default):
         Returns a self-contained HTML shell. Client-side JavaScript fetches
         profile data, contribution heatmap, badges, pinned repos, and activity
-        from ``/api/v1/musehub/users/{username}`` and from the ``?format=json``
+        from ``/api/v1/users/{username}`` and from the ``?format=json``
         alternate of this same URL.
 
     JSON (``Accept: application/json`` or ``?format=json``):
@@ -614,7 +614,7 @@ async def profile_page(
         - ``activity`` — paginated activity feed filtered by ``?tab``.
 
     No JWT required — profile pages are publicly accessible.
-    Returns 404 when the username has no registered Muse Hub profile.
+    Returns 404 when the username has no registered MuseHub profile.
     """
     # Determine if the caller wants JSON
     accept = request.headers.get("accept", "")

@@ -3,8 +3,8 @@
 
 {% block title %}Tags — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / tags
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / tags
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 

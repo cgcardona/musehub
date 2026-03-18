@@ -121,7 +121,7 @@ async def _seed_repo(db: AsyncSession) -> str:
 
 
 def _url(path: str = "") -> str:
-    return f"/musehub/ui/{_OWNER}/{_SLUG}/commits{path}"
+    return f"/{_OWNER}/{_SLUG}/commits{path}"
 
 
 # ── Filter bar HTML ───────────────────────────────────────────────────────────

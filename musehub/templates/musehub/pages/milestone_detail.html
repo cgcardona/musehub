@@ -2,119 +2,12 @@
 
 {% block title %}{{ milestone.title }} — {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
-  <a href="/musehub/ui/{{ owner }}">{{ owner }}</a> /
-  <a href="/musehub/ui/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> /
   <a href="{{ base_url }}/milestones">milestones</a> /
   #{{ milestone.number }}
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-/* ── Milestone detail layout ────────────────────────────────────────────── */
-.milestone-header {
-  margin-bottom: var(--space-4, 16px);
-}
-.milestone-header h1 { margin: 0 0 6px; }
-.milestone-header-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  color: var(--text-muted, #8b949e);
-  margin-bottom: 8px;
-}
-.milestone-description {
-  color: var(--text-secondary, #c9d1d9);
-  margin-bottom: var(--space-3, 12px);
-}
-
-/* Progress bar */
-.milestone-progress-large {
-  max-width: 480px;
-  margin-bottom: var(--space-4, 16px);
-}
-.milestone-progress-bar-track {
-  width: 100%;
-  height: 10px;
-  border-radius: 5px;
-  background: var(--bg-overlay, #161b22);
-  border: 1px solid var(--border, #30363d);
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-.milestone-progress-bar-fill {
-  height: 100%;
-  border-radius: 5px;
-  background: var(--green, #3fb950);
-}
-.milestone-progress-counts {
-  font-size: 13px;
-  color: var(--text-muted, #8b949e);
-}
-
-/* Issue state tabs */
-.milestone-state-tabs {
-  display: flex;
-  gap: var(--space-1, 4px);
-  border-bottom: 1px solid var(--border, #30363d);
-  margin-bottom: var(--space-3, 12px);
-}
-.milestone-tab {
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted, #8b949e);
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.milestone-tab:hover { color: var(--text-primary, #e6edf3); }
-.milestone-tab.tab-active {
-  color: var(--text-primary, #e6edf3);
-  border-bottom-color: var(--accent, #58a6ff);
-}
-
-/* Issue rows */
-.issue-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border, #30363d);
-}
-.issue-row:last-child { border-bottom: none; }
-.issue-state-icon { margin-top: 2px; font-size: 16px; }
-.issue-row-body { flex: 1; min-width: 0; }
-.issue-title-link { font-weight: 600; }
-.issue-meta {
-  font-size: 12px;
-  color: var(--text-muted, #8b949e);
-  margin-top: 3px;
-}
-.issue-labels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-.issue-label-badge {
-  padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 500;
-  background: var(--bg-overlay, #161b22);
-  border: 1px solid var(--border, #30363d);
-  color: var(--text-secondary, #c9d1d9);
-}
-.milestone-empty {
-  padding: 24px 0;
-  color: var(--text-muted, #8b949e);
-  text-align: center;
-}
-</style>
-{% endblock %}
 
 {% block page_data %}
 const repoId          = {{ repo_id | tojson }};

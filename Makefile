@@ -1,4 +1,4 @@
-.PHONY: help test test-fast test-cov typecheck seed docker-up docker-down docker-logs
+.PHONY: help test test-fast test-cov typecheck seed seed-local seed-prs seed-narratives docker-up docker-down docker-logs
 
 PYTHON  ?= python
 PYTEST  ?= pytest
@@ -38,11 +38,21 @@ typecheck:      ## Run mypy static type check over musehub/
 
 # ── Database ──────────────────────────────────────────────────────────────────
 
-seed:           ## Run seed script against the running Docker DB
+seed:           ## Run all three seed scripts against the running Docker DB
 	$(DOCKER) exec musehub python /app/scripts/seed_musehub.py --force
+	$(DOCKER) exec musehub python /app/scripts/seed_pull_requests.py --force
+	$(DOCKER) exec musehub python /app/scripts/seed_narratives.py --force
 
-seed-local:     ## Run seed script locally (requires DATABASE_URL env var)
+seed-prs:       ## Re-seed pull requests only (requires seed_musehub to have run first)
+	$(DOCKER) exec musehub python /app/scripts/seed_pull_requests.py --force
+
+seed-narratives: ## Re-seed narrative scenarios only (requires seed_musehub to have run first)
+	$(DOCKER) exec musehub python /app/scripts/seed_narratives.py --force
+
+seed-local:     ## Run all seed scripts locally (requires DATABASE_URL env var)
 	$(PYTHON) scripts/seed_musehub.py --force
+	$(PYTHON) scripts/seed_pull_requests.py --force
+	$(PYTHON) scripts/seed_narratives.py --force
 
 migrate:        ## Apply Alembic migrations in Docker
 	$(DOCKER) exec musehub alembic upgrade head

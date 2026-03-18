@@ -1,4 +1,4 @@
-"""RFC 8288 Link header pagination helpers for Muse Hub list endpoints.
+"""RFC 8288 Link header pagination helpers for MuseHub list endpoints.
 
 Why this exists: large repos with hundreds of commits, issues, or PRs are
 unusable when list endpoints return everything in a single unbounded response.

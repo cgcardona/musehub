@@ -1,4 +1,4 @@
-"""Muse Hub sync service — push and pull protocol implementation.
+"""MuseHub sync service — push and pull protocol implementation.
 
 Implements the two core data-movement operations:
 - ``ingest_push``: stores commits and objects from a client push, enforcing

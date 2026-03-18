@@ -1,4 +1,4 @@
-"""SSR tests for the Muse Hub new repo creation wizard (issue #562).
+"""SSR tests for the MuseHub new repo creation wizard (issue #562).
 
 Validates that the wizard form is rendered server-side via Jinja2 — license
 options, form inputs, and HTMX attributes appear in the raw HTML response
@@ -62,7 +62,7 @@ async def test_new_repo_page_renders_license_options_server_side(
     Confirms the license dropdown is Jinja2-rendered from the ``licenses``
     context variable, not built by client-side JavaScript.
     """
-    response = await client.get("/musehub/ui/new")
+    response = await client.get("/new")
     assert response.status_code == 200
     body = response.text
     # CC BY license option must appear as a real <option> tag in the raw HTML
@@ -79,11 +79,11 @@ async def test_new_repo_page_has_hx_get_on_name_input(
 
     This drives the live HTMX availability check without client JS polling.
     """
-    response = await client.get("/musehub/ui/new")
+    response = await client.get("/new")
     assert response.status_code == 200
     body = response.text
     assert "hx-get" in body
-    assert "/musehub/ui/new/check" in body
+    assert "/new/check" in body
 
 
 @pytest.mark.anyio
@@ -92,7 +92,7 @@ async def test_new_repo_page_has_visibility_inputs(
     db_session: AsyncSession,
 ) -> None:
     """Public and Private visibility radio inputs are in the server-rendered HTML."""
-    response = await client.get("/musehub/ui/new")
+    response = await client.get("/new")
     assert response.status_code == 200
     body = response.text
     assert 'value="public"' in body
@@ -109,7 +109,7 @@ async def test_new_repo_page_form_renders_without_js(
     The old JS-shell pattern rendered the form via innerHTML inside load().
     SSR means the form tag appears in the raw server response.
     """
-    response = await client.get("/musehub/ui/new")
+    response = await client.get("/new")
     assert response.status_code == 200
     assert "<form" in response.text
 
@@ -124,7 +124,7 @@ async def test_new_repo_page_has_hx_indicator_on_name_input(
     This gives users a loading spinner while the debounced availability check
     request is in-flight (issue #704).
     """
-    response = await client.get("/musehub/ui/new")
+    response = await client.get("/new")
     assert response.status_code == 200
     body = response.text
     assert 'hx-indicator="#name-check-indicator"' in body
@@ -141,7 +141,7 @@ async def test_new_repo_page_has_name_check_indicator_span(
     in-flight, giving the user visual feedback without any custom JavaScript
     (issue #704).
     """
-    response = await client.get("/musehub/ui/new")
+    response = await client.get("/new")
     assert response.status_code == 200
     body = response.text
     assert 'id="name-check-indicator"' in body
@@ -163,7 +163,7 @@ async def test_new_repo_name_check_htmx_returns_available_html(
     The span is swapped into #name-check by HTMX — no JS needed.
     """
     response = await client.get(
-        "/musehub/ui/new/check",
+        "/new/check",
         params={"owner": "newowner", "slug": "unique-name-xyz-123"},
         headers={"HX-Request": "true"},
     )
@@ -181,7 +181,7 @@ async def test_new_repo_name_check_htmx_returns_taken_html(
     """GET /new/check for an existing slug returns a "taken" HTML span."""
     await _seed_repo(db_session, owner="existingowner", slug="taken-repo")
     response = await client.get(
-        "/musehub/ui/new/check",
+        "/new/check",
         params={"owner": "existingowner", "slug": "taken-repo"},
         headers={"HX-Request": "true"},
     )
@@ -199,7 +199,7 @@ async def test_new_repo_name_check_json_path_unchanged(
 ) -> None:
     """GET /new/check without HX-Request header returns JSON — backward-compat path."""
     response = await client.get(
-        "/musehub/ui/new/check",
+        "/new/check",
         params={"owner": "anyowner", "slug": "any-slug-999"},
     )
     assert response.status_code == 200

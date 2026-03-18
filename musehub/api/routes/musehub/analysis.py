@@ -1,13 +1,13 @@
-"""Muse Hub Analysis API — agent-friendly structured JSON for all musical dimensions.
+"""MuseHub Analysis API — agent-friendly structured JSON for all musical dimensions.
 
 Endpoint summary:
-  GET /musehub/repos/{repo_id}/analysis/{ref} — all 13 dimensions
-  GET /musehub/repos/{repo_id}/analysis/{ref}/emotion-map — emotion map
-  GET /musehub/repos/{repo_id}/analysis/{ref}/recall?q=<query> — semantic recall
-  GET /musehub/repos/{repo_id}/analysis/{ref}/similarity — cross-ref similarity
-  GET /musehub/repos/{repo_id}/analysis/{ref}/emotion-diff?base=X — 8-axis emotion diff
-  GET /musehub/repos/{repo_id}/analysis/{ref}/dynamics/page — per-track dynamics page
-  GET /musehub/repos/{repo_id}/analysis/{ref}/{dimension} — one dimension
+  GET /repos/{repo_id}/analysis/{ref} — all 13 dimensions
+  GET /repos/{repo_id}/analysis/{ref}/emotion-map — emotion map
+  GET /repos/{repo_id}/analysis/{ref}/recall?q=<query> — semantic recall
+  GET /repos/{repo_id}/analysis/{ref}/similarity — cross-ref similarity
+  GET /repos/{repo_id}/analysis/{ref}/emotion-diff?base=X — 8-axis emotion diff
+  GET /repos/{repo_id}/analysis/{ref}/dynamics/page — per-track dynamics page
+  GET /repos/{repo_id}/analysis/{ref}/{dimension} — one dimension
 
 Supported dimensions (13):
   harmony, dynamics, motifs, form, groove, emotion, chord-map, contour,
@@ -273,7 +273,7 @@ async def get_analysis_recall(
     vector store redundantly.
 
     Args:
-        repo_id: Muse Hub repo UUID.
+        repo_id: MuseHub repo UUID.
         ref: Muse commit ref scoping the search.
         q: Natural-language query string.
         limit: Result count cap (1–50, default 10).

@@ -1,4 +1,4 @@
-"""Tests for the Muse Hub topics/tag browse API endpoints.
+"""Tests for the MuseHub topics/tag browse API endpoints.
 
 Covers acceptance criteria:
 - test_list_topics_empty — no public repos → empty topics list
@@ -263,7 +263,7 @@ async def test_repos_by_topic_pagination(
 
 
 # ---------------------------------------------------------------------------
-# POST /api/v1/musehub/repos/{repo_id}/topics
+# POST /api/v1/repos/{repo_id}/topics
 # ---------------------------------------------------------------------------
 
 
@@ -274,7 +274,7 @@ async def test_set_topics_requires_auth(
     """POST without a JWT returns 401."""
     repo_id = await _make_repo(db_session, name="auth-test")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz"]},
     )
     assert response.status_code == 401
@@ -287,7 +287,7 @@ async def test_set_topics_owner_only(
     """A user who is not the repo owner receives 403."""
     repo_id = await _make_repo(db_session, name="owned-elsewhere", owner_user_id="different-owner")
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz"]},
         headers=auth_headers,
     )
@@ -306,7 +306,7 @@ async def test_set_topics_replaces_list(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz", "piano"]},
         headers=auth_headers,
     )
@@ -327,7 +327,7 @@ async def test_set_topics_deduplicates(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["jazz", "jazz", "piano", "jazz"]},
         headers=auth_headers,
     )
@@ -346,7 +346,7 @@ async def test_set_topics_invalid_slug(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": ["Valid-slug", "BAD SLUG!", "ok-slug"]},
         headers=auth_headers,
     )
@@ -365,7 +365,7 @@ async def test_set_topics_too_many(
     )
     many_topics = [f"topic-{i}" for i in range(21)]
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": many_topics},
         headers=auth_headers,
     )
@@ -384,7 +384,7 @@ async def test_set_topics_clears_list(
         owner_user_id="550e8400-e29b-41d4-a716-446655440000",
     )
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/topics",
+        f"/api/v1/repos/{repo_id}/topics",
         json={"topics": []},
         headers=auth_headers,
     )
@@ -398,7 +398,7 @@ async def test_set_topics_repo_not_found(
 ) -> None:
     """Unknown repo_id returns 404."""
     response = await client.post(
-        "/api/v1/musehub/repos/nonexistent-repo-id/topics",
+        "/api/v1/repos/nonexistent-repo-id/topics",
         json={"topics": ["jazz"]},
         headers=auth_headers,
     )

@@ -110,38 +110,38 @@ def _url(path: str) -> str:
 # negotiate_response() and return pre-rendered Jinja2 HTML.
 _MIGRATED_ROUTES: list[tuple[str, str]] = [
     # Fixed routes — no repo required
-    ("explore", "/musehub/ui/explore"),
-    ("trending", "/musehub/ui/trending"),
-    ("global_search", "/musehub/ui/search"),
+    ("explore", "/explore"),
+    ("trending", "/trending"),
+    ("global_search", "/search"),
     # Repo-scoped listing routes
-    ("repo_home", "/musehub/ui/{O}/{S}"),
-    ("commits_list", "/musehub/ui/{O}/{S}/commits"),
-    ("pr_list", "/musehub/ui/{O}/{S}/pulls"),
-    ("issue_list", "/musehub/ui/{O}/{S}/issues"),
-    ("releases", "/musehub/ui/{O}/{S}/releases"),
-    ("sessions", "/musehub/ui/{O}/{S}/sessions"),
-    ("in_repo_search", "/musehub/ui/{O}/{S}/search"),
-    ("activity", "/musehub/ui/{O}/{S}/activity"),
-    ("credits", "/musehub/ui/{O}/{S}/credits"),
-    ("branches", "/musehub/ui/{O}/{S}/branches"),
-    ("tags", "/musehub/ui/{O}/{S}/tags"),
+    ("repo_home", "/{O}/{S}"),
+    ("commits_list", "/{O}/{S}/commits"),
+    ("pr_list", "/{O}/{S}/pulls"),
+    ("issue_list", "/{O}/{S}/issues"),
+    ("releases", "/{O}/{S}/releases"),
+    ("sessions", "/{O}/{S}/sessions"),
+    ("in_repo_search", "/{O}/{S}/search"),
+    ("activity", "/{O}/{S}/activity"),
+    ("credits", "/{O}/{S}/credits"),
+    ("branches", "/{O}/{S}/branches"),
+    ("tags", "/{O}/{S}/tags"),
 ]
 
 # Subset of _MIGRATED_ROUTES whose handlers call htmx_fragment_or_full() —
 # these must return a bare fragment (no <html>) when HX-Request: true.
 _HTMX_FRAGMENT_ROUTES: list[tuple[str, str]] = [
-    ("explore", "/musehub/ui/explore"),
-    ("trending", "/musehub/ui/trending"),
-    ("global_search", "/musehub/ui/search"),
-    ("repo_home", "/musehub/ui/{O}/{S}"),
-    ("commits_list", "/musehub/ui/{O}/{S}/commits"),
-    ("pr_list", "/musehub/ui/{O}/{S}/pulls"),
-    ("issue_list", "/musehub/ui/{O}/{S}/issues"),
-    ("releases", "/musehub/ui/{O}/{S}/releases"),
-    ("sessions", "/musehub/ui/{O}/{S}/sessions"),
-    ("in_repo_search", "/musehub/ui/{O}/{S}/search"),
-    ("activity", "/musehub/ui/{O}/{S}/activity"),
-    ("branches", "/musehub/ui/{O}/{S}/branches"),
+    ("explore", "/explore"),
+    ("trending", "/trending"),
+    ("global_search", "/search"),
+    ("repo_home", "/{O}/{S}"),
+    ("commits_list", "/{O}/{S}/commits"),
+    ("pr_list", "/{O}/{S}/pulls"),
+    ("issue_list", "/{O}/{S}/issues"),
+    ("releases", "/{O}/{S}/releases"),
+    ("sessions", "/{O}/{S}/sessions"),
+    ("in_repo_search", "/{O}/{S}/search"),
+    ("activity", "/{O}/{S}/activity"),
+    ("branches", "/{O}/{S}/branches"),
 ]
 
 

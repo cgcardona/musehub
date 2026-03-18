@@ -1,4 +1,4 @@
-"""Muse Hub protocol event models.
+"""MuseHub protocol event models.
 
 ``MuseEvent`` is the base class for all typed events on this server.
 Currently the server defines two concrete event types, both in the MCP

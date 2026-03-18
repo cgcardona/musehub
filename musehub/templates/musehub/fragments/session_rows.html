@@ -14,7 +14,7 @@
     total         : int         — total number of sessions
     page          : int         — current page (1-based)
     total_pages   : int         — total number of pages
-    base_url      : str         — repo base URL, e.g. /musehub/ui/owner/slug
+    base_url      : str         — repo base URL, e.g. /owner/slug
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
 {% from "musehub/macros/empty_state.html" import empty_state %}
@@ -55,7 +55,7 @@
       {% if s.participants %}
       <div class="session-participants">
         {% for p in s.participants %}
-        <a href="/musehub/ui/users/{{ p | urlencode }}" class="participant-chip">{{ p }}</a>
+        <a href="/{{ p | urlencode }}" class="participant-chip">{{ p }}</a>
         {% endfor %}
       </div>
       {% endif %}

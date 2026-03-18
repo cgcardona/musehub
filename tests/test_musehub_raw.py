@@ -1,4 +1,4 @@
-"""Tests for the Muse Hub raw file download endpoint.
+"""Tests for the MuseHub raw file download endpoint.
 
 Covers every acceptance criterion:
 - test_raw_midi_correct_mime — .mid served with audio/midi
@@ -17,7 +17,7 @@ Covers every acceptance criterion:
 - test_raw_accept_ranges_header — Accept-Ranges: bytes is present in response
 
 The endpoint under test:
-  GET /api/v1/musehub/repos/{repo_id}/raw/{ref}/{path:path}
+  GET /api/v1/repos/{repo_id}/raw/{ref}/{path:path}
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ from musehub.db.musehub_models import MusehubObject, MusehubRepo
 
 
 async def _make_repo(db: AsyncSession, *, visibility: str = "public") -> str:
-    """Seed a minimal Muse Hub repo and return its repo_id."""
+    """Seed a minimal MuseHub repo and return its repo_id."""
     repo = MusehubRepo(
         name="test-beats",
         owner="testuser",
@@ -92,7 +92,7 @@ async def test_raw_midi_correct_mime(
         repo_id = await _make_repo(db_session, visibility="public")
         await _make_object(db_session, repo_id, path="tracks/bass.mid", tmp_dir=tmp)
 
-        resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/raw/main/tracks/bass.mid")
+        resp = await client.get(f"/api/v1/repos/{repo_id}/raw/main/tracks/bass.mid")
 
     assert resp.status_code == 200
     assert "audio/midi" in resp.headers["content-type"]
@@ -108,7 +108,7 @@ async def test_raw_mp3_correct_mime(
         repo_id = await _make_repo(db_session, visibility="public")
         await _make_object(db_session, repo_id, path="mix/final.mp3", tmp_dir=tmp)
 
-        resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/raw/main/mix/final.mp3")
+        resp = await client.get(f"/api/v1/repos/{repo_id}/raw/main/mix/final.mp3")
 
     assert resp.status_code == 200
     assert "audio/mpeg" in resp.headers["content-type"]
@@ -124,7 +124,7 @@ async def test_raw_wav_correct_mime(
         repo_id = await _make_repo(db_session, visibility="public")
         await _make_object(db_session, repo_id, path="stems/drums.wav", tmp_dir=tmp)
 
-        resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/raw/main/stems/drums.wav")
+        resp = await client.get(f"/api/v1/repos/{repo_id}/raw/main/stems/drums.wav")
 
     assert resp.status_code == 200
     assert "audio/wav" in resp.headers["content-type"]
@@ -147,7 +147,7 @@ async def test_raw_json_correct_mime(
         )
 
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/raw/main/metadata/track.json"
+            f"/api/v1/repos/{repo_id}/raw/main/metadata/track.json"
         )
 
     assert resp.status_code == 200
@@ -165,7 +165,7 @@ async def test_raw_webp_correct_mime(
         await _make_object(db_session, repo_id, path="previews/piano_roll.webp", tmp_dir=tmp)
 
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/raw/main/previews/piano_roll.webp"
+            f"/api/v1/repos/{repo_id}/raw/main/previews/piano_roll.webp"
         )
 
     assert resp.status_code == 200
@@ -188,7 +188,7 @@ async def test_raw_xml_correct_mime(
             tmp_dir=tmp,
         )
 
-        resp = await client.get(f"/api/v1/musehub/repos/{repo_id}/raw/main/scores/piece.xml")
+        resp = await client.get(f"/api/v1/repos/{repo_id}/raw/main/scores/piece.xml")
 
     assert resp.status_code == 200
     assert "application/xml" in resp.headers["content-type"]
@@ -207,7 +207,7 @@ async def test_raw_404_unknown_path(
     """Path that has no matching object returns 404."""
     repo_id = await _make_repo(db_session, visibility="public")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/raw/main/does/not/exist.mid"
+        f"/api/v1/repos/{repo_id}/raw/main/does/not/exist.mid"
     )
     assert resp.status_code == 404
 
@@ -219,7 +219,7 @@ async def test_raw_404_unknown_repo(
 ) -> None:
     """Nonexistent repo_id returns 404 immediately."""
     resp = await client.get(
-        "/api/v1/musehub/repos/nonexistent-repo-uuid/raw/main/track.mid"
+        "/api/v1/repos/nonexistent-repo-uuid/raw/main/track.mid"
     )
     assert resp.status_code == 404
 
@@ -240,7 +240,7 @@ async def test_raw_public_no_auth(
         await _make_object(db_session, repo_id, path="tracks/open.mid", tmp_dir=tmp)
 
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/raw/main/tracks/open.mid"
+            f"/api/v1/repos/{repo_id}/raw/main/tracks/open.mid"
         )
 
     assert resp.status_code == 200
@@ -254,7 +254,7 @@ async def test_raw_private_requires_auth(
     """Private repo raw download without a JWT returns 401."""
     repo_id = await _make_repo(db_session, visibility="private")
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/raw/main/tracks/secret.mid"
+        f"/api/v1/repos/{repo_id}/raw/main/tracks/secret.mid"
     )
     assert resp.status_code == 401
 
@@ -271,7 +271,7 @@ async def test_raw_private_with_auth(
         await _make_object(db_session, repo_id, path="tracks/secret.mid", tmp_dir=tmp)
 
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/raw/main/tracks/secret.mid",
+            f"/api/v1/repos/{repo_id}/raw/main/tracks/secret.mid",
             headers={"Authorization": auth_headers["Authorization"]},
         )
 
@@ -296,7 +296,7 @@ async def test_raw_content_disposition(
         )
 
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/raw/main/tracks/groove_42.mid"
+            f"/api/v1/repos/{repo_id}/raw/main/tracks/groove_42.mid"
         )
 
     assert resp.status_code == 200
@@ -315,7 +315,7 @@ async def test_raw_accept_ranges_header(
         await _make_object(db_session, repo_id, path="mix/audio.mp3", tmp_dir=tmp)
 
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/raw/main/mix/audio.mp3"
+            f"/api/v1/repos/{repo_id}/raw/main/mix/audio.mp3"
         )
 
     assert resp.status_code == 200
@@ -340,7 +340,7 @@ async def test_raw_range_request(
         )
 
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/raw/main/mix/partial.mp3",
+            f"/api/v1/repos/{repo_id}/raw/main/mix/partial.mp3",
             headers={"Range": "bytes=0-4"},
         )
 

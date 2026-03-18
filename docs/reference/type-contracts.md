@@ -1,6 +1,6 @@
-# Muse Hub — Type Contracts Reference
+# MuseHub — Type Contracts Reference
 
-> Updated: 2026-03-17 | MCP Protocol: **2025-11-25** | Covers every named entity in the Muse Hub surface:
+> Updated: 2026-03-17 | MCP Protocol: **2025-11-25** | Covers every named entity in the MuseHub surface:
 > MIDI type aliases, JSON wire types, MCP protocol types (including Elicitation, Session, and SSE),
 > Pydantic API models, auth tokens, SSE event hierarchy, SQLAlchemy ORM models, and the full
 > MCP integration layer (Streamable HTTP transport, session management, dispatcher, resources,
@@ -545,7 +545,7 @@ optional claims added by the issuer.
 **Path:** `musehub/protocol/events.py`
 
 Protocol events are Pydantic `CamelModel` subclasses of `MuseEvent`, which
-provides `type`, `seq`, and `protocol_version` on every payload. Muse Hub
+provides `type`, `seq`, and `protocol_version` on every payload. MuseHub
 defines two concrete event types — both in the MCP relay path.
 
 ### Base Class
@@ -608,7 +608,7 @@ All are Pydantic `CamelModel` subclasses. Organized by domain feature.
 | Name | Description |
 |------|-------------|
 | `CreateRepoRequest` | Repository creation wizard body |
-| `RepoResponse` | Wire representation of a Muse Hub repo |
+| `RepoResponse` | Wire representation of a MuseHub repo |
 | `TransferOwnershipRequest` | Transfer repo to another user |
 | `RepoListResponse` | Paginated list of repos |
 | `RepoStatsResponse` | Aggregated commit / branch / release counts |
@@ -784,13 +784,13 @@ All are SQLAlchemy ORM subclasses of a declarative `Base`.
 | `MuseCliCommit` | `muse_commits` | Versioned commit pointing to a snapshot |
 | `MuseCliTag` | `muse_tags` | Music-semantic tag on a CLI commit |
 
-### `db/musehub_models.py` — Muse Hub Core
+### `db/musehub_models.py` — MuseHub Core
 
 | Model | Table | Description |
 |-------|-------|-------------|
 | `MusehubRepo` | `musehub_repos` | Remote repository with music-semantic metadata |
 | `MusehubBranch` | `musehub_branches` | Named branch pointer |
-| `MusehubCommit` | `musehub_commits` | Commit pushed to Muse Hub |
+| `MusehubCommit` | `musehub_commits` | Commit pushed to MuseHub |
 | `MusehubObject` | `musehub_objects` | Content-addressed binary artifact |
 | `MusehubMilestone` | `musehub_milestones` | Milestone grouping issues |
 | `MusehubIssueMilestone` | `musehub_issue_milestones` | Issue ↔ Milestone join table |
@@ -843,7 +843,7 @@ All are SQLAlchemy ORM subclasses of a declarative `Base`.
 ## Entity Hierarchy
 
 ```
-Muse Hub
+MuseHub
 │
 ├── MIDI Type Aliases (contracts/midi_types.py)
 │   ├── MidiPitch, MidiVelocity, MidiChannel, MidiCC, MidiCCValue
@@ -1025,7 +1025,7 @@ classDiagram
 
 ### Diagram 2 — MCP Protocol Event Types
 
-The two concrete events Muse Hub relays over SSE — both in the MCP path.
+The two concrete events MuseHub relays over SSE — both in the MCP path.
 `MuseEvent` is the typed base; the event registry maps type strings to
 model classes.
 
@@ -1275,7 +1275,7 @@ classDiagram
 
 ---
 
-### Diagram 7 — Muse Hub Repository Object Graph
+### Diagram 7 — MuseHub Repository Object Graph
 
 The core VCS entity relationships in the database.
 

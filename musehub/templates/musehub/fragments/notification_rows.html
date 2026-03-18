@@ -31,7 +31,7 @@
       —
       {{ notif.payload.description | default(notif.eventType) | e }}
       {% if notif.repoId %}
-        in <a href="/musehub/ui/{{ notif.payload.owner | default('') | e }}/{{ notif.payload.slug | default('') | e }}"
+        in <a href="/{{ notif.payload.owner | default('') | e }}/{{ notif.payload.slug | default('') | e }}"
               style="color:var(--color-accent)">
              {{ notif.payload.repoName | default(notif.repoId) | e }}
            </a>

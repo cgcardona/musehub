@@ -1,6 +1,6 @@
 """SSR-specific tests for the MuseHub notification inbox (ui_notifications.py).
 
-Covers the SSR migration at GET /musehub/ui/notifications:
+Covers the SSR migration at GET /notifications:
 
 - test_notifications_page_unauthenticated_renders_login_prompt — login prompt rendered without token
 - test_notifications_page_renders_notification_server_side — authenticated GET includes notif body
@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from musehub.db.musehub_models import MusehubNotification
 
 _TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
-_UI_PATH = "/musehub/ui/notifications"
+_UI_PATH = "/notifications"
 
 
 # ---------------------------------------------------------------------------

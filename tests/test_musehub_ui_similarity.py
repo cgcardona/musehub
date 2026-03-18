@@ -1,4 +1,4 @@
-"""Tests for the Muse Hub musical similarity page.
+"""Tests for the MuseHub musical similarity page.
 
 Covers:
 - test_similarity_page_renders — GET /{owner}/{repo}/similarity/{base}...{head} returns 200 HTML
@@ -51,13 +51,13 @@ async def test_similarity_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/similarity/{base}...{head} returns 200 HTML."""
+    """GET /{owner}/{slug}/similarity/{base}...{head} returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/main...feature")
+    response = await client.get("/testuser/test-beats/similarity/main...feature")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "main" in body
     assert "feature" in body
 
@@ -69,7 +69,7 @@ async def test_similarity_page_no_auth_required(
 ) -> None:
     """Similarity page is accessible without a JWT token."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/main...feature")
+    response = await client.get("/testuser/test-beats/similarity/main...feature")
     assert response.status_code == 200
 
 
@@ -80,7 +80,7 @@ async def test_similarity_page_invalid_ref_404(
 ) -> None:
     """Similarity path without '...' separator returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/mainfeature")
+    response = await client.get("/testuser/test-beats/similarity/mainfeature")
     assert response.status_code == 404
 
 
@@ -89,7 +89,7 @@ async def test_similarity_page_unknown_owner_404(
     client: AsyncClient,
 ) -> None:
     """Unknown owner/slug combination returns 404 on similarity page."""
-    response = await client.get("/musehub/ui/nobody/norepo/similarity/main...feature")
+    response = await client.get("/nobody/norepo/similarity/main...feature")
     assert response.status_code == 404
 
 
@@ -100,7 +100,7 @@ async def test_similarity_page_includes_radar(
 ) -> None:
     """Similarity page HTML contains a server-rendered SVG radar chart."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/main...feature")
+    response = await client.get("/testuser/test-beats/similarity/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "<svg" in body
@@ -114,7 +114,7 @@ async def test_similarity_page_includes_dimensions(
 ) -> None:
     """Similarity page HTML contains the 10-dimension breakdown table (SSR)."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/main...feature")
+    response = await client.get("/testuser/test-beats/similarity/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Dimension Breakdown" in body
@@ -128,7 +128,7 @@ async def test_similarity_page_includes_overall_badge(
 ) -> None:
     """Similarity page HTML contains overall similarity badge rendered server-side."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/main...feature")
+    response = await client.get("/testuser/test-beats/similarity/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "overall musical similarity" in body
@@ -142,7 +142,7 @@ async def test_similarity_page_includes_diff_button(
 ) -> None:
     """Similarity page HTML contains an 'Open Full Diff' button linking to the compare page."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/main...feature")
+    response = await client.get("/testuser/test-beats/similarity/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Open Full Diff" in body
@@ -156,7 +156,7 @@ async def test_similarity_page_includes_create_pr(
 ) -> None:
     """Similarity page HTML contains a 'Create Pull Request' call-to-action."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/similarity/main...feature")
+    response = await client.get("/testuser/test-beats/similarity/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Create Pull Request" in body
@@ -167,10 +167,10 @@ async def test_similarity_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/similarity/{refs}?format=json returns RefSimilarityResponse."""
+    """GET /{owner}/{slug}/similarity/{refs}?format=json returns RefSimilarityResponse."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/testuser/test-beats/similarity/main...feature?format=json"
+        "/testuser/test-beats/similarity/main...feature?format=json"
     )
     assert response.status_code == 200
     assert "application/json" in response.headers["content-type"]

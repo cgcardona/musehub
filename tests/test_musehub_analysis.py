@@ -1,7 +1,7 @@
-"""Tests for Muse Hub Analysis endpoints — .
+"""Tests for MuseHub Analysis endpoints — .
 
 Covers all acceptance criteria:
-- GET /musehub/repos/{repo_id}/analysis/{ref}/{dimension} returns structured JSON
+- GET /repos/{repo_id}/analysis/{ref}/{dimension} returns structured JSON
 - All 13 dimensions return valid typed data
 - Aggregate endpoint returns all 13 dimensions
 - Track and section query param filters are applied
@@ -384,7 +384,7 @@ async def test_analysis_harmony_endpoint(
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/repos/{repo_id}/analysis/{ref}/harmony returns dedicated harmony data.
+    """GET /repos/{repo_id}/analysis/{ref}/harmony returns dedicated harmony data.
 
     The /harmony path is now handled by the dedicated HarmonyAnalysisResponse endpoint rather than the generic /{dimension} catch-all. It returns
     Roman-numeral-centric data (key, mode, romanNumerals, cadences, modulations)
@@ -392,7 +392,7 @@ async def test_analysis_harmony_endpoint(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -415,7 +415,7 @@ async def test_analysis_dynamics_endpoint(
     """GET .../{repo_id}/analysis/{ref}/dynamics returns velocity data."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/dynamics",
+        f"/api/v1/repos/{repo_id}/analysis/main/dynamics",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -434,7 +434,7 @@ async def test_analysis_all_dimensions(
     """Aggregate GET .../analysis/{ref} returns all 13 dimensions."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main",
+        f"/api/v1/repos/{repo_id}/analysis/main",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -456,7 +456,7 @@ async def test_analysis_track_filter(
     """Track filter is reflected in filtersApplied across dimensions."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/groove?track=bass",
+        f"/api/v1/repos/{repo_id}/analysis/main/groove?track=bass",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -474,7 +474,7 @@ async def test_analysis_section_filter(
     """Section filter is reflected in filtersApplied."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/emotion?section=chorus",
+        f"/api/v1/repos/{repo_id}/analysis/main/emotion?section=chorus",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -491,7 +491,7 @@ async def test_analysis_unknown_dimension_404(
     """Unknown dimension returns 404, not 422."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/not-a-dimension",
+        f"/api/v1/repos/{repo_id}/analysis/main/not-a-dimension",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -506,7 +506,7 @@ async def test_analysis_unknown_repo_404(
 ) -> None:
     """Unknown repo_id returns 404 for single-dimension endpoint."""
     resp = await client.get(
-        "/api/v1/musehub/repos/00000000-0000-0000-0000-000000000000/analysis/main/harmony",
+        "/api/v1/repos/00000000-0000-0000-0000-000000000000/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -520,7 +520,7 @@ async def test_analysis_aggregate_unknown_repo_404(
 ) -> None:
     """Unknown repo_id returns 404 for aggregate endpoint."""
     resp = await client.get(
-        "/api/v1/musehub/repos/00000000-0000-0000-0000-000000000000/analysis/main",
+        "/api/v1/repos/00000000-0000-0000-0000-000000000000/analysis/main",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -535,7 +535,7 @@ async def test_analysis_cache_headers(
     """ETag and Last-Modified headers are present in analysis responses."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/key",
+        f"/api/v1/repos/{repo_id}/analysis/main/key",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -553,7 +553,7 @@ async def test_analysis_aggregate_cache_headers(
     """Aggregate endpoint also includes ETag header."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main",
+        f"/api/v1/repos/{repo_id}/analysis/main",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -572,7 +572,7 @@ async def test_analysis_requires_auth(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
     )
     assert resp.status_code == 401
 
@@ -589,7 +589,7 @@ async def test_analysis_aggregate_requires_auth(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main",
+        f"/api/v1/repos/{repo_id}/analysis/main",
     )
     assert resp.status_code == 401
 
@@ -612,7 +612,7 @@ async def test_analysis_all_13_dimensions_individually(
         # /similarity is a dedicated cross-ref endpoint requiring ?compare=
         params = {"compare": "main"} if dim == "similarity" else {}
         resp = await client.get(
-            f"/api/v1/musehub/repos/{repo_id}/analysis/main/{dim}",
+            f"/api/v1/repos/{repo_id}/analysis/main/{dim}",
             headers=auth_headers,
             params=params,
         )
@@ -733,10 +733,10 @@ async def test_emotion_map_endpoint_200(
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/emotion-map returns 200."""
+    """GET /api/v1/repos/{repo_id}/analysis/{ref}/emotion-map returns 200."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/emotion-map",
+        f"/api/v1/repos/{repo_id}/analysis/main/emotion-map",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -758,7 +758,7 @@ async def test_emotion_map_endpoint_requires_auth(
 ) -> None:
     """Emotion map endpoint returns 401 without a Bearer token."""
     resp = await client.get(
-        "/api/v1/musehub/repos/some-id/analysis/main/emotion-map",
+        "/api/v1/repos/some-id/analysis/main/emotion-map",
     )
     assert resp.status_code == 401
 
@@ -771,7 +771,7 @@ async def test_emotion_map_endpoint_unknown_repo_404(
 ) -> None:
     """Emotion map endpoint returns 404 for an unknown repo_id."""
     resp = await client.get(
-        "/api/v1/musehub/repos/00000000-0000-0000-0000-000000000000/analysis/main/emotion-map",
+        "/api/v1/repos/00000000-0000-0000-0000-000000000000/analysis/main/emotion-map",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -786,7 +786,7 @@ async def test_emotion_map_endpoint_etag(
     """Emotion map endpoint includes ETag header for client-side caching."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/emotion-map",
+        f"/api/v1/repos/{repo_id}/analysis/main/emotion-map",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -803,7 +803,7 @@ async def test_emotion_map_endpoint_track_filter(
     """Track filter is reflected in filtersApplied of the emotion map response."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/emotion-map?track=bass",
+        f"/api/v1/repos/{repo_id}/analysis/main/emotion-map?track=bass",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -823,7 +823,7 @@ async def test_contour_track_filter(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/contour?track=lead",
+        f"/api/v1/repos/{repo_id}/analysis/main/contour?track=lead",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -849,7 +849,7 @@ async def test_tempo_section_filter(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/tempo?section=chorus",
+        f"/api/v1/repos/{repo_id}/analysis/main/tempo?section=chorus",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -867,7 +867,7 @@ async def test_analysis_aggregate_endpoint_returns_all_dimensions(
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/analysis/{ref} returns all 13 dimensions.
+    """GET /api/v1/repos/{repo_id}/analysis/{ref} returns all 13 dimensions.
 
     Regression test: the aggregate endpoint must return all 13
     musical dimensions so the analysis dashboard can render summary cards for each
@@ -875,7 +875,7 @@ async def test_analysis_aggregate_endpoint_returns_all_dimensions(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main",
+        f"/api/v1/repos/{repo_id}/analysis/main",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -976,7 +976,7 @@ async def test_harmony_endpoint_returns_200(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1003,7 +1003,7 @@ async def test_harmony_endpoint_roman_numerals_fields(
     """Each roman numeral event carries beat, chord, root, quality, and function."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1024,7 +1024,7 @@ async def test_harmony_endpoint_cadence_fields(
     """Each cadence event carries beat, type, from, and to fields."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1044,7 +1044,7 @@ async def test_harmony_endpoint_etag_header(
     """GET /analysis/{ref}/harmony includes an ETag header for cache validation."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1068,7 +1068,7 @@ async def test_harmony_endpoint_requires_auth_for_private_repo(
     repo_id = str(resp.json()["repoId"])
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
     )
     assert resp.status_code == 401
 
@@ -1081,7 +1081,7 @@ async def test_harmony_endpoint_unknown_repo_404(
 ) -> None:
     """GET /analysis/{ref}/harmony with an unknown repo_id returns 404."""
     resp = await client.get(
-        "/api/v1/musehub/repos/nonexistent-repo-id/analysis/main/harmony",
+        "/api/v1/repos/nonexistent-repo-id/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1096,7 +1096,7 @@ async def test_harmony_endpoint_track_filter(
     """GET /analysis/{ref}/harmony?track=keys returns 200 (filter accepted)."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony?track=keys",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony?track=keys",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1190,7 +1190,7 @@ async def test_recall_endpoint_200(
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/recall?q= returns 200.
+    """GET /api/v1/repos/{repo_id}/analysis/{ref}/recall?q= returns 200.
 
     Regression test: the recall endpoint must return a ranked list
     of semantically similar commits so agents can retrieve musically relevant history
@@ -1198,7 +1198,7 @@ async def test_recall_endpoint_200(
     """
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/recall?q=jazzy+swing+groove",
+        f"/api/v1/repos/{repo_id}/analysis/main/recall?q=jazzy+swing+groove",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1221,7 +1221,7 @@ async def test_recall_endpoint_match_fields(
     """Each match carries commitId, commitMessage, branch, score, and matchedDimensions."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/recall?q=harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/recall?q=harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1242,7 +1242,7 @@ async def test_recall_endpoint_requires_auth(
 ) -> None:
     """Recall endpoint returns 401 without a Bearer token."""
     resp = await client.get(
-        "/api/v1/musehub/repos/some-repo/analysis/main/recall?q=groove",
+        "/api/v1/repos/some-repo/analysis/main/recall?q=groove",
     )
     assert resp.status_code == 401
 
@@ -1255,7 +1255,7 @@ async def test_recall_endpoint_unknown_repo_404(
 ) -> None:
     """Recall endpoint returns 404 for an unknown repo_id."""
     resp = await client.get(
-        "/api/v1/musehub/repos/00000000-0000-0000-0000-000000000000/analysis/main/recall?q=swing",
+        "/api/v1/repos/00000000-0000-0000-0000-000000000000/analysis/main/recall?q=swing",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1270,7 +1270,7 @@ async def test_recall_endpoint_etag_header(
     """Recall endpoint includes an ETag header for client-side cache validation."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/recall?q=groove",
+        f"/api/v1/repos/{repo_id}/analysis/main/recall?q=groove",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1287,7 +1287,7 @@ async def test_recall_endpoint_limit_param(
     """?limit=3 caps the returned matches to at most 3 results."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/recall?q=swing&limit=3",
+        f"/api/v1/repos/{repo_id}/analysis/main/recall?q=swing&limit=3",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1303,7 +1303,7 @@ async def test_recall_endpoint_missing_q_422(
     """Missing ?q returns 422 Unprocessable Entity (required query param)."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/recall",
+        f"/api/v1/repos/{repo_id}/analysis/main/recall",
         headers=auth_headers,
     )
     assert resp.status_code == 422
@@ -1318,7 +1318,7 @@ async def test_recall_endpoint_scores_descending(
     """Recall endpoint returns matches sorted best-first (descending score)."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/recall?q=jazz+harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/recall?q=jazz+harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1408,7 +1408,7 @@ async def test_ref_similarity_endpoint_200(
     """GET /analysis/{ref}/similarity returns 200 with required fields."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/similarity?compare=dev",
+        f"/api/v1/repos/{repo_id}/analysis/main/similarity?compare=dev",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1444,7 +1444,7 @@ async def test_ref_similarity_endpoint_requires_compare(
     """Missing compare param returns 422 Unprocessable Entity."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/similarity",
+        f"/api/v1/repos/{repo_id}/analysis/main/similarity",
         headers=auth_headers,
     )
     assert resp.status_code == 422
@@ -1459,7 +1459,7 @@ async def test_ref_similarity_endpoint_requires_auth(
     """Private repo returns 401 when no auth token is provided."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/similarity?compare=dev",
+        f"/api/v1/repos/{repo_id}/analysis/main/similarity?compare=dev",
     )
     assert resp.status_code == 401
 
@@ -1472,7 +1472,7 @@ async def test_ref_similarity_endpoint_unknown_repo_404(
 ) -> None:
     """Unknown repo_id returns 404."""
     resp = await client.get(
-        "/api/v1/musehub/repos/00000000-0000-0000-0000-000000000000/analysis/main/similarity?compare=dev",
+        "/api/v1/repos/00000000-0000-0000-0000-000000000000/analysis/main/similarity?compare=dev",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1487,7 +1487,7 @@ async def test_ref_similarity_endpoint_etag(
     """Similarity endpoint includes ETag header for client-side caching."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/similarity?compare=dev",
+        f"/api/v1/repos/{repo_id}/analysis/main/similarity?compare=dev",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1592,7 +1592,7 @@ async def test_emotion_diff_endpoint_200(
     """GET /analysis/{ref}/emotion-diff?base=X returns 200 with all required fields."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/emotion-diff?base=main~1",
+        f"/api/v1/repos/{repo_id}/analysis/main/emotion-diff?base=main~1",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -1620,7 +1620,7 @@ async def test_emotion_diff_endpoint_requires_auth(
     """GET /analysis/{ref}/emotion-diff without auth returns 401."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/emotion-diff?base=main~1",
+        f"/api/v1/repos/{repo_id}/analysis/main/emotion-diff?base=main~1",
     )
     assert resp.status_code == 401
 
@@ -1633,7 +1633,7 @@ async def test_emotion_diff_endpoint_unknown_repo_404(
 ) -> None:
     """GET /analysis/{ref}/emotion-diff with an unknown repo_id returns 404."""
     resp = await client.get(
-        "/api/v1/musehub/repos/nonexistent-repo/analysis/main/emotion-diff?base=main~1",
+        "/api/v1/repos/nonexistent-repo/analysis/main/emotion-diff?base=main~1",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -1648,7 +1648,7 @@ async def test_emotion_diff_endpoint_etag(
     """GET /analysis/{ref}/emotion-diff includes an ETag header for cache validation."""
     repo_id = await _create_repo(client, auth_headers)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/emotion-diff?base=main~1",
+        f"/api/v1/repos/{repo_id}/analysis/main/emotion-diff?base=main~1",
         headers=auth_headers,
     )
     assert resp.status_code == 200

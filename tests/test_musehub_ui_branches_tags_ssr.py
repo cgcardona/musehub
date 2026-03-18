@@ -1,7 +1,7 @@
-"""SSR tests for the Muse Hub branches and tags pages (issue #571).
+"""SSR tests for the MuseHub branches and tags pages (issue #571).
 
-Verifies that ``GET /musehub/ui/{owner}/{repo_slug}/branches`` and
-``GET /musehub/ui/{owner}/{repo_slug}/tags`` render data server-side rather
+Verifies that ``GET /{owner}/{repo_slug}/branches`` and
+``GET /{owner}/{repo_slug}/tags`` render data server-side rather
 than relying on client-side JavaScript fetches.
 
 Tests:
@@ -112,7 +112,7 @@ async def test_branches_page_renders_branch_name_server_side(
     repo_id = await _make_repo(db_session)
     await _make_branch(db_session, repo_id, name="feat/ssr-migration")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/branches", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/branches", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -132,7 +132,7 @@ async def test_branches_page_marks_default_branch(
     await _make_branch(db_session, repo_id, name="main")
     await _make_branch(db_session, repo_id, name="feat/other")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/branches", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/branches", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -152,7 +152,7 @@ async def test_branches_htmx_fragment_path(
     await _make_branch(db_session, repo_id, name="feat/htmx-swap")
     htmx_headers = {**auth_headers, "HX-Request": "true"}
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/branches", headers=htmx_headers
+        f"/{_OWNER}/{_SLUG}/branches", headers=htmx_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -171,7 +171,7 @@ async def test_branches_page_empty_state_when_no_branches(
     """Empty branch list renders the empty-state component server-side (no JS fetch needed)."""
     await _make_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/branches", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/branches", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -191,7 +191,7 @@ async def test_branches_page_compare_link_for_non_default(
     await _make_branch(db_session, repo_id, name="main")
     await _make_branch(db_session, repo_id, name="feat/new-bridge")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/branches", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/branches", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -215,7 +215,7 @@ async def test_tags_page_renders_tag_name_server_side(
     repo_id = await _make_repo(db_session)
     await _make_release(db_session, repo_id, tag="v2.0", title="Major release")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/tags", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/tags", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -233,7 +233,7 @@ async def test_tags_page_empty_state_when_no_tags(
     """Empty tag list renders the empty-state component server-side."""
     await _make_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/tags", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/tags", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text
@@ -252,7 +252,7 @@ async def test_tags_page_namespace_filter(
     await _make_release(db_session, repo_id, tag="emotion:happy", title="Happy mood tag")
     await _make_release(db_session, repo_id, tag="v1.0", title="Version release")
     resp = await client.get(
-        f"/musehub/ui/{_OWNER}/{_SLUG}/tags?namespace=emotion", headers=auth_headers
+        f"/{_OWNER}/{_SLUG}/tags?namespace=emotion", headers=auth_headers
     )
     assert resp.status_code == 200
     body = resp.text

@@ -1,7 +1,7 @@
-"""Tests for Muse Hub web UI endpoints.
+"""Tests for MuseHub web UI endpoints.
 
 Covers (compare view):
-- test_compare_page_renders — GET /musehub/ui/{owner}/{slug}/compare/{base}...{head} returns 200
+- test_compare_page_renders — GET /{owner}/{slug}/compare/{base}...{head} returns 200
 - test_compare_page_no_auth_required — compare page accessible without JWT
 - test_compare_page_invalid_ref_404 — refs without ... separator return 404
 - test_compare_page_unknown_owner_404 — unknown owner/slug returns 404
@@ -29,7 +29,7 @@ Covers acceptance criteria (commit list page):
 - test_commits_list_page_graph_link — link to DAG graph page present
 
 Covers the minimum acceptance criteria and :
-- test_ui_repo_page_returns_200 — GET /musehub/ui/{repo_id} returns HTML
+- test_ui_repo_page_returns_200 — GET /{repo_id} returns HTML
 - test_ui_commit_page_shows_artifact_links — commit page HTML mentions img/download
 - test_ui_pr_list_page_returns_200 — PR list page renders without error
 - test_ui_issue_list_page_returns_200 — Issue list page renders without error
@@ -61,13 +61,13 @@ Covers acceptance criteria (tree browser):
 - test_tree_unknown_ref_404
 
 Covers acceptance criteria (embed player):
-- test_embed_page_renders — GET /musehub/ui/{repo_id}/embed/{ref} returns 200
+- test_embed_page_renders — GET /{repo_id}/embed/{ref} returns 200
 - test_embed_no_auth_required — Public embed accessible without JWT
 - test_embed_page_x_frame_options — Response sets X-Frame-Options: ALLOWALL
 - test_embed_page_contains_player_ui — Player elements present in embed HTML
 
 Covers (emotion map page), migrated to owner/slug routing:
-- test_emotion_page_renders — GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/emotion returns 200
+- test_emotion_page_renders — GET /{owner}/{repo_slug}/analysis/{ref}/emotion returns 200
 - test_emotion_page_no_auth_required — emotion UI page accessible without JWT
 - test_emotion_page_includes_charts — page embeds valence-arousal plot and axis labels
 - test_emotion_page_includes_filters — page includes primary emotion and confidence display
@@ -76,7 +76,7 @@ Covers (emotion map page), migrated to owner/slug routing:
 - test_emotion_drift_distances — drift list has one entry per consecutive commit pair
 
 Covers (rich event cards in activity feed):
-- test_feed_page_returns_200 — GET /musehub/ui/feed returns 200 HTML
+- test_feed_page_returns_200 — GET /feed returns 200 HTML
 - test_feed_page_no_raw_json_payload — page does not render raw JSON.stringify of payload
 - test_feed_page_has_event_meta_for_all_types — EVENT_META covers all 8 event types
 - test_feed_page_has_data_notif_id_attribute — cards carry data-notif-id for mark-as-read hook
@@ -113,11 +113,11 @@ Covers (commit comment threads):
 
 Covers regression for PR #282 (owner/slug URL scheme):
 - test_ui_nav_links_use_owner_slug_not_uuid_* — every page handler injects
-  ``const base = '/musehub/ui/{owner}/{slug}'`` not a UUID-based path.
+  ``const base = '/{owner}/{slug}'`` not a UUID-based path.
 - test_ui_unknown_owner_slug_returns_404 — bad owner/slug → 404.
 
 Covers (analysis dashboard):
-- test_analysis_dashboard_renders — GET /musehub/ui/{owner}/{slug}/analysis/{ref} returns 200
+- test_analysis_dashboard_renders — GET /{owner}/{slug}/analysis/{ref} returns 200
 - test_analysis_dashboard_no_auth_required — accessible without JWT
 - test_analysis_dashboard_all_dimension_labels — 10 dimension labels present in HTML
 - test_analysis_dashboard_sparkline_logic_present — sparkline JS present
@@ -125,17 +125,17 @@ Covers (analysis dashboard):
 See also test_musehub_analysis.py::test_analysis_aggregate_endpoint_returns_all_dimensions
 
 Covers (branch list and tag browser):
-- test_branches_page_lists_all — GET /musehub/ui/{owner}/{slug}/branches returns 200 HTML
+- test_branches_page_lists_all — GET /{owner}/{slug}/branches returns 200 HTML
 - test_branches_default_marked — default branch badge present in JSON response
 - test_branches_compare_link — compare link JS present on branches page
 - test_branches_new_pr_button — new pull request link JS present
 - test_branches_json_response — JSON returns BranchDetailListResponse with ahead/behind
-- test_tags_page_lists_all — GET /musehub/ui/{owner}/{slug}/tags returns 200 HTML
+- test_tags_page_lists_all — GET /{owner}/{slug}/tags returns 200 HTML
 - test_tags_namespace_filter — namespace filter JS present on tags page
 - test_tags_json_response — JSON returns TagListResponse with namespace grouping
 
 Covers (audio player — listen page):
-- test_listen_page_renders — GET /musehub/ui/{owner}/{slug}/listen/{ref} returns 200
+- test_listen_page_renders — GET /{owner}/{slug}/listen/{ref} returns 200
 - test_listen_page_no_auth_required — listen page accessible without JWT
 - test_listen_page_contains_waveform_ui — waveform container and controls present
 - test_listen_page_contains_play_button — play button element present in HTML
@@ -143,7 +143,7 @@ Covers (audio player — listen page):
 - test_listen_page_contains_ab_loop_ui — A/B loop controls present
 - test_listen_page_loads_wavesurfer_vendor — page loads vendored wavesurfer.min.js (no CDN)
 - test_listen_page_loads_audio_player_js — page loads audio-player.js component script
-- test_listen_track_page_renders — GET /musehub/ui/{owner}/{slug}/listen/{ref}/{path} returns 200
+- test_listen_track_page_renders — GET /{owner}/{slug}/listen/{ref}/{path} returns 200
 - test_listen_track_page_has_track_path_in_js — track path injected into page JS context
 - test_listen_page_unknown_repo_404 — bad owner/slug → 404
 - test_listen_page_keyboard_shortcuts_documented — keyboard shortcuts mentioned in page
@@ -234,14 +234,14 @@ async def test_ui_repo_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id} returns 200 HTML without requiring a JWT."""
+    """GET /{repo_id} returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
     # Verify shared chrome is present
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "test-beats" in body  # repo slug is shown in the page header/title
     # Verify page-specific content is present (repo home page — file tree + clone section)
     assert "file-tree" in body or "Empty repository" in body
@@ -252,7 +252,7 @@ async def test_ui_commit_page_shows_artifact_links(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/commits/{commit_id} returns SSR HTML for a known commit.
+    """GET /{owner}/{slug}/commits/{commit_id} returns SSR HTML for a known commit.
 
     Post-SSR migration (issue #583): commit_page() now requires the commit to exist in the
     DB (returns 404 otherwise) and renders metadata + comments server-side.
@@ -274,7 +274,7 @@ async def test_ui_commit_page_shows_artifact_links(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
@@ -291,14 +291,14 @@ async def test_ui_pr_list_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/pulls returns 200 HTML without requiring a JWT."""
+    """GET /{repo_id}/pulls returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "Pull Requests" in body
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     # State filter select element must be present in the JS
     assert "state" in body
 
@@ -310,7 +310,7 @@ async def test_ui_pr_list_has_state_tabs(
 ) -> None:
     """PR list page includes Open, Merged, Closed, and All HTMX tab links with counts."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
     assert "tab-count" in body
@@ -337,7 +337,7 @@ async def test_ui_pr_list_has_body_preview_js(
         from_branch="feat/preview", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
     assert "pr-rows" in body
@@ -359,7 +359,7 @@ async def test_ui_pr_list_has_branch_pills(
         state="open", from_branch="feat/my-feature", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
     assert "branch-pill" in body
@@ -373,7 +373,7 @@ async def test_ui_pr_list_has_sort_controls(
 ) -> None:
     """PR list page HTML includes Newest and Oldest sort buttons."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
     assert "Newest" in body
@@ -398,7 +398,7 @@ async def test_ui_pr_list_has_merged_badge_markup(
         author="testuser", merge_commit_id=commit_id,
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls?state=merged")
+    response = await client.get("/testuser/test-beats/pulls?state=merged")
     assert response.status_code == 200
     body = response.text
     assert "badge-merged" in body
@@ -420,7 +420,7 @@ async def test_ui_pr_list_has_closed_badge_markup(
         state="closed", from_branch="feat/closed", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls?state=closed")
+    response = await client.get("/testuser/test-beats/pulls?state=closed")
     assert response.status_code == 200
     body = response.text
     assert "badge-closed" in body
@@ -431,14 +431,14 @@ async def test_ui_issue_list_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/issues returns 200 HTML without requiring a JWT."""
+    """GET /{repo_id}/issues returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "Issues" in body
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
 
 
 @pytest.mark.anyio
@@ -448,7 +448,7 @@ async def test_ui_issue_list_has_open_closed_tabs(
 ) -> None:
     """Issue list page HTML includes Open and Closed tab buttons and count spans."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
     # Tab buttons for open and closed state
@@ -471,7 +471,7 @@ async def test_ui_issue_list_has_sort_controls(
     (converted from client-side changeSort() as part of the HTMX migration).
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
     assert "Newest" in body
@@ -487,7 +487,7 @@ async def test_ui_issue_list_has_label_filter_js(
 ) -> None:
     """Issue list page HTML includes SSR label filter chips."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
     assert "label-chip-container" in body
@@ -501,7 +501,7 @@ async def test_ui_issue_list_has_body_preview_js(
 ) -> None:
     """Issue list page HTML includes bodyPreview helper for truncated body subtitles."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
     assert "bodyPreview" in body
@@ -515,7 +515,7 @@ async def test_ui_pr_list_has_comment_badge_js(
 ) -> None:
     """PR list page renders the SSR tab counts and HTMX state filters."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
     assert "tab-count" in body
@@ -530,7 +530,7 @@ async def test_ui_pr_list_has_reaction_pills_js(
 ) -> None:
     """PR list page renders the SSR open/merged/closed state tabs."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
     assert "tab-btn" in body
@@ -545,7 +545,7 @@ async def test_ui_issue_list_has_reaction_pills_js(
 ) -> None:
     """Issue list page renders the SSR filter sidebar."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
     assert "filter-sidebar" in body or "filter-select" in body
@@ -559,7 +559,7 @@ async def test_ui_issue_list_eager_social_signals(
 ) -> None:
     """Issue list page renders the SSR issue rows container."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
     assert "issue-rows" in body or "Issues" in body
@@ -571,7 +571,7 @@ async def test_ui_pr_detail_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/pulls/{pr_id} returns 200 HTML."""
+    """GET /{owner}/{slug}/pulls/{pr_id} returns 200 HTML."""
     import uuid
     from musehub.db.musehub_models import MusehubPullRequest
     repo_id = await _make_repo(db_session)
@@ -581,11 +581,11 @@ async def test_ui_pr_detail_page_returns_200(
         state="open", from_branch="feat/blues", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get(f"/musehub/ui/testuser/test-beats/pulls/{pr_id}")
+    response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Merge pull request" in body
 
 
@@ -604,7 +604,7 @@ async def test_ui_pr_detail_page_has_comment_section(
         state="open", from_branch="feat/comments", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get(f"/musehub/ui/testuser/test-beats/pulls/{pr_id}")
+    response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
     assert "pr-comments" in body
@@ -626,7 +626,7 @@ async def test_ui_pr_detail_page_has_reaction_bar(
         state="open", from_branch="feat/react", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get(f"/musehub/ui/testuser/test-beats/pulls/{pr_id}")
+    response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
     assert "pr-detail-layout" in body
@@ -648,7 +648,7 @@ async def test_pr_detail_shows_diff_radar(
         state="open", from_branch="feat/diff", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get(f"/musehub/ui/testuser/test-beats/pulls/{pr_id}")
+    response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
     assert "diff-stat" in body
@@ -670,7 +670,7 @@ async def test_pr_detail_audio_ab(
         state="open", from_branch="feat/audio", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get(f"/musehub/ui/testuser/test-beats/pulls/{pr_id}")
+    response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
     assert "branch-pill" in body
@@ -693,7 +693,7 @@ async def test_pr_detail_merge_strategies(
         state="open", from_branch="feat/merge", to_branch="main", author="testuser",
     ))
     await db_session.commit()
-    response = await client.get(f"/musehub/ui/testuser/test-beats/pulls/{pr_id}")
+    response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
     assert "merge_commit" in body
@@ -747,7 +747,7 @@ async def test_pr_detail_json_response(
     await db_session.commit()
 
     response = await client.get(
-        f"/musehub/ui/testuser/test-beats/pulls/{pr_id}?format=json",
+        f"/testuser/test-beats/pulls/{pr_id}?format=json",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -977,7 +977,7 @@ async def test_diff_api_affected_sections_empty_without_section_keywords(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/diff",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/diff",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1044,7 +1044,7 @@ async def test_diff_api_affected_sections_populated_from_commit_message(
     await db_session.commit()
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/pull-requests/{pr_id}/diff",
+        f"/api/v1/repos/{repo_id}/pull-requests/{pr_id}/diff",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1114,7 +1114,7 @@ async def test_ui_diff_json_affected_sections_from_commit_message(
     await db_session.commit()
 
     response = await client.get(
-        f"/musehub/ui/testuser/test-beats/pulls/{pr_id}?format=json",
+        f"/testuser/test-beats/pulls/{pr_id}?format=json",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1128,7 +1128,7 @@ async def test_ui_issue_detail_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/issues/{number} returns 200 HTML."""
+    """GET /{owner}/{slug}/issues/{number} returns 200 HTML."""
     from musehub.db.musehub_models import MusehubIssue
     repo_id = await _make_repo(db_session)
     db_session.add(MusehubIssue(
@@ -1136,11 +1136,11 @@ async def test_ui_issue_detail_page_returns_200(
         state="open", labels=[], author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Close issue" in body
 
 
@@ -1157,7 +1157,7 @@ async def test_ui_issue_detail_has_comment_section(
         state="open", labels=[], author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
     assert "Discussion" in body
@@ -1177,7 +1177,7 @@ async def test_ui_issue_detail_has_render_comments_js(
         state="open", labels=[], author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
     assert "/comments" in body
@@ -1197,7 +1197,7 @@ async def test_ui_issue_detail_has_submit_comment_js(
         state="open", labels=[], author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
     assert "Leave a comment" in body
@@ -1217,7 +1217,7 @@ async def test_ui_issue_detail_has_delete_comment_js(
         state="open", labels=[], author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
     assert "issue-body" in body
@@ -1237,7 +1237,7 @@ async def test_ui_issue_detail_has_reply_support_js(
         state="open", labels=[], author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
     assert "issue-detail-grid" in body
@@ -1257,7 +1257,7 @@ async def test_ui_issue_detail_comment_section_below_body(
         state="open", labels=[], author="testuser",
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
     body_pos = body.find("issue-body")
@@ -1274,7 +1274,7 @@ async def test_ui_repo_page_no_auth_required(
 ) -> None:
     """UI routes must be accessible without an Authorization header."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     # Must NOT return 401 — HTML shell has no auth requirement
     assert response.status_code != 401
     assert response.status_code == 200
@@ -1288,10 +1288,10 @@ async def test_ui_pages_include_token_form(
     """Every UI page embeds the JWT token input form and app.js via base.html."""
     repo_id = await _make_repo(db_session)
     for path in [
-        "/musehub/ui/testuser/test-beats",
-        "/musehub/ui/testuser/test-beats/pulls",
-        "/musehub/ui/testuser/test-beats/issues",
-        "/musehub/ui/testuser/test-beats/releases",
+        "/testuser/test-beats",
+        "/testuser/test-beats/pulls",
+        "/testuser/test-beats/issues",
+        "/testuser/test-beats/releases",
     ]:
         response = await client.get(path)
         assert response.status_code == 200
@@ -1305,14 +1305,14 @@ async def test_ui_release_list_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/releases returns 200 HTML without requiring a JWT."""
+    """GET /{owner}/{slug}/releases returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/releases")
+    response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "Releases" in body
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "testuser" in body
 
 
@@ -1329,7 +1329,7 @@ async def test_ui_release_list_page_has_download_buttons(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases")
+    response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
     assert "MIDI" in body
@@ -1352,7 +1352,7 @@ async def test_ui_release_list_page_has_body_preview(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases")
+    response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
     assert "release-body-preview" in body
@@ -1372,7 +1372,7 @@ async def test_ui_release_list_page_has_download_count_badge(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases")
+    response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
     assert "release-downloads" in body
@@ -1392,7 +1392,7 @@ async def test_ui_release_list_page_has_commit_link(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases")
+    response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
     assert "/commits/" in body
@@ -1415,7 +1415,7 @@ async def test_ui_release_list_page_has_tag_colour_coding(
         body="", author="testuser", is_prerelease=True,
     ))
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases")
+    response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
     assert "tag-stable" in body
@@ -1427,7 +1427,7 @@ async def test_ui_release_detail_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/releases/{tag} returns 200 HTML with download section."""
+    """GET /{owner}/{slug}/releases/{tag} returns 200 HTML with download section."""
     repo_id = await _make_repo(db_session)
     release = MusehubRelease(
         repo_id=repo_id, tag="v1.0", title="Version 1.0",
@@ -1435,11 +1435,11 @@ async def test_ui_release_detail_page_returns_200(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases/v1.0")
+    response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Download" in body
     assert "v1.0" in body
 
@@ -1457,7 +1457,7 @@ async def test_ui_release_detail_has_comment_section(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases/v1.0")
+    response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
     assert "release-header" in body
@@ -1477,7 +1477,7 @@ async def test_ui_release_detail_has_render_comments_js(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases/v1.0")
+    response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
     assert "Release Notes" in body
@@ -1497,7 +1497,7 @@ async def test_ui_release_detail_comment_uses_release_target_type(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases/v1.0")
+    response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
     assert "release" in body
@@ -1517,7 +1517,7 @@ async def test_ui_release_detail_has_reply_thread_js(
     )
     db_session.add(release)
     await db_session.commit()
-    response = await client.get("/musehub/ui/testuser/test-beats/releases/v1.0")
+    response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
     assert "meta-label" in body
@@ -1529,9 +1529,9 @@ async def test_ui_repo_page_shows_releases_button(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id} includes a Releases navigation button."""
+    """GET /{repo_id} includes a Releases navigation button."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
     assert "releases" in body.lower()
@@ -1547,13 +1547,13 @@ async def test_global_search_ui_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/search returns 200 HTML (no auth required — HTML shell)."""
-    response = await client.get("/musehub/ui/search")
+    """GET /search returns 200 HTML (no auth required — HTML shell)."""
+    response = await client.get("/search")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "Global Search" in body
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
 
 
 @pytest.mark.anyio
@@ -1561,8 +1561,8 @@ async def test_global_search_ui_page_no_auth_required(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/search must not return 401 — it is a static HTML shell."""
-    response = await client.get("/musehub/ui/search")
+    """GET /search must not return 401 — it is a static HTML shell."""
+    response = await client.get("/search")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -1578,10 +1578,10 @@ async def test_list_objects_returns_empty_for_new_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/objects returns empty list for new repo."""
+    """GET /api/v1/repos/{repo_id}/objects returns empty list for new repo."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/objects",
+        f"/api/v1/repos/{repo_id}/objects",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1593,9 +1593,9 @@ async def test_list_objects_requires_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/objects returns 401 without auth."""
+    """GET /api/v1/repos/{repo_id}/objects returns 401 without auth."""
     repo_id = await _make_repo(db_session)
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/objects")
+    response = await client.get(f"/api/v1/repos/{repo_id}/objects")
     assert response.status_code == 401
 
 
@@ -1605,9 +1605,9 @@ async def test_list_objects_404_for_unknown_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/objects returns 404."""
+    """GET /api/v1/repos/{unknown}/objects returns 404."""
     response = await client.get(
-        "/api/v1/musehub/repos/does-not-exist/objects",
+        "/api/v1/repos/does-not-exist/objects",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -1619,10 +1619,10 @@ async def test_get_object_content_404_for_unknown_object(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/objects/{unknown}/content returns 404."""
+    """GET /api/v1/repos/{repo_id}/objects/{unknown}/content returns 404."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/objects/sha256:notexist/content",
+        f"/api/v1/repos/{repo_id}/objects/sha256:notexist/content",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -1639,13 +1639,13 @@ async def test_credits_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/credits returns 200 HTML without requiring a JWT."""
+    """GET /{owner}/{repo_slug}/credits returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Credits" in body
 
 
@@ -1656,13 +1656,13 @@ async def test_graph_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/graph returns 200 HTML without requiring a JWT."""
+    """GET /{repo_id}/graph returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/graph")
+    response = await client.get("/testuser/test-beats/graph")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "graph" in body.lower()
 
 
@@ -1706,13 +1706,13 @@ async def test_context_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/context/{ref} returns 200 HTML without auth."""
+    """GET /{repo_id}/context/{ref} returns 200 HTML without auth."""
     repo_id, commit_id = await _make_repo_with_commit(db_session)
-    response = await client.get(f"/musehub/ui/testuser/jazz-context-test/context/{commit_id}")
+    response = await client.get(f"/testuser/jazz-context-test/context/{commit_id}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "context" in body.lower()
     assert repo_id[:8] in body
 
@@ -1723,10 +1723,10 @@ async def test_credits_json_response(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/credits returns JSON with required fields."""
+    """GET /api/v1/repos/{repo_id}/credits returns JSON with required fields."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/credits",
+        f"/api/v1/repos/{repo_id}/credits",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1747,10 +1747,10 @@ async def test_context_json_response(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/context/{ref} returns MuseHubContextResponse."""
+    """GET /api/v1/repos/{repo_id}/context/{ref} returns MuseHubContextResponse."""
     repo_id, commit_id = await _make_repo_with_commit(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context/{commit_id}",
+        f"/api/v1/repos/{repo_id}/context/{commit_id}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1777,7 +1777,7 @@ async def test_credits_empty_state_json(
     """Repo with no commits returns empty contributors list and totalContributors=0."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/credits",
+        f"/api/v1/repos/{repo_id}/credits",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1796,7 +1796,7 @@ async def test_context_includes_musical_state(
     """Context response includes musicalState with an activeTracks field."""
     repo_id, commit_id = await _make_repo_with_commit(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context/{commit_id}",
+        f"/api/v1/repos/{repo_id}/context/{commit_id}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -1814,10 +1814,10 @@ async def test_context_unknown_ref_404(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/context/{ref} returns 404 for unknown ref."""
+    """GET /api/v1/repos/{repo_id}/context/{ref} returns 404 for unknown ref."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context/deadbeef" + "0" * 56,
+        f"/api/v1/repos/{repo_id}/context/deadbeef" + "0" * 56,
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -1829,9 +1829,9 @@ async def test_context_unknown_repo_404(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/context/{ref} returns 404 for unknown repo."""
+    """GET /api/v1/repos/{unknown}/context/{ref} returns 404 for unknown repo."""
     response = await client.get(
-        "/api/v1/musehub/repos/ghost-repo/context/deadbeef" + "0" * 56,
+        "/api/v1/repos/ghost-repo/context/deadbeef" + "0" * 56,
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -1842,10 +1842,10 @@ async def test_context_requires_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/context/{ref} returns 401 without auth."""
+    """GET /api/v1/repos/{repo_id}/context/{ref} returns 401 without auth."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/context/deadbeef" + "0" * 56,
+        f"/api/v1/repos/{repo_id}/context/deadbeef" + "0" * 56,
     )
     assert response.status_code == 401
 
@@ -1857,7 +1857,7 @@ async def test_context_page_no_auth_required(
 ) -> None:
     """The context UI page must be accessible without a JWT (HTML shell handles auth)."""
     repo_id, commit_id = await _make_repo_with_commit(db_session)
-    response = await client.get(f"/musehub/ui/testuser/jazz-context-test/context/{commit_id}")
+    response = await client.get(f"/testuser/jazz-context-test/context/{commit_id}")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -1879,7 +1879,7 @@ async def test_context_page_contains_agent_explainer(
     and the Musical Context heading must be present.
     """
     repo_id, commit_id = await _make_repo_with_commit(db_session)
-    response = await client.get(f"/musehub/ui/testuser/jazz-context-test/context/{commit_id}")
+    response = await client.get(f"/testuser/jazz-context-test/context/{commit_id}")
     assert response.status_code == 200
     body = response.text
     assert "Musical Context" in body
@@ -1896,10 +1896,10 @@ async def test_embed_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/embed/{ref} returns 200 HTML."""
+    """GET /{repo_id}/embed/{ref} returns 200 HTML."""
     repo_id = await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/embed/{ref}")
+    response = await client.get(f"/testuser/test-beats/embed/{ref}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -1912,7 +1912,7 @@ async def test_embed_no_auth_required(
     """Embed page must be accessible without an Authorization header (public embedding)."""
     repo_id = await _make_repo(db_session)
     ref = "deadbeef1234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/embed/{ref}")
+    response = await client.get(f"/testuser/test-beats/embed/{ref}")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -1925,7 +1925,7 @@ async def test_embed_page_x_frame_options(
     """Embed page must set X-Frame-Options: ALLOWALL to permit cross-origin framing."""
     repo_id = await _make_repo(db_session)
     ref = "cafebabe1234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/embed/{ref}")
+    response = await client.get(f"/testuser/test-beats/embed/{ref}")
     assert response.status_code == 200
     assert response.headers.get("x-frame-options") == "ALLOWALL"
 
@@ -1935,15 +1935,15 @@ async def test_embed_page_contains_player_ui(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Embed page HTML must contain player elements: play button, progress bar, and Muse Hub link."""
+    """Embed page HTML must contain player elements: play button, progress bar, and MuseHub link."""
     repo_id = await _make_repo(db_session)
     ref = "feedface0123456789ab"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/embed/{ref}")
+    response = await client.get(f"/testuser/test-beats/embed/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "play-btn" in body
     assert "progress-bar" in body
-    assert "View on Muse Hub" in body
+    assert "View on MuseHub" in body
     assert "audio" in body
     assert repo_id in body
 
@@ -1958,13 +1958,13 @@ async def test_groove_check_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/groove-check returns 200 HTML without requiring a JWT."""
+    """GET /{repo_id}/groove-check returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/groove-check")
+    response = await client.get("/testuser/test-beats/groove-check")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Groove Check" in body
 
 
@@ -1975,7 +1975,7 @@ async def test_credits_page_contains_json_ld_injection_slug_route(
 ) -> None:
     """Credits page embeds JSON-LD injection logic via slug route."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "application/ld+json" in body
@@ -1990,7 +1990,7 @@ async def test_credits_page_contains_sort_options_slug_route(
 ) -> None:
     """Credits page includes sort dropdown via slug route."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "Most prolific" in body
@@ -2005,7 +2005,7 @@ async def test_credits_empty_state_message_in_page_slug_route(
 ) -> None:
     """Credits page renders the SSR empty state when there are no contributors."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "No credits yet" in body
@@ -2018,7 +2018,7 @@ async def test_credits_no_auth_required_slug_route(
 ) -> None:
     """Credits page must be accessible without an Authorization header via slug route."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     assert response.status_code != 401
 
@@ -2030,7 +2030,7 @@ async def test_credits_page_contains_avatar_functions(
 ) -> None:
     """Credits page renders the SSR credits layout with sort controls."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "🎶 Credits" in body
@@ -2044,7 +2044,7 @@ async def test_credits_page_contains_fetch_profile_function(
 ) -> None:
     """Credits page renders SSR sort controls for contributor ordering."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "Most prolific" in body
@@ -2056,9 +2056,9 @@ async def test_credits_page_contains_profile_link_pattern(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Credits page schema says profile links use /musehub/ui/users/ — verified via template."""
+    """Credits page schema says profile links use /users/ — verified via template."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/credits")
+    response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     # Always-rendered elements (profile links only appear with contributors)
@@ -2073,7 +2073,7 @@ async def test_groove_check_page_no_auth_required(
 ) -> None:
     """Groove check UI page must be accessible without an Authorization header (HTML shell)."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/groove-check")
+    response = await client.get("/testuser/test-beats/groove-check")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -2090,7 +2090,7 @@ async def test_groove_check_page_contains_chart_js(
 ) -> None:
     """Groove check page embeds the SVG chart rendering JavaScript."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/groove-check")
+    response = await client.get("/testuser/test-beats/groove-check")
     assert response.status_code == 200
     body = response.text
     assert "renderGrooveChart" in body
@@ -2105,7 +2105,7 @@ async def test_groove_check_page_contains_status_badges(
 ) -> None:
     """Groove check page HTML includes OK / WARN / FAIL status badge rendering."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/groove-check")
+    response = await client.get("/testuser/test-beats/groove-check")
     assert response.status_code == 200
     body = response.text
     assert "statusBadge" in body
@@ -2120,7 +2120,7 @@ async def test_groove_check_page_includes_token_form(
 ) -> None:
     """Groove check page embeds the JWT token input form so visitors can authenticate."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/groove-check")
+    response = await client.get("/testuser/test-beats/groove-check")
     assert response.status_code == 200
     body = response.text
     assert "token-form" in body
@@ -2133,10 +2133,10 @@ async def test_groove_check_endpoint_returns_json(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/groove-check returns JSON with required fields."""
+    """GET /api/v1/repos/{repo_id}/groove-check returns JSON with required fields."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/groove-check",
+        f"/api/v1/repos/{repo_id}/groove-check",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -2157,7 +2157,7 @@ async def test_graph_no_auth_required(
 ) -> None:
     """Graph page must be accessible without an Authorization header (HTML shell)."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/graph")
+    response = await client.get("/testuser/test-beats/graph")
     assert response.status_code == 200
     assert response.status_code != 401
 
@@ -2170,7 +2170,7 @@ async def test_groove_check_endpoint_entries_have_required_fields(
     """Groove check endpoint returns GrooveCheckResponse shape (stub: empty entries)."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/groove-check?limit=5",
+        f"/api/v1/repos/{repo_id}/groove-check?limit=5",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -2190,9 +2190,9 @@ async def test_groove_check_endpoint_requires_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/groove-check returns 401 without auth."""
+    """GET /api/v1/repos/{repo_id}/groove-check returns 401 without auth."""
     repo_id = await _make_repo(db_session)
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/groove-check")
+    response = await client.get(f"/api/v1/repos/{repo_id}/groove-check")
     assert response.status_code == 401
 
 
@@ -2202,9 +2202,9 @@ async def test_groove_check_endpoint_404_for_unknown_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/groove-check returns 404."""
+    """GET /api/v1/repos/{unknown}/groove-check returns 404."""
     response = await client.get(
-        "/api/v1/musehub/repos/does-not-exist/groove-check",
+        "/api/v1/repos/does-not-exist/groove-check",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -2219,7 +2219,7 @@ async def test_groove_check_endpoint_respects_limit(
     """Groove check endpoint returns at most ``limit`` entries."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/groove-check?limit=3",
+        f"/api/v1/repos/{repo_id}/groove-check?limit=3",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -2237,7 +2237,7 @@ async def test_groove_check_endpoint_custom_threshold(
     """Groove check endpoint accepts a custom threshold parameter."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/groove-check?threshold=0.05",
+        f"/api/v1/repos/{repo_id}/groove-check?threshold=0.05",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -2252,7 +2252,7 @@ async def test_repo_page_contains_groove_check_link(
 ) -> None:
     """Repo landing page navigation includes a Groove Check link."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
     assert "groove-check" in body
@@ -2268,13 +2268,13 @@ async def test_profile_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/users/{username} returns 200 HTML for a known profile."""
+    """GET /users/{username} returns 200 HTML for a known profile."""
     await _make_profile(db_session, "rockstar")
-    response = await client.get("/musehub/ui/users/rockstar")
+    response = await client.get("/users/rockstar")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "@rockstar" in body
     # Contribution graph JS must be present
     assert "contributionGraph" in body or "contrib-graph" in body
@@ -2287,7 +2287,7 @@ async def test_profile_no_auth_required_ui(
 ) -> None:
     """Profile UI page is publicly accessible without a JWT (returns 200, not 401)."""
     await _make_profile(db_session, "public-user")
-    response = await client.get("/musehub/ui/users/public-user")
+    response = await client.get("/users/public-user")
     assert response.status_code == 200
     assert response.status_code != 401
 
@@ -2409,8 +2409,8 @@ async def test_profile_page_unknown_user_renders_404_inline(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/users/{unknown} returns 200 HTML (JS renders 404 inline)."""
-    response = await client.get("/musehub/ui/users/ghost-user-xyz")
+    """GET /users/{unknown} returns 200 HTML (JS renders 404 inline)."""
+    response = await client.get("/users/ghost-user-xyz")
     # The HTML shell always returns 200 — the JS fetches and handles the API 404
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -2520,7 +2520,7 @@ async def test_profile_page_has_forked_section_js(
 ) -> None:
     """Profile HTML page includes the forked repos JS (loadForkedRepos, forked-section)."""
     await _make_profile(db_session, "jsforkuser")
-    response = await client.get("/musehub/ui/users/jsforkuser")
+    response = await client.get("/users/jsforkuser")
     assert response.status_code == 200
     body = response.text
     assert "loadForkedRepos" in body
@@ -2666,7 +2666,7 @@ async def test_profile_page_has_starred_section_js(
 ) -> None:
     """Profile HTML page includes the starred repos JS (loadStarredRepos, starred-section)."""
     await _make_profile(db_session, "jsstaruser")
-    response = await client.get("/musehub/ui/users/jsstaruser")
+    response = await client.get("/users/jsstaruser")
     assert response.status_code == 200
     body = response.text
     assert "loadStarredRepos" in body
@@ -2812,7 +2812,7 @@ async def test_profile_page_has_watched_section_js(
 ) -> None:
     """Profile HTML page includes the watched repos JS (loadWatchedRepos, watched-section)."""
     await _make_profile(db_session, "jswatchuser")
-    response = await client.get("/musehub/ui/users/jswatchuser")
+    response = await client.get("/users/jswatchuser")
     assert response.status_code == 200
     body = response.text
     assert "loadWatchedRepos" in body
@@ -2825,13 +2825,13 @@ async def test_timeline_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/timeline returns 200 HTML without requiring a JWT."""
+    """GET /{repo_id}/timeline returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "timeline" in body.lower()
     assert repo_id[:8] in body
 
@@ -2843,7 +2843,7 @@ async def test_timeline_page_no_auth_required(
 ) -> None:
     """Timeline UI route must be accessible without an Authorization header."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -2855,7 +2855,7 @@ async def test_timeline_page_contains_layer_controls(
 ) -> None:
     """Timeline page embeds toggleable layer controls for all four layers."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     assert "Commits" in body
@@ -2871,7 +2871,7 @@ async def test_timeline_page_contains_zoom_controls(
 ) -> None:
     """Timeline page embeds day/week/month/all zoom buttons."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     assert "Day" in body
@@ -2887,7 +2887,7 @@ async def test_timeline_page_includes_token_form(
 ) -> None:
     """Timeline page includes the JWT token form and app.js via base.html."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     assert "musehub/static/app.js" in body
@@ -2905,7 +2905,7 @@ async def test_timeline_page_contains_overlay_toggles(
     overlay markers for repo lifecycle events (sessions, PR merges, releases).
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     # All three new overlay toggle labels must be present.
@@ -2925,7 +2925,7 @@ async def test_timeline_page_overlay_js_variables(
     up in the page's inline script so the renderer can draw markers.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     # State variables for overlay data must be declared.
@@ -2949,7 +2949,7 @@ async def test_timeline_page_overlay_fetch_calls(
     will fetch overlay data when the page loads.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     assert "/sessions" in body
@@ -2964,7 +2964,7 @@ async def test_timeline_page_overlay_legend(
 ) -> None:
     """Timeline page legend must describe the three new overlay marker types."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     # Colour labels in the legend.
@@ -2984,7 +2984,7 @@ async def test_timeline_pr_markers_use_merged_at_for_positioning(
     merge time, sometimes off by days or weeks.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/timeline")
+    response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
     # The fix: JS should reference pr.mergedAt and fall back to pr.createdAt.
@@ -3093,7 +3093,7 @@ async def test_graph_page_contains_dag_js(
 ) -> None:
     """Graph page embeds the client-side DAG renderer JavaScript."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/graph")
+    response = await client.get("/testuser/test-beats/graph")
     assert response.status_code == 200
     body = response.text
     assert "renderGraph" in body
@@ -3115,7 +3115,7 @@ async def test_graph_page_contains_session_ring_js(
     will silently render with no session markers or reaction counts.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/graph")
+    response = await client.get("/testuser/test-beats/graph")
     assert response.status_code == 200
     body = response.text
     assert "SESSION_RING_COLOR" in body, "Teal session ring constant missing from graph page"
@@ -3128,13 +3128,13 @@ async def test_session_list_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/sessions returns 200 HTML without requiring a JWT."""
+    """GET /{repo_id}/sessions returns 200 HTML without requiring a JWT."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/sessions")
+    response = await client.get("/testuser/test-beats/sessions")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Sessions" in body
     assert "musehub/static/app.js" in body
 
@@ -3144,14 +3144,14 @@ async def test_session_detail_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/sessions/{session_id} returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/sessions/{session_id} returns 200 HTML."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Session" in body
     assert session_id[:8] in body
 
@@ -3164,7 +3164,7 @@ async def test_session_detail_participants(
     """Session detail page renders the Participants sidebar section."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id, participants=["alice", "bob"])
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     body = response.text
     assert "Participants" in body
@@ -3181,7 +3181,7 @@ async def test_session_detail_commits(
     session_id = await _make_session(
         db_session, repo_id, commits=["abc1234567890", "def9876543210"]
     )
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     body = response.text
     assert "Commits" in body
@@ -3199,7 +3199,7 @@ async def test_session_detail_404_for_unknown_session(
     rather than a JS shell that handles missing data client-side.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/sessions/does-not-exist-1234")
+    response = await client.get("/testuser/test-beats/sessions/does-not-exist-1234")
     assert response.status_code == 404
 
 
@@ -3211,7 +3211,7 @@ async def test_session_detail_shows_intent(
     """Session detail page renders the intent field when present."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id, intent="ambient soundscape")
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     assert "ambient soundscape" in response.text
 
@@ -3224,7 +3224,7 @@ async def test_session_detail_shows_location(
     """Session detail page renders the location field when present."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     assert "Studio A" in response.text
 
@@ -3237,7 +3237,7 @@ async def test_session_detail_shows_meta_labels(
     """Session detail page renders the meta-label / meta-value row layout."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     body = response.text
     assert "meta-label" in body
@@ -3253,7 +3253,7 @@ async def test_session_detail_active_shows_live_badge(
     """Session detail page shows a live badge for an active session."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id, is_active=True)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     body = response.text
     assert "live" in body
@@ -3268,7 +3268,7 @@ async def test_session_detail_ended_shows_badge(
     """Session detail page shows 'ended' badge for a completed session."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id, is_active=False)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     assert "ended" in response.text
 
@@ -3283,7 +3283,7 @@ async def test_session_detail_shows_notes(
     session_id = await _make_session(
         db_session, repo_id, notes="Great vibe, revisit the bridge section."
     )
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     assert "Great vibe, revisit the bridge section." in response.text
 
@@ -3328,12 +3328,12 @@ async def test_sessions_json_response(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/sessions returns session list with metadata."""
+    """GET /api/v1/repos/{repo_id}/sessions returns session list with metadata."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id, intent="jazz solo")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3367,7 +3367,7 @@ async def test_sessions_newest_first(
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3387,10 +3387,10 @@ async def test_sessions_empty_for_new_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/sessions returns empty list for new repo."""
+    """GET /api/v1/repos/{repo_id}/sessions returns empty list for new repo."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3404,9 +3404,9 @@ async def test_sessions_requires_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/sessions returns 401 without auth."""
+    """GET /api/v1/repos/{repo_id}/sessions returns 401 without auth."""
     repo_id = await _make_repo(db_session)
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/sessions")
+    response = await client.get(f"/api/v1/repos/{repo_id}/sessions")
     assert response.status_code == 401
 
 
@@ -3416,9 +3416,9 @@ async def test_sessions_404_for_unknown_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/sessions returns 404."""
+    """GET /api/v1/repos/{unknown}/sessions returns 404."""
     response = await client.get(
-        "/api/v1/musehub/repos/does-not-exist/sessions",
+        "/api/v1/repos/does-not-exist/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -3430,7 +3430,7 @@ async def test_create_session_returns_201(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """POST /api/v1/musehub/repos/{repo_id}/sessions creates a session and returns 201."""
+    """POST /api/v1/repos/{repo_id}/sessions creates a session and returns 201."""
     repo_id = await _make_repo(db_session)
     payload = {
         "participants": ["producer-a", "collab-b"],
@@ -3439,7 +3439,7 @@ async def test_create_session_returns_201(
         "isActive": True,
     }
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         json=payload,
         headers=auth_headers,
     )
@@ -3458,12 +3458,12 @@ async def test_stop_session_marks_ended(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """POST /api/v1/musehub/repos/{repo_id}/sessions/{session_id}/stop closes a live session."""
+    """POST /api/v1/repos/{repo_id}/sessions/{session_id}/stop closes a live session."""
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id, is_active=True)
 
     response = await client.post(
-        f"/api/v1/musehub/repos/{repo_id}/sessions/{session_id}/stop",
+        f"/api/v1/repos/{repo_id}/sessions/{session_id}/stop",
         json={},
         headers=auth_headers,
     )
@@ -3485,7 +3485,7 @@ async def test_active_session_has_null_duration(
     await _make_session(db_session, repo_id, is_active=True)
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3513,7 +3513,7 @@ async def test_session_response_includes_commits_and_notes(
     )
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3552,7 +3552,7 @@ async def test_session_response_commits_field_present(
     await db_session.refresh(row)
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3574,7 +3574,7 @@ async def test_session_response_empty_commits_and_notes_defaults(
     await _make_session(db_session, repo_id, intent="defaults check")
 
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/sessions",
+        f"/api/v1/repos/{repo_id}/sessions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3591,7 +3591,7 @@ async def test_session_list_page_contains_avatar_markup(
     """Sessions list page renders participant chips when a session has participants."""
     repo_id = await _make_repo(db_session)
     await _make_session(db_session, repo_id, participants=["producer-a", "bassist"])
-    response = await client.get("/musehub/ui/testuser/test-beats/sessions")
+    response = await client.get("/testuser/test-beats/sessions")
     assert response.status_code == 200
     body = response.text
     assert "participant-chip" in body
@@ -3606,7 +3606,7 @@ async def test_session_list_page_contains_commit_pill_markup(
     """Sessions list page renders a commit count badge when a session has commits."""
     repo_id = await _make_repo(db_session)
     await _make_session(db_session, repo_id, commits=["abc123", "def456"])
-    response = await client.get("/musehub/ui/testuser/test-beats/sessions")
+    response = await client.get("/testuser/test-beats/sessions")
     assert response.status_code == 200
     body = response.text
     assert "🎵" in body
@@ -3621,7 +3621,7 @@ async def test_session_list_page_contains_live_indicator_markup(
     """Sessions list page renders the live dot badge for an active session."""
     repo_id = await _make_repo(db_session)
     await _make_session(db_session, repo_id, is_active=True)
-    response = await client.get("/musehub/ui/testuser/test-beats/sessions")
+    response = await client.get("/testuser/test-beats/sessions")
     assert response.status_code == 200
     body = response.text
     assert "session-live-dot" in body
@@ -3636,7 +3636,7 @@ async def test_session_list_page_contains_notes_preview_markup(
     """Sessions list page renders the session notes when a session has notes."""
     repo_id = await _make_repo(db_session)
     await _make_session(db_session, repo_id, notes="Recorded the main piano riff")
-    response = await client.get("/musehub/ui/testuser/test-beats/sessions")
+    response = await client.get("/testuser/test-beats/sessions")
     assert response.status_code == 200
     body = response.text
     assert "session-notes" in body
@@ -3651,7 +3651,7 @@ async def test_session_list_page_contains_location_tag_markup(
     """Sessions list page renders location icon when a session has a location set."""
     repo_id = await _make_repo(db_session)
     await _make_session(db_session, repo_id)  # _make_session sets location="Studio A"
-    response = await client.get("/musehub/ui/testuser/test-beats/sessions")
+    response = await client.get("/testuser/test-beats/sessions")
     assert response.status_code == 200
     body = response.text
     assert "session-row" in body
@@ -3662,10 +3662,10 @@ async def test_contour_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/analysis/{ref}/contour returns 200 HTML."""
+    """GET /{repo_id}/analysis/{ref}/contour returns 200 HTML."""
     repo_id = await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/contour")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/contour")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -3678,7 +3678,7 @@ async def test_contour_page_no_auth_required(
     """Contour analysis page must be accessible without a JWT (HTML shell handles auth)."""
     repo_id = await _make_repo(db_session)
     ref = "deadbeef1234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/contour")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/contour")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -3691,7 +3691,7 @@ async def test_contour_page_contains_graph_ui(
     """Contour page SSR: must contain pitch-curve polyline, shape summary, and direction data."""
     repo_id = await _make_repo(db_session)
     ref = "cafebabe12345678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/contour")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/contour")
     assert response.status_code == 200
     body = response.text
     assert "Melodic Contour" in body
@@ -3707,7 +3707,7 @@ async def test_contour_json_response(
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/contour returns ContourData.
+    """GET /api/v1/repos/{repo_id}/analysis/{ref}/contour returns ContourData.
 
     Verifies that the JSON response includes shape classification labels and
     the pitch_curve array that the contour page visualises.
@@ -3721,7 +3721,7 @@ async def test_contour_json_response(
     repo_id = resp.json()["repoId"]
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/contour",
+        f"/api/v1/repos/{repo_id}/analysis/main/contour",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -3742,10 +3742,10 @@ async def test_tempo_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/analysis/{ref}/tempo returns 200 HTML."""
+    """GET /{repo_id}/analysis/{ref}/tempo returns 200 HTML."""
     repo_id = await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/tempo")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/tempo")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -3758,7 +3758,7 @@ async def test_tempo_page_no_auth_required(
     """Tempo analysis page must be accessible without a JWT (HTML shell handles auth)."""
     repo_id = await _make_repo(db_session)
     ref = "deadbeef5678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/tempo")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/tempo")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -3771,7 +3771,7 @@ async def test_tempo_page_contains_bpm_ui(
     """Tempo page must contain BPM display, stability bar, and tempo-change timeline."""
     repo_id = await _make_repo(db_session)
     ref = "feedface5678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/tempo")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/tempo")
     assert response.status_code == 200
     body = response.text
     assert "Tempo Analysis" in body
@@ -3787,7 +3787,7 @@ async def test_tempo_json_response(
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/tempo returns TempoData.
+    """GET /api/v1/repos/{repo_id}/analysis/{ref}/tempo returns TempoData.
 
     Verifies that the JSON response includes BPM, stability, time feel, and
     tempo_changes history that the tempo page visualises.
@@ -3801,7 +3801,7 @@ async def test_tempo_json_response(
     repo_id = resp.json()["repoId"]
 
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/tempo",
+        f"/api/v1/repos/{repo_id}/analysis/main/tempo",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -3828,14 +3828,14 @@ async def test_form_structure_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{repo_id}/form-structure/{ref} returns 200 HTML without auth."""
+    """GET /{repo_id}/form-structure/{ref} returns 200 HTML without auth."""
     repo_id = await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/{repo_id}/form-structure/{ref}")
+    response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Form" in body
 
 
@@ -3847,7 +3847,7 @@ async def test_form_structure_page_no_auth_required(
     """Form-structure UI page must be accessible without an Authorization header."""
     repo_id = await _make_repo(db_session)
     ref = "deadbeef1234"
-    response = await client.get(f"/musehub/ui/{repo_id}/form-structure/{ref}")
+    response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -3860,7 +3860,7 @@ async def test_form_structure_page_contains_section_map(
     """Form-structure page embeds section map SVG rendering logic."""
     repo_id = await _make_repo(db_session)
     ref = "cafebabe1234"
-    response = await client.get(f"/musehub/ui/{repo_id}/form-structure/{ref}")
+    response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "Section Map" in body
@@ -3876,7 +3876,7 @@ async def test_form_structure_page_contains_repetition_panel(
     """Form-structure page embeds repetition structure panel."""
     repo_id = await _make_repo(db_session)
     ref = "feedface0123"
-    response = await client.get(f"/musehub/ui/{repo_id}/form-structure/{ref}")
+    response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "Repetition" in body
@@ -3891,7 +3891,7 @@ async def test_form_structure_page_contains_heatmap(
     """Form-structure page embeds section comparison heatmap renderer."""
     repo_id = await _make_repo(db_session)
     ref = "deadcafe5678"
-    response = await client.get(f"/musehub/ui/{repo_id}/form-structure/{ref}")
+    response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "Section Comparison" in body
@@ -3907,7 +3907,7 @@ async def test_form_structure_page_includes_token_form(
     """Form-structure page includes the JWT token form and app.js via base.html."""
     repo_id = await _make_repo(db_session)
     ref = "babe1234abcd"
-    response = await client.get(f"/musehub/ui/{repo_id}/form-structure/{ref}")
+    response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "app.js" in body
@@ -3920,11 +3920,11 @@ async def test_form_structure_json_response(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/form-structure/{ref} returns JSON with required fields."""
+    """GET /api/v1/repos/{repo_id}/form-structure/{ref} returns JSON with required fields."""
     repo_id = await _make_repo(db_session)
     ref = "abc1234567890abcdef"
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/form-structure/{ref}",
+        f"/api/v1/repos/{repo_id}/form-structure/{ref}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3952,7 +3952,7 @@ async def test_form_structure_json_section_map_fields(
     repo_id = await _make_repo(db_session)
     ref = "abc1234567890abcdef"
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/form-structure/{ref}",
+        f"/api/v1/repos/{repo_id}/form-structure/{ref}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -3981,7 +3981,7 @@ async def test_form_structure_json_heatmap_is_symmetric(
     repo_id = await _make_repo(db_session)
     ref = "abc1234567890abcdef"
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/form-structure/{ref}",
+        f"/api/v1/repos/{repo_id}/form-structure/{ref}",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -4005,9 +4005,9 @@ async def test_form_structure_json_404_unknown_repo(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{unknown}/form-structure/{ref} returns 404."""
+    """GET /api/v1/repos/{unknown}/form-structure/{ref} returns 404."""
     response = await client.get(
-        "/api/v1/musehub/repos/does-not-exist/form-structure/abc123",
+        "/api/v1/repos/does-not-exist/form-structure/abc123",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -4018,10 +4018,10 @@ async def test_form_structure_json_requires_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/form-structure/{ref} returns 401 without auth."""
+    """GET /api/v1/repos/{repo_id}/form-structure/{ref} returns 401 without auth."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/form-structure/abc123",
+        f"/api/v1/repos/{repo_id}/form-structure/abc123",
     )
     assert response.status_code == 401
 
@@ -4038,13 +4038,13 @@ async def test_emotion_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/emotion returns 200 HTML without auth."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/emotion returns 200 HTML without auth."""
     await _make_repo(db_session)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
+    response = await client.get(f"/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Emotion" in body
 
 
@@ -4055,7 +4055,7 @@ async def test_emotion_page_no_auth_required(
 ) -> None:
     """Emotion UI page must be accessible without an Authorization header (HTML shell)."""
     await _make_repo(db_session)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
+    response = await client.get(f"/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -4067,7 +4067,7 @@ async def test_emotion_page_includes_charts(
 ) -> None:
     """Emotion page SSR: must contain SVG scatter plot and axis dimension labels."""
     await _make_repo(db_session)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
+    response = await client.get(f"/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
     assert response.status_code == 200
     body = response.text
     assert "<circle" in body or "<svg" in body
@@ -4083,7 +4083,7 @@ async def test_emotion_page_includes_filters(
 ) -> None:
     """Emotion page SSR: must contain summary vector bars and trajectory section."""
     await _make_repo(db_session)
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
+    response = await client.get(f"/testuser/test-beats/analysis/{_EMOTION_REF}/emotion")
     assert response.status_code == 200
     body = response.text
     assert "SUMMARY VECTOR" in body
@@ -4096,10 +4096,10 @@ async def test_emotion_json_response(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/emotion-map returns required fields."""
+    """GET /api/v1/repos/{repo_id}/analysis/{ref}/emotion-map returns required fields."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
+        f"/api/v1/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -4129,7 +4129,7 @@ async def test_emotion_trajectory(
     """Cross-commit trajectory must be a list of commit snapshots with emotion vectors."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
+        f"/api/v1/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -4155,7 +4155,7 @@ async def test_emotion_drift_distances(
     """Drift list must have exactly len(trajectory) - 1 entries."""
     repo_id = await _make_repo(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
+        f"/api/v1/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -4186,17 +4186,17 @@ async def test_ui_nav_links_use_owner_slug_not_uuid_repo_page(
     """Repo page must inject owner/slug base URL, not the internal UUID.
 
     Before the fix, every handler except repo_page used ``const base =
-    '/musehub/ui/' + repoId``. That produced UUID-based hrefs that 404 under
+    '/' + repoId``. That produced UUID-based hrefs that 404 under
     the new /{owner}/{repo_slug} routing. This test guards the regression.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
     # JS base variable must use owner/slug, not UUID concatenation
-    assert '"/musehub/ui/testuser/test-beats"' in body
+    assert '"/testuser/test-beats"' in body
     # UUID-concatenation pattern must NOT appear
-    assert "'/musehub/ui/' + repoId" not in body
+    assert "'/' + repoId" not in body
 
 
 @pytest.mark.anyio
@@ -4221,11 +4221,11 @@ async def test_ui_nav_links_use_owner_slug_not_uuid_commit_page(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
-    assert "/musehub/ui/testuser/test-beats" in body
-    assert "'/musehub/ui/' + repoId" not in body
+    assert "/testuser/test-beats" in body
+    assert "'/' + repoId" not in body
 
 
 @pytest.mark.anyio
@@ -4235,11 +4235,11 @@ async def test_ui_nav_links_use_owner_slug_not_uuid_graph_page(
 ) -> None:
     """Graph page back-to-repo link must use owner/slug, not internal UUID."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/graph")
+    response = await client.get("/testuser/test-beats/graph")
     assert response.status_code == 200
     body = response.text
-    assert '"/musehub/ui/testuser/test-beats"' in body
-    assert "'/musehub/ui/' + repoId" not in body
+    assert '"/testuser/test-beats"' in body
+    assert "'/' + repoId" not in body
 
 
 @pytest.mark.anyio
@@ -4249,11 +4249,11 @@ async def test_ui_nav_links_use_owner_slug_not_uuid_pr_list_page(
 ) -> None:
     """PR list page navigation must use owner/slug, not internal UUID."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
-    assert '"/musehub/ui/testuser/test-beats"' in body
-    assert "'/musehub/ui/' + repoId" not in body
+    assert '"/testuser/test-beats"' in body
+    assert "'/' + repoId" not in body
 
 
 @pytest.mark.anyio
@@ -4263,11 +4263,11 @@ async def test_ui_nav_links_use_owner_slug_not_uuid_releases_page(
 ) -> None:
     """Releases page navigation must use owner/slug, not internal UUID."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/releases")
+    response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
-    assert '"/musehub/ui/testuser/test-beats"' in body
-    assert "'/musehub/ui/' + repoId" not in body
+    assert '"/testuser/test-beats"' in body
+    assert "'/' + repoId" not in body
 
 
 @pytest.mark.anyio
@@ -4275,8 +4275,8 @@ async def test_ui_unknown_owner_slug_returns_404(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{unknown-owner}/{unknown-slug} must return 404."""
-    response = await client.get("/musehub/ui/nobody/nonexistent-repo")
+    """GET /{unknown-owner}/{unknown-slug} must return 404."""
+    response = await client.get("/nobody/nonexistent-repo")
     assert response.status_code == 404
 
 
@@ -4287,13 +4287,13 @@ async def test_ui_unknown_owner_slug_returns_404(
 
 @pytest.mark.anyio
 async def test_design_tokens_css_served(client: AsyncClient) -> None:
-    """GET /musehub/static/tokens.css must return 200 with CSS content-type.
+    """GET /static/tokens.css must return 200 with CSS content-type.
 
     Verifies the design token file is reachable at its canonical static path.
     If this fails, every MuseHub page will render unstyled because the CSS
     custom properties (--bg-base, --color-accent, etc.) will be missing.
     """
-    response = await client.get("/musehub/static/tokens.css")
+    response = await client.get("/static/tokens.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     body = response.text
@@ -4304,12 +4304,12 @@ async def test_design_tokens_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_components_css_served(client: AsyncClient) -> None:
-    """GET /musehub/static/components.css must return 200 with CSS content.
+    """GET /static/components.css must return 200 with CSS content.
 
     Verifies the component class file is reachable. These classes (.card,
     .badge, .btn, etc.) are used on every MuseHub page.
     """
-    response = await client.get("/musehub/static/components.css")
+    response = await client.get("/static/components.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     body = response.text
@@ -4320,8 +4320,8 @@ async def test_components_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_layout_css_served(client: AsyncClient) -> None:
-    """GET /musehub/static/layout.css must return 200."""
-    response = await client.get("/musehub/static/layout.css")
+    """GET /static/layout.css must return 200."""
+    response = await client.get("/static/layout.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     assert ".container" in response.text
@@ -4329,8 +4329,8 @@ async def test_layout_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_icons_css_served(client: AsyncClient) -> None:
-    """GET /musehub/static/icons.css must return 200."""
-    response = await client.get("/musehub/static/icons.css")
+    """GET /static/icons.css must return 200."""
+    response = await client.get("/static/icons.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     assert ".icon-mid" in response.text
@@ -4338,8 +4338,8 @@ async def test_icons_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_music_css_served(client: AsyncClient) -> None:
-    """GET /musehub/static/music.css must return 200."""
-    response = await client.get("/musehub/static/music.css")
+    """GET /static/music.css must return 200."""
+    response = await client.get("/static/music.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     assert ".piano-roll" in response.text
@@ -4355,10 +4355,10 @@ async def test_repo_page_uses_design_system(
     app.css is the bundled design system stylesheet loaded by base.html.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
-    assert "/musehub/static/app.css" in body
+    assert "/static/app.css" in body
 
 
 @pytest.mark.anyio
@@ -4368,7 +4368,7 @@ async def test_responsive_meta_tag_present_repo_page(
 ) -> None:
     """Repo page must include a viewport meta tag for mobile responsiveness."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     assert 'name="viewport"' in response.text
 
@@ -4380,7 +4380,7 @@ async def test_responsive_meta_tag_present_pr_page(
 ) -> None:
     """PR list page must include a viewport meta tag for mobile responsiveness."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/pulls")
+    response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     assert 'name="viewport"' in response.text
 
@@ -4392,7 +4392,7 @@ async def test_responsive_meta_tag_present_issues_page(
 ) -> None:
     """Issues page must include a viewport meta tag for mobile responsiveness."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/issues")
+    response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     assert 'name="viewport"' in response.text
 
@@ -4406,7 +4406,7 @@ async def test_design_tokens_css_contains_dimension_colors(
     These tokens are used in piano rolls, radar charts, and diff heatmaps.
     Missing tokens would break analysis page visualisations silently.
     """
-    response = await client.get("/musehub/static/tokens.css")
+    response = await client.get("/static/tokens.css")
     assert response.status_code == 200
     body = response.text
     for dim in ("harmonic", "rhythmic", "melodic", "structural", "dynamic"):
@@ -4418,7 +4418,7 @@ async def test_design_tokens_css_contains_track_colors(
     client: AsyncClient,
 ) -> None:
     """tokens.css must define all 8 track color tokens (--track-0 through --track-7)."""
-    response = await client.get("/musehub/static/tokens.css")
+    response = await client.get("/static/tokens.css")
     assert response.status_code == 200
     body = response.text
     for i in range(8):
@@ -4428,7 +4428,7 @@ async def test_design_tokens_css_contains_track_colors(
 @pytest.mark.anyio
 async def test_badge_variants_in_components_css(client: AsyncClient) -> None:
     """components.css must define all required badge variants including .badge-clean and .badge-dirty."""
-    response = await client.get("/musehub/static/components.css")
+    response = await client.get("/static/components.css")
     assert response.status_code == 200
     body = response.text
     for variant in ("open", "closed", "merged", "active", "clean", "dirty"):
@@ -4438,7 +4438,7 @@ async def test_badge_variants_in_components_css(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_file_type_icons_in_icons_css(client: AsyncClient) -> None:
     """icons.css must define icon classes for all required file types."""
-    response = await client.get("/musehub/static/icons.css")
+    response = await client.get("/static/icons.css")
     assert response.status_code == 200
     body = response.text
     for ext in ("mid", "mp3", "wav", "json", "webp", "xml", "abc"):
@@ -4458,7 +4458,7 @@ async def test_no_inline_css_on_repo_page(
     all styling comes from external files.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     body = response.text
     # Find the <head> section — inline CSS should not appear there
     head_end = body.find("</head>")
@@ -4478,13 +4478,13 @@ async def test_analysis_dashboard_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref} returns 200 HTML without a JWT."""
+    """GET /{owner}/{repo_slug}/analysis/{ref} returns 200 HTML without a JWT."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main")
+    response = await client.get("/testuser/test-beats/analysis/main")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Analysis" in body
     assert "test-beats" in body
 
@@ -4496,7 +4496,7 @@ async def test_analysis_dashboard_no_auth_required(
 ) -> None:
     """Analysis dashboard HTML shell must be accessible without an Authorization header."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main")
+    response = await client.get("/testuser/test-beats/analysis/main")
     assert response.status_code == 200
     assert response.status_code != 401
 
@@ -4512,7 +4512,7 @@ async def test_analysis_dashboard_all_dimension_labels(
     will silently skip rendering that dimension, so agents get an incomplete picture.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main")
+    response = await client.get("/testuser/test-beats/analysis/main")
     assert response.status_code == 200
     body = response.text
     for label in ("Key", "Tempo", "Meter", "Chord Map", "Dynamics",
@@ -4532,7 +4532,7 @@ async def test_analysis_dashboard_sparkline_logic_present(
     data is embedded directly in the HTML — no JS sparkline or API fetch is needed.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main")
+    response = await client.get("/testuser/test-beats/analysis/main")
     assert response.status_code == 200
     body = response.text
     # SSR dashboard renders dimension cards with inline data (tonic, BPM, time-sig, etc.)
@@ -4552,7 +4552,7 @@ async def test_analysis_dashboard_card_links_to_dimensions(
     so the JS template string must reference ``/analysis/`` as the path segment.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main")
+    response = await client.get("/testuser/test-beats/analysis/main")
     assert response.status_code == 200
     body = response.text
     assert "/analysis/" in body
@@ -4569,13 +4569,13 @@ async def test_motifs_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/motifs returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/motifs returns 200 HTML."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main/motifs")
+    response = await client.get("/testuser/test-beats/analysis/main/motifs")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
 
 
 @pytest.mark.anyio
@@ -4585,7 +4585,7 @@ async def test_motifs_page_no_auth_required(
 ) -> None:
     """Motifs UI page must be accessible without an Authorization header."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main/motifs")
+    response = await client.get("/testuser/test-beats/analysis/main/motifs")
     assert response.status_code == 200
     assert response.status_code != 401
 
@@ -4597,7 +4597,7 @@ async def test_motifs_page_contains_filter_ui(
 ) -> None:
     """Motifs page SSR: must contain interval pattern section and occurrence markers."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main/motifs")
+    response = await client.get("/testuser/test-beats/analysis/main/motifs")
     assert response.status_code == 200
     body = response.text
     assert "INTERVAL PATTERN" in body
@@ -4611,7 +4611,7 @@ async def test_motifs_page_contains_piano_roll_renderer(
 ) -> None:
     """Motifs page SSR: must contain motif browser heading and interval data."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main/motifs")
+    response = await client.get("/testuser/test-beats/analysis/main/motifs")
     assert response.status_code == 200
     body = response.text
     assert "Motif Browser" in body
@@ -4625,7 +4625,7 @@ async def test_motifs_page_contains_recurrence_grid(
 ) -> None:
     """Motifs page SSR: must contain recurrence grid section rendered server-side."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main/motifs")
+    response = await client.get("/testuser/test-beats/analysis/main/motifs")
     assert response.status_code == 200
     body = response.text
     assert "RECURRENCE GRID" in body or "occurrence" in body.lower()
@@ -4638,7 +4638,7 @@ async def test_motifs_page_shows_transformation_badges(
 ) -> None:
     """Motifs page SSR: must contain TRANSFORMATIONS section with inversion type labels."""
     repo_id = await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/analysis/main/motifs")
+    response = await client.get("/testuser/test-beats/analysis/main/motifs")
     assert response.status_code == 200
     body = response.text
     assert "TRANSFORMATIONS" in body
@@ -4655,13 +4655,13 @@ async def test_repo_page_html_default(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug} with no Accept header returns HTML by default."""
+    """GET /{owner}/{repo_slug} with no Accept header returns HTML by default."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "testuser" in body
     assert "test-beats" in body
 
@@ -4673,7 +4673,7 @@ async def test_repo_home_shows_stats(
 ) -> None:
     """Repo home page renders SSR stats (commit count link and hero section)."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
     assert "hero-header" in body
@@ -4687,7 +4687,7 @@ async def test_repo_home_recent_commits(
 ) -> None:
     """Repo home page renders a SSR recent commits sidebar section."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
     assert "Recent Commits" in body
@@ -4701,7 +4701,7 @@ async def test_repo_home_audio_player(
 ) -> None:
     """Repo home page includes the persistent floating audio player from base.html."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
     assert 'id="audio-player"' in body
@@ -4713,10 +4713,10 @@ async def test_repo_page_json_accept(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug} with Accept: application/json returns JSON repo data."""
+    """GET /{owner}/{repo_slug} with Accept: application/json returns JSON repo data."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/testuser/test-beats",
+        "/testuser/test-beats",
         headers={"Accept": "application/json"},
     )
     assert response.status_code == 200
@@ -4731,9 +4731,9 @@ async def test_commits_page_json_format_param(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/commits?format=json returns JSON commit list."""
+    """GET /{owner}/{repo_slug}/commits?format=json returns JSON commit list."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/commits?format=json")
+    response = await client.get("/testuser/test-beats/commits?format=json")
     assert response.status_code == 200
     assert "application/json" in response.headers["content-type"]
     data = response.json()
@@ -4751,7 +4751,7 @@ async def test_json_response_camelcase(
     """JSON response from repo page uses camelCase keys matching API convention."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/testuser/test-beats",
+        "/testuser/test-beats",
         headers={"Accept": "application/json"},
     )
     assert response.status_code == 200
@@ -4767,9 +4767,9 @@ async def test_commits_list_html_default(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/commits with no Accept header returns HTML."""
+    """GET /{owner}/{repo_slug}/commits with no Accept header returns HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/commits")
+    response = await client.get("/testuser/test-beats/commits")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -4838,9 +4838,9 @@ async def test_tree_root_lists_directories(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo}/tree/{ref} returns 200 HTML with tree JS."""
+    """GET /{owner}/{repo}/tree/{ref} returns 200 HTML with tree JS."""
     await _seed_tree_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/tree-test/tree/main")
+    response = await client.get("/testuser/tree-test/tree/main")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
@@ -4855,7 +4855,7 @@ async def test_tree_subdirectory_lists_files(
 ) -> None:
     """GET /{owner}/{repo}/tree/{ref}/tracks returns 200 HTML for the subdirectory."""
     await _seed_tree_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/tree-test/tree/main/tracks")
+    response = await client.get("/testuser/tree-test/tree/main/tracks")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
@@ -4870,7 +4870,7 @@ async def test_tree_file_icons_by_type(
 ) -> None:
     """Tree template includes JS that maps extensions to file-type icons."""
     await _seed_tree_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/tree-test/tree/main")
+    response = await client.get("/testuser/tree-test/tree/main")
     assert response.status_code == 200
     body = response.text
     # Piano icon for .mid files
@@ -4890,7 +4890,7 @@ async def test_tree_breadcrumbs_correct(
 ) -> None:
     """Tree page breadcrumb contains owner, repo, tree, and ref."""
     await _seed_tree_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/tree-test/tree/main")
+    response = await client.get("/testuser/tree-test/tree/main")
     assert response.status_code == 200
     body = response.text
     assert "testuser" in body
@@ -4904,10 +4904,10 @@ async def test_tree_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/tree/{ref} returns JSON with tree entries."""
+    """GET /api/v1/repos/{repo_id}/tree/{ref} returns JSON with tree entries."""
     repo_id = await _seed_tree_fixtures(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/tree/main"
+        f"/api/v1/repos/{repo_id}/tree/main"
         f"?owner=testuser&repo_slug=tree-test"
     )
     assert response.status_code == 200
@@ -4933,10 +4933,10 @@ async def test_tree_unknown_ref_404(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/tree/{unknown_ref} returns 404."""
+    """GET /api/v1/repos/{repo_id}/tree/{unknown_ref} returns 404."""
     repo_id = await _seed_tree_fixtures(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/tree/does-not-exist"
+        f"/api/v1/repos/{repo_id}/tree/does-not-exist"
         f"?owner=testuser&repo_slug=tree-test"
     )
     assert response.status_code == 404
@@ -4951,14 +4951,14 @@ async def test_harmony_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/harmony returns 200 SSR HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/harmony returns 200 SSR HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Harmony Analysis" in body
 
 
@@ -4970,7 +4970,7 @@ async def test_harmony_page_no_auth_required(
     """Harmony analysis SSR page must be accessible without a JWT (not 401)."""
     await _make_repo(db_session)
     ref = "deadbeef00001234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -4983,7 +4983,7 @@ async def test_harmony_page_contains_key_display(
     """Harmony SSR page must render key and mode summary from HarmonyAnalysisResponse."""
     await _make_repo(db_session)
     ref = "cafe0000000000000001"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     body = response.text
     # SSR template renders key summary card with harmony_data.key (full key label e.g. "F major"),
@@ -5001,7 +5001,7 @@ async def test_harmony_page_contains_chord_timeline(
     """Harmony SSR page must render the Roman-numeral chord events section."""
     await _make_repo(db_session)
     ref = "babe0000000000000002"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     body = response.text
     # SSR template renders a CHORD EVENTS card with Roman numeral symbols
@@ -5016,7 +5016,7 @@ async def test_harmony_page_contains_tension_curve(
     """Harmony SSR page must render the cadences section (replaces the old tension-curve card)."""
     await _make_repo(db_session)
     ref = "face0000000000000003"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     body = response.text
     # SSR template renders a CADENCES card (server-side, no JS SVG renderer needed)
@@ -5031,7 +5031,7 @@ async def test_harmony_page_contains_modulation_section(
     """Harmony SSR page must render the MODULATIONS card server-side."""
     await _make_repo(db_session)
     ref = "feed0000000000000004"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     body = response.text
     # SSR template renders a MODULATIONS card from harmony_data.modulations
@@ -5047,12 +5047,12 @@ async def test_harmony_page_contains_filter_controls(
     await _make_repo(db_session)
     ref = "beef0000000000000005"
     # Full page response
-    full = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    full = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert full.status_code == 200
     assert "<html" in full.text
     # HTMX fragment response (no outer HTML wrapper)
     fragment = await client.get(
-        f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony",
+        f"/testuser/test-beats/analysis/{ref}/harmony",
         headers={"HX-Request": "true"},
     )
     assert fragment.status_code == 200
@@ -5068,7 +5068,7 @@ async def test_harmony_page_contains_key_history(
     """Harmony SSR page must render breadcrumb with owner/repo_slug/analysis path."""
     await _make_repo(db_session)
     ref = "0000000000000000dead"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     body = response.text
     # SSR template breadcrumb shows owner, repo_slug, and analysis path
@@ -5085,7 +5085,7 @@ async def test_harmony_page_contains_voice_leading(
     """Harmony SSR page must render harmonic rhythm (replaces the old voice-leading JS card)."""
     await _make_repo(db_session)
     ref = "1111111111111111beef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     body = response.text
     # SSR template renders harmonic_rhythm_bpm as "chords/min" in the key summary card
@@ -5100,7 +5100,7 @@ async def test_harmony_page_has_token_form(
     """Harmony SSR page includes JWT token form and app.js via base.html layout."""
     await _make_repo(db_session)
     ref = "2222222222222222cafe"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/harmony")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/harmony")
     assert response.status_code == 200
     body = response.text
     assert 'id="token-form"' in body
@@ -5113,10 +5113,10 @@ async def test_harmony_json_response(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/harmony returns HarmonyAnalysisResponse."""
+    """GET /api/v1/repos/{repo_id}/analysis/{ref}/harmony returns HarmonyAnalysisResponse."""
     repo_id = await _make_repo(db_session)
     resp = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/analysis/main/harmony",
+        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -5175,14 +5175,14 @@ async def test_listen_page_full_mix(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo}/listen/{ref} returns 200 HTML with player UI."""
+    """GET /{owner}/{repo}/listen/{ref} returns 200 HTML with player UI."""
     await _seed_listen_fixtures(db_session)
     ref = "main"
-    response = await client.get(f"/musehub/ui/testuser/listen-test/listen/{ref}")
+    response = await client.get(f"/testuser/listen-test/listen/{ref}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "listen" in body.lower()
     # Full-mix player elements present
     assert "mix-play-btn" in body
@@ -5197,7 +5197,7 @@ async def test_listen_page_track_listing(
     """Listen page HTML embeds track-listing JS that renders per-track controls."""
     await _seed_listen_fixtures(db_session)
     ref = "main"
-    response = await client.get(f"/musehub/ui/testuser/listen-test/listen/{ref}")
+    response = await client.get(f"/testuser/listen-test/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     # Track-listing JavaScript is embedded
@@ -5222,7 +5222,7 @@ async def test_listen_page_no_renders_fallback(
     db_session.add(repo)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/testuser/silent-repo/listen/main")
+    response = await client.get("/testuser/silent-repo/listen/main")
     assert response.status_code == 200
     body = response.text
     # Fallback UI marker present (no-renders state)
@@ -5234,11 +5234,11 @@ async def test_listen_page_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo}/listen/{ref}?format=json returns TrackListingResponse."""
+    """GET /{owner}/{repo}/listen/{ref}?format=json returns TrackListingResponse."""
     await _seed_listen_fixtures(db_session)
     ref = "main"
     response = await client.get(
-        f"/musehub/ui/testuser/listen-test/listen/{ref}",
+        f"/testuser/listen-test/listen/{ref}",
         params={"format": "json"},
     )
     assert response.status_code == 200
@@ -5470,10 +5470,10 @@ async def test_commits_list_page_returns_200(
 ) -> None:
     """GET /{owner}/{repo}/commits returns 200 HTML."""
     await _seed_commit_list_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
+    resp = await client.get(f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
-    assert "Muse Hub" in resp.text
+    assert "MuseHub" in resp.text
 
 
 @pytest.mark.anyio
@@ -5483,7 +5483,7 @@ async def test_commits_list_page_shows_commit_sha(
 ) -> None:
     """Commit SHA (first 8 chars) appears in the rendered HTML."""
     await _seed_commit_list_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
+    resp = await client.get(f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
     assert resp.status_code == 200
     # All 4 commits should appear (per_page=30 default, total=4)
     assert _SHA_MAIN_1[:8] in resp.text
@@ -5499,7 +5499,7 @@ async def test_commits_list_page_shows_commit_message(
 ) -> None:
     """Commit messages appear truncated in commit rows."""
     await _seed_commit_list_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
+    resp = await client.get(f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
     assert resp.status_code == 200
     assert "walking bass line" in resp.text
     assert "rhodes chord voicings" in resp.text
@@ -5512,7 +5512,7 @@ async def test_commits_list_page_dag_indicator(
 ) -> None:
     """DAG node CSS class is present in the HTML for every commit row."""
     await _seed_commit_list_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
+    resp = await client.get(f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
     assert resp.status_code == 200
     assert "dag-node" in resp.text
     assert "commit-list-row" in resp.text
@@ -5525,7 +5525,7 @@ async def test_commits_list_page_merge_indicator(
 ) -> None:
     """Merge commits display the merge indicator and dag-node-merge class."""
     await _seed_commit_list_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
+    resp = await client.get(f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
     assert resp.status_code == 200
     assert "dag-node-merge" in resp.text
     assert "merge" in resp.text.lower()
@@ -5538,7 +5538,7 @@ async def test_commits_list_page_branch_selector(
 ) -> None:
     """Branch <select> dropdown is present when the repo has branches."""
     await _seed_commit_list_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
+    resp = await client.get(f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
     assert resp.status_code == 200
     # Select element with branch options
     assert "branch-sel" in resp.text
@@ -5553,7 +5553,7 @@ async def test_commits_list_page_graph_link(
 ) -> None:
     """Link to the DAG graph page is present."""
     await _seed_commit_list_repo(db_session)
-    resp = await client.get(f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
+    resp = await client.get(f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits")
     assert resp.status_code == 200
     assert "/graph" in resp.text
 
@@ -5567,7 +5567,7 @@ async def test_commits_list_page_pagination_links(
     await _seed_commit_list_repo(db_session)
     # Request per_page=2 so 4 commits produce 2 pages
     resp = await client.get(
-        f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?per_page=2&page=1"
+        f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?per_page=2&page=1"
     )
     assert resp.status_code == 200
     body = resp.text
@@ -5586,7 +5586,7 @@ async def test_commits_list_page_pagination_page2(
     """Page 2 renders with Newer navigation active."""
     await _seed_commit_list_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?per_page=2&page=2"
+        f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?per_page=2&page=2"
     )
     assert resp.status_code == 200
     body = resp.text
@@ -5601,7 +5601,7 @@ async def test_commits_list_page_branch_filter_html(
     """?branch=main returns only main-branch commits in HTML."""
     await _seed_commit_list_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?branch=main"
+        f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?branch=main"
     )
     assert resp.status_code == 200
     body = resp.text
@@ -5621,7 +5621,7 @@ async def test_commits_list_page_json_content_negotiation(
     """?format=json returns CommitListResponse JSON with commits and total."""
     await _seed_commit_list_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?format=json"
+        f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits?format=json"
     )
     assert resp.status_code == 200
     assert "application/json" in resp.headers["content-type"]
@@ -5643,7 +5643,7 @@ async def test_commits_list_page_json_pagination(
     """JSON with per_page=1&page=2 returns the second commit."""
     await _seed_commit_list_repo(db_session)
     resp = await client.get(
-        f"/musehub/ui/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits"
+        f"/{_COMMIT_LIST_OWNER}/{_COMMIT_LIST_SLUG}/commits"
         "?format=json&per_page=1&page=2"
     )
     assert resp.status_code == 200
@@ -5671,7 +5671,7 @@ async def test_commits_list_page_empty_state(
     db_session.add(repo)
     await db_session.commit()
 
-    resp = await client.get("/musehub/ui/emptyowner/empty-repo/commits")
+    resp = await client.get("/emptyowner/empty-repo/commits")
     assert resp.status_code == 200
     assert "No commits yet" in resp.text or "muse push" in resp.text
 
@@ -5746,7 +5746,7 @@ async def test_commit_detail_page_renders_enhanced_metadata(
     """Commit detail page SSR renders commit header fields (SHA, author, branch, parent link)."""
     await _seed_commit_detail_fixtures(db_session)
     sha = "bbbb1111222233334444555566667777bbbbcccc"
-    response = await client.get(f"/musehub/ui/testuser/commit-detail-test/commits/{sha}")
+    response = await client.get(f"/testuser/commit-detail-test/commits/{sha}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
@@ -5791,7 +5791,7 @@ async def test_commit_detail_audio_shell_with_snapshot_id(
     await db_session.commit()
 
     response = await client.get(
-        f"/musehub/ui/testuser/audio-test-repo/commits/cccc2222333344445555666677778888ccccdddd"
+        f"/testuser/audio-test-repo/commits/cccc2222333344445555666677778888ccccdddd"
     )
     assert response.status_code == 200
     body = response.text
@@ -5807,7 +5807,7 @@ async def test_commit_detail_ssr_message_present_in_body(
     """Commit message text is rendered in the SSR page body (replaces JS renderCommitBody)."""
     await _seed_commit_detail_fixtures(db_session)
     sha = "bbbb1111222233334444555566667777bbbbcccc"
-    response = await client.get(f"/musehub/ui/testuser/commit-detail-test/commits/{sha}")
+    response = await client.get(f"/testuser/commit-detail-test/commits/{sha}")
     assert response.status_code == 200
     body = response.text
     # SSR renders the commit message directly — no JS renderCommitBody needed
@@ -5820,10 +5820,10 @@ async def test_commit_detail_diff_summary_endpoint_returns_five_dimensions(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/commits/{sha}/diff-summary returns 5 dimensions."""
+    """GET /api/v1/repos/{repo_id}/commits/{sha}/diff-summary returns 5 dimensions."""
     repo_id, _parent_id, child_id = await _seed_commit_detail_fixtures(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{child_id}/diff-summary",
+        f"/api/v1/repos/{repo_id}/commits/{child_id}/diff-summary",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -5851,7 +5851,7 @@ async def test_commit_detail_diff_summary_root_commit_scores_one(
     """Diff summary for a root commit (no parent) scores all dimensions at 1.0."""
     repo_id, parent_id, _child_id = await _seed_commit_detail_fixtures(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{parent_id}/diff-summary",
+        f"/api/v1/repos/{repo_id}/commits/{parent_id}/diff-summary",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -5871,7 +5871,7 @@ async def test_commit_detail_diff_summary_keyword_detection(
     """Diff summary detects melodic keyword in child commit message."""
     repo_id, _parent_id, child_id = await _seed_commit_detail_fixtures(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/{child_id}/diff-summary",
+        f"/api/v1/repos/{repo_id}/commits/{child_id}/diff-summary",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -5890,7 +5890,7 @@ async def test_commit_detail_diff_summary_unknown_commit_404(
     """Diff summary for unknown commit ID returns 404."""
     repo_id, _p, _c = await _seed_commit_detail_fixtures(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/commits/deadbeefdeadbeefdeadbeef/diff-summary",
+        f"/api/v1/repos/{repo_id}/commits/deadbeefdeadbeefdeadbeef/diff-summary",
         headers=auth_headers, )
     assert response.status_code == 404
 
@@ -5921,7 +5921,7 @@ async def test_commit_page_has_comment_section_html(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     # SSR replaces JS-loaded comment section with a server-rendered HTMX target
@@ -5951,7 +5951,7 @@ async def test_commit_page_has_htmx_comment_form(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     # HTMX form replaces JS renderComments/submitComment/loadComments
@@ -5982,7 +5982,7 @@ async def test_commit_page_comment_htmx_target_present(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     assert 'id="commit-comments"' in body
@@ -6010,7 +6010,7 @@ async def test_commit_page_comment_htmx_posts_to_comments_endpoint(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     assert "hx-post" in body
@@ -6039,7 +6039,7 @@ async def test_commit_page_comment_has_ssr_avatar(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     # SSR avatar class from commit_comments.html fragment
@@ -6068,7 +6068,7 @@ async def test_commit_page_comment_has_htmx_form_elements(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     # HTMX form replaces old new-comment-form/new-comment-body/comment-submit-btn
@@ -6099,7 +6099,7 @@ async def test_commit_page_comment_section_shows_count_heading(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     assert "comment" in body
@@ -6133,7 +6133,7 @@ async def test_commit_page_ssr_renders_commit_message(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     # SSR renders commit message directly — no JS tagPill/isRefUrl needed
@@ -6162,7 +6162,7 @@ async def test_commit_page_ssr_renders_author_metadata(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     # SSR metadata grid shows author — no JS loadMuseTagsPanel needed
@@ -6192,7 +6192,7 @@ async def test_commit_page_no_audio_shell_when_no_snapshot(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     assert "commit-waveform" not in body
@@ -6208,10 +6208,10 @@ async def test_listen_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/listen/{ref} must return 200 HTML."""
+    """GET /{owner}/{slug}/listen/{ref} must return 200 HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -6224,7 +6224,7 @@ async def test_listen_page_no_auth_required(
     """Listen page must be accessible without an Authorization header."""
     await _make_repo(db_session)
     ref = "deadbeef1234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -6237,7 +6237,7 @@ async def test_listen_page_contains_waveform_ui(
     """Listen page HTML must contain the waveform container element."""
     await _make_repo(db_session)
     ref = "cafebabe1234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "waveform" in body
@@ -6251,7 +6251,7 @@ async def test_listen_page_contains_play_button(
     """Listen page must include a play button element."""
     await _make_repo(db_session)
     ref = "feed1234abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "play-btn" in body
@@ -6265,7 +6265,7 @@ async def test_listen_page_contains_speed_selector(
     """Listen page must include the playback speed selector element."""
     await _make_repo(db_session)
     ref = "1a2b3c4d5e6f7890"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "speed-sel" in body
@@ -6279,7 +6279,7 @@ async def test_listen_page_contains_ab_loop_ui(
     """Listen page must include A/B loop controls (loop info + clear button)."""
     await _make_repo(db_session)
     ref = "aabbccddeeff0011"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "loop-info" in body
@@ -6294,7 +6294,7 @@ async def test_listen_page_loads_wavesurfer_vendor(
     """Listen page must load wavesurfer from the local vendor path, not from a CDN."""
     await _make_repo(db_session)
     ref = "112233445566778899"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     # wavesurfer must be loaded from the local vendor directory
@@ -6313,7 +6313,7 @@ async def test_listen_page_loads_audio_player_js(
     """Listen page must load the audio-player.js component wrapper script."""
     await _make_repo(db_session)
     ref = "99aabbccddeeff00"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "audio-player.js" in body
@@ -6324,11 +6324,11 @@ async def test_listen_track_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/listen/{ref}/{path} must return 200."""
+    """GET /{owner}/{slug}/listen/{ref}/{path} must return 200."""
     await _make_repo(db_session)
     ref = "feedface0011aabb"
     response = await client.get(
-        f"/musehub/ui/testuser/test-beats/listen/{ref}/tracks/bass.mp3"
+        f"/testuser/test-beats/listen/{ref}/tracks/bass.mp3"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -6344,7 +6344,7 @@ async def test_listen_track_page_has_track_path_in_js(
     ref = "00aabbccddeeff11"
     track = "tracks/lead-guitar.mp3"
     response = await client.get(
-        f"/musehub/ui/testuser/test-beats/listen/{ref}/{track}"
+        f"/testuser/test-beats/listen/{ref}/{track}"
     )
     assert response.status_code == 200
     body = response.text
@@ -6359,7 +6359,7 @@ async def test_listen_page_unknown_repo_404(
 ) -> None:
     """GET listen page with nonexistent owner/slug must return 404."""
     response = await client.get(
-        "/musehub/ui/nobody/nonexistent-repo/listen/abc123"
+        "/nobody/nonexistent-repo/listen/abc123"
     )
     assert response.status_code == 404
 
@@ -6372,7 +6372,7 @@ async def test_listen_page_keyboard_shortcuts_documented(
     """Listen page must document Space, arrow, and L keyboard shortcuts."""
     await _make_repo(db_session)
     ref = "cafe0011aabb2233"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/listen/{ref}")
+    response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
     # Keyboard hint section must be present
@@ -6390,13 +6390,13 @@ async def test_compare_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/compare/{base}...{head} returns 200 HTML."""
+    """GET /{owner}/{slug}/compare/{base}...{head} returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "main" in body
     assert "feature" in body
 
@@ -6408,7 +6408,7 @@ async def test_compare_page_no_auth_required(
 ) -> None:
     """Compare page is accessible without a JWT token."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
 
 
@@ -6419,7 +6419,7 @@ async def test_compare_page_invalid_ref_404(
 ) -> None:
     """Compare path without '...' separator returns 404."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/mainfeature")
+    response = await client.get("/testuser/test-beats/compare/mainfeature")
     assert response.status_code == 404
 
 
@@ -6428,7 +6428,7 @@ async def test_compare_page_unknown_owner_404(
     client: AsyncClient,
 ) -> None:
     """Unknown owner/slug combination returns 404 on compare page."""
-    response = await client.get("/musehub/ui/nobody/norepo/compare/main...feature")
+    response = await client.get("/nobody/norepo/compare/main...feature")
     assert response.status_code == 404
 
 
@@ -6444,7 +6444,7 @@ async def test_compare_page_includes_radar(
     before any client-side JavaScript runs.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Melodic" in body
@@ -6462,7 +6462,7 @@ async def test_compare_page_includes_piano_roll(
     Both ref names must appear as column headers in the HTML.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "main" in body
@@ -6480,7 +6480,7 @@ async def test_compare_page_includes_emotion_diff(
     The dimension table includes a Change column showing delta values server-side.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Change" in body
@@ -6497,7 +6497,7 @@ async def test_compare_page_includes_commit_list(
     All five musical dimensions must appear as data rows in the server-rendered table.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Rhythmic" in body
@@ -6515,7 +6515,7 @@ async def test_compare_page_includes_create_pr_button(
     The SSR compare page shows the base and head refs in the page header.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
     body = response.text
     assert "Compare" in body
@@ -6528,13 +6528,13 @@ async def test_compare_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/compare/{refs} returns HTML with SSR dimension data.
+    """GET /{owner}/{slug}/compare/{refs} returns HTML with SSR dimension data.
 
     The compare page is now fully SSR — no JSON format negotiation.
     The response is always text/html containing the dimension table.
     """
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/compare/main...feature")
+    response = await client.get("/testuser/test-beats/compare/main...feature")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
@@ -6640,13 +6640,13 @@ async def test_branches_page_lists_all(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/branches returns 200 HTML."""
+    """GET /{owner}/{slug}/branches returns 200 HTML."""
     await _make_repo_with_branches(db_session)
-    resp = await client.get("/musehub/ui/testuser/branch-test/branches")
+    resp = await client.get("/testuser/branch-test/branches")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     body = resp.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     # Page-specific JS identifiers
     assert "branch-row" in body or "branches" in body.lower()
 
@@ -6659,7 +6659,7 @@ async def test_branches_default_marked(
     """JSON response marks the default branch with isDefault=true."""
     await _make_repo_with_branches(db_session)
     resp = await client.get(
-        "/musehub/ui/testuser/branch-test/branches",
+        "/testuser/branch-test/branches",
         headers={"Accept": "application/json"},
     )
     assert resp.status_code == 200
@@ -6677,7 +6677,7 @@ async def test_branches_compare_link(
 ) -> None:
     """Branches page HTML contains compare link JavaScript."""
     await _make_repo_with_branches(db_session)
-    resp = await client.get("/musehub/ui/testuser/branch-test/branches")
+    resp = await client.get("/testuser/branch-test/branches")
     assert resp.status_code == 200
     body = resp.text
     # The JS template must reference the compare URL pattern
@@ -6691,7 +6691,7 @@ async def test_branches_new_pr_button(
 ) -> None:
     """Branches page HTML contains New Pull Request link JavaScript."""
     await _make_repo_with_branches(db_session)
-    resp = await client.get("/musehub/ui/testuser/branch-test/branches")
+    resp = await client.get("/testuser/branch-test/branches")
     assert resp.status_code == 200
     body = resp.text
     assert "Pull Request" in body
@@ -6705,7 +6705,7 @@ async def test_branches_json_response(
     """JSON response includes branches with ahead/behind counts and divergence placeholder."""
     await _make_repo_with_branches(db_session)
     resp = await client.get(
-        "/musehub/ui/testuser/branch-test/branches?format=json",
+        "/testuser/branch-test/branches?format=json",
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -6739,13 +6739,13 @@ async def test_tags_page_lists_all(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/tags returns 200 HTML."""
+    """GET /{owner}/{slug}/tags returns 200 HTML."""
     await _make_repo_with_releases(db_session)
-    resp = await client.get("/musehub/ui/testuser/tag-test/tags")
+    resp = await client.get("/testuser/tag-test/tags")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     body = resp.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "Tags" in body
 
 
@@ -6756,7 +6756,7 @@ async def test_tags_namespace_filter(
 ) -> None:
     """Tags page HTML includes namespace filter dropdown JavaScript."""
     await _make_repo_with_releases(db_session)
-    resp = await client.get("/musehub/ui/testuser/tag-test/tags")
+    resp = await client.get("/testuser/tag-test/tags")
     assert resp.status_code == 200
     body = resp.text
     # Namespace filter select element is rendered by JS
@@ -6773,7 +6773,7 @@ async def test_tags_json_response(
     """JSON response returns TagListResponse with namespace grouping."""
     await _make_repo_with_releases(db_session)
     resp = await client.get(
-        "/musehub/ui/testuser/tag-test/tags?format=json",
+        "/testuser/tag-test/tags?format=json",
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -6813,9 +6813,9 @@ async def test_arrange_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/arrange/{ref} returns 200 HTML without a JWT."""
+    """GET /{owner}/{slug}/arrange/{ref} returns 200 HTML without a JWT."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/arrange/HEAD")
+    response = await client.get("/testuser/test-beats/arrange/HEAD")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -6825,9 +6825,9 @@ async def test_piano_roll_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/piano-roll/{ref} returns 200 HTML."""
+    """GET /{owner}/{slug}/piano-roll/{ref} returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/piano-roll/main")
+    response = await client.get("/testuser/test-beats/piano-roll/main")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -6839,7 +6839,7 @@ async def test_arrange_page_no_auth_required(
 ) -> None:
     """Arrangement matrix page is accessible without a JWT (auth handled client-side)."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/arrange/HEAD")
+    response = await client.get("/testuser/test-beats/arrange/HEAD")
     assert response.status_code == 200
     assert response.status_code != 401
 
@@ -6849,11 +6849,11 @@ async def test_arrange_page_contains_musehub(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Arrangement matrix page HTML shell contains 'Muse Hub' branding."""
+    """Arrangement matrix page HTML shell contains 'MuseHub' branding."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/arrange/abc1234")
+    response = await client.get("/testuser/test-beats/arrange/abc1234")
     assert response.status_code == 200
-    assert "Muse Hub" in response.text
+    assert "MuseHub" in response.text
 
 
 @pytest.mark.anyio
@@ -6863,7 +6863,7 @@ async def test_arrange_page_contains_grid_js(
 ) -> None:
     """Arrangement matrix page embeds the grid rendering JS (renderMatrix or arrange)."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/arrange/HEAD")
+    response = await client.get("/testuser/test-beats/arrange/HEAD")
     assert response.status_code == 200
     body = response.text
     assert "renderMatrix" in body or "arrange" in body.lower()
@@ -6876,7 +6876,7 @@ async def test_arrange_page_contains_density_logic(
 ) -> None:
     """Arrangement matrix page includes density colour logic."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/arrange/HEAD")
+    response = await client.get("/testuser/test-beats/arrange/HEAD")
     assert response.status_code == 200
     body = response.text
     assert "density" in body.lower() or "noteDensity" in body
@@ -6889,7 +6889,7 @@ async def test_arrange_page_contains_token_form(
 ) -> None:
     """Arrangement matrix page renders the SSR arrange grid."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/arrange/HEAD")
+    response = await client.get("/testuser/test-beats/arrange/HEAD")
     assert response.status_code == 200
     body = response.text
     assert "arrange-wrap" in body or "arrange-table" in body
@@ -6901,8 +6901,8 @@ async def test_arrange_page_unknown_repo_returns_404(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{unknown}/{slug}/arrange/{ref} returns 404 for unknown repos."""
-    response = await client.get("/musehub/ui/unknown-user/no-such-repo/arrange/HEAD")
+    """GET /{unknown}/{slug}/arrange/{ref} returns 404 for unknown repos."""
+    response = await client.get("/unknown-user/no-such-repo/arrange/HEAD")
     assert response.status_code == 404
 
 
@@ -6915,7 +6915,7 @@ async def test_commit_detail_unknown_format_param_returns_html(
     await _seed_commit_detail_fixtures(db_session)
     sha = "bbbb1111222233334444555566667777bbbbcccc"
     response = await client.get(
-        f"/musehub/ui/testuser/commit-detail-test/commits/{sha}?format=json"
+        f"/testuser/commit-detail-test/commits/{sha}?format=json"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -6931,7 +6931,7 @@ async def test_commit_detail_wavesurfer_js_conditional_on_audio_url(
     """WaveSurfer JS block is only present when audio_url is set (replaces musicalMeta JS checks)."""
     await _seed_commit_detail_fixtures(db_session)
     sha = "bbbb1111222233334444555566667777bbbbcccc"
-    response = await client.get(f"/musehub/ui/testuser/commit-detail-test/commits/{sha}")
+    response = await client.get(f"/testuser/commit-detail-test/commits/{sha}")
     assert response.status_code == 200
     body = response.text
     # The child commit has no snapshot_id in _seed_commit_detail_fixtures → no WaveSurfer
@@ -6948,7 +6948,7 @@ async def test_commit_detail_nav_has_parent_link(
     """Commit detail page navigation includes the parent commit link (SSR)."""
     await _seed_commit_detail_fixtures(db_session)
     sha = "bbbb1111222233334444555566667777bbbbcccc"
-    response = await client.get(f"/musehub/ui/testuser/commit-detail-test/commits/{sha}")
+    response = await client.get(f"/testuser/commit-detail-test/commits/{sha}")
     assert response.status_code == 200
     body = response.text
     # SSR renders parent commit link when parent_ids is non-empty
@@ -6964,7 +6964,7 @@ async def test_piano_roll_page_no_auth_required(
 ) -> None:
     """Piano roll UI page is accessible without a JWT token."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/piano-roll/main")
+    response = await client.get("/testuser/test-beats/piano-roll/main")
     assert response.status_code == 200
 
 
@@ -6975,7 +6975,7 @@ async def test_piano_roll_page_loads_piano_roll_js(
 ) -> None:
     """Piano roll page references piano-roll.js script."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/piano-roll/main")
+    response = await client.get("/testuser/test-beats/piano-roll/main")
     assert response.status_code == 200
     assert "piano-roll.js" in response.text
 
@@ -6987,7 +6987,7 @@ async def test_piano_roll_page_contains_canvas(
 ) -> None:
     """Piano roll page embeds a canvas element for rendering."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/piano-roll/main")
+    response = await client.get("/testuser/test-beats/piano-roll/main")
     assert response.status_code == 200
     body = response.text
     assert "PianoRoll" in body or "piano-canvas" in body or "piano-roll.js" in body
@@ -7000,7 +7000,7 @@ async def test_piano_roll_page_has_token_form(
 ) -> None:
     """Piano roll page renders the SSR piano roll wrapper and canvas."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/piano-roll/main")
+    response = await client.get("/testuser/test-beats/piano-roll/main")
     assert response.status_code == 200
     assert "piano-roll-wrapper" in response.text
     assert "piano-roll.js" in response.text
@@ -7012,7 +7012,7 @@ async def test_piano_roll_page_unknown_repo_404(
     db_session: AsyncSession,
 ) -> None:
     """Piano roll page for an unknown repo returns 404."""
-    response = await client.get("/musehub/ui/nobody/no-repo/piano-roll/main")
+    response = await client.get("/nobody/no-repo/piano-roll/main")
     assert response.status_code == 404
 
 
@@ -7023,7 +7023,7 @@ async def test_arrange_tab_in_repo_nav(
 ) -> None:
     """Repo home page navigation includes an 'Arrange' tab link."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats")
+    response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     assert "Arrange" in response.text or "arrange" in response.text
 
@@ -7036,7 +7036,7 @@ async def test_piano_roll_track_page_returns_200(
     """GET /piano-roll/{ref}/{path} (single track) returns 200."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/testuser/test-beats/piano-roll/main/tracks/bass.mid"
+        "/testuser/test-beats/piano-roll/main/tracks/bass.mid"
     )
     assert response.status_code == 200
 
@@ -7049,7 +7049,7 @@ async def test_piano_roll_track_page_embeds_path(
     """Single-track piano roll page embeds the MIDI file path in the JS context."""
     await _make_repo(db_session)
     response = await client.get(
-        "/musehub/ui/testuser/test-beats/piano-roll/main/tracks/bass.mid"
+        "/testuser/test-beats/piano-roll/main/tracks/bass.mid"
     )
     assert response.status_code == 200
     assert "tracks/bass.mid" in response.text
@@ -7057,8 +7057,8 @@ async def test_piano_roll_track_page_embeds_path(
 
 @pytest.mark.anyio
 async def test_piano_roll_js_served(client: AsyncClient) -> None:
-    """GET /musehub/static/piano-roll.js returns 200 JavaScript."""
-    response = await client.get("/musehub/static/piano-roll.js")
+    """GET /static/piano-roll.js returns 200 JavaScript."""
+    response = await client.get("/static/piano-roll.js")
     assert response.status_code == 200
     assert "javascript" in response.headers.get("content-type", "")
 
@@ -7066,7 +7066,7 @@ async def test_piano_roll_js_served(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_piano_roll_js_contains_renderer(client: AsyncClient) -> None:
     """piano-roll.js exports the PianoRoll.render function."""
-    response = await client.get("/musehub/static/piano-roll.js")
+    response = await client.get("/static/piano-roll.js")
     assert response.status_code == 200
     body = response.text
     assert "PianoRoll" in body
@@ -7136,9 +7136,9 @@ async def test_blob_404_unknown_path(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/blob/{ref}/{path} returns 404 for unknown path."""
+    """GET /api/v1/repos/{repo_id}/blob/{ref}/{path} returns 404 for unknown path."""
     repo_id = await _seed_blob_fixtures(db_session)
-    response = await client.get(f"/api/v1/musehub/repos/{repo_id}/blob/main/does/not/exist.mid")
+    response = await client.get(f"/api/v1/repos/{repo_id}/blob/main/does/not/exist.mid")
     assert response.status_code == 404
 
 
@@ -7149,7 +7149,7 @@ async def test_blob_image_shows_inline(
 ) -> None:
     """Blob page for .webp file includes <img> rendering logic in the template JS."""
     await _seed_blob_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/blob-test/blob/main/cover.webp")
+    response = await client.get("/testuser/blob-test/blob/main/cover.webp")
     assert response.status_code == 200
     body = response.text
     # JS template emits <img> for image file type
@@ -7162,10 +7162,10 @@ async def test_blob_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/repos/{repo_id}/blob/{ref}/{path} returns BlobMetaResponse JSON."""
+    """GET /api/v1/repos/{repo_id}/blob/{ref}/{path} returns BlobMetaResponse JSON."""
     repo_id = await _seed_blob_fixtures(db_session)
     response = await client.get(
-        f"/api/v1/musehub/repos/{repo_id}/blob/main/tracks/bass.mid"
+        f"/api/v1/repos/{repo_id}/blob/main/tracks/bass.mid"
     )
     assert response.status_code == 200
     data = response.json()
@@ -7184,7 +7184,7 @@ async def test_blob_json_syntax_highlighted(
 ) -> None:
     """Blob page for .json file includes syntax-highlighting logic in the template JS."""
     await _seed_blob_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/blob-test/blob/main/metadata.json")
+    response = await client.get("/testuser/blob-test/blob/main/metadata.json")
     assert response.status_code == 200
     body = response.text
     # highlightJson function must be present in the template script
@@ -7197,13 +7197,13 @@ async def test_blob_midi_shows_piano_roll_link(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo}/blob/{ref}/{path} returns 200 HTML for a .mid file.
+    """GET /{owner}/{repo}/blob/{ref}/{path} returns 200 HTML for a .mid file.
 
     The template's client-side JS must reference the piano roll URL pattern so that
     clicking the page in a browser navigates to the piano roll viewer.
     """
     await _seed_blob_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/blob-test/blob/main/tracks/bass.mid")
+    response = await client.get("/testuser/blob-test/blob/main/tracks/bass.mid")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
@@ -7220,7 +7220,7 @@ async def test_blob_mp3_shows_audio_player(
 ) -> None:
     """Blob page for .mp3 file includes <audio> rendering logic in the template JS."""
     await _seed_blob_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/blob-test/blob/main/tracks/keys.mp3")
+    response = await client.get("/testuser/blob-test/blob/main/tracks/keys.mp3")
     assert response.status_code == 200
     body = response.text
     # JS template emits <audio> element for audio file type
@@ -7235,7 +7235,7 @@ async def test_blob_raw_button(
 ) -> None:
     """Blob page JS constructs a Raw download link via the /raw/ endpoint."""
     await _seed_blob_fixtures(db_session)
-    response = await client.get("/musehub/ui/testuser/blob-test/blob/main/tracks/bass.mid")
+    response = await client.get("/testuser/blob-test/blob/main/tracks/bass.mid")
     assert response.status_code == 200
     body = response.text
     # JS constructs raw URL — the string '/raw/' must appear in the template script
@@ -7249,7 +7249,7 @@ async def test_score_page_contains_legend(
 ) -> None:
     """Score page includes a legend for note symbols."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main")
+    response = await client.get("/testuser/test-beats/score/main")
     assert response.status_code == 200
     body = response.text
     assert "legend" in body or "Note" in body
@@ -7262,7 +7262,7 @@ async def test_score_page_contains_score_meta(
 ) -> None:
     """Score page embeds a score metadata panel (key/tempo/time signature)."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main")
+    response = await client.get("/testuser/test-beats/score/main")
     assert response.status_code == 200
     body = response.text
     assert "score-meta" in body
@@ -7275,7 +7275,7 @@ async def test_score_page_contains_staff_container(
 ) -> None:
     """Score page embeds the SVG staff container markup."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main")
+    response = await client.get("/testuser/test-beats/score/main")
     assert response.status_code == 200
     body = response.text
     assert "staff-container" in body or "staves" in body
@@ -7288,7 +7288,7 @@ async def test_score_page_contains_track_selector(
 ) -> None:
     """Score page embeds a track selector element."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main")
+    response = await client.get("/testuser/test-beats/score/main")
     assert response.status_code == 200
     body = response.text
     assert "track-selector" in body
@@ -7301,7 +7301,7 @@ async def test_score_page_no_auth_required(
 ) -> None:
     """Score UI page must be accessible without an Authorization header."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main")
+    response = await client.get("/testuser/test-beats/score/main")
     assert response.status_code == 200
     assert response.status_code != 401
 
@@ -7311,13 +7311,13 @@ async def test_score_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/score/{ref} returns 200 HTML."""
+    """GET /{owner}/{slug}/score/{ref} returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main")
+    response = await client.get("/testuser/test-beats/score/main")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
 
 
 @pytest.mark.anyio
@@ -7327,7 +7327,7 @@ async def test_score_part_page_includes_path(
 ) -> None:
     """Single-part score page injects the path segment into page data."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main/piano")
+    response = await client.get("/testuser/test-beats/score/main/piano")
     assert response.status_code == 200
     body = response.text
     # scorePath JS variable should be set to the path segment
@@ -7339,13 +7339,13 @@ async def test_score_part_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{slug}/score/{ref}/{path} returns 200 HTML."""
+    """GET /{owner}/{slug}/score/{ref}/{path} returns 200 HTML."""
     await _make_repo(db_session)
-    response = await client.get("/musehub/ui/testuser/test-beats/score/main/piano")
+    response = await client.get("/testuser/test-beats/score/main/piano")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
 
 
 @pytest.mark.anyio
@@ -7353,8 +7353,8 @@ async def test_score_unknown_repo_404(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{unknown}/{slug}/score/{ref} returns 404."""
-    response = await client.get("/musehub/ui/nobody/no-beats/score/main")
+    """GET /{unknown}/{slug}/score/{ref} returns 404."""
+    response = await client.get("/nobody/no-beats/score/main")
     assert response.status_code == 404
 
 
@@ -7378,7 +7378,7 @@ async def test_ui_commit_page_artifact_auth_uses_blob_proxy(
     """
     await _make_repo(db_session)
     commit_id = "abc1234567890abcdef1234567890abcdef12345678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 404
 
 
@@ -7392,7 +7392,7 @@ async def test_reaction_bar_js_in_musehub_js(
     db_session: AsyncSession,
 ) -> None:
     """musehub.js must define loadReactions and toggleReaction for all detail pages."""
-    response = await client.get("/musehub/static/musehub.js")
+    response = await client.get("/static/musehub.js")
     assert response.status_code == 200
     body = response.text
     assert "loadReactions" in body
@@ -7406,7 +7406,7 @@ async def test_reaction_bar_emojis_in_musehub_js(
     db_session: AsyncSession,
 ) -> None:
     """musehub.js reaction bar must include all 8 required emojis."""
-    response = await client.get("/musehub/static/musehub.js")
+    response = await client.get("/static/musehub.js")
     assert response.status_code == 200
     body = response.text
     for emoji in ["🔥", "❤️", "👏", "✨", "🎵", "🎸", "🎹", "🥁"]:
@@ -7425,7 +7425,7 @@ async def test_reaction_bar_commit_page_has_load_call(
     """
     await _make_repo(db_session)
     commit_id = "abc1234567890abcdef1234567890abcdef12345678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/commits/{commit_id}")
+    response = await client.get(f"/testuser/test-beats/commits/{commit_id}")
     assert response.status_code == 404
 
 
@@ -7451,7 +7451,7 @@ async def test_reaction_bar_pr_detail_has_load_call(
     await db_session.refresh(pr)
     pr_id = str(pr.pr_id)
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/pulls/{pr_id}")
+    response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
     assert "pr-detail-layout" in body
@@ -7478,7 +7478,7 @@ async def test_reaction_bar_issue_detail_has_load_call(
     db_session.add(issue)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/testuser/test-beats/issues/1")
+    response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
     assert "issue-detail-grid" in body
@@ -7502,7 +7502,7 @@ async def test_reaction_bar_release_detail_has_load_call(
     db_session.add(release)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/testuser/test-beats/releases/v1.0")
+    response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
     assert "v1.0" in body
@@ -7520,7 +7520,7 @@ async def test_reaction_bar_session_detail_has_load_call(
     repo_id = await _make_repo(db_session)
     session_id = await _make_session(db_session, repo_id)
 
-    response = await client.get(f"/musehub/ui/testuser/test-beats/sessions/{session_id}")
+    response = await client.get(f"/testuser/test-beats/sessions/{session_id}")
     assert response.status_code == 200
     body = response.text
     assert "Session" in body
@@ -7550,7 +7550,7 @@ async def test_reaction_api_allows_new_emojis(
 
     for emoji in ["👏", "🎹"]:
         response = await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/reactions",
+            f"/api/v1/repos/{repo_id}/reactions",
             json={"target_type": "commit", "target_id": "abc123", "emoji": emoji},
             headers=token_headers,
         )
@@ -7586,7 +7586,7 @@ async def test_reaction_api_allows_release_and_session_target_types(
 
     for target_type in ["release", "session"]:
         response = await client.post(
-            f"/api/v1/musehub/repos/{repo_id}/reactions",
+            f"/api/v1/repos/{repo_id}/reactions",
             json={"target_type": target_type, "target_id": "some-id", "emoji": "🔥"},
             headers=token_headers,
         )
@@ -7638,10 +7638,10 @@ async def test_reaction_bar_css_loaded_on_detail_pages(
     session_id = await _make_session(db_session, repo_id)
 
     pages = [
-        f"/musehub/ui/testuser/test-beats/pulls/{pr_id}",
-        "/musehub/ui/testuser/test-beats/issues/1",
-        "/musehub/ui/testuser/test-beats/releases/v1.0",
-        f"/musehub/ui/testuser/test-beats/sessions/{session_id}",
+        f"/testuser/test-beats/pulls/{pr_id}",
+        "/testuser/test-beats/issues/1",
+        "/testuser/test-beats/releases/v1.0",
+        f"/testuser/test-beats/sessions/{session_id}",
     ]
     for page in pages:
         response = await client.get(page)
@@ -7655,7 +7655,7 @@ async def test_reaction_bar_components_css_has_styles(
     db_session: AsyncSession,
 ) -> None:
     """components.css must define .reaction-bar and .reaction-btn CSS classes."""
-    response = await client.get("/musehub/static/components.css")
+    response = await client.get("/static/components.css")
     assert response.status_code == 200
     body = response.text
     assert ".reaction-bar" in body
@@ -7674,8 +7674,8 @@ async def test_feed_page_returns_200(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/feed returns 200 HTML without requiring a JWT."""
-    response = await client.get("/musehub/ui/feed")
+    """GET /feed returns 200 HTML without requiring a JWT."""
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Activity Feed" in response.text
@@ -7692,7 +7692,7 @@ async def test_feed_page_no_raw_json_payload(
     JSON.stringify(item.payload) directly into the DOM, exposing raw JSON
     to users. The new rich card templates must not do this.
     """
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     body = response.text
     assert "JSON.stringify(item.payload" not in body
@@ -7705,7 +7705,7 @@ async def test_feed_page_has_event_meta_for_all_types(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must define EVENT_META entries for all 8 notification event types."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     body = response.text
     for event_type in (
@@ -7731,7 +7731,7 @@ async def test_feed_page_has_data_notif_id_attribute(
     This attribute is the hook that (mark-as-read UX) will use to
     attach action buttons to each card without restructuring the DOM.
     """
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "data-notif-id" in response.text
 
@@ -7742,7 +7742,7 @@ async def test_feed_page_has_unread_indicator(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must include logic to highlight unread cards with a left border."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     body = response.text
     assert "is_read" in body
@@ -7755,7 +7755,7 @@ async def test_feed_page_has_actor_avatar_logic(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must render actor avatars using the actorHsl / actorAvatar helpers."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     body = response.text
     assert "actorHsl" in body
@@ -7768,7 +7768,7 @@ async def test_feed_page_has_relative_timestamp(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must call fmtRelative to render timestamps in a human-readable form."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "fmtRelative" in response.text
 
@@ -7783,7 +7783,7 @@ async def test_feed_page_has_mark_one_read_function(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must define markOneRead() for per-notification mark-as-read."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "markOneRead" in response.text
 
@@ -7794,7 +7794,7 @@ async def test_feed_page_has_mark_all_read_function(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must define markAllRead() for bulk mark-as-read."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "markAllRead" in response.text
 
@@ -7805,7 +7805,7 @@ async def test_feed_page_has_decrement_nav_badge_function(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must define decrementNavBadge() to keep the nav badge in sync."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "decrementNavBadge" in response.text
 
@@ -7816,7 +7816,7 @@ async def test_feed_page_mark_read_btn_targets_notification_endpoint(
     db_session: AsyncSession,
 ) -> None:
     """markOneRead() must call POST /notifications/{notif_id}/read."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     body = response.text
     assert "/notifications/" in body
@@ -7829,7 +7829,7 @@ async def test_feed_page_mark_all_btn_targets_read_all_endpoint(
     db_session: AsyncSession,
 ) -> None:
     """markAllRead() must call POST /notifications/read-all."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "read-all" in response.text
 
@@ -7840,7 +7840,7 @@ async def test_feed_page_mark_all_btn_present_in_template(
     db_session: AsyncSession,
 ) -> None:
     """Feed page must render a 'Mark all as read' button element."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     assert "mark-all-read-btn" in response.text
 
@@ -7851,7 +7851,7 @@ async def test_feed_page_mark_read_updates_nav_badge(
     db_session: AsyncSession,
 ) -> None:
     """After marking all as read, page logic must update nav-notif-badge to hidden."""
-    response = await client.get("/musehub/ui/feed")
+    response = await client.get("/feed")
     assert response.status_code == 200
     body = response.text
     assert "nav-notif-badge" in body
@@ -7868,10 +7868,10 @@ async def test_key_analysis_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/key returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/key returns 200 HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/key")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/key")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -7884,7 +7884,7 @@ async def test_key_analysis_page_no_auth_required(
     """Key analysis page must be accessible without a JWT (HTML shell handles auth)."""
     await _make_repo(db_session)
     ref = "deadbeef1234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/key")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/key")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -7897,7 +7897,7 @@ async def test_key_analysis_page_contains_key_data_labels(
     """Key page must contain tonic, mode, relative key, and confidence UI elements."""
     await _make_repo(db_session)
     ref = "cafebabe12345678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/key")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/key")
     assert response.status_code == 200
     body = response.text
     assert "Key Detection" in body
@@ -7911,10 +7911,10 @@ async def test_meter_analysis_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/meter returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/meter returns 200 HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/meter")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/meter")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -7927,7 +7927,7 @@ async def test_meter_analysis_page_no_auth_required(
     """Meter analysis page must be accessible without a JWT (HTML shell handles auth)."""
     await _make_repo(db_session)
     ref = "deadbeef5678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/meter")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/meter")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -7940,7 +7940,7 @@ async def test_meter_analysis_page_contains_meter_data_labels(
     """Meter page must contain time signature, compound/simple badge, and beat strength UI."""
     await _make_repo(db_session)
     ref = "feedface5678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/meter")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/meter")
     assert response.status_code == 200
     body = response.text
     assert "Meter Analysis" in body
@@ -7956,10 +7956,10 @@ async def test_chord_map_analysis_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/chord-map returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/chord-map returns 200 HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/chord-map")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/chord-map")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -7972,7 +7972,7 @@ async def test_chord_map_analysis_page_no_auth_required(
     """Chord-map analysis page must be accessible without a JWT (HTML shell handles auth)."""
     await _make_repo(db_session)
     ref = "deadbeef9999"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/chord-map")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/chord-map")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -7985,7 +7985,7 @@ async def test_chord_map_analysis_page_contains_chord_data_labels(
     """Chord-map page SSR: must contain progression timeline, chord table, and tension data."""
     await _make_repo(db_session)
     ref = "beefdead1234"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/chord-map")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/chord-map")
     assert response.status_code == 200
     body = response.text
     assert "Chord Map" in body
@@ -7999,10 +7999,10 @@ async def test_groove_analysis_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/groove returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/groove returns 200 HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/groove")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/groove")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -8015,7 +8015,7 @@ async def test_groove_analysis_page_no_auth_required(
     """Groove analysis page must be accessible without a JWT (HTML shell handles auth)."""
     await _make_repo(db_session)
     ref = "deadbeef4321"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/groove")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/groove")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -8028,7 +8028,7 @@ async def test_groove_analysis_page_contains_groove_data_labels(
     """Groove page must contain style badge, BPM, swing factor, and groove score UI."""
     await _make_repo(db_session)
     ref = "cafefeed5678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/groove")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/groove")
     assert response.status_code == 200
     body = response.text
     assert "Groove Analysis" in body
@@ -8043,10 +8043,10 @@ async def test_emotion_analysis_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/emotion returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/emotion returns 200 HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/emotion")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/emotion")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -8059,7 +8059,7 @@ async def test_emotion_analysis_page_no_auth_required(
     """Emotion analysis page must be accessible without a JWT (HTML shell handles auth)."""
     await _make_repo(db_session)
     ref = "deadbeef0001"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/emotion")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/emotion")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -8072,7 +8072,7 @@ async def test_emotion_analysis_page_contains_emotion_data_labels(
     """Emotion page SSR: must contain SVG scatter plot and summary vector dimension bars."""
     await _make_repo(db_session)
     ref = "aabbccdd5678"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/emotion")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/emotion")
     assert response.status_code == 200
     body = response.text
     assert "Emotion Analysis" in body
@@ -8087,10 +8087,10 @@ async def test_form_analysis_page_renders(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /musehub/ui/{owner}/{repo_slug}/analysis/{ref}/form returns 200 HTML."""
+    """GET /{owner}/{repo_slug}/analysis/{ref}/form returns 200 HTML."""
     await _make_repo(db_session)
     ref = "abc1234567890abcdef"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/form")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/form")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -8103,7 +8103,7 @@ async def test_form_analysis_page_no_auth_required(
     """Form analysis page must be accessible without a JWT (HTML shell handles auth)."""
     await _make_repo(db_session)
     ref = "deadbeef0002"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/form")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/form")
     assert response.status_code != 401
     assert response.status_code == 200
 
@@ -8116,7 +8116,7 @@ async def test_form_analysis_page_contains_form_data_labels(
     """Form page must contain form label, section timeline, and sections table."""
     await _make_repo(db_session)
     ref = "11223344abcd"
-    response = await client.get(f"/musehub/ui/testuser/test-beats/analysis/{ref}/form")
+    response = await client.get(f"/testuser/test-beats/analysis/{ref}/form")
     assert response.status_code == 200
     body = response.text
     assert "Form Analysis" in body
@@ -8166,7 +8166,7 @@ async def test_profile_page_has_followers_following_tabs(
 ) -> None:
     """Profile page must render Followers and Following tab buttons."""
     await _make_profile(db_session, username="tabuser")
-    response = await client.get("/musehub/ui/users/tabuser")
+    response = await client.get("/users/tabuser")
     assert response.status_code == 200
     body = response.text
     assert "tab-btn-followers" in body
@@ -8181,7 +8181,7 @@ async def test_profile_page_has_user_card_js(
 ) -> None:
     """Profile page must include userCardHtml and loadFollowTab JS helpers."""
     await _make_profile(db_session, username="cardjsuser")
-    response = await client.get("/musehub/ui/users/cardjsuser")
+    response = await client.get("/users/cardjsuser")
     assert response.status_code == 200
     body = response.text
     assert "userCardHtml" in body
@@ -8195,7 +8195,7 @@ async def test_profile_page_has_switch_tab_js(
 ) -> None:
     """Profile page must include switchTab() to toggle between followers and following."""
     await _make_profile(db_session, username="switchtabuser")
-    response = await client.get("/musehub/ui/users/switchtabuser")
+    response = await client.get("/users/switchtabuser")
     assert response.status_code == 200
     assert "switchTab" in response.text
 
@@ -8372,7 +8372,7 @@ async def test_commit_page_has_inline_audio_player_section(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/audiouser/audio-player-test/commits/{commit_id}")
+    response = await client.get(f"/audiouser/audio-player-test/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     # SSR audio shell: waveform div with data-url set from snapshot_id
@@ -8407,7 +8407,7 @@ async def test_commit_page_inline_player_has_track_selector_js(
     await db_session.refresh(repo)
 
     commit_id = "aaaa1111bbbb2222cccc3333dddd4444eeee5555"
-    response = await client.get(f"/musehub/ui/trackuser/track-sel-test/commits/{commit_id}")
+    response = await client.get(f"/trackuser/track-sel-test/commits/{commit_id}")
     assert response.status_code == 404
 
 
@@ -8434,7 +8434,7 @@ async def test_commit_page_has_muse_tags_panel(
     await db_session.refresh(repo)
 
     commit_id = "1234567890abcdef1234567890abcdef12345678"
-    response = await client.get(f"/musehub/ui/tagsuser/tags-panel-test/commits/{commit_id}")
+    response = await client.get(f"/tagsuser/tags-panel-test/commits/{commit_id}")
     assert response.status_code == 404
 
 
@@ -8461,7 +8461,7 @@ async def test_commit_page_muse_tags_pill_colours_defined(
     await db_session.refresh(repo)
 
     commit_id = "abcd1234ef567890abcd1234ef567890abcd1234"
-    response = await client.get(f"/musehub/ui/pilluser/pill-colour-test/commits/{commit_id}")
+    response = await client.get(f"/pilluser/pill-colour-test/commits/{commit_id}")
     assert response.status_code == 404
 
 
@@ -8488,7 +8488,7 @@ async def test_commit_page_has_cross_references_section(
     await db_session.refresh(repo)
 
     commit_id = "face000011112222333344445555666677778888"
-    response = await client.get(f"/musehub/ui/xrefsuser/xrefs-test/commits/{commit_id}")
+    response = await client.get(f"/xrefsuser/xrefs-test/commits/{commit_id}")
     assert response.status_code == 404
 
 
@@ -8529,7 +8529,7 @@ async def test_commit_page_context_passes_listen_and_embed_urls(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get(f"/musehub/ui/urluser/url-context-test/commits/{commit_id}")
+    response = await client.get(f"/urluser/url-context-test/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
     assert "listenUrl" in body
@@ -8560,10 +8560,10 @@ async def test_repo_home_contributors_panel_js(
     db_session.add(repo)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/contribowner/contrib-panel-test")
+    response = await client.get("/contribowner/contrib-panel-test")
     assert response.status_code == 200
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "contribowner" in body
     assert "contrib-panel-test" in body
 
@@ -8584,10 +8584,10 @@ async def test_repo_home_activity_heatmap_js(
     db_session.add(repo)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/heatmapowner/heatmap-panel-test")
+    response = await client.get("/heatmapowner/heatmap-panel-test")
     assert response.status_code == 200
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "heatmapowner" in body
     assert "heatmap-panel-test" in body
 
@@ -8608,10 +8608,10 @@ async def test_repo_home_instrument_bar_js(
     db_session.add(repo)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/instrbarowner/instrbar-panel-test")
+    response = await client.get("/instrbarowner/instrbar-panel-test")
     assert response.status_code == 200
     body = response.text
-    assert "Muse Hub" in body
+    assert "MuseHub" in body
     assert "instrbarowner" in body
     assert "instrbar-panel-test" in body
 
@@ -8632,7 +8632,7 @@ async def test_repo_home_clone_widget_renders(
     db_session.add(repo)
     await db_session.commit()
 
-    response = await client.get("/musehub/ui/cloneowner/clone-widget-test")
+    response = await client.get("/cloneowner/clone-widget-test")
     assert response.status_code == 200
     body = response.text
 
@@ -8646,8 +8646,8 @@ async def test_repo_home_clone_widget_renders(
 async def test_explore_page_returns_200(
     client: AsyncClient,
 ) -> None:
-    """GET /musehub/ui/explore returns 200 without authentication."""
-    response = await client.get("/musehub/ui/explore")
+    """GET /explore returns 200 without authentication."""
+    response = await client.get("/explore")
     assert response.status_code == 200
 
 
@@ -8656,7 +8656,7 @@ async def test_explore_page_has_filter_sidebar(
     client: AsyncClient,
 ) -> None:
     """Explore page renders a filter sidebar with sort, license, and clear-filters sections."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
     assert "explore-sidebar" in body
@@ -8670,7 +8670,7 @@ async def test_explore_page_has_sort_options(
     client: AsyncClient,
 ) -> None:
     """Explore page sidebar includes all four sort radio options."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
     assert "Most starred" in body
@@ -8684,7 +8684,7 @@ async def test_explore_page_has_license_options(
     client: AsyncClient,
 ) -> None:
     """Explore page sidebar includes the expected license filter options."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
     assert "CC0" in body
@@ -8699,7 +8699,7 @@ async def test_explore_page_has_repo_grid(
     client: AsyncClient,
 ) -> None:
     """Explore page includes the repo grid and JS discover API loader."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
     assert "repo-grid" in body
@@ -8711,7 +8711,7 @@ async def test_explore_page_has_audio_preview_js(
     client: AsyncClient,
 ) -> None:
     """Explore page renders the filter sidebar and repo grid (SSR, no inline audio-preview JS)."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
     assert "filter-form" in body
@@ -8724,7 +8724,7 @@ async def test_explore_page_default_sort_stars(
     client: AsyncClient,
 ) -> None:
     """Explore page defaults to 'stars' sort when no sort param given."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
     # 'stars' radio should be pre-checked (default sort)
@@ -8737,7 +8737,7 @@ async def test_explore_page_sort_param_honoured(
     client: AsyncClient,
 ) -> None:
     """Explore page honours the ?sort= query param for pre-selecting a sort option."""
-    response = await client.get("/musehub/ui/explore?sort=updated")
+    response = await client.get("/explore?sort=updated")
     assert response.status_code == 200
     body = response.text
     assert 'value="updated"' in body
@@ -8748,7 +8748,7 @@ async def test_explore_page_no_auth_required(
     client: AsyncClient,
 ) -> None:
     """Explore page is publicly accessible — no JWT required (zero-friction discovery)."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     assert response.status_code != 401
     assert response.status_code != 403
@@ -8759,7 +8759,7 @@ async def test_explore_page_chip_toggle_js(
     client: AsyncClient,
 ) -> None:
     """Explore page includes toggleChip JS for progressive chip filter enhancement."""
-    response = await client.get("/musehub/ui/explore")
+    response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
     assert "toggleChip" in body
@@ -8772,6 +8772,6 @@ async def test_explore_page_get_params_preserved(
 ) -> None:
     """Explore page accepts lang, license, topic, sort GET params without error."""
     response = await client.get(
-        "/musehub/ui/explore?lang=piano&license=CC0&topic=jazz&sort=stars"
+        "/explore?lang=piano&license=CC0&topic=jazz&sort=stars"
     )
     assert response.status_code == 200
