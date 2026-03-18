@@ -474,10 +474,10 @@ document.addEventListener('htmx:configRequest', (evt: Event) => {
   if (token) (evt as CustomEvent).detail.headers['Authorization'] = 'Bearer ' + token;
 });
 
-document.addEventListener('htmx:afterSwap', () => {
-  const repoId = (window as Window & { __repoId?: string }).__repoId;
-  if (repoId) void initRepoNav(repoId);
-});
+/** Read repo_id from the DOM — repo_nav.html embeds it as a data-repo-id attribute. */
+function _repoIdFromDom(): string | null {
+  return document.getElementById('repo-header')?.getAttribute('data-repo-id') ?? null;
+}
 
 /* ═══════════════════════════════════════════════════════════════
  * Global surface — attach exports to window for inline handlers
@@ -564,6 +564,9 @@ function initPageGlobals(): void {
   if (typeof (window as unknown as Record<string, unknown>).lucide === 'object') {
     (window as unknown as { lucide: { createIcons: () => void } }).lucide.createIcons();
   }
+  // Initialize repo nav if the repo header card is present on this page
+  const repoId = _repoIdFromDom();
+  if (repoId) void initRepoNav(repoId);
   // Dispatch to the active page module via the #page-data JSON element
   const pageDataEl = document.getElementById('page-data');
   if (pageDataEl) {
@@ -586,7 +589,8 @@ function dispatchPageModule(data: Record<string, unknown>): void {
 
 // Run on initial hard load
 document.addEventListener('DOMContentLoaded', initPageGlobals);
-// Re-run after every HTMX swap so page modules activate on navigation
+// Re-run after every HTMX navigation — htmx:afterSettle fires after scripts
+// in the swapped content have run, so page modules and DOM data are ready.
 document.addEventListener('htmx:afterSettle', initPageGlobals);
 
 window.getToken = getToken;

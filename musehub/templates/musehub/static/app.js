@@ -340,10 +340,9 @@
     const token = getToken();
     if (token) evt.detail.headers["Authorization"] = "Bearer " + token;
   });
-  document.addEventListener("htmx:afterSwap", () => {
-    const repoId = window.__repoId;
-    if (repoId) void initRepoNav(repoId);
-  });
+  function _repoIdFromDom() {
+    return document.getElementById("repo-header")?.getAttribute("data-repo-id") ?? null;
+  }
   async function loadNotifBadge() {
     if (!getToken()) return;
     try {
@@ -366,6 +365,8 @@
     if (typeof window.lucide === "object") {
       window.lucide.createIcons();
     }
+    const repoId = _repoIdFromDom();
+    if (repoId) void initRepoNav(repoId);
     const pageDataEl = document.getElementById("page-data");
     if (pageDataEl) {
       try {
