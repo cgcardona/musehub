@@ -49,10 +49,7 @@
                  onclick="toggleChip(event,'lang','{{ tag | e }}')">{{ tag }}</a>
               {% endfor %}
             </div>
-            {# Hidden inputs carry selected values when the form submits #}
-            {% for tag in selected_langs %}
-            <input type="hidden" name="lang" value="{{ tag | e }}" class="lang-hidden">
-            {% endfor %}
+            {# Chip selections are tracked via URL params by toggleChip(), not hidden inputs #}
           {% else %}
             <p style="font-size:12px;color:var(--text-muted)">No tags yet</p>
           {% endif %}
@@ -83,9 +80,7 @@
                  onclick="toggleChip(event,'topic','{{ t | e }}')">{{ t }}</a>
               {% endfor %}
             </div>
-            {% for t in selected_topics %}
-            <input type="hidden" name="topic" value="{{ t | e }}" class="topic-hidden">
-            {% endfor %}
+            {# Topic selections are tracked via URL params by toggleChip(), not hidden inputs #}
           {% else %}
             <p style="font-size:12px;color:var(--text-muted)">No topics yet</p>
           {% endif %}
@@ -113,7 +108,6 @@
 {% block page_script %}
 {% raw %}
 // ── Strip empty fields before GET form submits so URLs stay clean ────────────
-// Without this, selects/inputs with "" values appear as "license=" in the URL.
 document.getElementById('filter-form').addEventListener('submit', function() {
   Array.from(this.elements).forEach(function(el) {
     if ((el.tagName === 'SELECT' || el.tagName === 'INPUT') && el.value === '') {
@@ -122,25 +116,28 @@ document.getElementById('filter-form').addEventListener('submit', function() {
   });
 });
 
-// ── Chip toggle helper (progressive enhancement — GET form works without JS) ─
+// ── Chip toggle — reads/writes the URL directly so multi-select is reliable ──
+// Using URLSearchParams as source of truth avoids hidden-input DOM edge cases.
 window.toggleChip = function(evt, filterName, value) {
   evt.preventDefault();
-  const form    = document.getElementById('filter-form');
-  const cls     = filterName + '-hidden';
-  const hiddens = Array.from(form.querySelectorAll('input.' + cls));
-  const exists  = hiddens.find(h => h.value === value);
-  if (exists) {
-    exists.remove();
+
+  const params  = new URLSearchParams(window.location.search);
+  const current = params.getAll(filterName);
+
+  if (current.includes(value)) {
+    // Deselect: rebuild the list without this value
+    params.delete(filterName);
+    current.filter(function(v) { return v !== value; })
+           .forEach(function(v) { params.append(filterName, v); });
+    evt.currentTarget.classList.remove('active');
   } else {
-    const inp = document.createElement('input');
-    inp.type  = 'hidden';
-    inp.name  = filterName;
-    inp.value = value;
-    inp.classList.add(cls);
-    form.appendChild(inp);
+    // Select: add this value
+    params.append(filterName, value);
+    evt.currentTarget.classList.add('active');
   }
-  evt.currentTarget.classList.toggle('active');
-  form.requestSubmit();
+
+  var url = '/explore?' + params.toString();
+  htmx.ajax('GET', url, { target: '#repo-grid', swap: 'innerHTML', pushURL: url });
 };
 {% endraw %}
 {% endblock %}
