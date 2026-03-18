@@ -112,6 +112,16 @@
 
 {% block page_script %}
 {% raw %}
+// ── Strip empty fields before GET form submits so URLs stay clean ────────────
+// Without this, selects/inputs with "" values appear as "license=" in the URL.
+document.getElementById('filter-form').addEventListener('submit', function() {
+  Array.from(this.elements).forEach(function(el) {
+    if ((el.tagName === 'SELECT' || el.tagName === 'INPUT') && el.value === '') {
+      el.disabled = true;
+    }
+  });
+});
+
 // ── Chip toggle helper (progressive enhancement — GET form works without JS) ─
 window.toggleChip = function(evt, filterName, value) {
   evt.preventDefault();
