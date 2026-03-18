@@ -69,6 +69,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
@@ -168,7 +169,7 @@ def _breadcrumbs(*segments: tuple[str, str]) -> list[dict[str, str]]:
 
 async def _resolve_repo(
     owner: str, repo_slug: str, db: AsyncSession
-) -> tuple[str, str, dict]:
+) -> tuple[str, str, dict[str, Any]]:
     """Resolve owner+slug to repo_id; raise 404 if not found.
 
     Returns (repo_id, base_url, nav_ctx) where nav_ctx contains all
@@ -202,7 +203,7 @@ async def _resolve_repo(
     open_pr_count: int = pr_count_result.scalar_one_or_none() or 0
     open_issue_count: int = issue_count_result.scalar_one_or_none() or 0
 
-    nav_ctx: dict = {
+    nav_ctx: dict[str, Any] = {
         "repo_key": row.key_signature or "",
         "repo_bpm": row.tempo_bpm,
         "repo_tags": row.tags or [],
@@ -562,7 +563,7 @@ async def repo_page(
         ),
     )
     tags_count = len(releases)
-    nav_ctx: dict = {
+    nav_ctx: dict[str, Any] = {
         "repo_key": repo.key_signature or "",
         "repo_bpm": repo.tempo_bpm,
         "repo_tags": repo.tags or [],
@@ -575,7 +576,7 @@ async def repo_page(
     orm_repo = await db.get(musehub_db.MusehubRepo, repo_id)
     repo_license: str = ""
     if orm_repo and orm_repo.settings and isinstance(orm_repo.settings, dict):
-        repo_license = orm_repo.settings.get("license", "") or ""
+        repo_license = str(orm_repo.settings.get("license", "") or "")
 
     page_url = str(request.url)
     ctx: dict[str, object] = {
@@ -1377,7 +1378,7 @@ async def embed_page(
     - Returns ``X-Frame-Options: ALLOWALL`` so browsers permit cross-origin framing.
     - Audio fetched from ``/api/v1/repos/{repo_id}/objects`` at runtime.
     """
-    repo_id, _ = await _resolve_repo(owner, repo_slug, db)
+    repo_id, _base, _nav = await _resolve_repo(owner, repo_slug, db)
     short_ref = ref[:8] if len(ref) >= 8 else ref
     listen_url = _base_url(owner, repo_slug)
 
@@ -1585,8 +1586,8 @@ async def credits_page(
     total_all_commits: int = sum(c.session_count for c in contributors) if contributors else 0
     max_commits: int       = max((c.session_count for c in contributors), default=1)
 
-    from datetime import timezone as _tz
-    _epoch = __import__("datetime").datetime(1970, 1, 1, tzinfo=_tz.utc)
+    from datetime import datetime as _dt, timezone as _tz
+    _epoch = _dt(1970, 1, 1, tzinfo=_tz.utc)
     project_start = min((c.first_active for c in contributors), default=_epoch)
     project_end   = max((c.last_active  for c in contributors), default=_epoch)
     project_span_days: int = max(0, (project_end - project_start).days)
@@ -1928,10 +1929,10 @@ async def divergence_page(  # noqa: C901 (complex but self-contained)
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     # --- Fetch branches and commits in parallel -------------------------
-    async def _get_branches():
+    async def _get_branches() -> list[Any]:
         return await musehub_repository.list_branches(db, repo_id)
 
-    async def _get_commits():
+    async def _get_commits() -> list[Any]:
         r = await db.execute(
             sa_select(musehub_db.MusehubCommit)
             .where(musehub_db.MusehubCommit.repo_id == repo_id)
@@ -2018,8 +2019,8 @@ async def divergence_page(  # noqa: C901 (complex but self-contained)
     radar_ring_50: str = ""
     radar_ring_75: str = ""
     radar_ring_100: str = ""
-    radar_axes: list[dict] = []
-    radar_dot_pts: list[dict] = []
+    radar_axes: list[dict[str, Any]] = []
+    radar_dot_pts: list[dict[str, Any]] = []
 
     def _make_radar(scores: list[float], r: float = 90.0,
                     cx: float = 120.0, cy: float = 120.0) -> None:
@@ -2063,7 +2064,7 @@ async def divergence_page(  # noqa: C901 (complex but self-contained)
     if len(branch_names) >= 2:
         try:
             result = await musehub_divergence.compute_hub_divergence(
-                db, repo_id, default_branch, initial_branch_b
+                db, repo_id=repo_id, branch_a=default_branch, branch_b=initial_branch_b
             )
             initial_divergence = result
             scores = [d.score for d in result.dimensions]
@@ -2299,7 +2300,7 @@ async def release_detail_page(
             )
         ),
     )
-    nav_ctx_release: dict = {
+    nav_ctx_release: dict[str, Any] = {
         "repo_key": repo.key_signature or "",
         "repo_bpm": repo.tempo_bpm,
         "repo_tags": repo.tags or [],
@@ -2979,7 +2980,7 @@ async def branches_page(
 
     # Fetch HEAD commit metadata for all branches in a single query.
     head_ids = [b.head_commit_id for b in branch_data.branches if b.head_commit_id]
-    commit_meta: dict[str, dict] = {}
+    commit_meta: dict[str, dict[str, Any]] = {}
     if head_ids:
         rows = (
             await db.execute(
