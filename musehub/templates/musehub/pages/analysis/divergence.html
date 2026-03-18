@@ -259,18 +259,18 @@ window.__analysisCfg = {
       {# Branch selectors #}
       <div class="an-branch-selectors">
         <span class="an-branch-lbl">Compare</span>
-        <select id="an-branch-a" class="an-branch-select" onchange="window.onBranchChange && window.onBranchChange()">
+        <select id="an-branch-a" class="an-branch-select">
           {% for b in branch_names %}
           <option value="{{ b }}" {% if b == default_branch %}selected{% endif %}>{{ b }}</option>
           {% endfor %}
         </select>
         <span class="an-branch-vs">vs</span>
-        <select id="an-branch-b" class="an-branch-select" onchange="window.onBranchChange && window.onBranchChange()">
+        <select id="an-branch-b" class="an-branch-select">
           {% for b in branch_names %}
           <option value="{{ b }}" {% if b == initial_branch_b %}selected{% endif %}>{{ b }}</option>
           {% endfor %}
         </select>
-        <button class="an-compare-btn" onclick="window.onBranchChange && window.onBranchChange()">Compare</button>
+        <button id="an-compare-btn" class="an-compare-btn">Compare</button>
       </div>
 
       {# Divergence result — SSR'd initial state, updated by TypeScript #}

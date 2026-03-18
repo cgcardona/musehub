@@ -231,16 +231,21 @@ export function initAnalysis(): void {
   const selA = document.getElementById('an-branch-a') as HTMLSelectElement | null;
   const selB = document.getElementById('an-branch-b') as HTMLSelectElement | null;
 
-  window.onBranchChange = () => {
+  const doCompare = () => {
     const bA = selA?.value;
     const bB = selB?.value;
     if (bA && bB) void loadDivergence(bA, bB);
   };
 
-  // Do NOT auto-trigger on page load — the server already rendered the initial
-  // divergence state via SSR. Only fire when the user changes a selector or
-  // clicks Compare, to avoid clobbering the SSR'd content with a 422 error
-  // when one of the pre-selected branches has no commits yet.
+  // Attach event listeners via JS — no inline onchange/onclick on the HTML
+  // elements. This prevents Chrome's autofill extension from firing change
+  // events before our handler is ready and accidentally triggering API calls.
+  selA?.addEventListener('change', doCompare);
+  selB?.addEventListener('change', doCompare);
+  document.getElementById('an-compare-btn')?.addEventListener('click', doCompare);
+
+  // Keep window.onBranchChange as a no-op fallback (template may reference it)
+  window.onBranchChange = doCompare;
 }
 
 declare global {
