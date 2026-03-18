@@ -62,10 +62,10 @@ async def test_all_musehub_endpoints_in_spec(openapi_spec: dict) -> None: # type
     """Core MuseHub API paths appear in the OpenAPI spec."""
     paths = openapi_spec["paths"]
     expected_path_prefixes = [
-        "/api/v1/musehub/repos",
-        "/api/v1/musehub/search",
-        "/api/v1/musehub/discover",
-        "/api/v1/musehub/users",
+        "/api/v1/repos",
+        "/api/v1/search",
+        "/api/v1/discover",
+        "/api/v1/users",
     ]
     for prefix in expected_path_prefixes:
         matching = [p for p in paths if p.startswith(prefix)]

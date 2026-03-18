@@ -197,7 +197,7 @@ async def test_expired_token_rejected_on_create_repo(
 
     expired = _make_expired_token(user_id="expired-user-id")
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "beats", "owner": "testuser"},
         headers={"Authorization": f"Bearer {expired}"},
     )
@@ -217,7 +217,7 @@ async def test_tampered_token_rejected_on_create_repo(
     valid = create_access_token(user_id="tamper-user-id", expires_hours=1)
     tampered = _make_tampered_token(valid)
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "beats", "owner": "testuser"},
         headers={"Authorization": f"Bearer {tampered}"},
     )
@@ -228,7 +228,7 @@ async def test_tampered_token_rejected_on_create_repo(
 async def test_garbage_token_rejected(client: AsyncClient, db_session: AsyncSession) -> None:
     """A completely invalid token string returns 401."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "beats", "owner": "testuser"},
         headers={"Authorization": "Bearer not-a-jwt-at-all"},
     )
@@ -240,7 +240,7 @@ async def test_none_alg_token_rejected(client: AsyncClient, db_session: AsyncSes
     """alg=none token is rejected — signature bypass attempt must fail."""
     token = _make_none_alg_token()
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "beats", "owner": "testuser"},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -249,7 +249,7 @@ async def test_none_alg_token_rejected(client: AsyncClient, db_session: AsyncSes
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("endpoint,method,body", [
-    ("/api/v1/musehub/repos", "POST", {"name": "x", "owner": "y"}),
+    ("/api/v1/repos", "POST", {"name": "x", "owner": "y"}),
     ("/api/v1/repos/fake-id/issues", "POST", {"title": "t"}),
     ("/api/v1/repos/fake-id/issues/1/close", "POST", {}),
 ])

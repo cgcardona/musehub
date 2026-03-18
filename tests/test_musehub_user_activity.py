@@ -306,7 +306,7 @@ async def test_list_user_activity_events_newest_first(db_session: AsyncSession) 
 @pytest.mark.anyio
 async def test_get_user_activity_404_unknown_username(client: AsyncClient) -> None:
     """GET /musehub/users/{username}/activity returns 404 for unknown username."""
-    response = await client.get("/api/v1/musehub/users/nobody-xyz/activity")
+    response = await client.get("/api/v1/users/nobody-xyz/activity")
     assert response.status_code == 404
 
 
@@ -317,11 +317,11 @@ async def test_get_user_activity_empty_feed(
 ) -> None:
     """GET activity returns empty feed for a user with no events."""
     await client.post(
-        "/api/v1/musehub/users",
+        "/api/v1/users",
         json={"username": "acttest1"},
         headers=auth_headers,
     )
-    response = await client.get("/api/v1/musehub/users/acttest1/activity")
+    response = await client.get("/api/v1/users/acttest1/activity")
     assert response.status_code == 200
     body = response.json()
     assert body["events"] == []
@@ -336,12 +336,12 @@ async def test_get_user_activity_returns_public_events(
 ) -> None:
     """GET activity returns events from public repos."""
     await client.post(
-        "/api/v1/musehub/users",
+        "/api/v1/users",
         json={"username": "acttest2"},
         headers=auth_headers,
     )
     repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "act-repo", "owner": "acttest2", "visibility": "public"},
         headers=auth_headers,
     )
@@ -354,7 +354,7 @@ async def test_get_user_activity_returns_public_events(
     )
     await db_session.commit()
 
-    response = await client.get("/api/v1/musehub/users/acttest2/activity")
+    response = await client.get("/api/v1/users/acttest2/activity")
     assert response.status_code == 200
     body = response.json()
     assert len(body["events"]) == 1
@@ -372,12 +372,12 @@ async def test_get_user_activity_type_filter_via_api(
 ) -> None:
     """?type=issue filter returns only issue-type events."""
     await client.post(
-        "/api/v1/musehub/users",
+        "/api/v1/users",
         json={"username": "acttest3"},
         headers=auth_headers,
     )
     repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "act-repo3", "owner": "acttest3", "visibility": "public"},
         headers=auth_headers,
     )
@@ -395,7 +395,7 @@ async def test_get_user_activity_type_filter_via_api(
     await db_session.commit()
 
     response = await client.get(
-        "/api/v1/musehub/users/acttest3/activity?type=issue"
+        "/api/v1/users/acttest3/activity?type=issue"
     )
     assert response.status_code == 200
     body = response.json()
@@ -411,12 +411,12 @@ async def test_get_user_activity_invalid_type_returns_422(
 ) -> None:
     """?type=invalid returns 422 (query param validation)."""
     await client.post(
-        "/api/v1/musehub/users",
+        "/api/v1/users",
         json={"username": "acttest4"},
         headers=auth_headers,
     )
     response = await client.get(
-        "/api/v1/musehub/users/acttest4/activity?type=invalid"
+        "/api/v1/users/acttest4/activity?type=invalid"
     )
     assert response.status_code == 422
 
@@ -429,12 +429,12 @@ async def test_get_user_activity_limit_param(
 ) -> None:
     """?limit=2 returns at most 2 events."""
     await client.post(
-        "/api/v1/musehub/users",
+        "/api/v1/users",
         json={"username": "acttest5"},
         headers=auth_headers,
     )
     repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "act-repo5", "owner": "acttest5", "visibility": "public"},
         headers=auth_headers,
     )
@@ -449,7 +449,7 @@ async def test_get_user_activity_limit_param(
     await db_session.commit()
 
     response = await client.get(
-        "/api/v1/musehub/users/acttest5/activity?limit=2"
+        "/api/v1/users/acttest5/activity?limit=2"
     )
     assert response.status_code == 200
     body = response.json()

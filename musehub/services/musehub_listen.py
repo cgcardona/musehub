@@ -55,7 +55,7 @@ def _piano_roll_url(path: str, object_map: dict[str, str], repo_id: str) -> str 
     for obj_path, obj_id in object_map.items():
         ext = os.path.splitext(obj_path)[1].lower()
         if ext in _IMAGE_EXTENSIONS and os.path.splitext(os.path.basename(obj_path))[0] == stem:
-            return f"/api/v1/musehub/repos/{repo_id}/objects/{obj_id}/content"
+            return f"/api/v1/repos/{repo_id}/objects/{obj_id}/content"
     return None
 
 
@@ -109,7 +109,7 @@ async def build_track_listing(
         )
 
     def _audio_url(object_id: str) -> str:
-        return f"/api/v1/musehub/repos/{repo_id}/objects/{object_id}/content"
+        return f"/api/v1/repos/{repo_id}/objects/{object_id}/content"
 
     full_mix_obj = next(
         (

@@ -72,7 +72,7 @@ def _pull_payload(
 
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "test-repo") -> str:
     r = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )

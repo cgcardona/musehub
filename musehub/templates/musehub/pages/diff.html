@@ -202,7 +202,7 @@ async function loadCommitAudio(cid) {
       return ['mp3','ogg','wav','flac'].includes(ext);
     });
     if (audioObj) {
-      const url = '/api/v1/musehub/repos/' + repoId + '/objects/' + audioObj.objectId + '/content';
+      const url = '/api/v1/repos/' + repoId + '/objects/' + audioObj.objectId + '/content';
       queueAudio(url, shortSha(cid), repoId);
     } else {
       alert('No audio artifacts found for this commit.');

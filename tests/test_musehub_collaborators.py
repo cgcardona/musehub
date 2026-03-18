@@ -26,7 +26,7 @@ _COLLABORATOR_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "collab-test-repo") -> str:
     """Create a repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser"},
         headers=auth_headers,
     )

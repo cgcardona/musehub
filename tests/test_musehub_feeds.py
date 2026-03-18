@@ -52,7 +52,7 @@ async def _create_public_repo(
 ) -> str:
     """Create a public repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "visibility": "public"},
         headers=auth_headers,
     )
@@ -68,7 +68,7 @@ async def _create_private_repo(
 ) -> str:
     """Create a private repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )

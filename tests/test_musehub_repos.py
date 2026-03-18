@@ -36,7 +36,7 @@ async def test_create_repo_returns_201(
 ) -> None:
     """POST /musehub/repos creates a repo and returns all required fields."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "my-beats", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -54,7 +54,7 @@ async def test_create_repo_returns_201(
 async def test_create_repo_requires_auth(client: AsyncClient) -> None:
     """POST /musehub/repos returns 401 without a Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "my-beats", "owner": "testuser"},
     )
     assert response.status_code == 401
@@ -67,7 +67,7 @@ async def test_create_repo_default_visibility_is_private(
 ) -> None:
     """Omitting visibility defaults to 'private'."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "silent-sessions", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -87,7 +87,7 @@ async def test_get_repo_returns_200(
 ) -> None:
     """GET /repos/{repo_id} returns the repo after creation."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "jazz-sessions", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -135,7 +135,7 @@ async def test_list_branches_empty_on_new_repo(
 ) -> None:
     """A newly created repo has an empty branches list when not initialized."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "drum-patterns", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -174,7 +174,7 @@ async def test_list_commits_empty_on_new_repo(
 ) -> None:
     """A new repo has no commits when initialize=false."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "empty-repo", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -201,7 +201,7 @@ async def test_list_commits_returns_newest_first(
 
     # Create repo via API (no init commit so we control the full history)
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "ordered-commits", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -251,7 +251,7 @@ async def test_list_commits_limit_param(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "limited-repo", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -342,7 +342,7 @@ async def test_divergence_endpoint_returns_five_dimensions(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "divergence-test-repo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -403,7 +403,7 @@ async def test_divergence_overall_score_is_mean_of_dimensions(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "divergence-mean-repo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -456,7 +456,7 @@ async def test_divergence_json_response_structure(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "divergence-struct-repo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -525,7 +525,7 @@ async def test_divergence_endpoint_returns_422_for_empty_branch(
 ) -> None:
     """GET /divergence returns 422 when a branch has no commits."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "empty-branch-repo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -551,7 +551,7 @@ async def test_graph_dag_endpoint_returns_empty_for_new_repo(
 ) -> None:
     """GET /dag returns empty nodes/edges for a repo with no commits (initialize=false)."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-empty", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -578,7 +578,7 @@ async def test_graph_dag_has_edges(
     from datetime import datetime, timezone, timedelta
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-edges", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -630,7 +630,7 @@ async def test_graph_dag_endpoint_topological_order(
     from datetime import datetime, timedelta, timezone
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-topo", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -713,7 +713,7 @@ async def test_graph_json_response_has_required_fields(
     from datetime import datetime, timezone
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "dag-fields", "owner": "testuser"},
         headers=auth_headers,
     )
@@ -993,7 +993,7 @@ async def _make_compare_repo(
     from datetime import datetime, timezone
 
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "compare-test", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -1083,7 +1083,7 @@ async def test_compare_unknown_ref_422(
 ) -> None:
     """Unknown ref (branch with no commits) returns 422."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "empty-compare", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -1838,7 +1838,7 @@ async def test_delete_repo_returns_204(
 ) -> None:
     """DELETE /repos/{repo_id} soft-deletes a repo owned by the caller and returns 204."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "to-delete", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -1856,7 +1856,7 @@ async def test_delete_repo_hides_repo_from_get(
 ) -> None:
     """After DELETE, GET /repos/{repo_id} returns 404."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "hidden-after-delete", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -1969,7 +1969,7 @@ async def test_transfer_repo_ownership_returns_200(
 ) -> None:
     """POST /repos/{repo_id}/transfer returns 200 with updated ownerUserId."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "transfer-me", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -2024,7 +2024,7 @@ async def test_create_repo_wizard_initialize_creates_branch_and_commit(
 ) -> None:
     """POST /repos with initialize=true creates a default branch + initial commit."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "wizard-init-repo",
             "owner": "testuser",
@@ -2062,7 +2062,7 @@ async def test_create_repo_wizard_no_initialize_stays_empty(
 ) -> None:
     """POST /repos with initialize=false leaves branches and commits empty."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "wizard-noinit-repo",
             "owner": "testuser",
@@ -2093,7 +2093,7 @@ async def test_create_repo_wizard_topics_merged_into_tags(
 ) -> None:
     """POST /repos with topics merges them into the tag list (deduplicated)."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "topics-test-repo",
             "owner": "testuser",
@@ -2118,7 +2118,7 @@ async def test_create_repo_wizard_clone_url_uses_musehub_scheme(
 ) -> None:
     """Clone URL returned by POST /repos uses the musehub:// protocol scheme."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "clone-url-test", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
@@ -2150,7 +2150,7 @@ async def test_create_repo_wizard_template_copies_description(
     template_id = str(template.repo_id)
 
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "from-template-repo",
             "owner": "testuser",
@@ -2188,7 +2188,7 @@ async def test_create_repo_wizard_private_template_not_copied(
     template_id = str(private_template.repo_id)
 
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "refused-template-repo",
             "owner": "testuser",
@@ -2212,7 +2212,7 @@ async def test_create_repo_wizard_custom_default_branch(
 ) -> None:
     """POST /repos with initialize=true and custom defaultBranch creates the right branch."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={
             "name": "custom-branch-repo",
             "owner": "testuser",
@@ -2247,12 +2247,12 @@ async def test_list_my_repos_returns_owned_repos(
     # Create two repos
     for name in ("owned-repo-a", "owned-repo-b"):
         await client.post(
-            "/api/v1/musehub/repos",
+            "/api/v1/repos",
             json={"name": name, "owner": "testuser", "initialize": False},
             headers=auth_headers,
         )
 
-    resp = await client.get("/api/v1/musehub/repos", headers=auth_headers)
+    resp = await client.get("/api/v1/repos", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
     assert "repos" in body
@@ -2266,7 +2266,7 @@ async def test_list_my_repos_returns_owned_repos(
 @pytest.mark.anyio
 async def test_list_my_repos_requires_auth(client: AsyncClient) -> None:
     """GET /repos returns 401 without a Bearer token."""
-    resp = await client.get("/api/v1/musehub/repos")
+    resp = await client.get("/api/v1/repos")
     assert resp.status_code == 401
 
 
@@ -2359,16 +2359,16 @@ async def test_list_my_repos_total_matches_count(
     auth_headers: dict[str, str],
 ) -> None:
     """total field in GET /repos matches the number of repos created."""
-    initial = await client.get("/api/v1/musehub/repos", headers=auth_headers)
+    initial = await client.get("/api/v1/repos", headers=auth_headers)
     initial_total: int = initial.json()["total"]
 
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "total-count-test", "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )
 
-    resp = await client.get("/api/v1/musehub/repos", headers=auth_headers)
+    resp = await client.get("/api/v1/repos", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["total"] == initial_total + 1
 
@@ -2397,7 +2397,7 @@ async def test_list_my_repos_pagination_cursor(
     await db_session.commit()
 
     first_page = await client.get(
-        "/api/v1/musehub/repos?limit=1",
+        "/api/v1/repos?limit=1",
         headers=auth_headers,
     )
     assert first_page.status_code == 200
@@ -2407,7 +2407,7 @@ async def test_list_my_repos_pagination_cursor(
     assert next_cursor is not None
 
     second_page = await client.get(
-        f"/api/v1/musehub/repos?limit=1&cursor={next_cursor}",
+        f"/api/v1/repos?limit=1&cursor={next_cursor}",
         headers=auth_headers,
     )
     assert second_page.status_code == 200

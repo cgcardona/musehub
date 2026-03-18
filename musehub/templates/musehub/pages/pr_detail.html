@@ -12,7 +12,7 @@
 const repoId = {{ repo_id | tojson }};
 const prId   = {{ pr_id | tojson }};
 const base   = {{ base_url | tojson }};
-const apiBase = '/api/v1/musehub/repos/' + repoId;
+const apiBase = '/api/v1/repos/' + repoId;
 {% endblock %}
 
 {% block content %}
@@ -104,7 +104,7 @@ const apiBase = '/api/v1/musehub/repos/' + repoId;
         <h2 style="margin:0 0 var(--space-3);font-size:16px">Merge Pull Request</h2>
         <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3);flex-wrap:wrap">
           <button class="btn btn-primary"
-                  hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
+                  hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
                   hx-ext="json-enc"
                   hx-vals='{"mergeStrategy":"merge_commit","deleteBranch":true}'
                   hx-target="#merge-section"
@@ -113,7 +113,7 @@ const apiBase = '/api/v1/musehub/repos/' + repoId;
             ✓ Merge pull request
           </button>
           <button class="btn btn-secondary"
-                  hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
+                  hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
                   hx-ext="json-enc"
                   hx-vals='{"mergeStrategy":"squash","deleteBranch":true}'
                   hx-target="#merge-section"
@@ -122,7 +122,7 @@ const apiBase = '/api/v1/musehub/repos/' + repoId;
             Squash &amp; merge
           </button>
           <button class="btn btn-secondary"
-                  hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
+                  hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/merge"
                   hx-ext="json-enc"
                   hx-vals='{"mergeStrategy":"rebase","deleteBranch":true}'
                   hx-target="#merge-section"
@@ -165,7 +165,7 @@ const apiBase = '/api/v1/musehub/repos/' + repoId;
     {# New comment form — HTMX POST #}
     <div class="card" style="margin-top:var(--space-4)">
       <h3 style="margin:0 0 var(--space-3);font-size:15px">Leave a review comment</h3>
-      <form hx-post="/api/v1/musehub/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/comments"
+      <form hx-post="/api/v1/repos/{{ repo_id }}/pull-requests/{{ pr_id }}/comments"
             hx-target="#pr-comments"
             hx-swap="innerHTML"
             hx-ext="json-enc">

@@ -42,7 +42,7 @@ async def _create_repo(
     name: str = "webhook-test-repo",
 ) -> str:
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser"},
         headers=auth_headers,
     )

@@ -5,12 +5,12 @@
 
 {% block page_data %}
 const username        = {{ username | tojson }};
-const API_PROFILE     = '/api/v1/musehub/users/' + username;
-const API_FORKS       = '/api/v1/musehub/users/' + username + '/forks';
-const API_STARRED     = '/api/v1/musehub/users/' + username + '/starred';
-const API_WATCHED     = '/api/v1/musehub/users/' + username + '/watched';
-const API_FOLLOWERS   = '/api/v1/musehub/users/' + username + '/followers-list';
-const API_FOLLOWING   = '/api/v1/musehub/users/' + username + '/following-list';
+const API_PROFILE     = '/api/v1/users/' + username;
+const API_FORKS       = '/api/v1/users/' + username + '/forks';
+const API_STARRED     = '/api/v1/users/' + username + '/starred';
+const API_WATCHED     = '/api/v1/users/' + username + '/watched';
+const API_FOLLOWERS   = '/api/v1/users/' + username + '/followers-list';
+const API_FOLLOWING   = '/api/v1/users/' + username + '/following-list';
 {% endblock %}
 
 {% block page_script %}
@@ -154,12 +154,12 @@ async function toggleFollow() {
   const isFollowing = btn.dataset.following === 'true';
   try {
     if (isFollowing) {
-      await fetch('/api/v1/musehub/users/' + username + '/follow', { method: 'DELETE', headers: authHeaders() });
+      await fetch('/api/v1/users/' + username + '/follow', { method: 'DELETE', headers: authHeaders() });
       btn.dataset.following = 'false';
       btn.textContent = 'Follow';
       btn.classList.remove('following');
     } else {
-      await fetch('/api/v1/musehub/users/' + username + '/follow', { method: 'POST', headers: authHeaders() });
+      await fetch('/api/v1/users/' + username + '/follow', { method: 'POST', headers: authHeaders() });
       btn.dataset.following = 'true';
       btn.textContent = 'Following';
       btn.classList.add('following');
@@ -209,7 +209,7 @@ function switchTab(tab) {
 
 async function loadFollowState() {
   try {
-    const data = await fetch('/api/v1/musehub/users/' + username + '/followers', { headers: authHeaders() }).then(r => r.json());
+    const data = await fetch('/api/v1/users/' + username + '/followers', { headers: authHeaders() }).then(r => r.json());
     const countEl = document.getElementById('follower-count');
     if (countEl) {
       countEl.textContent = (data.follower_count || 0) + ' followers · ' + (data.following_count || 0) + ' following';

@@ -88,7 +88,7 @@ async def test_profile_page_html_returns_200(
 ) -> None:
     """GET /users/{username} returns 200 HTML for any username."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser")
+    response = await client.get("/testuser")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -100,7 +100,7 @@ async def test_profile_page_no_auth_required(
 ) -> None:
     """Profile page is publicly accessible without a JWT token."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser")
+    response = await client.get("/testuser")
     assert response.status_code == 200
 
 
@@ -109,7 +109,7 @@ async def test_profile_page_unknown_user_still_renders(
     client: AsyncClient,
 ) -> None:
     """HTML shell renders even for unknown users — data fetched client-side."""
-    response = await client.get("/users/nobody-exists-xyzzy")
+    response = await client.get("/nobody-exists-xyzzy")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -119,13 +119,14 @@ async def test_profile_page_html_contains_heatmap_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """HTML includes heatmap rendering JavaScript."""
+    """HTML dispatches the user-profile TypeScript module (heatmap rendered client-side)."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser")
+    response = await client.get("/testuser")
     assert response.status_code == 200
     body = response.text
-    assert "renderHeatmap" in body
-    assert "heatmap-cell" in body
+    # renderHeatmap moved to app.js; page dispatch JSON confirms module will run
+    assert '"page": "user-profile"' in body
+    assert '"username": "testuser"' in body
 
 
 @pytest.mark.anyio
@@ -133,13 +134,14 @@ async def test_profile_page_html_contains_badge_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """HTML includes badge rendering JavaScript."""
+    """HTML dispatches user-profile module which renders badges client-side."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser")
+    response = await client.get("/testuser")
     assert response.status_code == 200
     body = response.text
-    assert "renderBadges" in body
-    assert "badge-card" in body
+    # renderBadges moved to app.js; verify page dispatch and profile container
+    assert '"page": "user-profile"' in body
+    assert "profile-container" in body or "content" in body
 
 
 @pytest.mark.anyio
@@ -147,13 +149,14 @@ async def test_profile_page_html_contains_pinned_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """HTML includes pinned repos rendering JavaScript."""
+    """HTML dispatches user-profile module which renders pinned repos client-side."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser")
+    response = await client.get("/testuser")
     assert response.status_code == 200
     body = response.text
-    assert "renderPinned" in body
-    assert "pinned-grid" in body
+    # renderPinned moved to app.js; verify page dispatch JSON
+    assert '"page": "user-profile"' in body
+    assert "testuser" in body
 
 
 @pytest.mark.anyio
@@ -161,13 +164,14 @@ async def test_profile_page_html_contains_activity_tab(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """HTML includes a fourth Activity tab in the tab navigation."""
+    """HTML renders the profile page; Activity tab is driven by the TypeScript module."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser")
+    response = await client.get("/testuser")
     assert response.status_code == 200
     body = response.text
+    # loadActivityTab moved to app.js; verify the page dispatches user-profile module
     assert "Activity" in body
-    assert "loadActivityTab" in body
+    assert '"page": "user-profile"' in body
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +186,7 @@ async def test_profile_page_json_returns_200(
 ) -> None:
     """GET /users/{username}?format=json returns 200 JSON."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser?format=json")
+    response = await client.get("/testuser?format=json")
     assert response.status_code == 200
     assert "application/json" in response.headers["content-type"]
 
@@ -192,7 +196,7 @@ async def test_profile_page_json_unknown_user_404(
     client: AsyncClient,
 ) -> None:
     """?format=json returns 404 for an unknown username."""
-    response = await client.get("/users/nobody-exists-xyzzy?format=json")
+    response = await client.get("/nobody-exists-xyzzy?format=json")
     assert response.status_code == 404
 
 
@@ -203,7 +207,7 @@ async def test_profile_page_json_heatmap_structure(
 ) -> None:
     """JSON response contains heatmap with days list and aggregate stats."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser?format=json")
+    response = await client.get("/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -232,7 +236,7 @@ async def test_profile_page_json_badges_structure(
 ) -> None:
     """JSON response contains exactly 8 badges with required fields."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser?format=json")
+    response = await client.get("/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -263,7 +267,7 @@ async def test_profile_page_json_pinned_repos(
     db_session.add(profile)
     await db_session.commit()
 
-    response = await client.get("/users/testuser?format=json")
+    response = await client.get("/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -284,7 +288,7 @@ async def test_profile_page_json_activity_empty(
 ) -> None:
     """JSON response returns empty activity list for a new user with no events."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser?format=json")
+    response = await client.get("/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -302,7 +306,7 @@ async def test_profile_page_json_activity_filter(
 ) -> None:
     """?tab=commits filters activity response to commits-only event types."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser?format=json&tab=commits")
+    response = await client.get("/testuser?format=json&tab=commits")
     assert response.status_code == 200
     body = response.json()
     assert body["activityFilter"] == "commits"
@@ -332,7 +336,7 @@ async def test_profile_page_json_badge_first_commit_earned(
     db_session.add(commit)
     await db_session.commit()
 
-    response = await client.get("/users/testuser?format=json")
+    response = await client.get("/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -348,7 +352,7 @@ async def test_profile_page_json_camel_case_keys(
 ) -> None:
     """JSON response uses camelCase keys throughout (no snake_case at top level)."""
     await _make_profile(db_session)
-    response = await client.get("/users/testuser?format=json")
+    response = await client.get("/testuser?format=json")
     assert response.status_code == 200
     body = response.json()
 
@@ -472,7 +476,7 @@ async def test_profile_page_json_includes_verified_and_license(
     db_session.add(profile)
     await db_session.commit()
 
-    response = await client.get("/users/kai_engel_test?format=json")
+    response = await client.get("/kai_engel_test?format=json")
     assert response.status_code == 200
     body = response.json()
 

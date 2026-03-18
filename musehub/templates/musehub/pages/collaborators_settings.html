@@ -27,7 +27,7 @@ const base   = {{ base_url | tojson }};
 {# Invite form — hx-post to the collaborators API; response replaces #collaborator-rows #}
 <div class="card" style="margin-bottom: var(--space-4)">
   <h3 style="margin-bottom: var(--space-3)">Invite a collaborator</h3>
-  <form hx-post="/api/v1/musehub/repos/{{ repo_id }}/collaborators"
+  <form hx-post="/api/v1/repos/{{ repo_id }}/collaborators"
         hx-target="#collaborator-rows"
         hx-swap="innerHTML"
         hx-include="[name='user_id'],[name='permission']"

@@ -234,7 +234,7 @@ async def test_create_repo_success(
     assert resp.status_code == 201
     data = resp.json()
     assert "redirect" in data
-    assert "musehub/ui" in data["redirect"]
+    assert "welcome=1" in data["redirect"]
 
 
 @pytest.mark.anyio

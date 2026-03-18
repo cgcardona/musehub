@@ -106,7 +106,7 @@ from musehub.services.musehub_analysis import (
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str]) -> str:
     """Create a test repo and return its repo_id."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "analysis-test-repo", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )
@@ -1060,7 +1060,7 @@ async def test_harmony_endpoint_requires_auth_for_private_repo(
     """GET /analysis/{ref}/harmony on a private repo without auth returns 401."""
     # Create a private repo with valid auth, then access without auth.
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "private-harmony-repo", "owner": "testuser", "visibility": "private"},
         headers=auth_headers,
     )

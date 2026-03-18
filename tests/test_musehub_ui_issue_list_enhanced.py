@@ -436,10 +436,11 @@ async def test_issue_list_milestone_progress_bar_css_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """milestone-progress-bar-fill CSS class is defined in the page."""
+    """milestone-progress-bar-fill CSS class is in app.css; page renders milestone sidebar."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "milestone-progress-bar-fill" in body
+    # Class moved to app.css (SCSS refactor); verify the milestone sidebar renders instead
+    assert "milestone-progress-heading" in body
 
 
 @pytest.mark.anyio
@@ -622,10 +623,12 @@ async def test_issue_list_issue_templates_const_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """ISSUE_TEMPLATES constant is present in the page JS."""
+    """ISSUE_TEMPLATES is in app.js (TypeScript module); page dispatches issue-list module."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "ISSUE_TEMPLATES" in body
+    # ISSUE_TEMPLATES moved to app.js; verify page dispatch JSON and template picker HTML
+    assert '"page": "issue-list"' in body
+    assert "template-picker" in body
 
 
 @pytest.mark.anyio
@@ -739,10 +742,11 @@ async def test_issue_list_toggle_issue_select_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """toggleIssueSelect() JS function is present in the page."""
+    """toggleIssueSelect() is in app.js (TypeScript module); page renders bulk toolbar."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "toggleIssueSelect" in body
+    # Function moved to app.js; verify bulk toolbar HTML element is present
+    assert "bulk-toolbar" in body
 
 
 @pytest.mark.anyio
@@ -761,10 +765,11 @@ async def test_issue_list_update_bulk_toolbar_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """updateBulkToolbar() JS function is present in the page."""
+    """updateBulkToolbar() is in app.js (TypeScript module); page renders bulk action buttons."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "updateBulkToolbar" in body
+    # Function moved to app.js; verify bulk action buttons are in the HTML
+    assert "bulk-action-btn" in body
 
 
 @pytest.mark.anyio

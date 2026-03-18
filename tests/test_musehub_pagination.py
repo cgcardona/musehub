@@ -137,7 +137,7 @@ def test_build_link_header_preserves_existing_query_params() -> None:
 
 def test_build_cursor_link_header_emits_next_only() -> None:
     """build_cursor_link_header emits exactly one rel="next" with cursor and limit encoded."""
-    req = _make_request("http://test/api/v1/musehub/repos?limit=20")
+    req = _make_request("http://test/api/v1/repos?limit=20")
     header = build_cursor_link_header(req, next_cursor="abc123", limit=20)
     assert 'rel="next"' in header
     assert "cursor=abc123" in header
@@ -153,7 +153,7 @@ def test_build_cursor_link_header_emits_next_only() -> None:
 
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str) -> str:
     r = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser"},
         headers=auth_headers,
     )

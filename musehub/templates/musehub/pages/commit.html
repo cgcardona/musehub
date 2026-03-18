@@ -16,7 +16,7 @@
 const repoId   = {{ repo_id | tojson }};
 const commitId = {{ commit_id | tojson }};
 const base     = {{ base_url | tojson }};
-const apiBase  = '/api/v1/musehub/repos/' + repoId;
+const apiBase  = '/api/v1/repos/' + repoId;
 const listenUrl = {{ listen_url | tojson }};
 const embedUrl  = {{ embed_url | tojson }};
 const shortId   = {{ short_id | tojson }};
@@ -369,7 +369,7 @@ function buildBeforeAfterAudio(currentAudio, parentAudio, repoId) {
   const playerCard = (title, files, id_suffix) => {
     if (!files.length) return '';
     const f = files[0];
-    const url = '/api/v1/musehub/repos/' + repoId + '/objects/' + f.objectId + '/content';
+    const url = '/api/v1/repos/' + repoId + '/objects/' + f.objectId + '/content';
     const name = f.path.split('/').pop();
     return `<div class="ab-player" id="ab-${id_suffix}">
       <div class="ab-label">${title}</div>
@@ -747,7 +747,7 @@ async function load() {
           <div class="stem-browser" id="stem-browser">
             ${audioFiles.map((obj, i) => {
               const name = obj.path.split('/').pop().replace(/\.[^.]+$/, '');
-              const url  = '/api/v1/musehub/repos/' + repoId + '/objects/' + obj.objectId + '/content';
+              const url  = '/api/v1/repos/' + repoId + '/objects/' + obj.objectId + '/content';
               return `<div class="stem-row" id="stem-row-${i}">
                 <button class="player-btn" onclick="queueAudio('${url}','${escHtml(name)}','')" title="Play stem">▶</button>
                 <span class="stem-label">${escHtml(name)}</span>
@@ -882,7 +882,7 @@ async function load() {
             <h2 style="margin:0">Artifacts (${objects.length})</h2>
             ${audioFiles.length > 0 ? `
             <button class="btn btn-primary btn-sm"
-                    onclick="queueAudio('/api/v1/musehub/repos/${repoId}/objects/${audioFiles[0].objectId}/content',
+                    onclick="queueAudio('/api/v1/repos/${repoId}/objects/${audioFiles[0].objectId}/content',
                     '${escHtml(audioFiles[0].path.split('/').pop())}', '${escHtml(repoId)}')">
               ▶ Play Latest
             </button>` : ''}
@@ -953,7 +953,7 @@ async function load() {
     // Inline player: mount with all audio objects from this commit
     const playerTracks = currentAudio.map(obj => ({
       name: obj.path.split('/').pop().replace(/\.[^.]+$/, ''),
-      url:  '/api/v1/musehub/repos/' + repoId + '/objects/' + obj.objectId + '/content',
+      url:  '/api/v1/repos/' + repoId + '/objects/' + obj.objectId + '/content',
     }));
     buildInlinePlayer(playerTracks);
 

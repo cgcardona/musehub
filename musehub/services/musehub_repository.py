@@ -1741,7 +1741,7 @@ async def get_repo_settings(
     back-filled with ``_SETTINGS_DEFAULTS`` so new and legacy repos both return
     a complete response.
 
-    Called by ``GET /api/v1/musehub/repos/{repo_id}/settings``.
+    Called by ``GET /api/v1/repos/{repo_id}/settings``.
     """
     row = await session.get(db.MusehubRepo, repo_id)
     if row is None:
@@ -1784,7 +1784,7 @@ async def update_repo_settings(
     Returns None if the repo does not exist. The caller is responsible for
     committing the session after a successful return.
 
-    Called by ``PATCH /api/v1/musehub/repos/{repo_id}/settings``.
+    Called by ``PATCH /api/v1/repos/{repo_id}/settings``.
     """
     row = await session.get(db.MusehubRepo, repo_id)
     if row is None:

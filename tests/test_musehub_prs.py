@@ -42,7 +42,7 @@ async def _create_repo(
 ) -> str:
     """Create a repo via the API and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )

@@ -183,12 +183,12 @@ async def test_global_search_accessible_without_auth(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /api/v1/musehub/search returns 200 without a JWT.
+    """GET /api/v1/search returns 200 without a JWT.
 
     Global search is a public endpoint — uses optional_token, so unauthenticated
     requests are allowed and return results for public repos.
     """
-    response = await client.get("/api/v1/musehub/search?q=jazz")
+    response = await client.get("/api/v1/search?q=jazz")
     assert response.status_code == 200
 
 
@@ -198,9 +198,9 @@ async def test_global_search_json(
     db_session: AsyncSession,
     auth_headers: dict[str, str],
 ) -> None:
-    """GET /api/v1/musehub/search returns JSON with correct content-type."""
+    """GET /api/v1/search returns JSON with correct content-type."""
     response = await client.get(
-        "/api/v1/musehub/search?q=jazz",
+        "/api/v1/search?q=jazz",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -229,7 +229,7 @@ async def test_global_search_public_only(
     )
 
     response = await client.get(
-        "/api/v1/musehub/search?q=jazz",
+        "/api/v1/search?q=jazz",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -260,7 +260,7 @@ async def test_global_search_results_grouped(
     )
 
     response = await client.get(
-        "/api/v1/musehub/search?q=bossa+nova",
+        "/api/v1/search?q=bossa+nova",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -298,7 +298,7 @@ async def test_global_search_empty_query_handled(
     await _make_repo(db_session, name="silent-repo", visibility="public")
 
     response = await client.get(
-        "/api/v1/musehub/search?q=zyxqwvutsr_no_match",
+        "/api/v1/search?q=zyxqwvutsr_no_match",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -324,7 +324,7 @@ async def test_global_search_keyword_mode(
     )
 
     response = await client.get(
-        "/api/v1/musehub/search?q=blues&mode=keyword",
+        "/api/v1/search?q=blues&mode=keyword",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -351,7 +351,7 @@ async def test_global_search_pattern_mode(
     )
 
     response = await client.get(
-        "/api/v1/musehub/search?q=%25minor%25&mode=pattern",
+        "/api/v1/search?q=%25minor%25&mode=pattern",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -380,7 +380,7 @@ async def test_global_search_pagination(
         )
 
     response = await client.get(
-        "/api/v1/musehub/search?q=paginate&page=1&page_size=2",
+        "/api/v1/search?q=paginate&page=1&page_size=2",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -390,7 +390,7 @@ async def test_global_search_pagination(
     assert data["pageSize"] == 2
 
     response2 = await client.get(
-        "/api/v1/musehub/search?q=paginate&page=2&page_size=2",
+        "/api/v1/search?q=paginate&page=2&page_size=2",
         headers=auth_headers,
     )
     assert response2.status_code == 200
@@ -416,7 +416,7 @@ async def test_global_search_match_contains_required_fields(
     )
 
     response = await client.get(
-        "/api/v1/musehub/search?q=swing",
+        "/api/v1/search?q=swing",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -480,7 +480,7 @@ async def test_global_search_audio_preview_populated_for_multiple_repos(
     await db_session.commit()
 
     response = await client.get(
-        "/api/v1/musehub/search?q=funky",
+        "/api/v1/search?q=funky",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -507,7 +507,7 @@ async def test_global_search_audio_preview_absent_when_no_audio_objects(
     )
 
     response = await client.get(
-        "/api/v1/musehub/search?q=silent",
+        "/api/v1/search?q=silent",
         headers=auth_headers,
     )
     assert response.status_code == 200

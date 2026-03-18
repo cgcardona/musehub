@@ -106,7 +106,7 @@ const filename = {{ filename | tojson }};
 const owner    = {{ owner | tojson }};
 const repoSlug = {{ repo_slug | tojson }};
 const base     = {{ base_url | tojson }};
-const apiBase  = '/api/v1/musehub/repos/' + repoId;
+const apiBase  = '/api/v1/repos/' + repoId;
 // SSR guard: JS skips the API fetch if server already rendered the blob.
 const ssrBlobRendered = {{ 'true' if blob_found else 'false' }};
 {% endblock %}

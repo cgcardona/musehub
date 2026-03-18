@@ -33,7 +33,9 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.main import app
 from musehub.mcp.session import (
@@ -57,8 +59,8 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-@pytest.fixture
-async def http_client():
+@pytest_asyncio.fixture
+async def http_client(db_session: AsyncSession) -> AsyncClient:
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://localhost",

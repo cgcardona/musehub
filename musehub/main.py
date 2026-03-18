@@ -189,21 +189,26 @@ app.include_router(musehub_ui_stash_routes.router, tags=["musehub-ui-stash"])
 app.include_router(musehub_ui_forks_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_collab_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_labels_routes.router, tags=["musehub-ui"])
+
+# Fixed-path routers that must come BEFORE the /{owner}/{repo_slug} wildcard in ui_routes.router.
+# Registering them after would cause /oembed, /oembed/commit, /sitemap.xml, /mcp, etc.
+# to be shadowed and matched as if "oembed"/"sitemap"/"mcp" were repo owner names.
+app.include_router(musehub_oembed_routes.router, tags=["musehub-oembed"])
+app.include_router(musehub_raw_routes.router, prefix="/api/v1", tags=["musehub-raw"])
+app.include_router(musehub_sitemap_routes.router, tags=["musehub-sitemap"])
+app.include_router(mcp_router)
+
+# Wildcard UI routes — /{owner}/{repo_slug} and deeper paths.
+# Must come after all fixed-path routers above.
 app.include_router(musehub_ui_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_blame_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_settings_routes.router, tags=["musehub-ui-settings"])
 app.include_router(musehub_ui_similarity_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_emotion_diff_routes.router, tags=["musehub-ui"])
-app.include_router(musehub_oembed_routes.router, tags=["musehub-oembed"])
-app.include_router(musehub_raw_routes.router, prefix="/api/v1", tags=["musehub-raw"])
-app.include_router(musehub_sitemap_routes.router, tags=["musehub-sitemap"])
-# Profile catch-all MUST be last — /{username} is a single-segment wildcard and
-# would shadow fixed routes (e.g. /explore, /feed, /topics) if registered earlier.
-app.include_router(musehub_ui_profile_routes.router, tags=["musehub-ui"])
 
-# MCP endpoint — mounted at root (no prefix) per MCP spec.
-# POST /mcp accepts JSON-RPC 2.0 single requests and batch arrays.
-app.include_router(mcp_router)
+# Profile catch-all MUST be last — /{username} is a single-segment wildcard and
+# would shadow fixed routes (e.g. /explore, /feed, /topics, /mcp) if registered earlier.
+app.include_router(musehub_ui_profile_routes.router, tags=["musehub-ui"])
 
 if settings.debug:
     @app.get("/docs", include_in_schema=False)

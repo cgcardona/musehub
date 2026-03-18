@@ -30,7 +30,7 @@ async def test_create_repo_response_shape(
 ) -> None:
     """POST /repos returns all required fields with correct types."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "contract-test", "owner": "tester", "visibility": "public"},
         headers=auth_headers,
     )
@@ -57,7 +57,7 @@ async def test_get_repo_response_shape(
 ) -> None:
     """GET /repos/{id} returns all expected fields."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "get-shape-test", "owner": "tester"},
         headers=auth_headers,
     )
@@ -81,7 +81,7 @@ async def test_update_repo_settings_returns_updated_fields(
 ) -> None:
     """PATCH /repos/{id}/settings returns the updated repo fields."""
     create = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "patch-test-repo", "owner": "patcher"},
         headers=auth_headers,
     )
@@ -217,7 +217,7 @@ async def test_create_issue_response_shape(
 ) -> None:
     """POST /repos/{id}/issues returns title, body, status, number, createdAt."""
     create_repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "issue-contract-repo", "owner": "issuer"},
         headers=auth_headers,
     )
@@ -247,7 +247,7 @@ async def test_list_issues_returns_open_issues(
 ) -> None:
     """GET /repos/{id}/issues returns issues envelope with status=open."""
     create_repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "issue-list-contract", "owner": "issuer2"},
         headers=auth_headers,
     )
@@ -283,7 +283,7 @@ async def test_close_issue_changes_status(
 ) -> None:
     """POST /repos/{id}/issues/{n}/close sets status to 'closed'."""
     create_repo_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "close-issue-contract", "owner": "closer"},
         headers=auth_headers,
     )
@@ -316,17 +316,17 @@ async def test_explore_returns_public_repos(
 ) -> None:
     """GET /repos/explore returns public repos and excludes private ones."""
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "explore-public", "owner": "explorer", "visibility": "public"},
         headers=auth_headers,
     )
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "explore-private", "owner": "explorer", "visibility": "private"},
         headers=auth_headers,
     )
 
-    resp = await client.get("/api/v1/musehub/discover/repos")
+    resp = await client.get("/api/v1/discover/repos")
     assert resp.status_code == 200
     body = resp.json()
     repos = body if isinstance(body, list) else body.get("repos", body.get("items", []))

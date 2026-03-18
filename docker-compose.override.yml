@@ -4,6 +4,7 @@ services:
   musehub:
     build:
       context: .
+    working_dir: /app
     volumes:
       - ./musehub:/app/musehub
       - ./tests:/app/tests
@@ -14,6 +15,8 @@ services:
     environment:
       DEBUG: "true"
       CORS_ORIGINS: '["http://localhost:10003", "muse://"]'
+      # Fallback dev/test secret (≥32 bytes for HMAC-SHA256) — override in .env for production
+      ACCESS_TOKEN_SECRET: "${ACCESS_TOKEN_SECRET:-dev-test-secret-change-in-prod!!}"
     # Reload on code changes
     command: >
       uvicorn musehub.main:app

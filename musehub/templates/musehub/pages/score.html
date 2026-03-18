@@ -272,11 +272,11 @@ async function load() {
   try {
     // Try JSON content negotiation first for notation data
     const url = scorePath
-      ? '/api/v1/musehub/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref) + '/' + encodeURIComponent(scorePath)
-      : '/api/v1/musehub/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref);
+      ? '/api/v1/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref) + '/' + encodeURIComponent(scorePath)
+      : '/api/v1/repos/' + encodeURIComponent(repoId) + '/score/' + encodeURIComponent(ref);
 
     // Fall back to the notation endpoint if dedicated score endpoint not yet available
-    const notationUrl = '/api/v1/musehub/repos/' + encodeURIComponent(repoId) + '/notation/' + encodeURIComponent(ref);
+    const notationUrl = '/api/v1/repos/' + encodeURIComponent(repoId) + '/notation/' + encodeURIComponent(ref);
 
     let data = null;
     try {

@@ -52,7 +52,7 @@ async def _make_repo(
 ) -> str:
     """Create a repo via API and return its repo_id."""
     resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "visibility": visibility},
         headers=auth_headers,
     )
@@ -415,7 +415,7 @@ async def test_get_followers_returns_zero_for_new_user(
     client: AsyncClient,
 ) -> None:
     """GET /users/{u}/followers returns 0 followers for a user nobody follows."""
-    resp = await client.get("/api/v1/musehub/users/newbie/followers")
+    resp = await client.get("/api/v1/users/newbie/followers")
     assert resp.status_code == 200
     body = resp.json()
     assert body["follower_count"] == 0
@@ -433,7 +433,7 @@ async def test_follow_user_returns_201(
     auth_headers: dict[str, str],
 ) -> None:
     """POST /users/{u}/follow returns 201 and following=True."""
-    resp = await client.post("/api/v1/musehub/users/other-musician/follow", headers=auth_headers)
+    resp = await client.post("/api/v1/users/other-musician/follow", headers=auth_headers)
     assert resp.status_code == 201
     body = resp.json()
     assert body["following"] is True
@@ -446,14 +446,14 @@ async def test_follow_user_self_returns_400(
     auth_headers: dict[str, str],
 ) -> None:
     """POST /users/{u}/follow returns 400 when trying to follow yourself."""
-    resp = await client.post(f"/api/v1/musehub/users/{_TEST_USER_ID}/follow", headers=auth_headers)
+    resp = await client.post(f"/api/v1/users/{_TEST_USER_ID}/follow", headers=auth_headers)
     assert resp.status_code == 400
 
 
 @pytest.mark.anyio
 async def test_follow_user_requires_auth(client: AsyncClient) -> None:
     """POST /users/{u}/follow returns 401 without token."""
-    resp = await client.post("/api/v1/musehub/users/someone/follow")
+    resp = await client.post("/api/v1/users/someone/follow")
     assert resp.status_code == 401
 
 
@@ -463,8 +463,8 @@ async def test_follow_user_increments_follower_count(
     auth_headers: dict[str, str],
 ) -> None:
     """Follower count increments after a follow and resets after unfollow."""
-    await client.post("/api/v1/musehub/users/followed-user/follow", headers=auth_headers)
-    resp = await client.get("/api/v1/musehub/users/followed-user/followers", headers=auth_headers)
+    await client.post("/api/v1/users/followed-user/follow", headers=auth_headers)
+    resp = await client.get("/api/v1/users/followed-user/followers", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["follower_count"] == 1
     assert resp.json()["following"] is True
@@ -481,7 +481,7 @@ async def test_unfollow_user_returns_204(
     auth_headers: dict[str, str],
 ) -> None:
     """DELETE /users/{u}/follow returns 204 (no-op if not following)."""
-    resp = await client.delete("/api/v1/musehub/users/some-user/follow", headers=auth_headers)
+    resp = await client.delete("/api/v1/users/some-user/follow", headers=auth_headers)
     assert resp.status_code == 204
 
 
@@ -491,16 +491,16 @@ async def test_unfollow_decrements_count(
     auth_headers: dict[str, str],
 ) -> None:
     """Unfollow reduces the follower count back to 0."""
-    await client.post("/api/v1/musehub/users/temp-follow/follow", headers=auth_headers)
-    await client.delete("/api/v1/musehub/users/temp-follow/follow", headers=auth_headers)
-    resp = await client.get("/api/v1/musehub/users/temp-follow/followers")
+    await client.post("/api/v1/users/temp-follow/follow", headers=auth_headers)
+    await client.delete("/api/v1/users/temp-follow/follow", headers=auth_headers)
+    resp = await client.get("/api/v1/users/temp-follow/followers")
     assert resp.json()["follower_count"] == 0
 
 
 @pytest.mark.anyio
 async def test_unfollow_requires_auth(client: AsyncClient) -> None:
     """DELETE /users/{u}/follow returns 401 without token."""
-    resp = await client.delete("/api/v1/musehub/users/someone/follow")
+    resp = await client.delete("/api/v1/users/someone/follow")
     assert resp.status_code == 401
 
 
@@ -613,7 +613,7 @@ async def test_list_notifications_empty_inbox(
     auth_headers: dict[str, str],
 ) -> None:
     """GET /notifications returns empty list for a user with no notifications."""
-    resp = await client.get("/api/v1/musehub/notifications", headers=auth_headers)
+    resp = await client.get("/api/v1/notifications", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -621,7 +621,7 @@ async def test_list_notifications_empty_inbox(
 @pytest.mark.anyio
 async def test_list_notifications_requires_auth(client: AsyncClient) -> None:
     """GET /notifications returns 401 without token."""
-    resp = await client.get("/api/v1/musehub/notifications")
+    resp = await client.get("/api/v1/notifications")
     assert resp.status_code == 401
 
 
@@ -645,7 +645,7 @@ async def test_list_notifications_returns_own_notifications(
     db_session.add(notif)
     await db_session.commit()
 
-    resp = await client.get("/api/v1/musehub/notifications", headers=auth_headers)
+    resp = await client.get("/api/v1/notifications", headers=auth_headers)
     assert resp.status_code == 200
     items = resp.json()
     assert len(items) == 1
@@ -683,7 +683,7 @@ async def test_list_notifications_unread_only_filter(
     db_session.add_all([read_notif, unread_notif])
     await db_session.commit()
 
-    resp = await client.get("/api/v1/musehub/notifications?unread_only=true", headers=auth_headers)
+    resp = await client.get("/api/v1/notifications?unread_only=true", headers=auth_headers)
     assert resp.status_code == 200
     items = resp.json()
     assert len(items) == 1
@@ -716,7 +716,7 @@ async def test_mark_notification_read(
     db_session.add(notif)
     await db_session.commit()
 
-    resp = await client.post(f"/api/v1/musehub/notifications/{notif_id}/read", headers=auth_headers)
+    resp = await client.post(f"/api/v1/notifications/{notif_id}/read", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
     assert body["read"] is True
@@ -730,7 +730,7 @@ async def test_mark_notification_read_not_found(
 ) -> None:
     """POST /notifications/{id}/read returns 404 for unknown notification."""
     resp = await client.post(
-        f"/api/v1/musehub/notifications/{uuid.uuid4()}/read",
+        f"/api/v1/notifications/{uuid.uuid4()}/read",
         headers=auth_headers,
     )
     assert resp.status_code == 404
@@ -739,7 +739,7 @@ async def test_mark_notification_read_not_found(
 @pytest.mark.anyio
 async def test_mark_notification_read_requires_auth(client: AsyncClient) -> None:
     """POST /notifications/{id}/read returns 401 without token."""
-    resp = await client.post(f"/api/v1/musehub/notifications/{uuid.uuid4()}/read")
+    resp = await client.post(f"/api/v1/notifications/{uuid.uuid4()}/read")
     assert resp.status_code == 401
 
 
@@ -770,7 +770,7 @@ async def test_mark_all_notifications_read(
         )
     await db_session.commit()
 
-    resp = await client.post("/api/v1/musehub/notifications/read-all", headers=auth_headers)
+    resp = await client.post("/api/v1/notifications/read-all", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["marked_read"] == 3
 
@@ -778,7 +778,7 @@ async def test_mark_all_notifications_read(
 @pytest.mark.anyio
 async def test_mark_all_notifications_requires_auth(client: AsyncClient) -> None:
     """POST /notifications/read-all returns 401 without token."""
-    resp = await client.post("/api/v1/musehub/notifications/read-all")
+    resp = await client.post("/api/v1/notifications/read-all")
     assert resp.status_code == 401
 
 
@@ -1062,7 +1062,7 @@ async def test_get_feed_empty(
     auth_headers: dict[str, str],
 ) -> None:
     """GET /feed returns empty list for a user with no activity."""
-    resp = await client.get("/api/v1/musehub/feed", headers=auth_headers)
+    resp = await client.get("/api/v1/feed", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -1070,7 +1070,7 @@ async def test_get_feed_empty(
 @pytest.mark.anyio
 async def test_get_feed_requires_auth(client: AsyncClient) -> None:
     """GET /feed returns 401 without token."""
-    resp = await client.get("/api/v1/musehub/feed")
+    resp = await client.get("/api/v1/feed")
     assert resp.status_code == 401
 
 
@@ -1107,7 +1107,7 @@ async def test_get_feed_returns_user_notifications(
     db_session.add_all([older, newer])
     await db_session.commit()
 
-    resp = await client.get("/api/v1/musehub/feed", headers=auth_headers)
+    resp = await client.get("/api/v1/feed", headers=auth_headers)
     assert resp.status_code == 200
     items = resp.json()
     assert len(items) == 2

@@ -10,7 +10,7 @@ can download the composition in their preferred format:
 - ``metadata`` — JSON manifest with tempo, key, and arrangement info
 
 At MVP these URLs are deterministic paths served by the object download
-endpoint (``GET /api/v1/musehub/repos/{repo_id}/objects/{object_id}/content``).
+endpoint (``GET /api/v1/repos/{repo_id}/objects/{object_id}/content``).
 For releases that don't have a pinned commit or whose commit has no stored
 objects, the URLs are ``None`` — the frontend renders "not available" for those
 entries.
@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from musehub.models.musehub import ReleaseDownloadUrls
 
-_BASE_API = "/api/v1/musehub"
+_BASE_API = "/api/v1"
 
 
 def build_download_urls(

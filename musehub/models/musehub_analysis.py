@@ -625,7 +625,7 @@ class SectionSimilarityHeatmap(CamelModel):
 class FormStructureResponse(CamelModel):
     """Combined form and structure analysis for a Muse commit ref.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/form-structure/{ref}``.
+    Returned by ``GET /api/v1/repos/{repo_id}/form-structure/{ref}``.
     Combines three complementary views of the piece's formal architecture:
 
     - ``section_map``: timeline of sections with bar ranges and colour hints
@@ -1004,7 +1004,7 @@ class HarmonyModulationEvent(CamelModel):
 class HarmonyAnalysisResponse(CamelModel):
     """Dedicated harmonic analysis response for a Muse commit ref.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/harmony``.
+    Returned by ``GET /api/v1/repos/{repo_id}/analysis/{ref}/harmony``.
     Maps to the ``muse harmony --ref {ref}`` command output.
 
     Unlike the generic ``harmony`` dimension in :class:`AnalysisResponse` (which
@@ -1058,7 +1058,7 @@ class RecallMatch(CamelModel):
 class RecallResponse(CamelModel):
     """Response for the semantic recall endpoint.
 
-    Returned by ``GET /api/v1/musehub/repos/{repo_id}/analysis/{ref}/recall?q=``.
+    Returned by ``GET /api/v1/repos/{repo_id}/analysis/{ref}/recall?q=``.
 
     Agents use this to surface musically relevant commits given a natural-language
     query (e.g. ``"a jazzy chord progression with swing groove"``). The results

@@ -22,7 +22,7 @@ const owner    = {{ owner | tojson }};
 const repoSlug = {{ repo_slug | tojson }};
 const base     = {{ base_url | tojson }};
 const trackPath = {{ (track_path if track_path is defined else '') | tojson }};
-const apiBase  = '/api/v1/musehub/repos/' + repoId;
+const apiBase  = '/api/v1/repos/' + repoId;
 const TRACK_PATH = trackPath;
 {% endblock %}
 

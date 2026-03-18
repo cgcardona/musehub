@@ -8,7 +8,7 @@
 
 {% block page_data %}
 const repoId  = {{ repo_id | tojson }};
-const apiBase = '/api/v1/musehub/repos/' + repoId;
+const apiBase = '/api/v1/repos/' + repoId;
 const uiBase  = {{ base_url | tojson }};
 {% endblock %}
 

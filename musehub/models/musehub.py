@@ -1274,7 +1274,7 @@ class ExploreRepoResult(CamelModel):
 
 
 class ProfileUpdateRequest(CamelModel):
-    """Body for PUT /api/v1/musehub/users/{username}.
+    """Body for PUT /api/v1/users/{username}.
 
     All fields are optional -- send only the ones to change.
     ``is_verified`` and ``cc_license`` are intentionally excluded: they are
@@ -1311,7 +1311,7 @@ class ProfileRepoSummary(CamelModel):
 
 
 class ExploreResponse(CamelModel):
-    """Paginated response from GET /api/v1/musehub/discover/repos.
+    """Paginated response from GET /api/v1/discover/repos.
 
     ``total`` reflects the full filtered result set size -- not just the current
     page -- so clients can render pagination controls without a second query.
@@ -1344,7 +1344,7 @@ class ContributionDay(CamelModel):
 class ProfileResponse(CamelModel):
     """Full wire representation of a MuseHub user profile.
 
-    Returned by GET /api/v1/musehub/users/{username}.
+    Returned by GET /api/v1/users/{username}.
     ``repos`` contains only public repos when the caller is not the owner.
     ``contribution_graph`` is the last 52 weeks of daily commit activity.
     ``session_credits`` is the total number of commits across all repos
@@ -2305,7 +2305,7 @@ class UserForkedRepoEntry(CamelModel):
 class UserForksResponse(CamelModel):
     """Paginated list of repos forked by a user.
 
-    Returned by ``GET /api/v1/musehub/users/{username}/forks``.
+    Returned by ``GET /api/v1/users/{username}/forks``.
     """
 
     forks: list[UserForkedRepoEntry] = Field(..., description="Repos forked by this user")
@@ -2384,7 +2384,7 @@ class UserStarredRepoEntry(CamelModel):
 class UserStarredResponse(CamelModel):
     """Paginated list of repos starred by a user.
 
-    Returned by ``GET /api/v1/musehub/users/{username}/starred``.
+    Returned by ``GET /api/v1/users/{username}/starred``.
     """
 
     starred: list[UserStarredRepoEntry] = Field(..., description="Repos starred by this user")
@@ -2407,7 +2407,7 @@ class UserWatchedRepoEntry(CamelModel):
 class UserWatchedResponse(CamelModel):
     """Paginated list of repos watched by a user.
 
-    Returned by ``GET /api/v1/musehub/users/{username}/watched``.
+    Returned by ``GET /api/v1/users/{username}/watched``.
     """
 
     watched: list[UserWatchedRepoEntry] = Field(..., description="Repos watched by this user")

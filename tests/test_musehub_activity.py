@@ -161,7 +161,7 @@ async def test_get_activity_empty_public_repo(
 ) -> None:
     """GET /repos/{repo_id}/activity returns empty feed for new public repo."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "activity-test", "owner": "testuser", "visibility": "public"},
         headers=auth_headers,
     )
@@ -197,7 +197,7 @@ async def test_get_activity_event_type_filter_via_api(
 ) -> None:
     """event_type query param filters events correctly via the HTTP API."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "filter-test", "owner": "testuser2", "visibility": "public"},
         headers=auth_headers,
     )
@@ -237,7 +237,7 @@ async def test_activity_ui_page_returns_html(
 ) -> None:
     """GET /{owner}/{slug}/activity returns 200 HTML."""
     await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "ui-activity", "owner": "uiuser", "visibility": "public"},
         headers=auth_headers,
     )

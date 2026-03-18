@@ -130,8 +130,8 @@ async def test_explore_page_no_auth_required(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_list_public_repos_empty(client: AsyncClient, db_session: AsyncSession) -> None:
-    """GET /api/v1/musehub/discover/repos returns empty list when no public repos exist."""
-    response = await client.get("/api/v1/musehub/discover/repos")
+    """GET /api/v1/discover/repos returns empty list when no public repos exist."""
+    response = await client.get("/api/v1/discover/repos")
     assert response.status_code == 200
     body = response.json()
     assert body["repos"] == []
@@ -148,7 +148,7 @@ async def test_explore_only_public_repos(
     await _make_public_repo(db_session, name="public-one")
     await _make_private_repo(db_session, name="private-one")
 
-    response = await client.get("/api/v1/musehub/discover/repos")
+    response = await client.get("/api/v1/discover/repos")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -165,7 +165,7 @@ async def test_explore_filters_by_genre(
     await _make_public_repo(db_session, name="jazz-project", tags=["jazz", "swing"])
     await _make_public_repo(db_session, name="lofi-project", tags=["lo-fi", "chill"])
 
-    response = await client.get("/api/v1/musehub/discover/repos?genre=jazz")
+    response = await client.get("/api/v1/discover/repos?genre=jazz")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -180,7 +180,7 @@ async def test_explore_filters_by_key(
     await _make_public_repo(db_session, name="fsharp-minor", key_signature="F# minor")
     await _make_public_repo(db_session, name="c-major", key_signature="C major")
 
-    response = await client.get("/api/v1/musehub/discover/repos?key=F%23+minor")
+    response = await client.get("/api/v1/discover/repos?key=F%23+minor")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -196,7 +196,7 @@ async def test_explore_filters_by_tempo(
     await _make_public_repo(db_session, name="mid", tempo_bpm=100)
     await _make_public_repo(db_session, name="fast", tempo_bpm=150)
 
-    response = await client.get("/api/v1/musehub/discover/repos?tempo_min=90&tempo_max=120")
+    response = await client.get("/api/v1/discover/repos?tempo_min=90&tempo_max=120")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -211,7 +211,7 @@ async def test_explore_filters_by_instrumentation(
     await _make_public_repo(db_session, name="bass-heavy", tags=["jazz", "bass", "drums"])
     await _make_public_repo(db_session, name="keys-only", tags=["ambient", "keys"])
 
-    response = await client.get("/api/v1/musehub/discover/repos?instrumentation=bass")
+    response = await client.get("/api/v1/discover/repos?instrumentation=bass")
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
@@ -233,7 +233,7 @@ async def test_explore_sorts_by_stars(
     db_session.add_all([star1, star2, star3])
     await db_session.commit()
 
-    response = await client.get("/api/v1/musehub/discover/repos?sort=stars")
+    response = await client.get("/api/v1/discover/repos?sort=stars")
     assert response.status_code == 200
     body = response.json()
     repos = body["repos"]
@@ -253,7 +253,7 @@ async def test_explore_sorts_by_created(
     await _make_public_repo(db_session, name="first-created")
     await _make_public_repo(db_session, name="second-created")
 
-    response = await client.get("/api/v1/musehub/discover/repos?sort=created")
+    response = await client.get("/api/v1/discover/repos?sort=created")
     assert response.status_code == 200
     body = response.json()
     # Newest first — second-created was inserted last
@@ -269,8 +269,8 @@ async def test_explore_pagination(
     for i in range(5):
         await _make_public_repo(db_session, name=f"repo-{i:02d}")
 
-    page1 = (await client.get("/api/v1/musehub/discover/repos?page=1&page_size=3")).json()
-    page2 = (await client.get("/api/v1/musehub/discover/repos?page=2&page_size=3")).json()
+    page1 = (await client.get("/api/v1/discover/repos?page=1&page_size=3")).json()
+    page2 = (await client.get("/api/v1/discover/repos?page=2&page_size=3")).json()
 
     assert page1["total"] == 5
     assert page2["total"] == 5
@@ -285,7 +285,7 @@ async def test_explore_invalid_sort_returns_422(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     """sort= with an invalid value returns 422 Unprocessable Entity."""
-    response = await client.get("/api/v1/musehub/discover/repos?sort=invalid")
+    response = await client.get("/api/v1/discover/repos?sort=invalid")
     assert response.status_code == 422
 
 

@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 @pytest.mark.anyio
 @pytest.mark.parametrize("method,url,body", [
     # POST endpoints that require auth regardless of whether the repo exists
-    ("POST", "/api/v1/musehub/repos",                            {"name": "beats", "owner": "testuser"}),
+    ("POST", "/api/v1/repos",                            {"name": "beats", "owner": "testuser"}),
     ("POST", "/api/v1/repos/any-repo-id/issues",         {"title": "Bug report"}),
     ("POST", "/api/v1/repos/any-repo-id/issues/1/close", {}),
 ])
@@ -97,7 +97,7 @@ async def test_private_repo_returns_401_without_auth(
 ) -> None:
     """GET /repos/{id} returns 401 for a private repo without a token."""
     create_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "private-auth-test", "owner": "authtest", "visibility": "private"},
         headers=auth_headers,
     )
@@ -117,7 +117,7 @@ async def test_public_repo_accessible_without_auth(
 ) -> None:
     """GET /repos/{id} returns 200 for a public repo without a token."""
     create_resp = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "public-auth-test", "owner": "authtest", "visibility": "public"},
         headers=auth_headers,
     )
@@ -145,7 +145,7 @@ async def test_hub_routes_accept_valid_token(
 ) -> None:
     """POST /musehub/repos succeeds (201) with a valid Bearer token."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": "auth-sanity-repo", "owner": "testuser"},
         headers=auth_headers,
     )

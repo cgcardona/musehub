@@ -15,21 +15,24 @@ LOCAL_PG_URL ?= postgresql+asyncpg://musehub:musehub@localhost:5434/musehub
 
 # ── Testing ──────────────────────────────────────────────────────────────────
 
-test:           ## Run full parallel test suite with coverage (uses Docker Postgres on :5433)
+test:           ## Run full test suite inside Docker (no local deps required)
+	$(DOCKER) exec musehub pytest tests/ -q --tb=short
+
+test-fast:      ## Run tests without coverage inside Docker (faster feedback)
+	$(DOCKER) exec musehub pytest tests/ -q --tb=short -p no:cov
+
+test-cov:       ## Run tests with coverage inside Docker
+	$(DOCKER) exec musehub pytest tests/ -q --tb=short --cov=musehub --cov-report=term-missing
+
+test-single:    ## Run a single test file inside Docker: make test-single FILE=tests/test_musehub_repos.py
+	$(DOCKER) exec musehub pytest $(FILE) -v --tb=short
+
+test-k:         ## Run tests matching a keyword inside Docker: make test-k K=harmony
+	$(DOCKER) exec musehub pytest -k "$(K)" -v --tb=short
+
+# Local targets (require Docker Postgres reachable on :5434 from host)
+test-local:     ## Run full test suite locally against Docker Postgres
 	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -n auto --cov=musehub --cov-report=term-missing --tb=short -q
-
-test-fast:      ## Run tests without coverage (faster feedback loop)
-	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -n auto --tb=short -q
-
-test-cov:       ## Run tests and open HTML coverage report
-	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -n auto --cov=musehub --cov-report=html --tb=short -q
-	open htmlcov/index.html 2>/dev/null || xdg-open htmlcov/index.html 2>/dev/null || true
-
-test-single:    ## Run a single test file: make test-single FILE=tests/test_musehub_repos.py
-	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) $(FILE) -v --tb=short
-
-test-k:         ## Run tests matching a keyword: make test-k K=harmony
-	DATABASE_URL=$(LOCAL_PG_URL) $(PYTEST) -k "$(K)" -v --tb=short
 
 # ── Type checking ─────────────────────────────────────────────────────────────
 

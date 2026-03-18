@@ -16,7 +16,7 @@ const repoId  = {{ repo_id | tojson }};
 const baseRef = {{ base_ref | tojson }};
 const headRef = {{ head_ref | tojson }};
 const uiBase  = {{ base_url | tojson }};
-const apiBase = '/api/v1/musehub/repos/' + repoId;
+const apiBase = '/api/v1/repos/' + repoId;
 {% endblock %}
 
 {% block content %}

@@ -13,7 +13,7 @@
 {% block page_data %}
 const repoId = {{ repo_id | tojson }};
 const base   = {{ base_url | tojson }};
-const API_TL = '/api/v1/musehub/repos/' + repoId + '/timeline';
+const API_TL = '/api/v1/repos/' + repoId + '/timeline';
 {% endblock %}
 
 {% block page_script %}
@@ -281,7 +281,7 @@ function openAudioModal(commitId, sha) {
       <h3>&#9654; Preview at commit ${sha}</h3>
       <p style="font-size:12px;color:#8b949e;margin-bottom:12px">Audio artifacts from this commit state.</p>
       <audio controls>
-        <source src="/api/v1/musehub/repos/${repoId}/commits/${commitId}/audio" type="audio/mpeg">
+        <source src="/api/v1/repos/${repoId}/commits/${commitId}/audio" type="audio/mpeg">
         No audio available for this commit.
       </audio>
       <div style="text-align:right;margin-top:8px">

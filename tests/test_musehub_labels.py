@@ -33,7 +33,7 @@ from musehub.db.musehub_models import MusehubBranch, MusehubCommit
 async def _create_repo(client: AsyncClient, auth_headers: dict[str, str], name: str = "label-test-repo") -> str:
     """Create a repo and return its repo_id."""
     response = await client.post(
-        "/api/v1/musehub/repos",
+        "/api/v1/repos",
         json={"name": name, "owner": "testuser", "initialize": False},
         headers=auth_headers,
     )

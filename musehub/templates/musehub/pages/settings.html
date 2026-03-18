@@ -16,7 +16,7 @@ const repoId      = {{ repo_id | tojson }};
 const owner       = {{ owner | tojson }};
 const repoSlug    = {{ repo_slug | tojson }};
 const base        = {{ base_url | tojson }};
-const apiBase     = '/api/v1/musehub/repos/' + repoId;
+const apiBase     = '/api/v1/repos/' + repoId;
 {% endblock %}
 
 {% block content %}
@@ -50,7 +50,7 @@ const apiBase     = '/api/v1/musehub/repos/' + repoId;
     <section id="section-general" x-show="section === 'general'" x-cloak>
       <div class="card">
         <h2 style="margin-bottom:var(--space-4)">General Settings</h2>
-        <form hx-patch="/api/v1/musehub/repos/{{ repo_id }}/settings"
+        <form hx-patch="/api/v1/repos/{{ repo_id }}/settings"
               hx-target="#general-save-result"
               hx-swap="innerHTML"
               style="display:flex;flex-direction:column;gap:var(--space-3)">
@@ -127,7 +127,7 @@ const apiBase     = '/api/v1/musehub/repos/' + repoId;
           review pull requests, and manage issues depending on their permission level.
         </p>
         <div id="collaborators-list"
-             hx-get="/api/v1/musehub/repos/{{ repo_id }}/collaborators"
+             hx-get="/api/v1/repos/{{ repo_id }}/collaborators"
              hx-trigger="load"
              hx-swap="innerHTML">
           <p class="loading">Loading collaborators&#8230;</p>
@@ -157,7 +157,7 @@ const apiBase     = '/api/v1/musehub/repos/' + repoId;
           Choose which merge strategies are allowed when merging pull requests.
           At least one strategy must remain enabled.
         </p>
-        <form hx-patch="/api/v1/musehub/repos/{{ repo_id }}/settings"
+        <form hx-patch="/api/v1/repos/{{ repo_id }}/settings"
               hx-target="#merge-save-result"
               hx-swap="innerHTML">
           <div class="form-checkbox-row">
@@ -246,7 +246,7 @@ const apiBase     = '/api/v1/musehub/repos/' + repoId;
     <div class="confirm-modal">
       <h3>&#9888; Archive repository?</h3>
       <p>Archiving makes the repository read-only. Commits, issues, and pull requests will be disabled. You can unarchive later from this settings page.</p>
-      <form hx-patch="/api/v1/musehub/repos/{{ repo_id }}/settings"
+      <form hx-patch="/api/v1/repos/{{ repo_id }}/settings"
             hx-target="#danger-msg"
             hx-swap="innerHTML"
             hx-vals='{"archived": true}'
@@ -267,7 +267,7 @@ const apiBase     = '/api/v1/musehub/repos/' + repoId;
     <div class="confirm-modal">
       <h3>Transfer ownership</h3>
       <p>Enter the username of the new owner. You will lose owner access to this repository.</p>
-      <form hx-post="/api/v1/musehub/repos/{{ repo_id }}/transfer"
+      <form hx-post="/api/v1/repos/{{ repo_id }}/transfer"
             hx-target="#danger-msg"
             hx-swap="innerHTML"
             x-on:htmx:after-request="transferOpen = false">
@@ -303,7 +303,7 @@ const apiBase     = '/api/v1/musehub/repos/' + repoId;
           The name you entered does not match.
         </span>
       </div>
-      <form hx-delete="/api/v1/musehub/repos/{{ repo_id }}"
+      <form hx-delete="/api/v1/repos/{{ repo_id }}"
             hx-target="#danger-msg"
             hx-swap="innerHTML"
             hx-push-url="true"
@@ -358,7 +358,7 @@ async function inviteCollaborator() {
     const token = typeof getToken === 'function' ? getToken() : null;
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = 'Bearer ' + token;
-    const resp = await fetch('/api/v1/musehub/repos/' + repoId + '/collaborators', {
+    const resp = await fetch('/api/v1/repos/' + repoId + '/collaborators', {
       method: 'POST',
       headers,
       body: JSON.stringify({ username, role }),
