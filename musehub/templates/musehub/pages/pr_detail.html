@@ -245,9 +245,7 @@ const apiBase = '/api/v1/repos/' + repoId;
 {% endblock %}
 
 {% block page_script %}
-<script>
 document.addEventListener('DOMContentLoaded', function() {
   if (typeof initRepoNav === 'function') initRepoNav({{ repo_id | tojson }});
 });
-</script>
 {% endblock %}

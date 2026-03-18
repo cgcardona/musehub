@@ -74,10 +74,8 @@ const base   = {{ base_url | tojson }};
 {% endblock %}
 
 {% block page_script %}
-<script>
 // Minimal JS: repo nav initialisation only. All data is server-rendered.
 document.addEventListener('DOMContentLoaded', function() {
   if (typeof initRepoNav === 'function') initRepoNav({{ repo_id | tojson }});
 });
-</script>
 {% endblock %}

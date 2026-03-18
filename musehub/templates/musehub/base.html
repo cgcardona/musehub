@@ -74,6 +74,6 @@
   {# page_json: JSON data bridge for new TypeScript page modules (read by musehub.ts dispatchPageModule) #}
   <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>
   {# page_script: legacy inline scripts; prefer page modules via page_json instead #}
-  {% block page_script %}{% endblock %}
+  <script>{% block page_script %}{% endblock %}</script>
 </body>
 </html>
