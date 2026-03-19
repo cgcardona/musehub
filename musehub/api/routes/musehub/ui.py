@@ -3061,10 +3061,19 @@ async def insights_page(
             .where(musehub_db.MusehubFork.source_repo_id == repo_id)
         ) or 0
 
+    # Pre-declare types so mypy doesn't widen them to `object` after gather.
+    commits_raw:  list[Any] = []
+    branches_raw: list[Any] = []
+    issues_raw:   list[Any] = []
+    prs_raw:      list[Any] = []
+    releases_raw: list[Any] = []
+    sessions_raw: list[Any] = []
+    star_count:   int       = 0
+    fork_count:   int       = 0
     (
         commits_raw, branches_raw, issues_raw, prs_raw,
         releases_raw, sessions_raw, star_count, fork_count,
-    ) = await asyncio.gather(
+    ) = await asyncio.gather(  # type: ignore[assignment]
         _q_commits(), _q_branches(), _q_issues(), _q_prs(),
         _q_releases(), _q_sessions(), _q_stars(), _q_forks(),
     )
