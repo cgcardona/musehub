@@ -58,22 +58,22 @@ window.__timelineCfg = {
     <span class="tl-section-lbl">Layers</span>
 
     <label class="tl-layer-toggle" title="Commit dots on the timeline rail">
-      <input type="checkbox" checked onchange="window.toggleLayer('commits', this.checked)">
+      <input type="checkbox" checked data-layer="commits">
       <span class="tl-dot tl-dot-commits"></span>
       Commits
     </label>
     <label class="tl-layer-toggle" title="Valence · Energy · Tension area chart">
-      <input type="checkbox" checked onchange="window.toggleLayer('emotion', this.checked)" style="accent-color:#3fb950">
+      <input type="checkbox" checked data-layer="emotion">
       <span class="tl-dot tl-dot-emotion"></span>
       Emotion
     </label>
     <label class="tl-layer-toggle" title="Section add/remove markers">
-      <input type="checkbox" checked onchange="window.toggleLayer('sections', this.checked)" style="accent-color:#3fb950">
+      <input type="checkbox" checked data-layer="sections">
       <span class="tl-dot tl-dot-sections"></span>
       Sections
     </label>
     <label class="tl-layer-toggle" title="Track add/remove markers">
-      <input type="checkbox" checked onchange="window.toggleLayer('tracks', this.checked)" style="accent-color:#a371f7">
+      <input type="checkbox" checked data-layer="tracks">
       <span class="tl-dot tl-dot-tracks"></span>
       Tracks
     </label>
@@ -81,17 +81,17 @@ window.__timelineCfg = {
     <div class="tl-toolbar-sep"></div>
 
     <label class="tl-layer-toggle" title="Recording sessions (teal dashed lines)">
-      <input type="checkbox" checked onchange="window.toggleLayer('sessions', this.checked)" style="accent-color:#2dd4bf">
+      <input type="checkbox" checked data-layer="sessions">
       <span class="tl-dot tl-dot-sessions"></span>
       Sessions
     </label>
     <label class="tl-layer-toggle" title="Merged pull requests (purple triangles)">
-      <input type="checkbox" checked onchange="window.toggleLayer('prs', this.checked)" style="accent-color:#a371f7">
+      <input type="checkbox" checked data-layer="prs">
       <span class="tl-dot tl-dot-prs"></span>
       PRs
     </label>
     <label class="tl-layer-toggle" title="Releases (gold diamonds)">
-      <input type="checkbox" checked onchange="window.toggleLayer('releases', this.checked)" style="accent-color:#e3b341">
+      <input type="checkbox" checked data-layer="releases">
       <span class="tl-dot tl-dot-releases"></span>
       Releases
     </label>
@@ -102,10 +102,10 @@ window.__timelineCfg = {
 
     <div class="tl-zoom-group">
       <span class="tl-zoom-label">Zoom:</span>
-      <button class="tl-zoom-btn" data-zoom="day"   onclick="window.setZoom('day')">Day</button>
-      <button class="tl-zoom-btn" data-zoom="week"  onclick="window.setZoom('week')">Week</button>
-      <button class="tl-zoom-btn" data-zoom="month" onclick="window.setZoom('month')">Month</button>
-      <button class="tl-zoom-btn active" data-zoom="all" onclick="window.setZoom('all')">All</button>
+      <button class="tl-zoom-btn" data-zoom="day">Day</button>
+      <button class="tl-zoom-btn" data-zoom="week">Week</button>
+      <button class="tl-zoom-btn" data-zoom="month">Month</button>
+      <button class="tl-zoom-btn active" data-zoom="all">All</button>
     </div>
   </div>
 
