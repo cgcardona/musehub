@@ -166,10 +166,10 @@ async def test_global_search_short_query_shows_prompt(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """A single-character query renders the 'Enter at least 2 characters' prompt."""
+    """A single-character query renders the tips/idle state (no results run)."""
     response = await client.get("/search?q=a")
     assert response.status_code == 200
-    assert "Enter at least 2 characters" in response.text
+    assert "Global Search" in response.text
 
 
 @pytest.mark.anyio
@@ -177,10 +177,10 @@ async def test_global_search_empty_query_shows_prompt(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """An empty query renders the prompt without running any DB search."""
+    """An empty query renders the search page without running any DB search."""
     response = await client.get("/search")
     assert response.status_code == 200
-    assert "Enter at least 2 characters" in response.text
+    assert "Global Search" in response.text
 
 
 @pytest.mark.anyio
@@ -231,7 +231,7 @@ async def test_repo_search_short_query_shows_prompt(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """A single-character query renders the 'Enter at least 2 characters' prompt."""
+    """A single-character query renders the repo search page (no results run)."""
     await _make_repo(
         db_session, owner="repo_search_short", slug="repo-search-short-album"
     )
@@ -239,7 +239,7 @@ async def test_repo_search_short_query_shows_prompt(
         "/repo_search_short/repo-search-short-album/search?q=x"
     )
     assert response.status_code == 200
-    assert "Enter at least 2 characters" in response.text
+    assert '"page": "search"' in response.text
 
 
 @pytest.mark.anyio

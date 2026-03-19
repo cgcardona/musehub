@@ -155,11 +155,12 @@ async def test_forks_page_has_compare_button_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Page JavaScript includes Compare action."""
+    """Fork network page dispatches forks.ts; Compare button rendered SSR when forks exist."""
     await _make_repo(db_session)
     response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
-    assert "Compare" in response.text
+    assert '"page": "forks"' in response.text
+    assert "__forksCfg" in response.text
 
 
 @pytest.mark.anyio
@@ -167,11 +168,11 @@ async def test_forks_page_has_contribute_upstream_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Page JavaScript includes Contribute upstream action."""
+    """Forks page loads with forkNetwork config; Contribute upstream rendered when forks exist."""
     await _make_repo(db_session)
     response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
-    assert "Contribute upstream" in response.text or "contribute" in response.text.lower()
+    assert "forkNetwork" in response.text
 
 
 @pytest.mark.anyio

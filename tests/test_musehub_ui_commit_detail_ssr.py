@@ -204,7 +204,7 @@ async def test_commit_detail_audio_shell_when_audio_url(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """When a commit has a snapshot_id, the waveform div is rendered with data-url."""
+    """When a commit has a snapshot_id, listenUrl is set in __commitPageCfg (player rendered by commit.ts)."""
     repo_id = await _make_repo(db_session)
     snap_id = f"sha256:{uuid.uuid4().hex}"
     commit = await _make_commit(db_session, repo_id, snapshot_id=snap_id)
@@ -212,7 +212,7 @@ async def test_commit_detail_audio_shell_when_audio_url(
     status, body = await _get_detail(client, commit.commit_id)
 
     assert status == 200
-    assert "commit-waveform" in body
+    assert "__commitPageCfg" in body
     assert snap_id in body
 
 

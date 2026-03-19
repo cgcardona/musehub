@@ -600,10 +600,10 @@ async def test_issue_list_show_template_picker_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """showTemplatePicker() JS function is present in the page."""
+    """Template picker is triggered by a data-action button (showTemplatePicker moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "showTemplatePicker" in body
+    assert "show-template-picker" in body
 
 
 @pytest.mark.anyio
@@ -611,10 +611,10 @@ async def test_issue_list_select_template_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """selectTemplate() JS function is present in the page."""
+    """Template cards use data-action="select-template" (selectTemplate moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "selectTemplate" in body
+    assert "select-template" in body
 
 
 @pytest.mark.anyio
@@ -635,11 +635,11 @@ async def test_issue_list_new_issue_btn_calls_template(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """New Issue button invokes showTemplatePicker."""
+    """New Issue button opens template picker via data-action (showTemplatePicker moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
     assert "New Issue" in body
-    assert "showTemplatePicker" in body
+    assert "show-template-picker" in body
 
 
 @pytest.mark.anyio
@@ -753,10 +753,10 @@ async def test_issue_list_deselect_all_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """deselectAll() JS function is present in the page."""
+    """Deselect action uses data-bulk-action="deselect" (deselectAll moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "deselectAll" in body
+    assert 'data-bulk-action="deselect"' in body
 
 
 @pytest.mark.anyio
@@ -776,10 +776,10 @@ async def test_issue_list_bulk_close_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """bulkClose() JS stub is present in the page."""
+    """Close bulk action uses data-bulk-action="close" (bulkClose moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "bulkClose" in body
+    assert 'data-bulk-action="close"' in body
 
 
 @pytest.mark.anyio
@@ -787,10 +787,10 @@ async def test_issue_list_bulk_reopen_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """bulkReopen() JS stub is present in the page."""
+    """Reopen bulk action uses data-bulk-action="reopen" (bulkReopen moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "bulkReopen" in body
+    assert 'data-bulk-action="reopen"' in body
 
 
 @pytest.mark.anyio
@@ -798,10 +798,10 @@ async def test_issue_list_bulk_assign_label_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """bulkAssignLabel() JS stub is present in the page."""
+    """Assign label uses data-bulk-action="assign-label" (bulkAssignLabel moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "bulkAssignLabel" in body
+    assert 'data-bulk-action="assign-label"' in body
 
 
 @pytest.mark.anyio
@@ -809,10 +809,10 @@ async def test_issue_list_bulk_assign_milestone_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """bulkAssignMilestone() JS stub is present in the page."""
+    """Assign milestone uses data-bulk-action="assign-milestone" (bulkAssignMilestone moved to issue-list.ts)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "bulkAssignMilestone" in body
+    assert 'data-bulk-action="assign-milestone"' in body
 
 
 @pytest.mark.anyio
