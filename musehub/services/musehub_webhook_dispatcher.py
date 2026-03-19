@@ -19,7 +19,6 @@ Boundary rules (same as all musehub services):
 - May import ORM models from musehub.db.musehub_models.
 - May import Pydantic models from musehub.models.musehub.
 """
-from __future__ import annotations
 
 import asyncio
 import hashlib

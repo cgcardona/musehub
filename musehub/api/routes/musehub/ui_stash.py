@@ -32,6 +32,7 @@ exposes a ``router`` attribute. No changes to ``__init__.py`` are needed.
 """
 from __future__ import annotations
 
+
 import logging
 from datetime import datetime
 from typing import Any

@@ -381,4 +381,4 @@ async def test_blob_page_unknown_path_no_ssr(
     # must NOT appear (note: the string 'blob-ssr-content' may appear in JS code).
     assert 'id="blob-ssr-content"' not in response.text
     # JS guard variable must be set to false so the JS fallback runs
-    assert "ssrBlobRendered = false" in response.text
+    assert "ssrBlobRendered: false" in response.text

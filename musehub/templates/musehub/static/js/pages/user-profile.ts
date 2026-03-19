@@ -213,12 +213,17 @@ async function loadActivityTab(filter: string, page: number): Promise<void> {
       </div>`).join('');
     const totalPages = Math.ceil((data.total ?? 0) / 20);
     const pageBtns = totalPages > 1 ? `
-      <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-top:16px">
-        ${page > 1 ? `<button class="btn btn-secondary" onclick="window._switchProfileTab('activity', '${filter}', ${page - 1})">&larr; Prev</button>` : ''}
-        <span style="font-size:13px;color:var(--text-muted)">Page ${page} of ${totalPages}</span>
-        ${page < totalPages ? `<button class="btn btn-secondary" onclick="window._switchProfileTab('activity', '${filter}', ${page + 1})">Next &rarr;</button>` : ''}
+      <div class="activity-pagination">
+        ${page > 1 ? `<button class="btn btn-secondary" data-activity-page="${page - 1}" data-activity-filter="${filter}">&larr; Prev</button>` : ''}
+        <span class="activity-pagination-label">Page ${page} of ${totalPages}</span>
+        ${page < totalPages ? `<button class="btn btn-secondary" data-activity-page="${page + 1}" data-activity-filter="${filter}">Next &rarr;</button>` : ''}
       </div>` : '';
     tabContent.innerHTML = rows + pageBtns;
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-activity-page]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        void loadActivityTab(btn.dataset.activityFilter ?? 'all', Number(btn.dataset.activityPage));
+      });
+    });
   } catch (_) { tabContent.innerHTML = '<p class="error">Failed to load activity.</p>'; }
 }
 
@@ -241,10 +246,6 @@ export async function initUserProfile(data: UserProfileData): Promise<void> {
   if (!username) return;
   currentUsername = username;
 
-  // Expose for template onclick handlers
-  window.switchTab = switchTab;
-  (window as unknown as Record<string, unknown>)['_switchProfileTab'] = switchTab;
-
   const profileHdr    = document.getElementById('profile-hdr');
   const tabsSection   = document.getElementById('tabs-section');
 
@@ -265,7 +266,12 @@ export async function initUserProfile(data: UserProfileData): Promise<void> {
     renderPinned(enhancedData.pinnedRepos ?? [], isOwner);
 
     cachedRepos = profileData.repos ?? [];
-    if (tabsSection) tabsSection.style.display = '';
+    if (tabsSection) {
+      tabsSection.removeAttribute('hidden');
+      tabsSection.querySelectorAll<HTMLElement>('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab ?? 'repos'));
+      });
+    }
     renderReposTab(cachedRepos);
   } catch (e) {
     if (profileHdr) profileHdr.innerHTML = `<p class="error">✕ Could not load profile for @${esc(username)}: ${esc(e instanceof Error ? e.message : String(e))}</p>`;

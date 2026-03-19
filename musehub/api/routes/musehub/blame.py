@@ -18,7 +18,6 @@ realistic dataset to render.
 Auth: public repos allow unauthenticated access (``optional_token``); private
 repos require a valid JWT Bearer token.
 """
-from __future__ import annotations
 
 import hashlib
 import logging

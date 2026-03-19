@@ -6,7 +6,6 @@ from the original path while MuseHub extraction is pending.
 
 TODO(musehub-extraction): remove when MuseHub is extracted to its own repo.
 """
-from __future__ import annotations
 
 from musehub.db.muse_cli_models import (
     MuseCliObject,

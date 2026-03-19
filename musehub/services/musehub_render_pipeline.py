@@ -26,7 +26,6 @@ Boundary rules (same as musehub_sync):
   - May import ORM models from musehub.db.musehub_models.
   - May import Pydantic models from musehub.models.musehub.
 """
-from __future__ import annotations
 
 import hashlib
 import logging
@@ -49,7 +48,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderPipelineResult:
     """Summary of a single render pipeline execution for one commit.
 

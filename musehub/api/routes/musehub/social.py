@@ -30,6 +30,7 @@ Write endpoints always require require_valid_token.
 """
 from __future__ import annotations
 
+
 import logging
 import uuid
 from datetime import datetime, timezone

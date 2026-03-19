@@ -74,7 +74,7 @@
               <label>
                 <input type="checkbox" name="label" value="{{ lbl.name }}"
                        {% if lbl.name == active_label %}checked{% endif %}
-                       onchange="this.form.requestSubmit()" style="display:none"/>
+                       data-filter-select style="display:none"/>
                 {{ label_chip(lbl.name, lbl.color, active=(lbl.name == active_label)) }}
               </label>
             {% endfor %}
@@ -88,7 +88,7 @@
       <div class="filter-section">
         <p class="filter-section-title">Milestone</p>
         <select name="milestone_id" id="filter-milestone" class="filter-select"
-                onchange="this.form.requestSubmit()">
+                data-filter-select>
           <option value="">All milestones</option>
           {% for ms in milestones_data %}
             <option value="{{ ms.milestone_id }}"
@@ -103,7 +103,7 @@
       <div class="filter-section">
         <p class="filter-section-title">Assignee</p>
         <select name="assignee" id="filter-assignee" class="filter-select"
-                onchange="this.form.requestSubmit()">
+                data-filter-select>
           <option value="">All assignees</option>
           {% for a in assignees %}
             <option value="{{ a }}" {% if a == active_assignee %}selected{% endif %}>{{ a }}</option>
@@ -116,7 +116,7 @@
         <p class="filter-section-title">Author</p>
         <input name="author" id="filter-author" type="text" class="filter-input"
                placeholder="Filter by author…" value="{{ active_author }}"
-               oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.requestSubmit(),300)"/>
+               data-search-input/>
       </div>
 
       {# Sort radios #}
@@ -127,7 +127,7 @@
             <label class="sort-radio-label">
               <input type="radio" name="sort" value="{{ value }}"
                      {% if value == active_sort %}checked{% endif %}
-                     onchange="this.form.requestSubmit()"/>
+                     data-filter-select/>
               {{ lbl }}
             </label>
           {% endfor %}
@@ -156,7 +156,7 @@
           <option value="{{ lbl.name }}">{{ lbl.name }}</option>
         {% endfor %}
       </select>
-      <button class="bulk-action-btn" onclick="bulkAssignLabel()">Apply label</button>
+      <button class="bulk-action-btn" data-bulk-action="assign-label">Apply label</button>
       <span class="bulk-sep"></span>
       <select id="bulk-milestone-select" title="Milestone to assign">
         <option value="">Assign milestone…</option>
@@ -164,11 +164,11 @@
           <option value="{{ ms.milestone_id }}">{{ ms.title }}</option>
         {% endfor %}
       </select>
-      <button class="bulk-action-btn" onclick="bulkAssignMilestone()">Apply milestone</button>
+      <button class="bulk-action-btn" data-bulk-action="assign-milestone">Apply milestone</button>
       <span class="bulk-sep"></span>
-      <button class="bulk-action-btn" onclick="bulkClose()">Close</button>
-      <button class="bulk-action-btn" onclick="bulkReopen()">Reopen</button>
-      <button class="bulk-action-btn" style="margin-left:auto" onclick="deselectAll()">✕ Deselect</button>
+      <button class="bulk-action-btn" data-bulk-action="close">Close</button>
+      <button class="bulk-action-btn" data-bulk-action="reopen">Reopen</button>
+      <button class="bulk-action-btn bulk-action-btn-deselect" data-bulk-action="deselect">✕ Deselect</button>
     </div>
 
     {# ── Tab strip + new issue button ── #}
@@ -195,7 +195,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:var(--space-2);padding-bottom:var(--space-2)">
         <span style="font-size:12px;color:var(--text-muted)">{{ total }} result{{ 's' if total != 1 }}</span>
-        <button class="btn btn-primary btn-sm" onclick="showTemplatePicker()">
+        <button class="btn btn-primary btn-sm" data-action="show-template-picker">
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           New Issue
         </button>
@@ -218,8 +218,7 @@
       <div class="card" style="border-color:var(--color-accent)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
           <h2 style="margin:0;font-size:16px">Choose a template</h2>
-          <button class="btn btn-ghost btn-sm"
-                  onclick="document.getElementById('template-picker').style.display='none'">✕</button>
+          <button class="btn btn-ghost btn-sm" data-action="hide-template-picker">✕</button>
         </div>
         <div class="template-grid">
           {% for tpl in [
@@ -229,7 +228,7 @@
             {'id':'arrangement','icon':'🎵','title':'Arrangement Issue','desc':'Track needs musical arrangement work.'},
             {'id':'theory','icon':'🎼','title':'Music Theory','desc':'Related to harmony, rhythm, or theory decisions.'},
           ] %}
-            <div class="template-card" onclick="selectTemplate('{{ tpl.id }}')">
+            <div class="template-card" data-action="select-template" data-template-id="{{ tpl.id }}">
               <div class="template-card-icon">{{ tpl.icon }}</div>
               <div class="template-card-title">{{ tpl.title }}</div>
               <div class="template-card-desc">{{ tpl.desc }}</div>

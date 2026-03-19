@@ -23,7 +23,6 @@ Content negotiation (``?format=json`` or ``Accept: application/json``):
 
 No JWT auth required — milestones are publicly readable.
 """
-from __future__ import annotations
 
 import logging
 

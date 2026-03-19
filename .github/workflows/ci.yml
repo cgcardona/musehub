@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: Test & lint (Python 3.12)
+    name: Test & lint (Python 3.14)
     runs-on: ubuntu-latest
 
     services:
@@ -33,15 +33,17 @@ jobs:
       MUSE_ENV: test
       # Silence SQLAlchemy echo in CI output
       SQLALCHEMY_WARN_20: "1"
+      # Opt into Node.js 24 for GitHub Actions runners ahead of the June 2026 forced migration
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.14
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
           cache: pip
 
       - name: Install dependencies

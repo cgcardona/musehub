@@ -16,7 +16,6 @@ Design notes
   agents can handle None gracefully today and receive populated values once that
   integration lands.
 """
-from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone

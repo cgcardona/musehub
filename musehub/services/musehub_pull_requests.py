@@ -18,7 +18,6 @@ updates the ``to_branch`` head pointer and marks the PR as merged.
 If either branch has no commits yet (no head commit), the merge is rejected with
 a ``ValueError`` — there is nothing to merge.
 """
-from __future__ import annotations
 
 import logging
 import uuid

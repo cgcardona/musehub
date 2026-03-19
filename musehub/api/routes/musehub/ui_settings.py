@@ -20,7 +20,6 @@ Auth contract:
 - Write operations (rename, visibility change, delete) call the authed API
   endpoints and are rejected with 401/403 by the API when unauthenticated.
 """
-from __future__ import annotations
 
 import logging
 

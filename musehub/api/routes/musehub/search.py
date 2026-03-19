@@ -15,7 +15,6 @@ Endpoints:
 Authentication: JWT Bearer token required (inherited from musehub router).
 
 """
-from __future__ import annotations
 
 import logging
 from datetime import datetime

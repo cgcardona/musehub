@@ -16,9 +16,8 @@ had to be made in two places, creating a divergence risk.
 This service owns all of that logic. Both handlers are now thin call-through
 wrappers around ``build_track_listing()``.
 """
-from __future__ import annotations
 
-import os
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,7 +40,7 @@ _FULL_MIX_KEYWORDS: tuple[str, ...] = ("mix", "full", "master", "bounce")
 
 def _is_audio(path: str) -> bool:
     """Return True when the path extension is a recognised audio format."""
-    return os.path.splitext(path)[1].lower() in _AUDIO_EXTENSIONS
+    return Path(path).suffix.lower() in _AUDIO_EXTENSIONS
 
 
 def _piano_roll_url(path: str, object_map: dict[str, str], repo_id: str) -> str | None:
@@ -51,10 +50,10 @@ def _piano_roll_url(path: str, object_map: dict[str, str], repo_id: str) -> str 
     matches the audio file's basename — a naming convention produced by the
     Muse DAW when exporting piano-roll snapshots alongside audio stems.
     """
-    stem = os.path.splitext(os.path.basename(path))[0]
+    stem = Path(path).stem
     for obj_path, obj_id in object_map.items():
-        ext = os.path.splitext(obj_path)[1].lower()
-        if ext in _IMAGE_EXTENSIONS and os.path.splitext(os.path.basename(obj_path))[0] == stem:
+        ext = Path(obj_path).suffix.lower()
+        if ext in _IMAGE_EXTENSIONS and Path(obj_path).stem == stem:
             return f"/api/v1/repos/{repo_id}/objects/{obj_id}/content"
     return None
 
@@ -115,14 +114,14 @@ async def build_track_listing(
         (
             o
             for o in audio_objects
-            if any(kw in os.path.basename(o.path).lower() for kw in _FULL_MIX_KEYWORDS)
+            if any(kw in Path(o.path).name.lower() for kw in _FULL_MIX_KEYWORDS)
         ),
         audio_objects[0],
     )
 
     tracks = [
         AudioTrackEntry(
-            name=os.path.splitext(os.path.basename(obj.path))[0],
+            name=Path(obj.path).stem,
             path=obj.path,
             object_id=obj.object_id,
             audio_url=_audio_url(obj.object_id),

@@ -30,7 +30,6 @@ Auth: all endpoints require a valid JWT Bearer token (inherited from the
 musehub router-level dependency). No business logic lives here — all
 analysis is delegated to :mod:`musehub.services.musehub_analysis`.
 """
-from __future__ import annotations
 
 import hashlib
 import logging

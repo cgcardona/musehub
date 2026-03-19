@@ -11,7 +11,6 @@ After a successful push, embeddings are computed for the new commits and
 upserted to Qdrant as a BackgroundTask — the response is returned
 immediately without waiting for embedding completion.
 """
-from __future__ import annotations
 
 import logging
 

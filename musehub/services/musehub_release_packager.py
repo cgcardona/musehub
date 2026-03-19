@@ -18,7 +18,6 @@ entries.
 This module contains NO database access. It operates purely on the release
 and repo identifiers to construct URL strings.
 """
-from __future__ import annotations
 
 from musehub.models.musehub import ReleaseDownloadUrls
 

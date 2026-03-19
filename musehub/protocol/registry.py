@@ -4,8 +4,9 @@ Invariants:
   - Every event the server can emit has an entry here.
   - Registry is frozen at import time; no runtime mutation.
 """
-
 from __future__ import annotations
+
+
 
 from musehub.protocol.events import MCPMessageEvent, MCPPingEvent, MuseEvent
 

@@ -3,7 +3,6 @@ Muse Configuration
 
 Environment-based configuration for the Muse service.
 """
-from __future__ import annotations
 
 import logging
 from functools import lru_cache

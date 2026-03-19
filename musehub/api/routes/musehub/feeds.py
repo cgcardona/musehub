@@ -15,7 +15,6 @@ No business logic lives here. Persistence is delegated to:
   - musehub.services.musehub_releases (releases)
   - musehub.services.musehub_issues (issues)
 """
-from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone

@@ -29,7 +29,6 @@ Security:
   - Allowed origins configured via ``MUSEHUB_ALLOWED_ORIGINS`` env var
     (comma-separated). Defaults to localhost in dev mode.
 """
-from __future__ import annotations
 
 import json
 import logging

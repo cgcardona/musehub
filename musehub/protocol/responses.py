@@ -5,8 +5,9 @@ the contract between the route handler, its serializer, and any caller
 explicit.  Field names are camelCase by declaration to match the wire
 format already consumed by clients.
 """
-
 from __future__ import annotations
+
+
 
 from pydantic import BaseModel, Field
 

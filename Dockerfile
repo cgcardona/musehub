@@ -5,7 +5,7 @@
 #   requirements.txt changed  →  docker compose build musehub
 #   Python code changed       →  no rebuild (override.yml bind-mounts musehub/ tests/ etc.)
 
-FROM python:3.11-slim as builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
 
-FROM python:3.11-slim as runtime
+FROM python:3.14-slim AS runtime
 
 WORKDIR /app
 

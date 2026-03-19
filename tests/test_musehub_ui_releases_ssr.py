@@ -181,7 +181,7 @@ async def test_release_detail_shows_audio_player_container(
     response = await client.get("/musician/ssr-album/releases/v1.0-audio")
     assert response.status_code == 200
     # The audio player container div must be present in the HTML.
-    assert 'id="release-audio-player"' in response.text
+    assert 'id="rd-player"' in response.text
     assert "cdn.example.com/album-v1.0.mp3" in response.text
 
 

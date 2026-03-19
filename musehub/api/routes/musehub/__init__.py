@@ -23,7 +23,6 @@ Auth policy:
 - Write endpoints (POST/PUT/DELETE) always use ``require_valid_token``
   declared on the individual route handler.
 """
-from __future__ import annotations
 
 import importlib
 import pkgutil

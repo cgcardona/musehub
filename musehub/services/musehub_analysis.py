@@ -28,7 +28,6 @@ Boundary rules
 - Must NOT import StateStore, EntityRegistry, or executor modules.
 - Must NOT import LLM handlers or muse_* pipeline modules.
 """
-from __future__ import annotations
 
 import hashlib
 import logging

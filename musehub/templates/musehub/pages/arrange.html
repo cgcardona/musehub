@@ -1,233 +1,286 @@
 {% extends "musehub/base.html" %}
 
-{% block title %}Arrange {{ ref[:8] }}{% endblock %}
+{% block title %}Arrange · {{ owner }}/{{ repo_slug }}{% endblock %}
+
 {% block breadcrumb %}
   <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
-  arrange / {{ ref[:8] }}
+  <a href="{{ base_url }}/arrange/HEAD">arrange</a> / {{ ref[:7] if ref != 'HEAD' else 'HEAD' }}
 {% endblock %}
+
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
+{% block page_json %}{"page": "arrange"}{% endblock %}
+
 {% block page_data %}
-const repoId   = {{ repo_id | tojson }};
-const ref      = {{ ref | tojson }};
-const owner    = {{ owner | tojson }};
-const repoSlug = {{ repo_slug | tojson }};
-const base     = {{ base_url | tojson }};
-const apiBase  = '/api/v1/repos/' + repoId;
+window.__arrangeCfg = {
+  base:    {{ base_url | tojson }},
+  ref:     {{ ref | tojson }},
+  owner:   {{ owner | tojson }},
+  repoSlug:{{ repo_slug | tojson }},
+};
 {% endblock %}
 
-{% block page_script %}
-{% raw %}
-// ── Helpers ─────────────────────────────────────────────────────────────
-function escHtml(s) {
-  if (s === null || s === undefined) return '—';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+{%- set inst_icons = {
+  "bass":    "🎸",
+  "keys":    "🎹",
+  "guitar":  "🎸",
+  "drums":   "🥁",
+  "lead":    "🎵",
+  "pads":    "🎼",
+  "vocals":  "🎤",
+  "strings": "🎻",
+  "horns":   "🎺",
+  "synth":   "🎹",
+} %}
 
-// Map instrument name → emoji icon
-const INST_ICONS = {
-  bass:   '🎸',
-  keys:   '🎹',
-  guitar: '🎸',
-  drums:  '🥁',
-  lead:   '🎺',
-  pads:   '🌊',
-};
-function instIcon(name) {
-  return INST_ICONS[name] || '🎵';
-}
+{% block content %}
+<div class="content-wide">
 
-// Colour for a density value [0, 1]:
-// 0 = transparent (#0d1117), max = vivid blue (#1f6feb).
-// We interpolate through a warm hue for mid-density values.
-function densityColor(density) {
-  if (density <= 0) return '#0d1117';
-  // Three-stop gradient: 0 → #0d1117, 0.5 → #0d419d, 1 → #1f6feb
-  const stops = [
-    [0,   [13,  17,  23]],
-    [0.4, [13,  65,  157]],
-    [1.0, [31, 111, 235]],
-  ];
-  let lo = stops[0], hi = stops[1];
-  for (let i = 0; i < stops.length - 1; i++) {
-    if (density >= stops[i][0] && density <= stops[i+1][0]) {
-      lo = stops[i]; hi = stops[i+1];
-      break;
-    }
-  }
-  const t = (density - lo[0]) / (hi[0] - lo[0]);
-  const r = Math.round(lo[1][0] + t * (hi[1][0] - lo[1][0]));
-  const g = Math.round(lo[1][1] + t * (hi[1][1] - lo[1][1]));
-  const b = Math.round(lo[1][2] + t * (hi[1][2] - lo[1][2]));
-  return `rgb(${r},${g},${b})`;
-}
-
-function formatBeats(start, end) {
-  return `beats ${start}–${end}`;
-}
-
-// ── Piano roll URL helper ───────────────────────────────────────────────
-// Navigates to the piano roll for a given instrument + section.
-// This links to the analysis page filtered by track + section until a
-// dedicated piano roll page exists.
-function pianoRollUrl(instrument, section) {
-  const q = new URLSearchParams({ track: instrument, section });
-  return base + '/analysis/' + encodeURIComponent(ref) + '/motifs?' + q.toString();
-}
-
-// ── Main renderer ───────────────────────────────────────────────────────
-function renderMatrix(data) {
-  const { instruments, sections, cells, rowSummaries, columnSummaries, totalBeats } = data;
-
-  // Index cells for O(1) lookup.
-  const cellIdx = {};
-  cells.forEach(c => { cellIdx[c.instrument + '|' + c.section] = c; });
-
-  // Stats bar
-  const totalNotes = cells.reduce((s, c) => s + c.noteCount, 0);
-  const activeCells = cells.filter(c => c.active).length;
-  const density = cells.length ? (activeCells / cells.length * 100).toFixed(0) : 0;
-
-  const statsBit = `
-    <div class="stats-pills">
-      <div class="stats-pill">Total notes <strong>${totalNotes.toLocaleString()}</strong></div>
-      <div class="stats-pill">Active cells <strong>${activeCells} / ${cells.length}</strong></div>
-      <div class="stats-pill">Fill density <strong>${density}%</strong></div>
-      <div class="stats-pill">Total beats <strong>${totalBeats}</strong></div>
-    </div>`;
-
-  // Legend
-  const legendBit = `
-    <div class="legend">
-      <span>Density:</span>
-      <span><span class="legend-swatch" style="background:#0d1117;border:1px solid #30363d"></span>Silent</span>
-      <span><span class="legend-swatch" style="background:#0d419d"></span>Low</span>
-      <span><span class="legend-swatch" style="background:#1f6feb"></span>High</span>
-      <span style="margin-left:8px;color:#58a6ff">Click a cell → open piano roll</span>
-    </div>`;
-
-  // Column headers (sections)
-  const sectionCols = sections.map(sec => {
-    const cs = (columnSummaries || []).find(s => s.section === sec) || {};
-    return `<th>
-      ${escHtml(sec.replace(/_/g, '\u00a0'))}
-      <span class="section-beats">${formatBeats(cs.beatStart || 0, cs.beatEnd || 0)}</span>
-    </th>`;
-  }).join('');
-
-  // Data rows
-  const rows = instruments.map(inst => {
-    const rs = (rowSummaries || []).find(r => r.instrument === inst) || {};
-    const maxRowNotes = rs.totalNotes || 1;
-
-    const dataCells = sections.map(sec => {
-      const cell = cellIdx[inst + '|' + sec];
-      if (!cell || !cell.active) {
-        return `<td><div class="arrange-cell silent" title="${escHtml(inst)} / ${escHtml(sec)}: silent">—</div></td>`;
-      }
-      const bg = densityColor(cell.noteDensity);
-      const tipLines = [
-        `<strong>${escHtml(inst)} × ${escHtml(sec)}</strong>`,
-        `Notes: ${cell.noteCount}`,
-        `Density: ${(cell.noteDensity * 100).toFixed(0)}%`,
-        `${formatBeats(cell.beatStart, cell.beatEnd)}`,
-        `Pitch: MIDI ${cell.pitchLow}–${cell.pitchHigh}`,
-        `<em style="color:#58a6ff">Click → piano roll</em>`,
-      ].join('<br>');
-      const href = pianoRollUrl(inst, sec);
-      return `<td>
-        <a href="${escHtml(href)}" style="text-decoration:none">
-          <div class="arrange-cell" style="background:${bg}" aria-label="${escHtml(inst)} in ${escHtml(sec)}: ${cell.noteCount} notes">
-            ${cell.noteCount}
-            <div class="cell-tooltip">${tipLines}</div>
-          </div>
-        </a>
-      </td>`;
-    }).join('');
-
-    // Row summary cell
-    const rowBarPct = rs.totalNotes ? Math.round((rs.totalNotes / (rowSummaries.reduce((m,r)=>Math.max(m,r.totalNotes),1))) * 100) : 0;
-    const summaryCell = `<td class="summary-cell">
-      ${rs.totalNotes || 0} notes<br>
-      <span style="color:#58a6ff">${rs.activeSections || 0}/${sections.length} sections</span>
-      <div class="density-bar" style="width:${rowBarPct}%"></div>
-    </td>`;
-
-    return `<tr>
-      <th class="row-header">
-        ${instIcon(inst)} ${escHtml(inst)}
-      </th>
-      ${dataCells}
-      ${summaryCell}
-    </tr>`;
-  }).join('');
-
-  // Column summary row
-  const maxColNotes = (columnSummaries || []).reduce((m, c) => Math.max(m, c.totalNotes || 0), 1);
-  const colSumCells = sections.map(sec => {
-    const cs = (columnSummaries || []).find(s => s.section === sec) || {};
-    const pct = cs.totalNotes ? Math.round((cs.totalNotes / maxColNotes) * 100) : 0;
-    return `<td class="col-summary-cell">
-      ${cs.totalNotes || 0} notes<br>
-      <span style="color:#58a6ff">${cs.activeInstruments || 0}/${instruments.length} inst.</span>
-      <div class="density-bar" style="width:${pct}%;margin:3px auto 0"></div>
-    </td>`;
-  }).join('');
-
-  const table = `
-    <div class="arrange-wrap">
-      <table class="arrange-table">
-        <thead>
-          <tr>
-            <th class="row-header">Instrument \\ Section</th>
-            ${sectionCols}
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-          <tr>
-            <th class="row-header" style="color:#8b949e">Totals</th>
-            ${colSumCells}
-            <td class="summary-cell">${totalNotes.toLocaleString()}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>`;
-
-  document.getElementById('content').innerHTML = `
-    <div style="margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <a href="${escHtml(base)}">&larr; Back to repo</a>
-      <span style="color:#8b949e;font-size:13px">
-        Arrangement for <code style="background:#161b22;padding:2px 6px;border-radius:4px">${escHtml(ref.substring(0,12))}</code>
-      </span>
+  {# ── Commit header ──────────────────────────────────────────────────── #}
+  <div class="ar-commit-header">
+    <div class="ar-commit-left">
+      {%- if commit_message %}
+      <div class="ar-commit-message">{{ commit_message }}</div>
+      {%- else %}
+      <div class="ar-commit-message" style="color:var(--text-muted)">Viewing ref: {{ ref }}</div>
+      {%- endif %}
+      <div class="ar-commit-meta">
+        {%- if commit_branch %}
+        <span class="ar-branch-pill">⑂ {{ commit_branch }}</span>
+        {%- endif %}
+        {%- if commit_id and commit_id != ref %}
+        <span class="ar-sha">{{ commit_id[:7] }}</span>
+        {%- endif %}
+        {%- if commit_author %}
+        <span>by {{ commit_author }}</span>
+        {%- endif %}
+        {%- if commit_timestamp %}
+        <span>{{ commit_timestamp | fmtdate }}</span>
+        {%- endif %}
+        {# Render job status #}
+        {%- if render_status %}
+        <span class="ar-render-status ar-rs-{{ render_status }}">
+          {%- if render_status == 'complete' %}✓ Rendered
+          {%- elif render_status == 'pending' %}⏳ Pending
+          {%- elif render_status == 'rendering' %}⚙ Rendering
+          {%- elif render_status == 'failed' %}✗ Failed
+          {%- endif %}
+          {%- if midi_count %} · {{ midi_count }} MIDI{%- endif %}
+        </span>
+        {%- else %}
+        <span class="ar-render-status ar-rs-none">No render job</span>
+        {%- endif %}
+      </div>
     </div>
-    <div class="card">
-      <h2 style="margin-bottom:12px">&#127926; Arrangement Matrix</h2>
-      <p style="font-size:13px;color:#8b949e;margin-bottom:12px">
-        Cell colour intensity = note density. Click a cell to open the piano roll for
-        that instrument and section.
-      </p>
-      ${statsBit}
-      ${legendBit}
-      ${table}
-    </div>`;
-}
+    <div class="ar-commit-nav">
+      {%- if prev_commit_id %}
+      <a class="ar-nav-btn" href="{{ base_url }}/arrange/{{ prev_commit_id }}" title="Previous commit">← Prev</a>
+      {%- else %}
+      <span class="ar-nav-btn ar-nav-btn--disabled">← Prev</span>
+      {%- endif %}
+      <a class="ar-nav-btn" href="{{ base_url }}/arrange/HEAD">HEAD</a>
+      {%- if next_commit_id %}
+      <a class="ar-nav-btn" href="{{ base_url }}/arrange/{{ next_commit_id }}" title="Next commit">Next →</a>
+      {%- else %}
+      <span class="ar-nav-btn ar-nav-btn--disabled">Next →</span>
+      {%- endif %}
+    </div>
+  </div>
 
-// ── Loader ──────────────────────────────────────────────────────────────
-async function load() {
-  document.getElementById('content').innerHTML = '<p class="loading">Loading arrangement&#8230;</p>';
-  try {
-    const resp = await apiFetch('/repos/' + encodeURIComponent(repoId) + '/arrange/' + encodeURIComponent(ref));
-    renderMatrix(resp.data || resp);
-  } catch (e) {
-    if (e.message !== 'auth') {
-      document.getElementById('content').innerHTML =
-        '<p class="error">&#10005; ' + escHtml(e.message) + '</p>';
-    }
-  }
-}
+  {# ── Stats ribbon ───────────────────────────────────────────────────── #}
+  <div class="ar-stats-bar">
+    <div class="ar-stat-pill"><strong>{{ instruments | length }}</strong> instruments</div>
+    <div class="ar-stat-pill"><strong>{{ sections | length }}</strong> sections</div>
+    <div class="ar-stat-pill"><strong>{{ total_beats }}</strong> total beats</div>
+    <div class="ar-stat-pill"><strong>{{ total_notes }}</strong> total notes</div>
+    <div class="ar-stat-pill">
+      <strong>{{ active_cells }}</strong> / {{ total_cells }} cells active
+    </div>
+  </div>
 
-load();
-{% endraw %}
+  {# ── Section timeline bar ───────────────────────────────────────────── #}
+  <div class="ar-timeline" title="Section arrangement timeline">
+    {%- for sp in section_pcts %}
+    {%- set activity = "high" if sp.active_instruments >= (instruments | length) * 0.7 else ("medium" if sp.active_instruments >= (instruments | length) * 0.4 else "low") %}
+    <div class="ar-timeline-seg"
+         style="flex: {{ sp.pct }}"
+         data-active="{{ activity }}"
+         title="{{ sp.section }}: beats {{ sp.beat_start | int }}–{{ sp.beat_end | int }}, {{ sp.active_instruments }} instruments">
+      <span class="ar-timeline-label">{{ sp.section.replace('_', ' ') | title }}</span>
+      <span class="ar-timeline-beats">{{ sp.beat_start | int }}–{{ sp.beat_end | int }}</span>
+    </div>
+    {%- endfor %}
+  </div>
+
+  {# ── Density legend ─────────────────────────────────────────────────── #}
+  <div class="ar-legend">
+    <span class="ar-legend-label">Density:</span>
+    <span><span class="ar-legend-swatch ar-sw-0"></span> Silent</span>
+    <span><span class="ar-legend-swatch ar-sw-1"></span> Low</span>
+    <span><span class="ar-legend-swatch ar-sw-2"></span> Medium</span>
+    <span><span class="ar-legend-swatch ar-sw-3"></span> High</span>
+    <span><span class="ar-legend-swatch ar-sw-4"></span> Maximum</span>
+    <span style="margin-left:auto;color:var(--text-muted);font-size:0.68rem">
+      Click a cell to open piano roll · Hover for details
+    </span>
+  </div>
+
+  {# ── Arrangement matrix ─────────────────────────────────────────────── #}
+  <div class="ar-matrix-wrap">
+    <table class="ar-table" id="ar-matrix">
+      <thead>
+        <tr>
+          <th class="ar-th-inst">Instrument</th>
+          {%- for sec in sections %}
+          <th data-col="{{ loop.index0 }}">
+            {{ sec.replace('_', ' ') | title }}
+            {%- set col_sum = column_summaries | selectattr('section', 'eq', sec) | first %}
+            {%- if col_sum %}
+            <div style="font-size:0.6rem;font-weight:400;color:var(--text-muted);margin-top:2px">
+              {{ col_sum.active_instruments }}/{{ instruments | length }} inst
+            </div>
+            {%- endif %}
+          </th>
+          {%- endfor %}
+          <th>Activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {%- for inst in instruments %}
+        {%- set row_sum = row_summaries | selectattr('instrument', 'eq', inst) | first %}
+        <tr data-instrument="{{ inst }}">
+          <td style="padding: 6px 12px; background:var(--bg-surface); white-space:nowrap;">
+            <span style="font-size:1rem">{{ inst_icons.get(inst, '🎵') }}</span>
+            <span style="font-size:var(--font-size-sm); font-weight:600; color:var(--text-secondary); margin-left:6px; text-transform:capitalize">{{ inst }}</span>
+          </td>
+          {%- for sec in sections %}
+          {%- set cell = cell_map.get(inst, {}).get(sec) %}
+          {%- if cell and cell.active %}
+          <td data-col="{{ loop.index0 }}">
+            <a class="ar-cell"
+               data-level="{{ cell.level }}"
+               data-instrument="{{ inst }}"
+               data-section="{{ sec }}"
+               data-notes="{{ cell.note_count }}"
+               data-density="{{ cell.note_density }}"
+               data-beat-start="{{ cell.beat_start }}"
+               data-beat-end="{{ cell.beat_end }}"
+               href="{{ base_url }}/analysis/{{ ref }}/motifs?track={{ inst }}&section={{ sec }}"
+               title="{{ inst }} / {{ sec }}: {{ cell.note_count }} notes">
+              <span class="ar-cell-notes">{{ cell.note_count }}</span>
+              <div class="ar-cell-bar">
+                <div class="ar-cell-bar-fill" style="width: {{ (cell.note_density * 100) | int }}%"></div>
+              </div>
+            </a>
+          </td>
+          {%- else %}
+          <td data-col="{{ loop.index0 }}">
+            <div class="ar-cell" data-level="0" aria-hidden="true">
+              <span class="ar-cell-silent-dash">—</span>
+            </div>
+          </td>
+          {%- endif %}
+          {%- endfor %}
+          <td style="background:var(--bg-surface); padding:6px 10px; white-space:nowrap; min-width:110px">
+            {%- if row_sum %}
+            <div style="font-size:var(--font-size-xs); color:var(--text-muted); margin-bottom:3px">
+              {{ row_sum.active_sections }}/{{ sections | length }} sections &bull; {{ row_sum.total_notes }} notes
+            </div>
+            <div class="ar-density-bar" style="width: {{ (row_sum.mean_density * 100) | int }}%"></div>
+            {%- endif %}
+          </td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="ar-summary-col">
+          <td style="background:var(--bg-overlay); padding:6px 12px; font-size:var(--font-size-xs); color:var(--text-muted); font-weight:600">
+            Notes
+          </td>
+          {%- for sec in sections %}
+          {%- set col_sum = column_summaries | selectattr('section', 'eq', sec) | first %}
+          <td data-col="{{ loop.index0 }}" style="background:var(--bg-overlay); padding:6px 8px; text-align:center">
+            {%- if col_sum %}
+            <span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--text-muted)">
+              {{ col_sum.total_notes }}
+            </span>
+            {%- endif %}
+          </td>
+          {%- endfor %}
+          <td style="background:var(--bg-overlay)"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  {# ── Bottom stat panels ─────────────────────────────────────────────── #}
+  <div class="ar-panels-row">
+
+    {# Instrument activity #}
+    <div class="ar-panel">
+      <div class="ar-panel-header">🎵 Instrument Activity</div>
+      <div class="ar-panel-body">
+        {%- set max_inst_notes = (row_summaries | map(attribute='total_notes') | max) | default(1) %}
+        {%- for rs in row_summaries | sort(attribute='total_notes', reverse=True) %}
+        <div class="ar-panel-row">
+          <div class="ar-panel-label">
+            {{ inst_icons.get(rs.instrument, '🎵') }} {{ rs.instrument | title }}
+          </div>
+          <div class="ar-panel-bar-track">
+            <div class="ar-panel-bar-fill" style="width: {{ (rs.total_notes / max_inst_notes * 100) | int }}%"></div>
+          </div>
+          <div class="ar-panel-value">{{ rs.active_sections }}/{{ sections | length }}</div>
+        </div>
+        {%- endfor %}
+      </div>
+    </div>
+
+    {# Section density #}
+    <div class="ar-panel">
+      <div class="ar-panel-header">📐 Section Density</div>
+      <div class="ar-panel-body">
+        {%- set max_col_notes = (column_summaries | map(attribute='total_notes') | max) | default(1) %}
+        {%- for cs in column_summaries | sort(attribute='total_notes', reverse=True) %}
+        <div class="ar-panel-row">
+          <div class="ar-panel-label">{{ cs.section.replace('_', ' ') | title }}</div>
+          <div class="ar-panel-bar-track">
+            <div class="ar-panel-bar-fill" style="width: {{ (cs.total_notes / max_col_notes * 100) | int }}%"></div>
+          </div>
+          <div class="ar-panel-value">{{ cs.active_instruments }}/{{ instruments | length }}</div>
+        </div>
+        {%- endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Recent commits on this branch (navigation) ─────────────────────── #}
+  {%- if branch_commits %}
+  <div class="ar-panel" style="margin-bottom: var(--space-5)">
+    <div class="ar-panel-header">🕐 Recent Commits on {{ commit_branch }}</div>
+    <div class="ar-panel-body" style="padding: var(--space-2) var(--space-4)">
+      {%- for bc in branch_commits %}
+      <a href="{{ base_url }}/arrange/{{ bc.id }}"
+         style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-2) 0; border-bottom:1px solid var(--border-default); text-decoration:none; color:inherit; {% if bc.id == commit_id %}background:rgba(88,166,255,0.06); margin: 0 calc(-1 * var(--space-4)); padding-left:var(--space-4); padding-right:var(--space-4);{% endif %}">
+        <span class="ar-sha">{{ bc.id[:7] }}</span>
+        <span style="flex:1; font-size:var(--font-size-xs); color:{% if bc.id == commit_id %}var(--color-accent){% else %}var(--text-secondary){% endif %}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
+          {{ bc.msg }}
+        </span>
+        <span style="font-size:var(--font-size-xs); color:var(--text-muted); flex-shrink:0">{{ bc.ts | fmtdate }}</span>
+      </a>
+      {%- endfor %}
+    </div>
+  </div>
+  {%- endif %}
+
+</div>
+
+{# Floating tooltip rendered by arrange.ts #}
+<div class="ar-tooltip" id="ar-tooltip" aria-hidden="true">
+  <div class="ar-tooltip-title" id="ar-tip-title"></div>
+  <div class="ar-tooltip-row"><span class="ar-tooltip-key">Notes</span><span class="ar-tooltip-val" id="ar-tip-notes"></span></div>
+  <div class="ar-tooltip-row"><span class="ar-tooltip-key">Density</span><span class="ar-tooltip-val" id="ar-tip-density"></span></div>
+  <div class="ar-tooltip-row"><span class="ar-tooltip-key">Beats</span><span class="ar-tooltip-val" id="ar-tip-beats"></span></div>
+</div>
+
 {% endblock %}

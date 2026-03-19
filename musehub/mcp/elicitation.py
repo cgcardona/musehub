@@ -20,7 +20,6 @@ Usage:
         request_id="elicit-1",
     )
 """
-from __future__ import annotations
 
 import secrets
 from typing import Final

@@ -461,16 +461,6 @@ declare global {
     parseCommitMeta: (message: string) => Record<string, string>;
     loadReactions: (targetType: string, targetId: string, containerId: string) => Promise<void>;
     toggleReaction: (targetType: string, targetId: string, emoji: string, containerId: string) => Promise<void>;
-    // Page-module helpers exposed for inline onclick handlers
-    showTemplatePicker?: () => void;
-    selectTemplate?: (tplId: string) => void;
-    toggleIssueSelect?: (issueId: string, checked: boolean) => void;
-    deselectAll?: () => void;
-    bulkClose?: () => void;
-    bulkReopen?: () => void;
-    bulkAssignLabel?: () => void;
-    bulkAssignMilestone?: () => void;
-    bodyPreview?: (text: string, maxLen?: number) => string;
     switchTab?: (tab: string, filter?: string, page?: number) => void;
     renderFromObjectId?: (repoId: string, objectId: string, container: HTMLElement | null) => void;
     renderFromUrl?: (url: string, container: HTMLElement | null) => void;

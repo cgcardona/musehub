@@ -23,7 +23,6 @@ Usage (cursor-based, e.g. repos list):
     if result.next_cursor:
         response.headers["Link"] = build_cursor_link_header(request, result.next_cursor, limit)
 """
-from __future__ import annotations
 
 import math
 from typing import TypeVar

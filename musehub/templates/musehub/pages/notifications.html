@@ -5,6 +5,8 @@
 {% block title %}Notifications{% endblock %}
 {% block breadcrumb %}Notifications{% endblock %}
 
+{% block page_json %}{"page": "notifications"}{% endblock %}
+
 {% block content %}
 {% if not authenticated %}
   {{ empty_state("🔔", "Sign in to see notifications", "Your notifications appear here when you're signed in.") }}
@@ -28,12 +30,12 @@
     <label class="sort-radio-label" style="display:flex;align-items:center;gap:var(--space-2);font-size:13px;cursor:pointer">
       <input type="checkbox" name="unread_only" value="true"
              {% if unread_only %}checked{% endif %}
-             onchange="this.form.requestSubmit()"/>
+             data-autosubmit/>
       Unread only
     </label>
     <select name="type_filter" class="filter-select"
             style="font-size:13px;padding:4px 8px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary)"
-            onchange="this.form.requestSubmit()">
+            data-autosubmit>
       <option value="">All types</option>
       {% for et in event_types %}
         <option value="{{ et }}" {% if et == type_filter %}selected{% endif %}>{{ et | title }}</option>

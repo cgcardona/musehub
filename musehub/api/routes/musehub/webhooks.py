@@ -11,7 +11,6 @@ All endpoints require a valid JWT Bearer token.
 No business logic lives here — all persistence is delegated to
 musehub.services.musehub_webhook_dispatcher.
 """
-from __future__ import annotations
 
 import logging
 

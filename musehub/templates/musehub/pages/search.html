@@ -1,50 +1,80 @@
 {% extends "musehub/base.html" %}
-{% from "musehub/macros/empty_state.html" import empty_state %}
 
-{% block title %}Search — {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block title %}Search · {{ owner }}/{{ repo_slug }}{% endblock %}
+
 {% block breadcrumb %}
-  <a href="/{{ owner }}">{{ owner }}</a> /
-  <a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a> / search
+  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / search
 {% endblock %}
+
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
+{% block page_json %}{"page": "search"}{% endblock %}
+
 {% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const base   = {{ base_url | tojson }};
+window.__searchCfg = {
+  owner:    {{ owner | tojson }},
+  repoSlug: {{ repo_slug | tojson }},
+  base:     {{ base_url | tojson }},
+  query:    {{ query | tojson }},
+};
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:var(--space-3)">
-  <a href="{{ base_url }}">&larr; Back to repo</a>
-</div>
+<div class="content-wide">
 
-<div class="card">
-  <h1 style="margin-bottom:var(--space-3)">🔍 Search Commits</h1>
+  {# ── Search hero ──────────────────────────────────────────────────────── #}
+  <div class="sr-hero">
+    <form id="sr-form"
+          method="get"
+          action="{{ base_url }}/search"
+          hx-get="{{ base_url }}/search"
+          hx-target="#sr-results"
+          hx-push-url="true"
+          hx-indicator="#sr-spinner">
+      <div class="sr-input-wrap">
+        <span class="sr-input-icon">🔍</span>
+        <input id="sr-q"
+               name="q"
+               type="search"
+               class="sr-input"
+               placeholder="Search commits, issues, pull requests, releases, sessions…"
+               value="{{ query }}"
+               autocomplete="off"
+               autofocus
+               hx-get="{{ base_url }}/search"
+               hx-target="#sr-results"
+               hx-trigger="input changed delay:350ms"
+               hx-include="closest form" />
+        <input type="hidden" name="mode" id="sr-mode-hidden" value="{{ mode }}" />
+        <input type="hidden" name="search_type" id="sr-type-hidden" value="{{ search_type }}" />
+        <input type="hidden" name="limit" value="20" />
+        <button type="submit" class="sr-submit-btn">Search</button>
+      </div>
 
-  <form method="get"
-        hx-get="/{{ owner }}/{{ repo_slug }}/search"
-        hx-target="#repo-search-results"
-        hx-push-url="true"
-        class="search-bar">
-    <input name="q" type="search" class="form-input"
-           placeholder="Search commit messages…"
-           value="{{ query }}" autofocus
-           hx-get="/{{ owner }}/{{ repo_slug }}/search"
-           hx-target="#repo-search-results"
-           hx-trigger="input changed delay:400ms"
-           hx-include="closest form"
-           style="flex:1" />
-    <select name="mode" class="filter-select" onchange="this.form.requestSubmit()">
-      {% for m in modes %}
-        <option value="{{ m }}" {% if m == mode %}selected{% endif %}>{{ m | title }}</option>
-      {% endfor %}
-    </select>
-    <input name="limit" type="hidden" value="{{ limit }}" />
-    <button type="submit" class="btn btn-primary">Search</button>
-  </form>
+      {# Mode pills — apply to commit search #}
+      <div class="sr-mode-bar">
+        <span class="sr-mode-label">Commit mode:</span>
+        {%- set mode_info = [
+          ("keyword", "🔑", "Keyword", "Token overlap scoring"),
+          ("pattern",  "🔎", "Pattern",  "Substring / regex match"),
+          ("ask",      "💬", "Ask",      "Natural language query"),
+        ] %}
+        {%- for m, icon, label, tip in mode_info %}
+        <button type="button"
+                class="sr-mode-pill {% if mode == m %}sr-mode-pill--active{% endif %}"
+                data-mode="{{ m }}"
+                title="{{ tip }}">
+          {{ icon }} {{ label }}
+        </button>
+        {%- endfor %}
+      </div>
+    </form>
+  </div>
 
-  <div id="repo-search-results">
+  {# ── Results (HTMX target) ─────────────────────────────────────────────── #}
+  <div id="sr-results">
     {% include "musehub/fragments/search_results.html" %}
   </div>
+
 </div>
 {% endblock %}

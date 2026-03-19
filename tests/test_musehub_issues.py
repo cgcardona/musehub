@@ -441,8 +441,8 @@ async def test_issue_detail_page_shows_author_label(
     response = await client.get(f"/testuser/author-detail-beats/issues/{number}")
     assert response.status_code == 200
     body = response.text
-    # The SSR template renders author inline: "Opened … by <strong>…</strong>"
-    assert "by <strong>" in body
+    # The SSR template renders the author via an id-author-link anchor in the meta row
+    assert "id-author-link" in body
 
 
 # ---------------------------------------------------------------------------

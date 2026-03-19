@@ -15,7 +15,6 @@ Design notes:
 - The heartbeat (``": heartbeat"`` comment) keeps proxies alive without
   affecting the event stream semantics.
 """
-from __future__ import annotations
 
 import json
 import logging

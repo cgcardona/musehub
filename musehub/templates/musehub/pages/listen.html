@@ -7,330 +7,37 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block body_extra %}
-{# SSR playlist data — WaveSurfer reads these globals on init #}
-<script>window.__playlist = {{ playlist_json | default([]) | tojson }};</script>
-<script>window.__firstTrackUrl = {{ first_track_url | default(none) | tojson }};</script>
-<script src="/static/vendor/wavesurfer.min.js"></script>
-<script src="/static/audio-player.js"></script>
-{% endblock %}
-
-{% block page_data %}
-const repoId   = {{ repo_id | tojson }};
-const ref      = {{ ref | tojson }};
-const owner    = {{ owner | tojson }};
-const repoSlug = {{ repo_slug | tojson }};
-const base     = {{ base_url | tojson }};
-const trackPath = {{ (track_path if track_path is defined else '') | tojson }};
-const apiBase  = '/api/v1/repos/' + repoId;
-const TRACK_PATH = trackPath;
-{% endblock %}
+{% block page_json %}{"page": "listen", "repo_id": {{ repo_id | tojson }}, "ref": {{ ref | tojson }}, "base": {{ base_url | tojson }}}{% endblock %}
 
 {% block content %}
 {# SSR track listing — rendered server-side for immediate paint and crawlability.
-   JS player (below) takes over after load(), hydrating the #content div.
+   listen.ts takes over after init, replacing #content with the interactive player.
    Both layers coexist: SSR gives the initial state, JS provides full interactivity. #}
 <div id="ssr-track-listing">
 {% if tracks is defined and tracks %}
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <h2 style="margin:0;font-size:14px;color:#e6edf3">&#127897; Tracks</h2>
-    <span style="font-size:11px;color:#8b949e">{{ tracks | length }} track{{ 's' if tracks | length != 1 }}</span>
+  <div>
+    <h2>&#127897; Tracks</h2>
+    <span class="text-muted">{{ tracks | length }} track{{ 's' if tracks | length != 1 }}</span>
   </div>
-  <div id="ssr-track-list">
+  <div id="ssr-track-list" class="track-list">
     {% for track in tracks %}
-    <div class="track-list-item{% if loop.first %} track-active{% endif %}"
+    <div class="track-row{% if loop.first %} track-active{% endif %}"
          id="track-item-{{ loop.index0 }}"
          data-track-url="{{ track.audio_url }}"
-         data-track-name="{{ track.name }}"
-         style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-radius:4px;background:#161b22;border:1px solid #30363d;margin-bottom:4px">
-      <span style="width:20px;text-align:right;font-size:11px;color:#8b949e">{{ loop.index }}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e6edf3">{{ track.name }}</div>
-        <div style="font-size:11px;color:#8b949e;font-family:monospace">{{ track.path }}</div>
+         data-track-name="{{ track.name }}">
+      <span class="track-meta">{{ loop.index }}</span>
+      <div class="track-info">
+        <div class="track-name">{{ track.name }}</div>
+        <div class="track-path">{{ track.path }}</div>
       </div>
-      <a href="{{ track.audio_url }}" download title="Download" style="font-size:11px;color:#8b949e">&#11015;</a>
+      <a href="{{ track.audio_url }}" download title="Download" class="btn btn-ghost btn-sm">&#11015;</a>
     </div>
     {% endfor %}
   </div>
 {% elif tracks is defined %}
-  <p style="color:#8b949e;padding:16px 0">No audio tracks in this repository.</p>
+  <p class="text-muted">No audio tracks in this repository.</p>
 {% else %}
   <p class="loading">Loading&#8230;</p>
 {% endif %}
 </div>
-{% endblock %}
-
-{% block page_script %}
-{% raw %}
-// ── Audio state ────────────────────────────────────────────────────────────
-let mixAudio    = null;
-let trackAudios = {};   // path → <audio> element
-let currentPath = null;
-
-function fmtTime(s) {
-  if (!isFinite(s) || s < 0) return '0:00';
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return m + ':' + (sec < 10 ? '0' : '') + sec;
-}
-
-function fmtBytes(n) {
-  if (n < 1024) return n + ' B';
-  if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
-  return (n / 1048576).toFixed(1) + ' MB';
-}
-
-// ── Mini waveform (deterministic from object_id) ──────────────────────────
-function miniWaveform(objectId, isPlaying) {
-  const seed = objectId ? objectId.charCodeAt(objectId.length - 1) : 0;
-  const heights = [];
-  for (let i = 0; i < 16; i++) {
-    const h = 20 + Math.abs(Math.sin((seed + i * 7) * 0.8)) * 45;
-    heights.push(Math.round(h));
-  }
-  return heights
-    .map(h => '<div class="track-waveform-bar" style="height:' + h + '%"></div>')
-    .join('');
-}
-
-// ── Full-mix player ────────────────────────────────────────────────────────
-function initMixPlayer(url, title) {
-  mixAudio = new Audio();
-  mixAudio.preload = 'metadata';
-  const playBtn  = document.getElementById('mix-play-btn');
-  const fill     = document.getElementById('mix-progress-fill');
-  const bar      = document.getElementById('mix-progress-bar');
-  const timeCur  = document.getElementById('mix-time-cur');
-  const timeDur  = document.getElementById('mix-time-dur');
-
-  mixAudio.addEventListener('canplay', () => { playBtn.disabled = false; });
-  mixAudio.addEventListener('timeupdate', () => {
-    const pct = mixAudio.duration ? (mixAudio.currentTime / mixAudio.duration) * 100 : 0;
-    fill.style.width = pct + '%';
-    timeCur.textContent = fmtTime(mixAudio.currentTime);
-  });
-  mixAudio.addEventListener('durationchange', () => {
-    timeDur.textContent = fmtTime(mixAudio.duration);
-  });
-  mixAudio.addEventListener('ended', () => {
-    playBtn.innerHTML = '&#9654;';
-    fill.style.width = '0%';
-    mixAudio.currentTime = 0;
-  });
-  mixAudio.addEventListener('error', () => {
-    playBtn.disabled = true;
-    playBtn.title = 'Audio unavailable';
-  });
-
-  playBtn.addEventListener('click', () => {
-    pauseAllTracks();
-    if (mixAudio.paused) {
-      mixAudio.src = url;
-      mixAudio.play();
-      playBtn.innerHTML = '&#9646;&#9646;';
-      currentPath = '__mix__';
-    } else {
-      mixAudio.pause();
-      playBtn.innerHTML = '&#9654;';
-      currentPath = null;
-    }
-  });
-
-  bar.addEventListener('click', (e) => {
-    if (!mixAudio.duration) return;
-    const rect = bar.getBoundingClientRect();
-    mixAudio.currentTime = ((e.clientX - rect.left) / rect.width) * mixAudio.duration;
-  });
-}
-
-// ── Per-track players ──────────────────────────────────────────────────────
-function playTrack(path, url, playBtnId, rowId) {
-  if (mixAudio && !mixAudio.paused) {
-    mixAudio.pause();
-    const btn = document.getElementById('mix-play-btn');
-    if (btn) btn.innerHTML = '&#9654;';
-  }
-
-  // Pause any other track
-  Object.keys(trackAudios).forEach(p => {
-    if (p !== path && !trackAudios[p].paused) {
-      trackAudios[p].pause();
-      const oldRow = document.getElementById('track-row-' + CSS.escape(p));
-      if (oldRow) oldRow.classList.remove('is-playing');
-      const oldBtn = document.getElementById('track-btn-' + CSS.escape(p));
-      if (oldBtn) { oldBtn.innerHTML = '&#9654;'; oldBtn.classList.remove('is-playing'); }
-    }
-  });
-
-  if (!trackAudios[path]) {
-    trackAudios[path] = new Audio();
-    trackAudios[path].preload = 'metadata';
-  }
-  const audio = trackAudios[path];
-  const btn   = document.getElementById(playBtnId);
-  const row   = document.getElementById(rowId);
-
-  if (audio.paused) {
-    audio.src = url;
-    audio.play();
-    if (btn) { btn.innerHTML = '&#9646;&#9646;'; btn.classList.add('is-playing'); }
-    if (row) row.classList.add('is-playing');
-    currentPath = path;
-    audio.addEventListener('ended', () => {
-      if (btn) { btn.innerHTML = '&#9654;'; btn.classList.remove('is-playing'); }
-      if (row) row.classList.remove('is-playing');
-      currentPath = null;
-    }, { once: true });
-  } else {
-    audio.pause();
-    if (btn) { btn.innerHTML = '&#9654;'; btn.classList.remove('is-playing'); }
-    if (row) row.classList.remove('is-playing');
-    currentPath = null;
-  }
-}
-
-function pauseAllTracks() {
-  Object.values(trackAudios).forEach(a => { if (!a.paused) a.pause(); });
-  document.querySelectorAll('.track-play-btn').forEach(b => {
-    b.innerHTML = '&#9654;';
-    b.classList.remove('is-playing');
-  });
-  document.querySelectorAll('.track-row').forEach(r => r.classList.remove('is-playing'));
-}
-
-// ── Main loader ────────────────────────────────────────────────────────────
-async function load() {
-  initRepoNav(repoId);
-
-  const content = document.getElementById('content');
-  content.innerHTML = '<p class="loading">Loading audio tracks&#8230;</p>';
-
-  try {
-    const apiToken = apiBase + '/listen/' + encodeURIComponent(ref) + '/tracks';
-    let listing;
-    try {
-      listing = await apiFetch('/repos/' + repoId + '/listen/' + encodeURIComponent(ref) + '/tracks');
-    } catch (e) {
-      // Unauthenticated visitors may not have access; render fallback shell
-      listing = { hasRenders: false, tracks: [], fullMixUrl: null, ref: ref, repoId: repoId };
-    }
-
-    const tracks  = listing.tracks  || [];
-    const hasMix  = !!listing.fullMixUrl;
-    const hasAny  = listing.hasRenders;
-
-    // ── Back link + heading ────────────────────────────────────────────────
-    let html = '<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
-      + '<a href="' + escHtml(base) + '">&larr; Back to repo</a>'
-      + '<h1 style="margin:0;font-size:20px">&#127925; Listen</h1>'
-      + '<code class="ref-badge">' + escHtml(ref.length > 16 ? ref.substring(0, 16) + '\u2026' : ref) + '</code>'
-      + '</div>';
-
-    if (!hasAny) {
-      // ── No renders fallback ────────────────────────────────────────────
-      html += '<div class="no-renders-card">'
-        + '<div class="no-renders-icon">&#127897;</div>'
-        + '<div class="no-renders-title">No audio renders yet</div>'
-        + '<div class="no-renders-sub">Push audio artifacts (.mp3, .wav, .ogg) to this repo to enable playback.</div>'
-        + '<div style="margin-top:20px"><a class="btn btn-primary" href="' + escHtml(base) + '/tree/' + encodeURIComponent(ref) + '">Browse files</a></div>'
-        + '</div>';
-      content.innerHTML = html;
-      return;
-    }
-
-    // ── Full-mix player ────────────────────────────────────────────────────
-    const mixTitle = tracks.length > 0 ? tracks[0].name : 'Full Mix';
-    html += '<div class="listen-player-card">'
-      + '<div class="listen-player-title">&#127908; Full Mix</div>'
-      + '<div class="listen-player-sub">ref: ' + escHtml(ref.substring(0, 16)) + ' &bull; ' + tracks.length + ' track' + (tracks.length !== 1 ? 's' : '') + '</div>'
-      + '<div class="listen-controls">'
-      + '<button class="listen-play-btn" id="mix-play-btn" disabled title="Play / Pause">&#9654;</button>'
-      + '<div class="listen-progress-wrap">'
-      + '<div class="listen-progress-bar" id="mix-progress-bar">'
-      + '<div class="listen-progress-fill" id="mix-progress-fill"></div>'
-      + '</div>'
-      + '<div class="listen-time-row">'
-      + '<span id="mix-time-cur">0:00</span>'
-      + '<span id="mix-time-dur">0:00</span>'
-      + '</div>'
-      + '<div class="speed-wrap">'
-      + '<label for="speed-sel">Speed</label>'
-      + '<select id="speed-sel"></select>'
-      + '</div>'
-      + '</div>'
-      + '<div class="loop-bar">'
-      + '<span id="loop-info"></span>'
-      + '<button id="loop-clear-btn">Clear loop</button>'
-      + '</div>'
-      + '<div class="help-card" style="font-size:12px;color:#8b949e;margin-top:8px">'
-      + '<kbd>Space</kbd> play / pause &nbsp;&bull;&nbsp; <kbd>L</kbd> clear loop'
-      + '</div>'
-      + '</div>';
-
-    if (hasMix) {
-      html += '<div class="listen-actions">'
-        + '<a class="btn btn-secondary" href="' + escHtml(listing.fullMixUrl) + '" download>&#11015; Download mix</a>'
-        + '<a class="btn btn-secondary" href="' + escHtml(base) + '/embed/' + encodeURIComponent(ref) + '">&#128279; Embed</a>'
-        + '</div>';
-    }
-    html += '</div>';
-
-    // ── Track listing ──────────────────────────────────────────────────────
-    if (tracks.length > 0) {
-      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
-        + '<h2 style="margin:0;font-size:16px">&#127897; Tracks</h2>'
-        + '<span style="font-size:12px;color:#8b949e">' + tracks.length + ' artifact' + (tracks.length !== 1 ? 's' : '') + '</span>'
-        + '</div>';
-
-      html += '<div class="track-list">';
-      tracks.forEach((track, i) => {
-        const escapedPath = escHtml(track.path);
-        const safePath    = 'track-' + i;
-        html += '<div class="track-row" id="track-row-' + escHtml(track.objectId) + '">'
-          + '<button class="track-play-btn" id="track-btn-' + escHtml(track.objectId) + '"'
-          + ' onclick="playTrack(' + JSON.stringify(track.path) + ',' + JSON.stringify(track.audioUrl) + ','
-          + JSON.stringify('track-btn-' + track.objectId) + ',' + JSON.stringify('track-row-' + track.objectId) + ')"'
-          + ' title="Play ' + escHtml(track.name) + '">&#9654;</button>'
-          + '<div class="track-info">'
-          + '<div class="track-name">' + escHtml(track.name) + '</div>'
-          + '<div class="track-path">' + escHtml(track.path) + '</div>'
-          + '</div>'
-          + '<div class="track-waveform" aria-hidden="true">' + miniWaveform(track.objectId, false) + '</div>'
-          + '<div class="track-meta">' + escHtml(fmtBytes(track.sizeBytes || 0)) + '</div>'
-          + '<div class="track-row-actions">';
-
-        if (track.pianoRollUrl) {
-          html += '<a class="btn btn-secondary" style="font-size:11px;padding:4px 8px"'
-            + ' href="' + escHtml(base) + '/listen/' + encodeURIComponent(ref) + '/' + escapedPath + '"'
-            + ' title="View piano roll">&#127929;</a>';
-        }
-        html += '<a class="btn btn-secondary" style="font-size:11px;padding:4px 8px"'
-          + ' href="' + escHtml(track.audioUrl) + '" download title="Download">&#11015;</a>';
-
-        html += '</div></div>';
-      });
-      html += '</div>';
-    }
-
-    content.innerHTML = html;
-
-    // Init full-mix player after DOM is ready
-    if (hasMix) {
-      initMixPlayer(listing.fullMixUrl, mixTitle);
-      // Trigger preload so duration shows quickly
-      const mixAudioEl = new Audio();
-      mixAudioEl.preload = 'metadata';
-      mixAudioEl.src = listing.fullMixUrl;
-    }
-
-  } catch (e) {
-    if (e.message !== 'auth') {
-      document.getElementById('content').innerHTML =
-        '<p class="error">&#10005; ' + escHtml(e.message) + '</p>';
-    }
-  }
-}
-
-load();
-{% endraw %}
 {% endblock %}

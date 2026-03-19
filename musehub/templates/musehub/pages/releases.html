@@ -193,37 +193,4 @@
 
 {% endblock %}
 
-{% block page_script %}
-<script>
-(function () {
-  const filterTabs = document.querySelectorAll('.rel-filter-tab');
-  const searchInput = document.getElementById('rel-search');
-  const list = document.getElementById('release-rows');
-  let activeFilter = 'all';
-
-  function applyFilters() {
-    const q = searchInput ? searchInput.value.toLowerCase() : '';
-    const cards = list ? list.querySelectorAll('.rel-card') : [];
-    cards.forEach(function (card) {
-      const status = (card.dataset.status || '').toLowerCase();
-      const text   = (card.dataset.title  || '').toLowerCase();
-      const statusMatch = activeFilter === 'all' || status === activeFilter;
-      const searchMatch = !q || text.includes(q);
-      card.style.display = (statusMatch && searchMatch) ? '' : 'none';
-    });
-  }
-
-  filterTabs.forEach(function (tab) {
-    tab.addEventListener('click', function (e) {
-      e.preventDefault();
-      filterTabs.forEach(function (t) { t.classList.remove('active'); });
-      tab.classList.add('active');
-      activeFilter = tab.dataset.filter || 'all';
-      applyFilters();
-    });
-  });
-
-  if (searchInput) { searchInput.addEventListener('input', applyFilters); }
-})();
-</script>
-{% endblock %}
+{% block page_json %}{"page": "release-list"}{% endblock %}

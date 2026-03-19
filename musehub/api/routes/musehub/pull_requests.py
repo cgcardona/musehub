@@ -18,7 +18,6 @@ of public repos, matching the same visibility rules as get_pull_request).
 No business logic lives here — all persistence is delegated to
 musehub.services.musehub_pull_requests.
 """
-from __future__ import annotations
 
 import logging
 

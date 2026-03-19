@@ -7,7 +7,6 @@ Each UI page that includes ``repo_nav.html`` / ``repo_tabs.html`` requires:
 Centralising this lookup here avoids repeating it in every separate UI route
 file and keeps the nav_ctx contract in one place.
 """
-from __future__ import annotations
 
 from typing import Any
 

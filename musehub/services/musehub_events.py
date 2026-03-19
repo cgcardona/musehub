@@ -25,7 +25,6 @@ tag_pushed — a tag was pushed
 session_started — a recording session was started
 session_ended — a recording session was ended
 """
-from __future__ import annotations
 
 import logging
 

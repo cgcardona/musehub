@@ -1,36 +1,55 @@
 {% extends "musehub/base.html" %}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
-{% block title %}Search{% endblock %}
+{% block title %}Search · MuseHub{% endblock %}
 {% block breadcrumb %}Search{% endblock %}
 
+{% block page_json %}{"page": "global-search"}{% endblock %}
+
 {% block content %}
-<div class="card">
-  <h1 style="margin-bottom:var(--space-3)">🔍 Global Search</h1>
+<div class="content-wide" style="max-width: 860px; margin: 0 auto;">
 
-  <form method="get" action="/search"
-        hx-get="/search"
-        hx-target="#search-results"
-        hx-push-url="true"
-        class="search-bar">
-    <input name="q" type="search" class="form-input"
-           placeholder="Search commit messages across all public repos…"
-           value="{{ query }}" autofocus
-           hx-get="/search"
-           hx-target="#search-results"
-           hx-trigger="input changed delay:400ms"
-           hx-include="closest form"
-           style="flex:1" />
-    <select name="mode" class="filter-select" onchange="this.form.requestSubmit()">
-      {% for m in modes %}
-        <option value="{{ m }}" {% if m == mode %}selected{% endif %}>{{ m | title }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit" class="btn btn-primary">Search</button>
-  </form>
+  <div class="sr-hero">
+    <div class="sr-hero-title">🔍 Global Search</div>
+    <form id="sr-global-form"
+          method="get"
+          action="/search"
+          hx-get="/search"
+          hx-target="#sr-global-results"
+          hx-push-url="true">
+      <div class="sr-input-wrap">
+        <span class="sr-input-icon">🔍</span>
+        <input name="q"
+               type="search"
+               class="sr-input"
+               placeholder="Search commit messages across all public repos…"
+               value="{{ query }}"
+               autocomplete="off"
+               autofocus
+               hx-get="/search"
+               hx-target="#sr-global-results"
+               hx-trigger="input changed delay:350ms"
+               hx-include="closest form" />
+        <input type="hidden" name="mode" id="sr-global-mode" value="{{ mode }}" />
+        <button type="submit" class="sr-submit-btn">Search</button>
+      </div>
 
-  <div id="search-results">
+      <div class="sr-mode-bar">
+        <span class="sr-mode-label">Mode:</span>
+        {%- for m in modes %}
+        <button type="button"
+                class="sr-mode-pill {% if mode == m %}sr-mode-pill--active{% endif %}"
+                data-global-mode="{{ m }}">
+          {{ m | title }}
+        </button>
+        {%- endfor %}
+      </div>
+    </form>
+  </div>
+
+  <div id="sr-global-results">
     {% include "musehub/fragments/global_search_results.html" %}
   </div>
+
 </div>
 {% endblock %}

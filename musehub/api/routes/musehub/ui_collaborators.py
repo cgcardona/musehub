@@ -30,7 +30,6 @@ populated from the database, suitable for agent consumption.
 Endpoint summary:
   GET /{owner}/{repo_slug}/settings/collaborators — HTML (default), HTMX fragment, or JSON
 """
-from __future__ import annotations
 
 import logging
 

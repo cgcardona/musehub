@@ -1,5 +1,13 @@
 {% extends "musehub/base.html" %}
 
+{%- set dim_icons = {
+    "melodic":    "🎵",
+    "harmonic":   "🎼",
+    "rhythmic":   "🥁",
+    "structural": "🏗",
+    "dynamic":    "📊",
+} %}
+
 {% block title %}{{ short_id }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
@@ -9,206 +17,220 @@
   {{ short_id }}
 {% endblock %}
 
-{% block repo_nav %}
-{% include "musehub/partials/repo_nav.html" %}
-{% endblock %}
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+
+{% block page_json %}{"page": "commit-detail"}{% endblock %}
 
 {% block page_data %}
-const repoId   = {{ repo_id | tojson }};
-const commitId = {{ commit_id | tojson }};
-const base     = {{ base_url | tojson }};
-const apiBase  = '/api/v1/repos/' + repoId;
-const listenUrl = {{ listen_url | tojson }};
-const embedUrl  = {{ embed_url | tojson }};
-const shortId   = {{ short_id | tojson }};
+window.__commitCfg = {
+  repoId:    {{ repo_id | tojson }},
+  commitId:  {{ commit_id | tojson }},
+  shortId:   {{ short_id | tojson }},
+  base:      {{ base_url | tojson }},
+  audioUrl:  {{ audio_url | tojson }},
+  listenUrl: {{ listen_url | tojson }},
+  embedUrl:  {{ embed_url | tojson }},
+};
 {% endblock %}
 
 {% block content %}
-<div class="commit-liner-notes">
+<div class="content-wide" style="padding-top: var(--space-4)">
 
-  {# Commit header — fully server-rendered #}
-  <div class="card commit-message-card">
-    <div class="commit-header-row">
-      <div class="commit-header-left">
-        <span class="badge">commit</span>
+  {# ── Commit Header ────────────────────────────────────────────────────── #}
+  <div class="cd-header">
+
+    {# Top bar: chips + action buttons #}
+    <div class="cd-header-top">
+      <div class="cd-header-chips">
+
+        {# Render/audio status #}
+        {%- if render_status == "ready" %}
+        <span class="cd-render-badge ready">🎧 Audio ready</span>
+        {%- else %}
+        <span class="cd-render-badge none">No audio</span>
+        {%- endif %}
+
+        {# Branch #}
+        <span class="cd-branch-pill">⑂ {{ commit.branch or "—" }}</span>
+
+        {# SHA with copy #}
+        <span class="cd-sha-chip" id="cd-sha-chip" title="{{ commit_id }}">
+          {{ short_id }}
+          <button class="cd-copy-btn" data-sha="{{ commit_id }}" title="Copy full SHA">⎘</button>
+        </span>
+
+        {# Branch position #}
+        {%- if branch_position %}
+        <span style="font-size:var(--font-size-xs);color:var(--text-muted)">
+          #{{ branch_position }} of {{ branch_commit_count }} on this branch
+        </span>
+        {%- endif %}
+
       </div>
-      <div class="commit-header-right">
+
+      <div class="cd-actions">
         <a href="{{ base_url }}/commits/{{ commit.commit_id }}/diff"
            class="btn btn-secondary btn-sm">⊕ Musical Diff</a>
-        <a href="{{ listen_url }}" class="btn btn-secondary btn-sm" target="_blank">
-          🎧 Listen ↗
+        <a href="{{ listen_url }}" class="btn btn-secondary btn-sm" target="_blank">🎧 Listen ↗</a>
+        <a href="{{ embed_url }}" class="btn btn-ghost btn-sm" target="_blank">⊞ Embed ↗</a>
+      </div>
+    </div>
+
+    {# Commit message #}
+    <div class="cd-header-body">
+      <h1 class="cd-title">{{ commit.message }}</h1>
+
+      {# Author · date · parent SHA(s) #}
+      <div class="cd-header-meta">
+        <a href="/{{ commit.author }}" class="cd-author-link">
+          <span class="cd-author-avatar">{{ commit.author[0] | upper if commit.author else '?' }}</span>
+          {{ commit.author or "unknown" }}
         </a>
+        <span class="cd-meta-sep">·</span>
+        <span>{{ commit.timestamp | fmtrelative }}</span>
+        <span style="color:var(--text-muted)">{{ commit.timestamp | fmtdate }}</span>
+
+        {%- if commit.parent_ids %}
+        <span class="cd-meta-sep">·</span>
+        <span style="font-size:var(--font-size-xs);color:var(--text-muted)">Parent:</span>
+        {%- for p in commit.parent_ids %}
+        <a href="{{ base_url }}/commits/{{ p }}" class="cd-parent-link">{{ p[:8] }}</a>
+        {%- if not loop.last %}<span>,</span>{%- endif %}
+        {%- endfor %}
+        {%- endif %}
       </div>
     </div>
-    <h1 class="commit-subject">{{ commit.message }}</h1>
-    <div class="meta-row" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-top:var(--space-3)">
-      <div class="meta-item">
-        <span class="meta-label">Author</span>
-        <span class="meta-value">
-          <a href="/{{ commit.author }}" class="text-sm">{{ commit.author }}</a>
+
+    {# Branch position track #}
+    {%- if branch_position and branch_commit_count %}
+    {%- set pos_pct = ((branch_commit_count - branch_position + 1) / branch_commit_count * 100) | round(1) %}
+    <div class="cd-branch-pos">
+      <span>Newest</span>
+      <div class="cd-pos-track">
+        <div class="cd-pos-fill" style="width: {{ pos_pct }}%"></div>
+      </div>
+      <span>Oldest</span>
+      <span style="margin-left: var(--space-2)">{{ pos_pct }}% from newest</span>
+    </div>
+    {%- endif %}
+
+  </div>{# /cd-header #}
+
+  {# ── Musical Changes ──────────────────────────────────────────────────── #}
+  <div class="cd-dim-panel">
+    <div class="cd-dim-header">
+      <span>🎵</span>
+      <h2 class="cd-dim-title">Musical Changes</h2>
+      <span class="cd-overall-badge">
+        {%- set overall_pct = (overall_change * 100) | round(0) | int %}
+        Overall: {{ overall_pct }}%
+        {%- if commit.parent_ids %} vs parent{%- else %} (root commit){%- endif %}
+      </span>
+    </div>
+    <div class="cd-dim-body">
+      {%- for dim in dimensions %}
+      {%- set pct = (dim.score * 100) | round(0) | int %}
+      <div class="cd-dim-row" data-target="{{ pct }}" data-level="{{ dim.label }}">
+        <span class="cd-dim-icon">{{ dim_icons.get(dim.dimension, "♩") }}</span>
+        <span class="cd-dim-name">{{ dim.dimension | title }}</span>
+        <div class="cd-dim-track">
+          <div class="cd-dim-fill level-{{ dim.label }}" style="width: {{ pct }}%"></div>
+        </div>
+        <span class="cd-dim-pct">{{ pct }}%</span>
+        <span class="cd-dim-level level-{{ dim.label }}">{{ dim.label }}</span>
+      </div>
+      {%- endfor %}
+    </div>
+  </div>
+
+  {# ── Audio Player ─────────────────────────────────────────────────────── #}
+  {%- if audio_url %}
+  <div class="cd-audio-panel" id="cd-audio-section">
+    <div class="cd-audio-header">
+      <span>🎧</span>
+      <h2 class="cd-dim-title" style="margin:0">Audio Preview</h2>
+      <div class="cd-audio-actions">
+        <a href="{{ listen_url }}" class="btn btn-ghost btn-sm" target="_blank">Open player ↗</a>
+      </div>
+    </div>
+    <div class="cd-audio-body">
+      <div class="cd-waveform" id="cd-waveform" data-audio-url="{{ audio_url }}">
+        <span>🎵 Loading waveform…</span>
+      </div>
+      <div class="cd-audio-controls">
+        <button class="cd-play-btn" id="cd-play-btn" type="button" title="Play / Pause">▶</button>
+        <span class="cd-time" id="cd-time">0:00</span>
+        <span style="font-size:var(--font-size-xs);color:var(--text-muted);margin-left:var(--space-2)">
+          Snapshot: <code style="font-family:var(--font-mono)">{{ commit.snapshot_id[:8] if commit.snapshot_id else '—' }}</code>
         </span>
       </div>
-      <div class="meta-item">
-        <span class="meta-label">Date</span>
-        <span class="meta-value text-sm">{{ commit.timestamp | fmtdate }}</span>
+    </div>
+  </div>
+  {%- endif %}
+
+  {# ── Sibling Navigation ───────────────────────────────────────────────── #}
+  <div class="cd-nav">
+    {%- if older_commit %}
+    <a href="{{ base_url }}/commits/{{ older_commit.commit_id }}" class="cd-nav-card">
+      <span class="cd-nav-dir">← Older commit</span>
+      <span class="cd-nav-message">{{ older_commit.message | truncate(70) }}</span>
+      <span class="cd-nav-sha">{{ older_commit.commit_id[:8] }}</span>
+    </a>
+    {%- else %}
+    <div class="cd-nav-card" style="opacity:0.4;pointer-events:none">
+      <span class="cd-nav-dir">← Older commit</span>
+      <span class="cd-nav-message" style="color:var(--text-muted)">This is the oldest commit on {{ commit.branch }}</span>
+    </div>
+    {%- endif %}
+
+    <a href="{{ base_url }}/commits" class="cd-nav-back">↑ All commits</a>
+
+    {%- if newer_commit %}
+    <a href="{{ base_url }}/commits/{{ newer_commit.commit_id }}" class="cd-nav-card" style="text-align:right">
+      <span class="cd-nav-dir">Newer commit →</span>
+      <span class="cd-nav-message">{{ newer_commit.message | truncate(70) }}</span>
+      <span class="cd-nav-sha">{{ newer_commit.commit_id[:8] }}</span>
+    </a>
+    {%- else %}
+    <div class="cd-nav-card" style="opacity:0.4;pointer-events:none;text-align:right">
+      <span class="cd-nav-dir">Newer commit →</span>
+      <span class="cd-nav-message" style="color:var(--text-muted)">This is the latest commit on {{ commit.branch }}</span>
+    </div>
+    {%- endif %}
+  </div>
+
+  {# ── Comments ─────────────────────────────────────────────────────────── #}
+  <div class="cd-comment-section">
+    <div class="cd-comment-header">
+      <span>💬</span>
+      <h2 class="cd-comment-title">Comments</h2>
+      <span class="cd-comment-count">{{ comments | length }}</span>
+    </div>
+    <div class="cd-comment-body">
+      <div id="commit-comments">
+        {% include "musehub/fragments/commit_comments.html" %}
       </div>
-      <div class="meta-item">
-        <span class="meta-label">Branch</span>
-        <span class="meta-value text-mono text-sm">{{ commit.branch or '—' }}</span>
-      </div>
-      <div class="meta-item">
-        <span class="meta-label">SHA</span>
-        <span class="meta-value text-mono text-sm" title="{{ commit.commit_id }}">{{ short_id }}</span>
-      </div>
-      {% if commit.parent_ids %}
-      <div class="meta-item">
-        <span class="meta-label">Parent</span>
-        <span class="meta-value">
-          {% for p in commit.parent_ids %}
-          <a href="{{ base_url }}/commits/{{ p }}"
-             class="text-mono text-sm">{{ p[:8] }}</a>{% if not loop.last %}, {% endif %}
-          {% endfor %}
-        </span>
-      </div>
-      {% endif %}
+    </div>
+    <div class="cd-comment-form">
+      <form hx-post="{{ base_url }}/commits/{{ commit.commit_id }}/comments"
+            hx-target="#commit-comments"
+            hx-swap="innerHTML"
+            hx-on::after-request="this.reset()">
+        <textarea name="body" class="cd-textarea" rows="4"
+                  placeholder="Leave a comment about this commit…"></textarea>
+        <div style="margin-top: var(--space-2)">
+          <button type="submit" class="btn btn-primary">Comment</button>
+        </div>
+      </form>
     </div>
   </div>
 
-  {# Audio player — SSR shell, WaveSurfer attaches when audio_url is provided #}
-  {% if audio_url %}
-  <div class="card iap-card" style="margin-top:var(--space-3)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
-      <h2 style="margin:0">🎵 Audio Preview</h2>
-    </div>
-    <div id="commit-waveform" data-url="{{ audio_url }}"
-         style="min-height:64px;background:#0d1117;border-radius:var(--radius-sm);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center">
-      <span style="color:var(--text-muted);font-size:var(--font-size-sm)">🎵 Loading waveform…</span>
-    </div>
-    <div class="iap-controls" style="margin-top:var(--space-3)">
-      <button id="play-btn" class="iap-play-btn" type="button" title="Play / Pause">▶</button>
-      <span id="play-time" style="font-size:var(--font-size-xs);color:var(--text-muted);font-variant-numeric:tabular-nums">0:00</span>
-    </div>
-  </div>
-  {% endif %}
-
-  {# Score preview — SSR shell, abcjs renders when has_score is True #}
-  {% if has_score %}
-  <div class="card" style="margin-top:var(--space-3)">
-    <h2 style="font-size:14px;margin-bottom:var(--space-2)">🎼 Score</h2>
-    <div id="commit-score" data-abc-url="{{ abc_url }}"
-         style="background:white;border-radius:4px;padding:var(--space-2)">
-      <p style="color:#8b949e">Loading score…</p>
-    </div>
-  </div>
-  {% endif %}
-
-  {# Comments — HTMX target refreshed after comment POST #}
-  <div class="card" style="margin-top:var(--space-3)">
-    <h2 style="margin:0 0 var(--space-3) 0">
-      💬 {{ comments | length }} comment{{ 's' if comments | length != 1 else '' }}
-    </h2>
-    <div id="commit-comments">
-      {% include "musehub/fragments/commit_comments.html" %}
-    </div>
-    <form hx-post="{{ base_url }}/commits/{{ commit.commit_id }}/comments"
-          hx-target="#commit-comments"
-          hx-swap="innerHTML"
-          hx-on::after-request="this.reset()"
-          style="margin-top:var(--space-3)">
-      <textarea name="body" class="form-input" rows="4"
-                placeholder="Leave a comment…"
-                style="width:100%;resize:vertical;font-family:var(--font-sans)"></textarea>
-      <button type="submit" class="btn btn-primary"
-              style="margin-top:var(--space-2)">Comment</button>
-    </form>
-  </div>
-
-  {# Navigation #}
-  <div style="display:flex;gap:var(--space-3);margin-top:var(--space-2);flex-wrap:wrap">
-    {% if commit.parent_ids %}
-    <a href="{{ base_url }}/commits/{{ commit.parent_ids[0] }}"
-       class="btn btn-secondary btn-sm">← Parent Commit</a>
-    {% endif %}
-    <a href="{{ base_url }}/commits" class="btn btn-ghost btn-sm">← Back to commits</a>
-    <a href="{{ listen_url }}" class="btn btn-ghost btn-sm" target="_blank">🎧 Listen ↗</a>
-    <a href="{{ embed_url }}" class="btn btn-ghost btn-sm" target="_blank">⊞ Embed ↗</a>
-  </div>
-
-</div>
+</div>{# /content-wide #}
 {% endblock %}
 
 {% block body_extra %}
-{# WaveSurfer — JS core kept, initialized from data-url attribute #}
-{% if audio_url %}
+{# Load WaveSurfer library — initialization is handled by commit-detail.ts #}
+{%- if audio_url %}
 <script src="/static/vendor/wavesurfer.min.js"></script>
-<script>
-(function () {
-  const wrapEl = document.getElementById('commit-waveform');
-  const playBtn = document.getElementById('play-btn');
-  const timeEl  = document.getElementById('play-time');
-  if (!wrapEl) return;
-  const url = wrapEl.dataset.url;
-  if (!url) return;
-
-  function fmtTime(s) {
-    if (!isFinite(s)) return '—';
-    return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-  }
-
-  if (window.WaveSurfer) {
-    wrapEl.innerHTML = '<div id="ws-inner" style="height:64px;width:100%"></div>';
-    const ws = WaveSurfer.create({
-      container: '#ws-inner',
-      waveColor: '#1f6feb',
-      progressColor: '#388bfd',
-      height: 64,
-      normalize: true,
-      backend: 'MediaElement',
-    });
-    ws.load(url);
-    ws.on('audioprocess', function () {
-      if (timeEl) timeEl.textContent = fmtTime(ws.getCurrentTime());
-    });
-    ws.on('finish', function () { if (playBtn) playBtn.textContent = '▶'; });
-    ws.on('error', function () {
-      wrapEl.innerHTML = '<span style="color:var(--color-danger);font-size:var(--font-size-sm)">⚠ Could not load audio.</span>';
-    });
-    if (playBtn) {
-      playBtn.addEventListener('click', function () {
-        ws.playPause();
-        playBtn.textContent = ws.isPlaying() ? '⏸' : '▶';
-      });
-    }
-  } else {
-    wrapEl.innerHTML = '<audio controls preload="none" style="width:100%"><source src="' + url + '" /></audio>';
-    if (playBtn) playBtn.style.display = 'none';
-  }
-}());
-</script>
-{% endif %}
-
-{# abcjs — JS core kept, initialized from data-abc-url attribute #}
-{% if has_score %}
-<script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-basic-min.js"></script>
-<script>
-(function () {
-  const sc = document.getElementById('commit-score');
-  if (!sc || !sc.dataset.abcUrl) return;
-  fetch(sc.dataset.abcUrl)
-    .then(function (r) { return r.text(); })
-    .then(function (abc) {
-      sc.innerHTML = '';
-      if (window.ABCJS) {
-        ABCJS.renderAbc('commit-score', abc, { responsive: 'resize' });
-      } else {
-        sc.innerHTML = '<pre style="font-size:11px;overflow-x:auto">' + abc + '</pre>';
-      }
-    })
-    .catch(function () {
-      sc.innerHTML = '<p style="color:var(--color-danger)">⚠ Could not load score.</p>';
-    });
-}());
-</script>
-{% endif %}
+{%- endif %}
 {% endblock %}
-

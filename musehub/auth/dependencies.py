@@ -4,7 +4,6 @@ FastAPI Authentication Dependencies
 Provides dependency injection for protecting endpoints with access token validation
 and for asset endpoints with device-ID-only (X-Device-ID) validation.
 """
-from __future__ import annotations
 
 import logging
 import uuid

@@ -10,7 +10,6 @@ Boundary rules:
 - May import ORM models from musehub.db.musehub_models.
 - May import Pydantic response models from musehub.models.musehub.
 """
-from __future__ import annotations
 
 import logging
 import re

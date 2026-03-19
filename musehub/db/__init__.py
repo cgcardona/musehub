@@ -3,7 +3,6 @@ Database module for MuseHub.
 
 Provides async SQLAlchemy support with PostgreSQL and SQLite.
 """
-from __future__ import annotations
 
 from musehub.db.database import (
     get_db,

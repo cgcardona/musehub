@@ -6,7 +6,6 @@ MuseHub test fixtures use them to populate the muse_commits table.
 
 TODO(musehub-extraction): remove when MuseHub is extracted.
 """
-from __future__ import annotations
 
 import logging
 

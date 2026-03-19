@@ -3,7 +3,6 @@
 All version references (app, protocol, MCP server) read from here.
 """
 
-from __future__ import annotations
 
 
 def _read_version() -> str:

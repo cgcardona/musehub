@@ -308,13 +308,12 @@ async def test_commits_enhanced_compare_check_inputs_present(
 async def test_commits_enhanced_compare_js_function(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """toggleCompareMode() and onCompareCheck() JS functions are defined."""
+    """Compare mode uses SSR compare-toggle-btn and compare-strip (JS moved to commits.ts)."""
     await _seed_repo(db_session)
     resp = await client.get(_url())
     assert resp.status_code == 200
-    assert "toggleCompareMode" in resp.text
-    assert "onCompareCheck" in resp.text
-    assert "updateCompareStrip" in resp.text
+    assert "compare-toggle-btn" in resp.text
+    assert "compare-strip" in resp.text
 
 
 # ── Metadata badge JS ─────────────────────────────────────────────────────────
@@ -335,14 +334,11 @@ async def test_commits_enhanced_meta_badges_container_present(
 async def test_commits_enhanced_badge_js_extract_function(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """extractBadges() and renderBadges() JS functions are defined."""
+    """Badge logic (extractBadges/renderBadges) moved to commits.ts; page dispatches commits module."""
     await _seed_repo(db_session)
     resp = await client.get(_url())
     assert resp.status_code == 200
-    assert "extractBadges" in resp.text
-    assert "renderBadges" in resp.text
-    assert "TEMPO_RE" in resp.text
-    assert "EMOTION_RE" in resp.text
+    assert '"page": "commits"' in resp.text
 
 
 @pytest.mark.anyio

@@ -7,10 +7,7 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const base   = {{ base_url | tojson }};
-{% endblock %}
+{% block page_json %}{"page": "repo", "repo_id": {{ repo_id | tojson }}}{% endblock %}
 
 {% block content %}
 

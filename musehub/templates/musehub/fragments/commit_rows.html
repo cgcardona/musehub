@@ -52,8 +52,8 @@
     <div class="compare-col">
       <input type="checkbox"
              class="compare-check"
-             aria-label="Select commit {{ sha8 }} for compare"
-             onchange="onCompareCheck(this, {{ commit.commit_id | tojson }})">
+             data-commit-id="{{ commit.commit_id | e }}"
+             aria-label="Select commit {{ sha8 }} for compare">
     </div>
 
     <!-- Commit info -->
@@ -69,8 +69,14 @@
         <span class="merge-indicator">⊕ merge</span>
         {% endif %}
 
-        <!-- Music metadata chips (populated by JS from commit message) -->
-        <span class="meta-badges"></span>
+        <!-- Music metadata chips — server-rendered, no JS needed -->
+        {%- if commit.badges %}
+        <span class="meta-badges">
+          {%- for badge in commit.badges %}
+          <span class="meta-chip {{ badge.cls }}">{{ badge.label }}</span>
+          {%- endfor %}
+        </span>
+        {%- endif %}
       </div>
 
       <div class="commit-cell-bottom">
@@ -88,10 +94,10 @@
           {% endif %}
         </span>
 
-        <!-- Timestamp -->
-        <span class="commit-meta-item" title="{{ commit.timestamp.isoformat() }}">
+        <!-- Timestamp — server-rendered relative time, no JS upgrade needed -->
+        <span class="commit-meta-item" title="{{ commit.timestamp }}">
           <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="opacity:.6"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
-          <span class="js-rel-time" data-ts="{{ commit.timestamp.isoformat() }}">{{ commit.timestamp.strftime('%Y-%m-%d') }}</span>
+          {{ commit.timestamp | fmtrelative }}
         </span>
 
         <!-- Branch (shown only in all-branches view) -->

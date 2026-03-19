@@ -15,7 +15,6 @@ UI can render results with a single shared commit-row template regardless of mod
 Date-range filtering (``since`` / ``until``) is applied at the SQL layer for
 efficiency before any Python-level scoring.
 """
-from __future__ import annotations
 
 import logging
 import re

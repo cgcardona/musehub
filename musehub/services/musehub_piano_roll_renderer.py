@@ -20,7 +20,6 @@ Design constraints:
 
 Result type: ``PianoRollRenderResult`` — registered in docs/reference/type_contracts.md.
 """
-from __future__ import annotations
 
 import io
 import logging
@@ -76,7 +75,7 @@ _MIN_NOTE_PX: int = 1
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PianoRollRenderResult:
     """Outcome of a single piano roll render operation.
 

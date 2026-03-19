@@ -1,5 +1,4 @@
 """Write executors for social operations: star_repo, create_label."""
-from __future__ import annotations
 
 import logging
 import uuid

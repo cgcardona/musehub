@@ -1,5 +1,4 @@
 """Write executors for repository operations: create_repo, fork_repo."""
-from __future__ import annotations
 
 import logging
 import uuid

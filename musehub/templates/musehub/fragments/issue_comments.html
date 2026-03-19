@@ -1,55 +1,75 @@
 {#
-  issue_comments — bare comment thread fragment for HTMX partial updates.
+  fragments/issue_comments.html — HTMX fragment: issue comment thread.
 
-  Rendered for both the initial include inside issue_detail.html and for
-  subsequent HTMX requests (HX-Request: true) that refresh the thread after
-  a new comment is submitted.
+  Rendered in two contexts:
+  1. Full-page load: included inline by issue_detail.html inside #issue-comments.
+  2. HTMX partial swap: returned directly on HX-Request after a comment POST.
 
-  Context
-  -------
-  comments : list[dict]
-    Chronologically-ordered comments with keys: commentId, author, body,
-    parentId, createdAt, musicalRefs.
+  Required context:
+    comments  : list[dict]  — all comments for this issue (top-level + replies)
+    base_url  : str
+    issue     : dict        — issue data (for issue_number in reply links)
 #}
-{% if comments %}
-{% for comment in comments %}
-{% if not comment.get('parent_id') %}
-<div class="comment" id="comment-{{ comment.comment_id }}">
-  <div class="comment-header">
-    <span class="comment-avatar">{{ (comment.author or '?')[0] | upper }}</span>
-    <span class="comment-author">{{ comment.author or 'unknown' }}</span>
-    <span class="comment-date">{{ comment.created_at | fmtrelative }}</span>
-  </div>
-  <div class="comment-body">{{ comment.body | safe }}</div>
-  {% if comment.musical_refs %}
-  <div class="musical-refs">
-    {% for ref in comment.musical_refs %}
-    <span class="musical-ref musical-ref-{{ ref.type }}">
-      {% if ref.type == 'track' %}🎵{% elif ref.type == 'section' %}🎼{% elif ref.type == 'beats' %}🥁{% else %}🎵{% endif %}
-      {{ ref.raw }}
+
+{%- set ref_icons = {"track": "🎵", "section": "🎼", "beats": "🥁"} %}
+
+{%- if comments %}
+
+{%- for comment in comments %}
+{%- if not comment.get('parent_id') %}
+{%- set replies = comments | selectattr('parent_id', 'equalto', comment.comment_id) | list %}
+
+<div class="id-comment" id="comment-{{ comment.comment_id }}">
+
+  <div class="id-comment-header">
+    <span class="id-avatar-lg">{{ (comment.author or '?')[0] | upper }}</span>
+    <a href="/{{ comment.author }}" class="id-comment-author" style="text-decoration:none;color:var(--text-primary)">
+      {{ comment.author or 'unknown' }}
+    </a>
+    <span class="id-comment-date" title="{{ comment.created_at }}">
+      {{ comment.created_at | fmtrelative }}
     </span>
-    {% endfor %}
   </div>
-  {% endif %}
+
+  <div class="id-comment-body">{{ comment.body | safe }}</div>
+
+  {# Musical refs parsed at write time #}
+  {%- if comment.musical_refs %}
+  <div class="id-comment-refs">
+    {%- for ref in comment.musical_refs %}
+    <span class="id-comment-ref ref-{{ ref.type }}">
+      {{ ref_icons.get(ref.type, "🎵") }} {{ ref.raw }}
+    </span>
+    {%- endfor %}
+  </div>
+  {%- endif %}
+
   {# Nested replies #}
-  {% set replies = comments | selectattr('parent_id', 'equalto', comment.comment_id) | list %}
-  {% if replies %}
-  <div class="comment-replies">
-    {% for reply in replies %}
-    <div class="comment comment-reply" id="comment-{{ reply.comment_id }}">
-      <div class="comment-header">
-        <span class="comment-avatar">{{ (reply.author or '?')[0] | upper }}</span>
-        <span class="comment-author">{{ reply.author or 'unknown' }}</span>
-        <span class="comment-date">{{ reply.created_at | fmtrelative }}</span>
+  {%- if replies %}
+  <div class="id-comment-replies">
+    {%- for reply in replies %}
+    <div class="id-reply" id="comment-{{ reply.comment_id }}">
+      <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1)">
+        <span class="id-avatar" style="width:20px;height:20px;font-size:0.5rem">
+          {{ (reply.author or '?')[0] | upper }}
+        </span>
+        <span class="id-reply-author">{{ reply.author or 'unknown' }}</span>
+        <span class="id-reply-date">{{ reply.created_at | fmtrelative }}</span>
       </div>
-      <div class="comment-body">{{ reply.body | safe }}</div>
+      <div class="id-reply-body">{{ reply.body | safe }}</div>
     </div>
-    {% endfor %}
+    {%- endfor %}
   </div>
-  {% endif %}
+  {%- endif %}
+
 </div>
-{% endif %}
-{% endfor %}
-{% else %}
-<p class="muted" style="margin:0 0 16px">No comments yet. Be the first to start the discussion.</p>
-{% endif %}
+
+{%- endif %}
+{%- endfor %}
+
+{%- else %}
+<div class="id-empty-comments">
+  <div style="font-size:1.5rem;margin-bottom:var(--space-2)">💬</div>
+  <div>No comments yet. Be the first to start the discussion.</div>
+</div>
+{%- endif %}

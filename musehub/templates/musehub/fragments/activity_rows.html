@@ -1,48 +1,180 @@
-{#  fragments/activity_rows.html — bare HTMX fragment: activity event rows + pagination.
+{#
+  fragments/activity_rows.html — HTMX fragment: activity filter pills + date-grouped timeline.
 
-    This template is intentionally minimal — no <html>, <head>, or nav.
-    It is rendered in two contexts:
-
-    1. Full-page load: included inline by musehub/pages/activity.html inside
-       the ``<div id="activity-rows">`` target container.
-
-    2. HTMX partial swap: returned directly when the handler detects
-       ``HX-Request: true``, replacing only the ``#activity-rows`` container.
-
-    Required context variables
-    --------------------------
-    events       : list[ActivityEventResponse]  — current page of activity events
-    page         : int                          — current 1-based page number
-    total_pages  : int                          — total number of pages
-    base_url     : str                          — repo base URL, e.g. /owner/slug
-    event_type   : str                          — active event_type filter ('' if none)
+  Required context variables:
+    event_groups  : list[{label, events}]  — events grouped by calendar date
+    type_pills    : list[{type, count}]    — per-type counts for filter pills
+    event_type    : str                    — current active type filter (or "")
+    total         : int                    — total filtered event count
+    total_all     : int                    — total unfiltered event count
+    page          : int
+    total_pages   : int
+    base_url      : str
+    owner         : str
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
-{% from "musehub/macros/empty_state.html" import empty_state %}
 
-{% if events %}
-  {% for event in events %}
-  <div class="activity-row" id="event-{{ event.event_id }}">
-    <div class="activity-body">
-      <div class="activity-description">{{ event.description }}</div>
-      <div class="activity-meta">
-        <a href="/{{ event.actor | urlencode }}"
-           class="activity-actor">{{ event.actor }}</a>
-        &bull;
-        <span class="activity-type-badge">{{ event.event_type | replace('_', ' ') | title }}</span>
-        &bull;
-        <span class="text-muted" title="{{ event.created_at }}">{{ event.created_at | fmtrelative }}</span>
-      </div>
+{# ── Event type metadata (icon + human label) ──────────────────────────── #}
+{%- set ev_cfg = {
+  "commit_pushed":   {"icon": "📝", "label": "Commit"},
+  "pr_opened":       {"icon": "🔀", "label": "PR Opened"},
+  "pr_merged":       {"icon": "🟣", "label": "PR Merged"},
+  "pr_closed":       {"icon": "✕",  "label": "PR Closed"},
+  "issue_opened":    {"icon": "🐛", "label": "Issue Opened"},
+  "issue_closed":    {"icon": "✓",  "label": "Issue Closed"},
+  "branch_created":  {"icon": "⑂",  "label": "Branch Created"},
+  "branch_deleted":  {"icon": "🗑",  "label": "Branch Deleted"},
+  "tag_pushed":      {"icon": "🏷",  "label": "Tag Pushed"},
+  "session_started": {"icon": "🎙",  "label": "Session Started"},
+  "session_ended":   {"icon": "⏹",  "label": "Session Ended"},
+} %}
+
+{# ── Filter pills ──────────────────────────────────────────────────────── #}
+{%- set pill_base = base_url ~ "/activity" %}
+<div class="av-filter-bar">
+  <span class="av-filter-label">Filter:</span>
+
+  {# All pill #}
+  <a class="av-pill {% if not event_type %}av-pill--active{% endif %}"
+     href="{{ pill_base }}"
+     hx-get="{{ pill_base }}"
+     hx-target="#av-feed"
+     hx-push-url="true">
+    All
+    <span class="av-pill-count">{{ total_all }}</span>
+  </a>
+
+  {# Per-type pills — sorted by count descending #}
+  {%- for pill in type_pills %}
+  {%- if pill.count > 0 %}
+  {%- set cfg = ev_cfg.get(pill.type, {"icon": "•", "label": pill.type | replace("_"," ") | title}) %}
+  <a class="av-pill {% if event_type == pill.type %}av-pill--active{% endif %}"
+     href="{{ pill_base }}?event_type={{ pill.type }}"
+     hx-get="{{ pill_base }}?event_type={{ pill.type }}"
+     hx-target="#av-feed"
+     hx-push-url="true"
+     title="{{ cfg.label }}">
+    {{ cfg.icon }} {{ cfg.label }}
+    <span class="av-pill-count">{{ pill.count }}</span>
+  </a>
+  {%- endif %}
+  {%- endfor %}
+
+  {# Filtered count badge #}
+  {%- if event_type %}
+  <span style="margin-left:auto;font-size:var(--font-size-xs);color:var(--text-muted)">
+    {{ total }} matching
+  </span>
+  {%- endif %}
+</div>
+
+{# ── Timeline ──────────────────────────────────────────────────────────── #}
+{%- if event_groups %}
+
+{%- for group in event_groups %}
+{# Date header #}
+<div class="av-date-header">
+  <span>{{ group.label }}</span>
+  <div class="av-date-line"></div>
+  <span>{{ group.events | length }} event{{ '' if group.events | length == 1 else 's' }}</span>
+</div>
+
+{# Event rows in this date group #}
+{%- for event in group.events %}
+{%- set cfg = ev_cfg.get(event.event_type, {"icon": "•", "label": event.event_type | replace("_"," ") | title}) %}
+{%- set meta = event.metadata | default({}) %}
+{%- set is_last_in_group = loop.last %}
+
+<div class="av-row" id="event-{{ event.event_id }}">
+
+  {# Icon column with connector line #}
+  <div class="av-row-icon-col">
+    <div class="av-icon-badge av-type-{{ event.event_type }}">{{ cfg.icon }}</div>
+    {%- if not is_last_in_group or not loop.last %}
+    <div class="av-row-connector"></div>
+    {%- endif %}
+  </div>
+
+  {# Body #}
+  <div class="av-row-body">
+    <div class="av-row-title">{{ event.description }}</div>
+
+    <div class="av-row-meta">
+      {# Actor with avatar #}
+      <a href="/{{ event.actor }}" class="av-actor-link">
+        <span class="av-actor-avatar">{{ event.actor[0] | upper if event.actor else '?' }}</span>
+        {{ event.actor }}
+      </a>
+
+      {# Type badge #}
+      <span class="av-type-label">{{ cfg.label }}</span>
+
+      {# Rich metadata chips from event_metadata JSON #}
+      {%- if meta.get("commit_id") %}
+      <a href="{{ base_url }}/commits/{{ meta.commit_id }}"
+         class="av-chip av-chip-commit"
+         title="View commit">
+        {{ meta.commit_id[:7] }}
+      </a>
+      {%- endif %}
+
+      {%- if meta.get("branch") %}
+      <span class="av-chip av-chip-branch">⑂ {{ meta.branch }}</span>
+      {%- endif %}
+
+      {%- if meta.get("pr_number") %}
+      <a href="{{ base_url }}/pull-requests"
+         class="av-chip av-chip-pr"
+         title="Pull request #{{ meta.pr_number }}">
+        #{{ meta.pr_number }}
+      </a>
+      {%- elif meta.get("pr_id") %}
+      <span class="av-chip av-chip-pr">PR</span>
+      {%- endif %}
+
+      {%- if meta.get("tag") %}
+      <span class="av-chip av-chip-tag">🏷 {{ meta.tag }}</span>
+      {%- endif %}
+
+      {%- if meta.get("session_id") %}
+      <span class="av-chip av-chip-session">🎙 session</span>
+      {%- endif %}
+
+      {%- if meta.get("participants") %}
+      <span class="av-chip">{{ meta.participants | length }} participant{{ '' if meta.participants | length == 1 else 's' }}</span>
+      {%- endif %}
+
+      {# Timestamp #}
+      <span title="{{ event.created_at }}">{{ event.created_at | fmtrelative }}</span>
     </div>
   </div>
-  {% endfor %}
+</div>
+{%- endfor %}{# event loop #}
+{%- endfor %}{# group loop #}
 
+{# ── Pagination ────────────────────────────────────────────────────────── #}
+{%- if total_pages > 1 %}
+<div style="padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border-default); background: var(--bg-overlay)">
   {{ pagination(page, total_pages, base_url ~ '/activity',
-               extra_params={'event_type': event_type}) }}
-{% else %}
-  {{ empty_state(
-      "📅",
-      "No activity",
-      "Repository events will appear here when commits are pushed, PRs opened, issues created, and more.",
-  ) }}
-{% endif %}
+               extra_params={'event_type': event_type} if event_type else {}) }}
+</div>
+{%- endif %}
+
+{%- else %}
+<div class="av-empty">
+  {%- if event_type %}
+  <p style="font-size:1.5rem;margin-bottom:var(--space-2)">🔇</p>
+  <p>No <strong>{{ ev_cfg.get(event_type, {}).get("label", event_type) }}</strong> events yet.</p>
+  <a href="{{ base_url }}/activity"
+     hx-get="{{ base_url }}/activity"
+     hx-target="#av-feed"
+     hx-push-url="true"
+     style="color:var(--color-accent);font-size:var(--font-size-sm)">
+    Clear filter →
+  </a>
+  {%- else %}
+  <p style="font-size:1.5rem;margin-bottom:var(--space-2)">🌱</p>
+  <p>No activity yet. Push a commit to see the feed come alive.</p>
+  {%- endif %}
+</div>
+{%- endif %}

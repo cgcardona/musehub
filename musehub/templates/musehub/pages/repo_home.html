@@ -9,6 +9,8 @@
 {% include "musehub/partials/repo_nav.html" %}
 {% endblock %}
 
+{% block page_json %}{"page": "repo", "repo_id": {{ repo_id | tojson }}, "clone_musehub": {{ clone_url_musehub | tojson }}, "clone_https": {{ clone_url_https | tojson }}, "clone_ssh": {{ clone_url_ssh | tojson }}}{% endblock %}
+
 {#
   Parse repo.tags into display groups.
   Tags may be prefixed (genre:baroque, emotion:melancholic, stage:rough-mix, ref:beethoven, key:c)
@@ -106,7 +108,7 @@
         {# Action cluster #}
         <div class="repo-hero-actions">
           <button class="btn btn-star btn-sm" id="nav-star-btn"
-                  onclick="toggleStar()" style="display:none">
+                  style="display:none">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             <span id="nav-star-count">0</span>
           </button>
@@ -136,7 +138,7 @@
         <span class="stat-card-value">{{ tags_count }}</span>
         <span class="stat-card-label">Releases</span>
       </a>
-      <a href="#" class="stat-card" id="stat-stars" onclick="toggleStar(); return false;">
+      <a href="#" class="stat-card" id="stat-stars">
         <span class="stat-card-value" id="stat-star-count" style="color:var(--color-warning)">—</span>
         <span class="stat-card-label">Stars</span>
       </a>
@@ -149,7 +151,7 @@
             hx-target="#file-tree"
             hx-push-url="true"
             style="display:inline">
-        <select name="ref" class="filter-select" onchange="this.form.requestSubmit()">
+        <select name="ref" class="filter-select">
           {% for branch in branches %}
           <option value="{{ branch.name }}" {% if branch.name == ref %}selected{% endif %}>
             &#127807; {{ branch.name }}
@@ -375,16 +377,15 @@
       </div>
       <div style="padding:0 var(--space-4) var(--space-3)">
         <div class="clone-tabs">
-          <button class="clone-tab-btn active" onclick="switchCloneTab(this,'musehub')">MuseHub</button>
-          <button class="clone-tab-btn" onclick="switchCloneTab(this,'https')">HTTPS</button>
-          <button class="clone-tab-btn" onclick="switchCloneTab(this,'ssh')">SSH</button>
+          <button class="clone-tab-btn active" data-clone-tab="musehub">MuseHub</button>
+          <button class="clone-tab-btn" data-clone-tab="https">HTTPS</button>
+          <button class="clone-tab-btn" data-clone-tab="ssh">SSH</button>
         </div>
         <div class="clone-input-wrap">
           <input type="text" class="clone-input" id="clone-input" readonly
                  value="{{ clone_url_musehub }}">
           <button class="btn btn-secondary btn-sm clone-copy-btn"
-                  id="clone-copy-btn"
-                  onclick="copyClone()">
+                  id="clone-copy-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             Copy
           </button>
@@ -396,29 +397,3 @@
 </div>
 {% endblock %}
 
-{% block page_data %}
-const CLONE_URLS = {
-  musehub: {{ clone_url_musehub | tojson }},
-  https:   {{ clone_url_https   | tojson }},
-  ssh:     {{ clone_url_ssh     | tojson }},
-};
-{% endblock %}
-
-{% block page_script %}
-window.switchCloneTab = function(btn, protocol) {
-  document.querySelectorAll('.clone-tab-btn').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  document.getElementById('clone-input').value = CLONE_URLS[protocol] || '';
-};
-
-window.copyClone = function() {
-  var input = document.getElementById('clone-input');
-  var btn   = document.getElementById('clone-copy-btn');
-  navigator.clipboard.writeText(input.value).then(function() {
-    var orig = btn.innerHTML;
-    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
-    btn.classList.add('clone-copy-flash');
-    setTimeout(function() { btn.innerHTML = orig; btn.classList.remove('clone-copy-flash'); }, 1800);
-  });
-};
-{% endblock %}

@@ -3,7 +3,6 @@ Muse Authentication Module
 
 Provides JWT-based access token generation and validation.
 """
-from __future__ import annotations
 
 from musehub.auth.tokens import (
     generate_access_code,

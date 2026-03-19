@@ -24,7 +24,6 @@ Write endpoints always require a valid JWT Bearer token.
 No business logic lives here — all persistence is delegated to
 musehub.services.musehub_issues.
 """
-from __future__ import annotations
 
 import logging
 

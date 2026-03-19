@@ -490,31 +490,177 @@ function setupTooltip(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Audio modal helpers
+// ---------------------------------------------------------------------------
+
+/** Relative timestamp label (no DOM dependency). */
+function relLabel(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60)  return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60)  return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24)  return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+/** Format seconds → "M:SS". */
+function fmtTime(sec: number): string {
+  if (!isFinite(sec) || sec < 0) return '—';
+  const m = Math.floor(sec / 60);
+  const s = String(Math.floor(sec % 60)).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+interface MusicalBadge { cls: string; label: string; }
+
+/** Extract musical badges from a commit message (mirrors server-side Python). */
+function extractBadges(msg: string): MusicalBadge[] {
+  const badges: MusicalBadge[] = [];
+  const bpmM = /\b(\d{2,3})\s*(?:bpm|BPM)\b/.exec(msg);
+  if (bpmM) badges.push({ cls: 'am-bpm', label: `♩ ${bpmM[1]} BPM` });
+  const keyM = /\b([A-G][b#]?(?:m(?:aj(?:or)?)?|min(?:or)?|M)?)\b/.exec(msg);
+  if (keyM) badges.push({ cls: 'am-key', label: `🎵 ${keyM[1]}` });
+  const emoM = /emotion:([\w-]+)/i.exec(msg);
+  if (emoM) badges.push({ cls: '', label: `💜 ${emoM[1]}` });
+  const instrRe = /\b(piano|bass|drums?|keys|strings?|guitar|synth|pad|lead|brass|horn|flute|cello|violin|organ|arp|vocals?|percussion|kick|snare|hihat|hi-hat|clap)\b/gi;
+  const instrs = [...new Set([...msg.matchAll(instrRe)].map(m => m[1].toLowerCase()))].slice(0, 3);
+  if (instrs.length) badges.push({ cls: 'am-instr', label: instrs.join(' · ') });
+  return badges;
+}
+
+// ---------------------------------------------------------------------------
 // Audio modal
 // ---------------------------------------------------------------------------
 function setupAudioModal(): void {
   window.openAudioModal = (commitId: string, sha: string) => {
     document.getElementById('audio-modal')?.remove();
+
+    // Look up commit metadata from already-fetched timeline data
+    const commit = tlData?.commits?.find(c => c.commitId === commitId);
+    const message  = commit?.message  ?? sha;
+    const author   = commit?.author   ?? '?';
+    const branch   = commit?.branch   ?? '';
+    const tsIso    = commit?.timestamp ?? '';
+    const tsLabel  = tsIso ? relLabel(tsIso) : '';
+    const initial  = author[0]?.toUpperCase() ?? '?';
+    const badges   = extractBadges(message);
+    const audioSrc = `/api/v1/repos/${cfg.repoId}/commits/${commitId}/audio`;
+    const commitUrl = `${cfg.baseUrl}/commits/${commitId}`;
+
+    // Build badge HTML
+    const badgeHTML = badges.map(b =>
+      `<span class="am-badge ${escHtml(b.cls)}">${escHtml(b.label)}</span>`
+    ).join('');
+
     const modal = document.createElement('div');
     modal.id        = 'audio-modal';
     modal.className = 'audio-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', `Audio preview — commit ${sha}`);
+
     modal.innerHTML = `
-      <div class="audio-modal-box">
-        <h3>▶ Preview at commit ${escHtml(sha)}</h3>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
-          Audio artifacts from this commit state.
-        </p>
-        <audio controls style="width:100%;margin-bottom:12px">
-          <source src="/api/v1/repos/${cfg.repoId}/commits/${commitId}/audio" type="audio/mpeg">
-          No audio available for this commit.
-        </audio>
-        <div style="text-align:right;margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
-          <a href="${cfg.baseUrl}/commits/${commitId}" class="btn btn-secondary" style="font-size:12px">View commit</a>
-          <button class="btn btn-secondary" onclick="document.getElementById('audio-modal').remove()" style="font-size:12px">Close</button>
+      <div class="am-box" id="am-box">
+
+        <div class="am-header">
+          <span class="am-header-icon">🎧</span>
+          <span class="am-header-title">Audio Preview</span>
+          <span class="am-sha">${escHtml(sha)}</span>
+          <button class="am-close-btn" id="am-close-btn" title="Close (Esc)" aria-label="Close">✕</button>
         </div>
-      </div>`;
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+        <div class="am-body">
+          <div class="am-message">${escHtml(message)}</div>
+
+          <div class="am-meta">
+            <span class="am-avatar">${escHtml(initial)}</span>
+            <span class="am-author">${escHtml(author)}</span>
+            ${branch ? `<span class="am-branch">⑂ ${escHtml(branch)}</span>` : ''}
+            ${tsLabel ? `<span title="${escHtml(tsIso)}">${escHtml(tsLabel)}</span>` : ''}
+          </div>
+
+          ${badgeHTML ? `<div class="am-badges">${badgeHTML}</div>` : ''}
+
+          <div class="am-player" id="am-player">
+            <div class="am-player-row">
+              <button class="am-play-btn" id="am-play-btn" title="Play / Pause" disabled>▶</button>
+              <div class="am-progress-wrap" id="am-prog-wrap">
+                <div class="am-progress-fill" id="am-prog-fill"></div>
+              </div>
+              <span class="am-time" id="am-time">Loading…</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="am-footer">
+          <a href="${escHtml(commitUrl)}" class="btn btn-secondary btn-sm">View commit ↗</a>
+          <button class="btn btn-ghost btn-sm" id="am-close-btn-2">Close</button>
+        </div>
+
+      </div>
+      <audio id="am-audio" preload="none" style="display:none">
+        <source src="${escHtml(audioSrc)}" type="audio/mpeg">
+      </audio>`;
+
+    // Wire close events
+    const close = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    modal.querySelector('#am-close-btn')?.addEventListener('click', close);
+    modal.querySelector('#am-close-btn-2')?.addEventListener('click', close);
+
+    // ESC key
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+    };
+    document.addEventListener('keydown', onKey);
+    modal.addEventListener('remove', () => document.removeEventListener('keydown', onKey));
+
     document.body.appendChild(modal);
+
+    // Wire custom audio player
+    const audio    = modal.querySelector<HTMLAudioElement>('#am-audio')!;
+    const playBtn  = modal.querySelector<HTMLButtonElement>('#am-play-btn')!;
+    const progWrap = modal.querySelector<HTMLElement>('#am-prog-wrap')!;
+    const progFill = modal.querySelector<HTMLElement>('#am-prog-fill')!;
+    const timeEl   = modal.querySelector<HTMLElement>('#am-time')!;
+
+    audio.addEventListener('canplaythrough', () => {
+      playBtn.disabled = false;
+      timeEl.textContent = `0:00 / ${fmtTime(audio.duration)}`;
+    });
+    audio.addEventListener('error', () => {
+      playBtn.disabled = true;
+      timeEl.textContent = 'No audio';
+      modal.querySelector<HTMLElement>('#am-player')!.innerHTML =
+        `<div class="am-no-audio">🔇 No audio available for this commit.<br>
+         <a href="${escHtml(commitUrl)}" style="color:var(--color-accent)">View full commit →</a></div>`;
+    });
+    audio.addEventListener('timeupdate', () => {
+      const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+      progFill.style.width = `${pct}%`;
+      timeEl.textContent = `${fmtTime(audio.currentTime)} / ${fmtTime(audio.duration)}`;
+    });
+    audio.addEventListener('ended', () => { playBtn.textContent = '▶'; });
+
+    playBtn.addEventListener('click', () => {
+      if (audio.paused) {
+        audio.play().catch(() => { timeEl.textContent = 'Playback error'; });
+        playBtn.textContent = '⏸';
+      } else {
+        audio.pause();
+        playBtn.textContent = '▶';
+      }
+    });
+
+    // Click progress bar to seek
+    progWrap.addEventListener('click', (e: MouseEvent) => {
+      if (!audio.duration) return;
+      const rect = progWrap.getBoundingClientRect();
+      audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+    });
+
+    audio.load();
   };
 }
 
@@ -543,18 +689,39 @@ function setupScrubber(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Layer + zoom controls (exposed to window for onclick handlers)
+// Layer + zoom controls — bound via addEventListener, no inline handlers
 // ---------------------------------------------------------------------------
+function setupLayerAndZoomControls(): void {
+  // Layer toggle checkboxes: <input data-layer="commits"> etc.
+  document.querySelectorAll<HTMLInputElement>('[data-layer]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      (layers as Record<string, boolean>)[cb.dataset.layer!] = cb.checked;
+      renderTimeline();
+    });
+  });
+
+  // Zoom buttons: <button data-zoom="day"> etc.
+  document.querySelectorAll<HTMLElement>('[data-zoom]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const z = btn.dataset.zoom!;
+      zoom = z;
+      document.querySelectorAll<HTMLElement>('[data-zoom]').forEach(b => {
+        b.classList.toggle('active', b.dataset.zoom === z);
+      });
+      renderTimeline();
+    });
+  });
+}
+
+// Keep window globals as legacy shims so any cached HTML still works
 window.toggleLayer = (name: string, checked: boolean): void => {
   (layers as Record<string, boolean>)[name] = checked;
   renderTimeline();
 };
-
 window.setZoom = (z: string): void => {
   zoom = z;
-  // Update active class on zoom buttons
-  document.querySelectorAll('.tl-zoom-btn').forEach(btn => {
-    btn.classList.toggle('active', (btn as HTMLElement).dataset.zoom === z);
+  document.querySelectorAll<HTMLElement>('[data-zoom]').forEach(b => {
+    b.classList.toggle('active', b.dataset.zoom === z);
   });
   renderTimeline();
 };
@@ -594,11 +761,7 @@ export function initTimeline(): void {
   setupTooltip();
   setupAudioModal();
   setupScrubber();
-
-  // Set initial zoom button active state
-  document.querySelectorAll('.tl-zoom-btn').forEach(btn => {
-    btn.classList.toggle('active', (btn as HTMLElement).dataset.zoom === zoom);
-  });
+  setupLayerAndZoomControls();
 
   (async () => {
     try {

@@ -48,8 +48,9 @@ Protocol introspection aliases:
   EventJsonSchema — dict[str, JSONValue] (single event JSON Schema)
   EventSchemaMap — dict[str, EventJsonSchema] (event_type → JSON Schema)
 """
-
 from __future__ import annotations
+
+
 
 from collections.abc import Iterable
 from typing import Required, TypedDict, TypeGuard, overload

@@ -165,7 +165,7 @@ async def test_listen_page_playlist_json_injected(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """window.__playlist must be set in the server-rendered page script tag."""
+    """Track listing is rendered SSR; listen.ts reads track data from data-track-url attributes."""
     await _make_repo_with_tracks(
         db_session,
         slug="playlist-repo",
@@ -174,7 +174,8 @@ async def test_listen_page_playlist_json_injected(
     response = await client.get("/testuser/playlist-repo/listen/main")
     assert response.status_code == 200
     body = response.text
-    assert "window.__playlist" in body
+    assert '"page": "listen"' in body
+    assert "data-track-url" in body
 
 
 # ---------------------------------------------------------------------------

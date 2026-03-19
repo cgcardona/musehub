@@ -83,14 +83,54 @@ export function bulkAssignMilestone(): void { const s = document.getElementById(
 
 export function initIssueList(data: RepoPageData): void {
   initRepoPage(data);
-  // Expose helpers for inline onclick handlers still in the template
-  window.showTemplatePicker = showTemplatePicker;
-  window.selectTemplate = selectTemplate;
-  window.toggleIssueSelect = toggleIssueSelect;
-  window.deselectAll = deselectAll;
-  window.bulkClose = bulkClose;
-  window.bulkReopen = bulkReopen;
-  window.bulkAssignLabel = bulkAssignLabel;
-  window.bulkAssignMilestone = bulkAssignMilestone;
-  window.bodyPreview = bodyPreview;
+
+  // Filter form auto-submit: label checkboxes, milestone/assignee selects, sort radios
+  document.querySelectorAll<HTMLElement>('[data-filter-select]').forEach((el) => {
+    el.addEventListener('change', () => (el.closest('form') as HTMLFormElement)?.requestSubmit());
+  });
+
+  // Author input with debounce
+  const searchInput = document.querySelector<HTMLInputElement>('[data-search-input]');
+  if (searchInput) {
+    let t: ReturnType<typeof setTimeout>;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(() => (searchInput.closest('form') as HTMLFormElement)?.requestSubmit(), 300);
+    });
+  }
+
+  // Issue row checkbox — delegated so it works after HTMX swaps
+  document.addEventListener('change', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLInputElement>('[data-issue-toggle]');
+    if (!el) return;
+    toggleIssueSelect(el.dataset.issueToggle!, (el as HTMLInputElement).checked);
+  });
+
+  // Bulk action buttons
+  document.addEventListener('click', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-bulk-action]');
+    if (!el) return;
+    const action = el.dataset.bulkAction;
+    if (action === 'assign-label') bulkAssignLabel();
+    else if (action === 'assign-milestone') bulkAssignMilestone();
+    else if (action === 'close') bulkClose();
+    else if (action === 'reopen') bulkReopen();
+    else if (action === 'deselect') deselectAll();
+  });
+
+  // Template picker actions
+  document.addEventListener('click', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+    if (action === 'show-template-picker') {
+      showTemplatePicker();
+    } else if (action === 'hide-template-picker') {
+      const picker = document.getElementById('template-picker');
+      if (picker) picker.style.display = 'none';
+    } else if (action === 'select-template') {
+      const tid = el.dataset.templateId;
+      if (tid) selectTemplate(tid);
+    }
+  });
 }

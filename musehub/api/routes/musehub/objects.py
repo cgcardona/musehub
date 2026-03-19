@@ -20,12 +20,11 @@ renderer in the browser.
 
 All endpoints require a valid JWT Bearer token.
 """
-from __future__ import annotations
 
 import logging
 import mimetypes
-import os
 import uuid
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -56,7 +55,7 @@ _EXTRA_MIME: dict[str, str] = {
 
 def _content_type(path: str) -> str:
     """Resolve MIME type from path extension; fall back to octet-stream."""
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     if ext in _EXTRA_MIME:
         return _EXTRA_MIME[ext]
     guessed, _ = mimetypes.guess_type(path)
@@ -87,7 +86,7 @@ def _detect_file_type(path: str) -> str:
 
     Values: 'midi' | 'audio' | 'json' | 'image' | 'xml' | 'other'
     """
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     return _FILE_TYPE_MAP.get(ext, "other")
 
 
@@ -142,7 +141,7 @@ async def get_blob_meta(
 
     content_text: str | None = None
     if file_type in ("json", "xml") and obj.size_bytes <= _MAX_TEXT_EMBED_BYTES:
-        if os.path.exists(obj.disk_path):
+        if Path(obj.disk_path).exists():
             try:
                 with open(obj.disk_path, encoding="utf-8", errors="replace") as fh:
                     content_text = fh.read()
@@ -152,7 +151,7 @@ async def get_blob_meta(
     return BlobMetaResponse(
         object_id=obj.object_id,
         path=obj.path,
-        filename=os.path.basename(obj.path),
+        filename=Path(obj.path).name,
         size_bytes=obj.size_bytes,
         sha=obj.object_id,
         created_at=obj.created_at,
@@ -224,14 +223,14 @@ async def get_object_content(
     if obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found")
 
-    if not os.path.exists(obj.disk_path):
+    if not Path(obj.disk_path).exists():
         logger.warning("⚠️ Object %s exists in DB but missing from disk: %s", object_id, obj.disk_path)
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="Object file has been removed from storage",
         )
 
-    filename = os.path.basename(obj.path)
+    filename = Path(obj.path).name
     media_type = _content_type(obj.path)
     return FileResponse(obj.disk_path, media_type=media_type, filename=filename)
 
@@ -298,14 +297,14 @@ async def parse_midi_object(
     if obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found")
 
-    ext = os.path.splitext(obj.path)[1].lower()
+    ext = Path(obj.path).suffix.lower()
     if ext not in {".mid", ".midi"}:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Object '{obj.path}' is not a MIDI file",
         )
 
-    if not os.path.exists(obj.disk_path):
+    if not Path(obj.disk_path).exists():
         logger.warning("⚠️ MIDI object %s missing from disk: %s", object_id, obj.disk_path)
         raise HTTPException(
             status_code=status.HTTP_410_GONE,

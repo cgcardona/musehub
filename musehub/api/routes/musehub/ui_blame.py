@@ -18,7 +18,6 @@ Auth:
   a token from ``localStorage`` and passes it as a Bearer header when calling the
   JSON API, matching all other MuseHub UI pages.
 """
-from __future__ import annotations
 
 import logging
 from typing import Any

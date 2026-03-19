@@ -10,4 +10,3 @@ Each sub-module handles a domain of write operations:
 All public functions are async, accept plain scalar arguments extracted from
 the MCP ``arguments`` dict, and return ``MusehubToolResult``.
 """
-from __future__ import annotations

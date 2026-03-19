@@ -1,5 +1,4 @@
 """Contract hashing and lineage verification utilities."""
-from __future__ import annotations
 
 from musehub.contracts.hash_utils import (
     canonical_contract_dict,

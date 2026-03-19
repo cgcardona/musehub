@@ -64,11 +64,10 @@ using a token stored in ``localStorage``.
 
 The embed route sets ``X-Frame-Options: ALLOWALL`` for cross-origin iframe use.
 """
-from __future__ import annotations
 
 import asyncio
 import logging
-import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -153,7 +152,7 @@ def _detect_language(path: str) -> str:
     the correct syntax-highlighting hint for the client-side enhancer.
     Returns an empty string for unrecognised extensions.
     """
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     return _LANG_MAP.get(ext, "")
 
 
@@ -699,6 +698,37 @@ async def commits_list_page(
     )
     rows = (await db.execute(rows_stmt)).scalars().all()
 
+    # ── Server-side badge extraction (eliminates client-side FOUC) ──────────
+    import re as _re
+    _TEMPO_RE_C  = _re.compile(r'\b(\d{2,3})\s*(?:bpm|BPM)\b')
+    _KEY_RE_C    = _re.compile(r'\b([A-G][b#]?(?:m(?:aj(?:or)?)?|min(?:or)?|M)?)\b')
+    _EMOTION_RE_C= _re.compile(r'emotion:([\w-]+)', _re.IGNORECASE)
+    _STAGE_RE_C  = _re.compile(r'stage:([\w-]+)', _re.IGNORECASE)
+    _INSTR_RE_C  = _re.compile(
+        r'\b(piano|bass|drums?|keys|strings?|guitar|synth|pad|lead|brass|'
+        r'horn|flute|cello|violin|organ|arp|vocals?|percussion|kick|snare|hihat|hi-hat|clap)\b',
+        _re.IGNORECASE,
+    )
+
+    def _commit_badges(msg: str) -> list[dict[str, str]]:
+        b: list[dict[str, str]] = []
+        tm = _TEMPO_RE_C.search(msg)
+        if tm:
+            b.append({"cls": "chip-tempo", "label": f"♩ {tm.group(1)} BPM"})
+        km = _KEY_RE_C.search(msg)
+        if km:
+            b.append({"cls": "chip-key", "label": f"🎵 {km.group(1)}"})
+        em = _EMOTION_RE_C.search(msg)
+        if em:
+            b.append({"cls": "chip-emotion", "label": f"💜 {em.group(1)}"})
+        sm = _STAGE_RE_C.search(msg)
+        if sm:
+            b.append({"cls": "chip-stage", "label": sm.group(1)})
+        instrs = sorted({m.group(1).lower() for m in _INSTR_RE_C.finditer(msg)})[:3]
+        if instrs:
+            b.append({"cls": "chip-instr", "label": " · ".join(instrs)})
+        return b
+
     # Build CommitResponse objects inline — same mapping as the service layer.
     commits = [
         CommitResponse(
@@ -711,6 +741,11 @@ async def commits_list_page(
             snapshot_id=r.snapshot_id,
         )
         for r in rows
+    ]
+    # Enrich commits with SSR badge data (avoids client-side badge injection FOUC).
+    commits_enriched: list[dict[str, Any]] = [
+        {**c.model_dump(mode="json"), "badges": _commit_badges(c.message)}
+        for c in commits
     ]
 
     # ── Distinct authors for the filter dropdown ──────────────────────────────
@@ -746,7 +781,7 @@ async def commits_list_page(
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "commits",
-        "commits": commits,
+        "commits": commits_enriched,
         "total": total,
         "page": page,
         "per_page": per_page,
@@ -810,10 +845,11 @@ async def commit_page(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Commit not found")
 
     short_id = commit_id[:8]
+    api_base = f"/api/v1/repos/{repo_id}"
 
-    # Fetch commit comments server-side (target_type="commit" in musehub_comments).
-    comment_rows = (
-        await db.execute(
+    # ── Parallel: comments + sibling commits on same branch ──────────────
+    async def _q_comments() -> list[dict[str, Any]]:
+        rows = (await db.execute(
             sa_select(musehub_db.MusehubComment)
             .where(
                 musehub_db.MusehubComment.repo_id == repo_id,
@@ -822,32 +858,65 @@ async def commit_page(
                 musehub_db.MusehubComment.is_deleted.is_(False),
             )
             .order_by(musehub_db.MusehubComment.created_at)
+        )).scalars().all()
+        return [
+            {
+                "comment_id": r.comment_id,
+                "author": r.author,
+                "body": r.body,
+                "parent_id": r.parent_id,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
+
+    async def _q_branch_commits() -> list[Any]:
+        commits, _ = await musehub_repository.list_commits(
+            db, repo_id, branch=commit.branch, limit=100
         )
-    ).scalars().all()
-    comments = [
-        {
-            "comment_id": r.comment_id,
-            "author": r.author,
-            "body": r.body,
-            "parent_id": r.parent_id,
-            "created_at": r.created_at,
-        }
-        for r in comment_rows
+        return commits
+
+    comments, branch_commits = await asyncio.gather(_q_comments(), _q_branch_commits())
+
+    # ── Find prev (older) / next (newer) siblings on branch ──────────────
+    # list_commits returns newest-first; pos+1 = older, pos-1 = newer
+    cur_pos = next((i for i, c in enumerate(branch_commits) if c.commit_id == commit_id), None)
+    older_commit: Any = branch_commits[cur_pos + 1] if (cur_pos is not None and cur_pos + 1 < len(branch_commits)) else None
+    newer_commit: Any = branch_commits[cur_pos - 1] if (cur_pos is not None and cur_pos > 0) else None
+
+    # ── Compute musical dimension change scores from commit message ───────
+    _DIM_KWS: list[tuple[str, frozenset[str]]] = [
+        ("melodic",    frozenset(["melody", "melodic", "lead", "motif", "phrase", "contour", "scale", "mode"])),
+        ("harmonic",   frozenset(["key", "chord", "harmony", "harmonic", "tonal", "modulation", "progression", "pitch"])),
+        ("rhythmic",   frozenset(["bpm", "tempo", "beat", "rhythm", "rhythmic", "groove", "swing", "meter", "time"])),
+        ("structural", frozenset(["section", "structural", "intro", "verse", "chorus", "bridge", "outro", "form", "arrangement", "structure"])),
+        ("dynamic",    frozenset(["dynamic", "volume", "velocity", "loud", "soft", "crescendo", "decrescendo", "fade", "mute", "swell"])),
     ]
 
-    # Derive audio URL from snapshot_id when available.  WaveSurfer picks this
-    # up from the data-url attribute; no JS API call needed when present.
-    api_base = f"/api/v1/repos/{repo_id}"
+    def _dim_score(msg: str, kws: frozenset[str], is_root: bool) -> dict[str, Any]:
+        score = 1.0 if is_root else (0.0 if not any(kw in msg for kw in kws) else min(0.35 + (sum(1 for kw in kws if kw in msg) - 1) * 0.15, 0.95))
+        label = "none" if score < 0.15 else ("low" if score < 0.40 else ("medium" if score < 0.70 else "high"))
+        return {"dimension": name, "score": round(score, 3), "label": label}
+
+    is_root = not commit.parent_ids
+    msg_lower = commit.message.lower()
+    dimensions: list[dict[str, Any]] = []
+    for name, kws in _DIM_KWS:
+        score = 1.0 if is_root else (0.0 if not any(kw in msg_lower for kw in kws) else min(0.35 + (sum(1 for kw in kws if kw in msg_lower) - 1) * 0.15, 0.95))
+        label = "none" if score < 0.15 else ("low" if score < 0.40 else ("medium" if score < 0.70 else "high"))
+        dimensions.append({"dimension": name, "score": round(score, 3), "label": label})
+
+    overall_change = round(sum(d["score"] for d in dimensions) / len(dimensions), 3) if dimensions else 0.0
+
+    # ── Audio / render status ─────────────────────────────────────────────
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
         if commit.snapshot_id is not None
         else None
     )
-    # Score (abcjs) support is reserved for future data-model enrichment.
-    has_score = False
-    abc_url: str | None = None
+    render_status = "ready" if audio_url else "none"
 
-    ctx: dict[str, object] = {
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
@@ -857,11 +926,16 @@ async def commit_page(
         "listen_url": f"{base_url}/listen/{commit_id}",
         "embed_url": f"{base_url}/embed/{commit_id}",
         "current_page": "commits",
-        "commit": commit.model_dump(),
+        "commit": commit.model_dump(mode="json"),
         "comments": comments,
         "audio_url": audio_url,
-        "has_score": has_score,
-        "abc_url": abc_url,
+        "render_status": render_status,
+        "dimensions": dimensions,
+        "overall_change": overall_change,
+        "older_commit": older_commit.model_dump(mode="json") if older_commit else None,
+        "newer_commit": newer_commit.model_dump(mode="json") if newer_commit else None,
+        "branch_commit_count": len(branch_commits),
+        "branch_position": (cur_pos + 1) if cur_pos is not None else None,
         "breadcrumb_data": _breadcrumbs(
             (owner, f"/{owner}"),
             (repo_slug, base_url),
@@ -1092,31 +1166,77 @@ async def pr_detail_page(
             )
         return JSONResponse(diff_response.model_dump(by_alias=True, mode="json"))
 
-    reviews_resp = await musehub_pull_requests.list_reviews(
-        db, repo_id=repo_id, pr_id=pr_id
+    # ── Parallel queries ─────────────────────────────────────────────────
+    async def _q_reviews() -> Any:
+        return await musehub_pull_requests.list_reviews(db, repo_id=repo_id, pr_id=pr_id)
+
+    async def _q_comments() -> Any:
+        return await musehub_pull_requests.list_pr_comments(db, pr_id=pr_id, repo_id=repo_id)
+
+    async def _q_diff() -> Any:
+        try:
+            result = await musehub_divergence.compute_hub_divergence(
+                db, repo_id=repo_id, branch_a=pr.from_branch, branch_b=pr.to_branch,
+            )
+            return musehub_divergence.build_pr_diff_response(
+                pr_id=pr_id, from_branch=pr.from_branch,
+                to_branch=pr.to_branch, result=result,
+            )
+        except Exception:
+            return musehub_divergence.build_zero_diff_response(
+                pr_id=pr_id, repo_id=repo_id,
+                from_branch=pr.from_branch, to_branch=pr.to_branch,
+            )
+
+    reviews_resp, comments_resp, diff_resp = await asyncio.gather(
+        _q_reviews(), _q_comments(), _q_diff(),
     )
-    comments_resp = await musehub_pull_requests.list_pr_comments(
-        db, pr_id=pr_id, repo_id=repo_id
-    )
+
+    # ── Fetch commits on the from_branch ────────────────────────────────
+    commit_rows = (await db.execute(
+        sa_select(musehub_db.MusehubCommit)
+        .where(
+            musehub_db.MusehubCommit.repo_id == repo_id,
+            musehub_db.MusehubCommit.branch == pr.from_branch,
+        )
+        .order_by(musehub_db.MusehubCommit.created_at.desc())
+        .limit(25)
+    )).scalars().all()
+    pr_commits: list[dict[str, Any]] = [
+        {
+            "commit_id": c.commit_id,
+            "message": c.message,
+            "author_name": c.author,
+            "created_at": c.timestamp,
+        }
+        for c in commit_rows
+    ]
 
     approved_count = sum(1 for r in reviews_resp.reviews if r.state == "approved")
     changes_count = sum(
         1 for r in reviews_resp.reviews if r.state == "changes_requested"
     )
+    pending_count = sum(1 for r in reviews_resp.reviews if r.state == "pending")
 
-    ctx: dict[str, object] = {
+    # Diff summary data for template
+    diff_dict = diff_resp.model_dump(mode="json")
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "pr_id": pr_id,
         "base_url": base_url,
         "current_page": "pulls",
-        "pr": pr.model_dump(),
-        "reviews": [r.model_dump() for r in reviews_resp.reviews],
-        "comments": [c.model_dump() for c in comments_resp.comments],
+        "pr": pr.model_dump(mode="json"),
+        "reviews": [r.model_dump(mode="json") for r in reviews_resp.reviews],
+        "comments": [c.model_dump(mode="json") for c in comments_resp.comments],
         "comment_count": comments_resp.total,
         "approved_count": approved_count,
         "changes_count": changes_count,
+        "pending_count": pending_count,
+        "diff": diff_dict,
+        "pr_commits": pr_commits,
         "breadcrumb_data": _breadcrumbs(
             (owner, f"/{owner}"),
             (repo_slug, base_url),
@@ -1302,12 +1422,14 @@ async def issue_detail_page(
     number: int,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the issue detail page with SSR body and HTMX comment threading.
+    """Render the issue detail page.
 
-    Fetches the issue, comments, labels, milestones, and linked PRs server-side.
-    HTMX requests receive only the comment fragment; direct navigation receives
-    the full page that extends base.html.
+    Fetches issue, comments, labels, milestones, linked PRs, and prev/next issue
+    navigation in parallel.  Parses musical refs from the issue body server-side
+    so the template needs no client-side JS for content rendering.
     """
+    import re as _re
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     issue = await musehub_issues.get_issue(db, repo_id, number)
@@ -1317,31 +1439,136 @@ async def issue_detail_page(
             detail=f"Issue #{number} not found",
         )
 
-    comment_list = await musehub_issues.list_comments(db, issue.issue_id)
-    comments = [c.model_dump() for c in comment_list.comments]
+    # ── Parallel queries ────────────────────────────────────────────────────────
+    async def _q_comments() -> list[dict[str, Any]]:
+        cl = await musehub_issues.list_comments(db, issue.issue_id)
+        return [c.model_dump(mode="json") for c in cl.comments]
 
-    milestone_list = await musehub_issues.list_milestones(db, repo_id, state="open")
-    milestones_data = [m.model_dump() for m in milestone_list.milestones]
+    async def _q_milestones() -> list[dict[str, Any]]:
+        ml = await musehub_issues.list_milestones(db, repo_id, state="open")
+        return [m.model_dump(mode="json") for m in ml.milestones]
 
-    label_rows = (
-        await db.execute(
+    async def _q_labels() -> list[dict[str, str]]:
+        rows = (await db.execute(
             sa_select(label_db.MusehubLabel)
             .where(label_db.MusehubLabel.repo_id == repo_id)
             .order_by(label_db.MusehubLabel.name)
-        )
-    ).scalars().all()
-    labels_data = [{"name": r.name, "color": r.color} for r in label_rows]
+        )).scalars().all()
+        return [{"name": r.name, "color": r.color} for r in rows]
 
-    ctx: dict[str, object] = {
+    async def _q_linked_prs() -> list[dict[str, Any]]:
+        tag = f"#{number}"
+        rows = (await db.execute(
+            sa_select(musehub_db.MusehubPullRequest)
+            .where(
+                musehub_db.MusehubPullRequest.repo_id == repo_id,
+                (musehub_db.MusehubPullRequest.title.contains(tag))
+                | (musehub_db.MusehubPullRequest.body.contains(tag)),
+            )
+            .order_by(musehub_db.MusehubPullRequest.created_at.desc())
+            .limit(5)
+        )).scalars().all()
+        return [
+            {
+                "pr_id": r.pr_id,
+                "title": r.title,
+                "state": r.state,
+                "from_branch": r.from_branch,
+                "to_branch": r.to_branch,
+            }
+            for r in rows
+        ]
+
+    async def _q_nav() -> tuple[int | None, int | None]:
+        prev_num = await db.scalar(
+            sa_select(musehub_db.MusehubIssue.number)
+            .where(
+                musehub_db.MusehubIssue.repo_id == repo_id,
+                musehub_db.MusehubIssue.number < number,
+            )
+            .order_by(musehub_db.MusehubIssue.number.desc())
+            .limit(1)
+        )
+        next_num = await db.scalar(
+            sa_select(musehub_db.MusehubIssue.number)
+            .where(
+                musehub_db.MusehubIssue.repo_id == repo_id,
+                musehub_db.MusehubIssue.number > number,
+            )
+            .order_by(musehub_db.MusehubIssue.number.asc())
+            .limit(1)
+        )
+        return prev_num, next_num
+
+    comments, milestones_data, labels_data, linked_prs, (prev_number, next_number) = (
+        await asyncio.gather(
+            _q_comments(), _q_milestones(), _q_labels(), _q_linked_prs(), _q_nav(),
+        )
+    )
+
+    # ── Parse musical refs from the issue body ──────────────────────────────────
+    _MUS_RE = _re.compile(r"\b(track|section|beats):([A-Za-z0-9_\-]+)\b", _re.IGNORECASE)
+    _ref_icons: dict[str, str] = {"track": "🎵", "section": "🎼", "beats": "🥁"}
+    body_refs: list[dict[str, str]] = [
+        {
+            "type": m.group(1).lower(),
+            "value": m.group(2),
+            "icon": _ref_icons.get(m.group(1).lower(), "🎵"),
+            "raw": m.group(0),
+        }
+        for m in _MUS_RE.finditer(issue.body or "")
+    ]
+
+    # Collect unique musical refs from all comments too
+    seen: set[str] = {r["raw"] for r in body_refs}
+    all_refs: list[dict[str, str]] = list(body_refs)
+    for c in comments:
+        for ref in (c.get("musical_refs") or []):
+            raw = ref.get("raw", "")
+            if raw and raw not in seen:
+                seen.add(raw)
+                all_refs.append({
+                    "type": ref.get("type", ""),
+                    "value": ref.get("value", ""),
+                    "icon": _ref_icons.get(ref.get("type", ""), "🎵"),
+                    "raw": raw,
+                })
+
+    # Derive issue type from well-known label names
+    _type_map: dict[str, tuple[str, str]] = {
+        "bug":           ("🐛", "Bug"),
+        "feature":       ("✨", "Feature"),
+        "enhancement":   ("⬆", "Enhancement"),
+        "question":      ("❓", "Question"),
+        "documentation": ("📖", "Docs"),
+        "performance":   ("⚡", "Performance"),
+        "discussion":    ("💬", "Discussion"),
+    }
+    issue_type: tuple[str, str] | None = None
+    for lbl in (issue.labels or []):
+        key = lbl.lower().replace(" ", "-")
+        if key in _type_map:
+            issue_type = _type_map[key]
+            break
+
+    issue_dict = issue.model_dump(mode="json")
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "issues",
-        "issue": issue.model_dump(),
+        "issue": issue_dict,
         "comments": comments,
         "labels_data": labels_data,
         "milestones_data": milestones_data,
+        "linked_prs": linked_prs,
+        "prev_number": prev_number,
+        "next_number": next_number,
+        "body_refs": body_refs,
+        "all_refs": all_refs,
+        "issue_type": issue_type,
         "breadcrumb_data": _breadcrumbs(
             (owner, f"/{owner}"),
             (repo_slug, base_url),
@@ -1500,8 +1727,6 @@ async def listen_track_page(
 
     No JWT required — HTML shell; JS handles auth for private repos.
     """
-    import os
-
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     objects = await musehub_repository.list_objects(db, repo_id)
 
@@ -1518,10 +1743,10 @@ async def listen_track_page(
     full_mix_url: str | None = None
 
     if target_obj:
-        stem = os.path.splitext(os.path.basename(target_obj.path))[0]
+        stem = Path(target_obj.path).stem
         piano_roll_url: str | None = None
         for p, oid in object_map.items():
-            if os.path.splitext(p)[1].lower() in image_exts and os.path.splitext(os.path.basename(p))[0] == stem:
+            if Path(p).suffix.lower() in image_exts and Path(p).stem == stem:
                 piano_roll_url = f"{api_base}/objects/{oid}/content"
                 break
         tracks = [
@@ -1712,37 +1937,139 @@ async def search_page(
     repo_slug: str,
     q: str = Query("", description="Search query"),
     mode: str = Query("keyword", description="Search mode: keyword | pattern | ask"),
+    search_type: str = Query("all", description="Result type filter: all | commits | issues | prs | releases | sessions"),
     limit: int = Query(20, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the in-repo search page with SSR results.
+    """Render the in-repo multi-type search page with SSR results.
 
-    Simple keyword / pattern / ask modes are run server-side when ``q`` is
-    provided and at least 2 characters long.  The Musical Properties mode
-    (``mode=property``) keeps its JS-driven form because its multi-field
-    filter UI is not expressible as a single query param — that panel degrades
-    gracefully to a submit-button form when JS is unavailable.
+    Searches commits, issues, pull requests, releases, and sessions in
+    parallel.  The ``type`` param filters which category is shown; the
+    ``mode`` param (keyword/pattern/ask) applies only to commit search.
 
-    HTMX live-search swaps only the ``#repo-search-results`` fragment on
-    debounced input, avoiding a full-page reload for subsequent queries.
+    HTMX live-search swaps only the ``#sr-results`` fragment on debounced
+    input, avoiding a full-page reload for subsequent queries.
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     safe_mode = mode if mode in ("keyword", "pattern", "ask") else "keyword"
-    search_result = None
-    if q and len(q.strip()) >= 2 and safe_mode != "property":
-        if safe_mode == "keyword":
-            search_result = await musehub_search.search_by_keyword(
-                db, repo_id=repo_id, keyword=q, limit=limit
-            )
-        elif safe_mode == "ask":
-            search_result = await musehub_search.search_by_ask(
-                db, repo_id=repo_id, question=q, limit=limit
-            )
-        elif safe_mode == "pattern":
-            search_result = await musehub_search.search_by_pattern(
+    safe_type = search_type if search_type in ("all", "commits", "issues", "prs", "releases", "sessions") else "all"
+
+    commit_result = None
+    issue_hits: list[Any] = []
+    pr_hits: list[Any] = []
+    release_hits: list[Any] = []
+    session_hits: list[Any] = []
+
+    if q and len(q.strip()) >= 2:
+        q_lower = q.strip().lower()
+
+        async def _search_commits() -> Any:
+            if safe_mode == "keyword":
+                return await musehub_search.search_by_keyword(
+                    db, repo_id=repo_id, keyword=q, limit=limit
+                )
+            if safe_mode == "ask":
+                return await musehub_search.search_by_ask(
+                    db, repo_id=repo_id, question=q, limit=limit
+                )
+            return await musehub_search.search_by_pattern(
                 db, repo_id=repo_id, pattern=q, limit=limit
             )
-    ctx: dict[str, object] = {
+
+        async def _search_issues() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubIssue.issue_id,
+                    musehub_db.MusehubIssue.number,
+                    musehub_db.MusehubIssue.title,
+                    musehub_db.MusehubIssue.state,
+                    musehub_db.MusehubIssue.author,
+                    musehub_db.MusehubIssue.labels,
+                    musehub_db.MusehubIssue.created_at,
+                ).where(
+                    musehub_db.MusehubIssue.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubIssue.title).contains(q_lower),
+                ).order_by(musehub_db.MusehubIssue.created_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        async def _search_prs() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubPullRequest.pr_id,
+                    musehub_db.MusehubPullRequest.title,
+                    musehub_db.MusehubPullRequest.state,
+                    musehub_db.MusehubPullRequest.author,
+                    musehub_db.MusehubPullRequest.from_branch,
+                    musehub_db.MusehubPullRequest.to_branch,
+                    musehub_db.MusehubPullRequest.created_at,
+                ).where(
+                    musehub_db.MusehubPullRequest.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubPullRequest.title).contains(q_lower),
+                ).order_by(musehub_db.MusehubPullRequest.created_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        async def _search_releases() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubRelease.release_id,
+                    musehub_db.MusehubRelease.tag,
+                    musehub_db.MusehubRelease.title,
+                    musehub_db.MusehubRelease.is_prerelease,
+                    musehub_db.MusehubRelease.is_draft,
+                    musehub_db.MusehubRelease.created_at,
+                ).where(
+                    musehub_db.MusehubRelease.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubRelease.title).contains(q_lower)
+                    | func.lower(musehub_db.MusehubRelease.tag).contains(q_lower),
+                ).order_by(musehub_db.MusehubRelease.created_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        async def _search_sessions() -> list[Any]:
+            rows = (await db.execute(
+                sa_select(
+                    musehub_db.MusehubSession.session_id,
+                    musehub_db.MusehubSession.intent,
+                    musehub_db.MusehubSession.location,
+                    musehub_db.MusehubSession.participants,
+                    musehub_db.MusehubSession.is_active,
+                    musehub_db.MusehubSession.started_at,
+                ).where(
+                    musehub_db.MusehubSession.repo_id == repo_id,
+                    func.lower(musehub_db.MusehubSession.intent).contains(q_lower)
+                    | func.lower(musehub_db.MusehubSession.location).contains(q_lower),
+                ).order_by(musehub_db.MusehubSession.started_at.desc())
+                .limit(limit)
+            )).all()
+            return list(rows)
+
+        (
+            commit_result,
+            issue_hits,
+            pr_hits,
+            release_hits,
+            session_hits,
+        ) = await asyncio.gather(
+            _search_commits(),
+            _search_issues(),
+            _search_prs(),
+            _search_releases(),
+            _search_sessions(),
+        )
+
+    commit_count  = len(commit_result.matches) if commit_result else 0
+    issue_count   = len(issue_hits)
+    pr_count      = len(pr_hits)
+    release_count = len(release_hits)
+    session_count = len(session_hits)
+    total_count   = commit_count + issue_count + pr_count + release_count + session_count
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
@@ -1750,9 +2077,22 @@ async def search_page(
         "current_page": "search",
         "query": q,
         "mode": safe_mode,
+        "search_type": safe_type,
         "limit": limit,
-        "search_result": search_result,
-        "modes": ["keyword", "pattern", "ask"],
+        # Commit search result
+        "search_result": commit_result,
+        # Multi-type hits
+        "issue_hits": issue_hits,
+        "pr_hits": pr_hits,
+        "release_hits": release_hits,
+        "session_hits": session_hits,
+        # Counts (for type tabs)
+        "commit_count": commit_count,
+        "issue_count": issue_count,
+        "pr_count": pr_count,
+        "release_count": release_count,
+        "session_count": session_count,
+        "total_count": total_count,
     }
     ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
@@ -1818,30 +2158,179 @@ async def arrange_page(
     ref: str,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the arrangement matrix page for a given commit ref.
+    """Render the fully server-side-rendered arrangement matrix page.
 
-    Fetches ``GET /api/v1/repos/{repo_id}/arrange/{ref}`` and renders
-    an interactive instrument × section grid where:
-
-    - Y-axis: instruments (bass, keys, guitar, drums, lead, pads)
-    - X-axis: sections (intro, verse_1, chorus, bridge, outro)
-    - Cell colour intensity encodes note density (0 = silent, max = densest)
-    - Cell click navigates to the piano roll for that instrument + section
-    - Hover tooltip shows note count, beat range, and pitch range
-    - Row summaries show per-instrument note totals and section activity counts
-    - Column summaries show per-section note totals and active instrument counts
-
-    Auth is handled client-side via localStorage JWT, matching all other UI
-    pages.  No JWT is required to render the HTML shell.
+    Pre-computes the instrument × section matrix, fetches commit metadata,
+    render-job status, and recent branch commits for navigation — all passed
+    to the Jinja2 template.  No client-side API calls needed for initial render.
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    ctx: dict[str, object] = {
+
+    # ── Resolve commit for this ref ─────────────────────────────────────────
+    commit_row: Any = None
+    render_job_row: Any = None
+    branch_commits: list[Any] = []
+
+    if ref == "HEAD":
+        result = await db.execute(
+            sa_select(
+                musehub_db.MusehubCommit.commit_id,
+                musehub_db.MusehubCommit.message,
+                musehub_db.MusehubCommit.author,
+                musehub_db.MusehubCommit.timestamp,
+                musehub_db.MusehubCommit.branch,
+            ).where(musehub_db.MusehubCommit.repo_id == repo_id)
+            .order_by(musehub_db.MusehubCommit.timestamp.desc())
+            .limit(1)
+        )
+        commit_row = result.first()
+    else:
+        result = await db.execute(
+            sa_select(
+                musehub_db.MusehubCommit.commit_id,
+                musehub_db.MusehubCommit.message,
+                musehub_db.MusehubCommit.author,
+                musehub_db.MusehubCommit.timestamp,
+                musehub_db.MusehubCommit.branch,
+            ).where(
+                musehub_db.MusehubCommit.repo_id == repo_id,
+                musehub_db.MusehubCommit.commit_id == ref,
+            ).limit(1)
+        )
+        commit_row = result.first()
+
+    actual_commit_id = commit_row.commit_id if commit_row else ref
+    commit_branch    = commit_row.branch if commit_row else "main"
+
+    # ── Render job status ───────────────────────────────────────────────────
+    rj_result = await db.execute(
+        sa_select(
+            musehub_db.MusehubRenderJob.status,
+            musehub_db.MusehubRenderJob.midi_count,
+            musehub_db.MusehubRenderJob.mp3_object_ids,
+            musehub_db.MusehubRenderJob.image_object_ids,
+        ).where(
+            musehub_db.MusehubRenderJob.repo_id == repo_id,
+            musehub_db.MusehubRenderJob.commit_id == actual_commit_id,
+        ).limit(1)
+    )
+    render_job_row = rj_result.first()
+
+    # ── Recent commits on the same branch for navigation ────────────────────
+    bc_result = await db.execute(
+        sa_select(
+            musehub_db.MusehubCommit.commit_id,
+            musehub_db.MusehubCommit.message,
+            musehub_db.MusehubCommit.timestamp,
+        ).where(
+            musehub_db.MusehubCommit.repo_id == repo_id,
+            musehub_db.MusehubCommit.branch == commit_branch,
+        ).order_by(musehub_db.MusehubCommit.timestamp.desc())
+        .limit(20)
+    )
+    branch_commits = list(bc_result.all())
+
+    # Determine prev/next commit in time order on this branch
+    commit_ids_asc = [c.commit_id for c in reversed(branch_commits)]
+    current_idx    = next((i for i, c in enumerate(commit_ids_asc) if c == actual_commit_id), None)
+    prev_commit_id = commit_ids_asc[current_idx - 1] if current_idx is not None and current_idx > 0 else None
+    next_commit_id = commit_ids_asc[current_idx + 1] if current_idx is not None and current_idx < len(commit_ids_asc) - 1 else None
+
+    # ── Arrangement matrix (computed server-side) ───────────────────────────
+    matrix = musehub_analysis.compute_arrangement_matrix(
+        repo_id=repo_id, ref=actual_commit_id
+    )
+
+    # Build cell_map[instrument][section] for easy template iteration
+    cell_map: dict[str, dict[str, Any]] = {}
+    for cell in matrix.cells:
+        cell_map.setdefault(cell.instrument, {})[cell.section] = cell
+
+    # Density → CSS level (0-4) for styling without inline CSS
+    def _density_level(d: float) -> int:
+        if d <= 0:
+            return 0
+        if d < 0.25:
+            return 1
+        if d < 0.5:
+            return 2
+        if d < 0.75:
+            return 3
+        return 4
+
+    # Flatten for template with precomputed level
+    cells_enriched: list[dict[str, Any]] = []
+    for cell in matrix.cells:
+        cells_enriched.append({
+            "instrument": cell.instrument,
+            "section": cell.section,
+            "note_count": cell.note_count,
+            "note_density": round(cell.note_density, 3),
+            "beat_start": cell.beat_start,
+            "beat_end": cell.beat_end,
+            "pitch_low": cell.pitch_low,
+            "pitch_high": cell.pitch_high,
+            "active": cell.active,
+            "level": _density_level(cell.note_density) if cell.active else 0,
+        })
+
+    # Rebuild cell_map with enriched data
+    cell_map_enriched: dict[str, dict[str, Any]] = {}
+    for c in cells_enriched:
+        cell_map_enriched.setdefault(c["instrument"], {})[c["section"]] = c
+
+    # Total beats across all sections
+    total_beats = matrix.total_beats
+
+    # Section beat widths as percentages (for the timeline bar)
+    section_pcts: list[dict[str, Any]] = []
+    for col in matrix.column_summaries:
+        beats_span = col.beat_end - col.beat_start
+        pct = round(beats_span / total_beats * 100, 1) if total_beats else 0
+        section_pcts.append({
+            "section": col.section,
+            "beat_start": col.beat_start,
+            "beat_end": col.beat_end,
+            "pct": pct,
+            "active_instruments": col.active_instruments,
+            "total_notes": col.total_notes,
+        })
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "ref": ref,
         "base_url": base_url,
         "current_page": "arrange",
+        # Commit context
+        "commit_id": actual_commit_id,
+        "commit_message": commit_row.message if commit_row else None,
+        "commit_author": commit_row.author if commit_row else None,
+        "commit_timestamp": commit_row.timestamp if commit_row else None,
+        "commit_branch": commit_branch,
+        # Navigation
+        "prev_commit_id": prev_commit_id,
+        "next_commit_id": next_commit_id,
+        "branch_commits": [
+            {"id": c.commit_id, "msg": c.message[:60], "ts": c.timestamp}
+            for c in branch_commits[:10]
+        ],
+        # Render job
+        "render_status": render_job_row.status if render_job_row else None,
+        "midi_count": render_job_row.midi_count if render_job_row else 0,
+        "mp3_count": len(render_job_row.mp3_object_ids or []) if render_job_row else 0,
+        # Matrix
+        "instruments": matrix.instruments,
+        "sections": matrix.sections,
+        "cell_map": cell_map_enriched,
+        "row_summaries": matrix.row_summaries,
+        "column_summaries": matrix.column_summaries,
+        "section_pcts": section_pcts,
+        "total_beats": total_beats,
+        "total_notes": sum(rs.total_notes for rs in matrix.row_summaries),
+        "active_cells": sum(1 for c in cells_enriched if c["active"]),
+        "total_cells": len(cells_enriched),
     }
     ctx.update(nav_ctx)
     return json_or_html(
@@ -2323,15 +2812,27 @@ async def release_detail_page(
     assets_resp = await musehub_releases.list_release_assets(db, release.release_id, tag)
     page_url = str(request.url)
     jsonld_script = render_jsonld_script(jsonld_release(release, repo, page_url))
-    ctx: dict[str, object] = {
+
+    # Serialize to plain dicts so templates can use | tojson safely
+    release_dict = release.model_dump(mode="json")
+    assets_data = [a.model_dump(mode="json") for a in assets_resp.assets]
+    total_downloads = sum(a.download_count or 0 for a in assets_resp.assets)
+
+    # Count which download package formats are present
+    dl_urls: dict[str, str] = release_dict.get("download_urls") or {}
+    available_formats = [k for k, v in dl_urls.items() if v]
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "tag": tag,
         "base_url": base_url,
         "current_page": "releases",
-        "release": release,
-        "assets": assets_resp.assets,
+        "release": release_dict,
+        "assets": assets_data,
+        "total_downloads": total_downloads,
+        "available_formats": available_formats,
         "jsonld_script": jsonld_script,
     }
     ctx.update(nav_ctx_release)
@@ -2466,19 +2967,337 @@ async def insights_page(
     repo_slug: str,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the repo insights dashboard.
+    """Render the fully server-side-rendered repo insights dashboard.
 
-    Shows commit frequency heatmap, contributor breakdown, musical evolution
-    timeline (key/BPM/energy across commits), branch activity, and download
-    statistics.
+    All metrics — commit heatmap, branch activity, contributor leaderboard,
+    PR/issue health, musical evolution, session analytics, and release cadence
+    — are pre-computed in parallel here and passed to the Jinja2 template.
+    No client-side API calls needed for the initial render.
     """
+    import re as _re
+    from datetime import date as _date, timedelta as _td, timezone as _tz
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    ctx: dict[str, object] = {
+
+    # ── Parallel DB fetches ─────────────────────────────────────────────────
+    async def _q_commits() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubCommit.commit_id,
+                musehub_db.MusehubCommit.branch,
+                musehub_db.MusehubCommit.author,
+                musehub_db.MusehubCommit.timestamp,
+                musehub_db.MusehubCommit.message,
+            ).where(musehub_db.MusehubCommit.repo_id == repo_id)
+            .order_by(musehub_db.MusehubCommit.timestamp.asc())
+        )).all()
+        return list(rows)
+
+    async def _q_branches() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(musehub_db.MusehubBranch.name)
+            .where(musehub_db.MusehubBranch.repo_id == repo_id)
+        )).scalars().all()
+        return list(rows)
+
+    async def _q_issues() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubIssue.state,
+                musehub_db.MusehubIssue.created_at,
+                musehub_db.MusehubIssue.updated_at,
+            ).where(musehub_db.MusehubIssue.repo_id == repo_id)
+        )).all()
+        return list(rows)
+
+    async def _q_prs() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubPullRequest.state,
+                musehub_db.MusehubPullRequest.created_at,
+                musehub_db.MusehubPullRequest.merged_at,
+            ).where(musehub_db.MusehubPullRequest.repo_id == repo_id)
+        )).all()
+        return list(rows)
+
+    async def _q_releases() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubRelease.tag,
+                musehub_db.MusehubRelease.title,
+                musehub_db.MusehubRelease.is_prerelease,
+                musehub_db.MusehubRelease.is_draft,
+                musehub_db.MusehubRelease.created_at,
+            ).where(musehub_db.MusehubRelease.repo_id == repo_id)
+            .order_by(musehub_db.MusehubRelease.created_at.desc())
+        )).all()
+        return list(rows)
+
+    async def _q_sessions() -> list[Any]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubSession.started_at,
+                musehub_db.MusehubSession.ended_at,
+                musehub_db.MusehubSession.participants,
+                musehub_db.MusehubSession.location,
+                musehub_db.MusehubSession.is_active,
+            ).where(musehub_db.MusehubSession.repo_id == repo_id)
+            .order_by(musehub_db.MusehubSession.started_at.desc())
+        )).all()
+        return list(rows)
+
+    async def _q_stars() -> int:
+        return await db.scalar(
+            sa_select(func.count()).select_from(musehub_db.MusehubStar)
+            .where(musehub_db.MusehubStar.repo_id == repo_id)
+        ) or 0
+
+    async def _q_forks() -> int:
+        return await db.scalar(
+            sa_select(func.count()).select_from(musehub_db.MusehubFork)
+            .where(musehub_db.MusehubFork.source_repo_id == repo_id)
+        ) or 0
+
+    # Pre-declare types so mypy doesn't widen them to `object` after gather.
+    commits_raw:  list[Any] = []
+    branches_raw: list[Any] = []
+    issues_raw:   list[Any] = []
+    prs_raw:      list[Any] = []
+    releases_raw: list[Any] = []
+    sessions_raw: list[Any] = []
+    star_count:   int       = 0
+    fork_count:   int       = 0
+    (
+        commits_raw, branches_raw, issues_raw, prs_raw,
+        releases_raw, sessions_raw, star_count, fork_count,
+    ) = await asyncio.gather(  # type: ignore[assignment]
+        _q_commits(), _q_branches(), _q_issues(), _q_prs(),
+        _q_releases(), _q_sessions(), _q_stars(), _q_forks(),
+    )
+
+    # ── Heatmap: 52 weeks × 7 days ─────────────────────────────────────────
+    today = _date.today()
+    # Start on the nearest past Sunday covering 364 days
+    _start_offset = (today.weekday() + 1) % 7  # days since last Sunday
+    heatmap_start = today - _td(days=364 + _start_offset)
+    commit_by_date: dict[str, int] = {}
+    for c in commits_raw:
+        dk = c.timestamp.date().isoformat()
+        commit_by_date[dk] = commit_by_date.get(dk, 0) + 1
+
+    heatmap_weeks: list[list[dict[str, Any]]] = []
+    for w in range(53):
+        week: list[dict[str, Any]] = []
+        for d in range(7):
+            cell_date = heatmap_start + _td(days=w * 7 + d)
+            if cell_date > today:
+                week.append({"date": "", "count": -1})  # future: skip
+            else:
+                cnt = commit_by_date.get(cell_date.isoformat(), 0)
+                level = 0 if cnt == 0 else (1 if cnt == 1 else (2 if cnt <= 3 else (3 if cnt <= 6 else 4)))
+                week.append({"date": cell_date.isoformat(), "count": cnt, "level": level})
+        heatmap_weeks.append(week)
+
+    commits_last_year = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=365))
+    )
+
+    # ── Branch activity ─────────────────────────────────────────────────────
+    branch_commit_counts: dict[str, int] = {}
+    for c in commits_raw:
+        branch_commit_counts[c.branch] = branch_commit_counts.get(c.branch, 0) + 1
+    max_branch_commits = max(branch_commit_counts.values(), default=1)
+    top_branches = sorted(branch_commit_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    branch_bars: list[dict[str, Any]] = [
+        {
+            "name": name,
+            "count": cnt,
+            "pct": round(cnt / max_branch_commits * 100),
+        }
+        for name, cnt in top_branches
+    ]
+
+    # ── Contributor leaderboard ─────────────────────────────────────────────
+    author_commit_counts: dict[str, int] = {}
+    for c in commits_raw:
+        author_commit_counts[c.author] = author_commit_counts.get(c.author, 0) + 1
+    max_author_commits = max(author_commit_counts.values(), default=1)
+    top_authors = sorted(author_commit_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+    contributor_bars: list[dict[str, Any]] = [
+        {
+            "name": name,
+            "count": cnt,
+            "pct": round(cnt / max_author_commits * 100),
+            "avatar_letter": name[0].upper() if name else "?",
+        }
+        for name, cnt in top_authors
+    ]
+
+    # ── Issue & PR health ───────────────────────────────────────────────────
+    open_issues = sum(1 for i in issues_raw if i.state == "open")
+    closed_issues = sum(1 for i in issues_raw if i.state == "closed")
+    total_issues = len(issues_raw)
+    issue_close_rate = round(closed_issues / total_issues * 100) if total_issues else 0
+
+    open_prs = sum(1 for p in prs_raw if p.state == "open")
+    merged_prs = sum(1 for p in prs_raw if p.state == "merged")
+    closed_prs = sum(1 for p in prs_raw if p.state == "closed")
+    total_prs = len(prs_raw)
+    pr_merge_rate = round(merged_prs / total_prs * 100) if total_prs else 0
+
+    # Average time to merge (for merged PRs that have both created_at and merged_at)
+    merge_times_days: list[float] = [
+        (p.merged_at - p.created_at).total_seconds() / 86400
+        for p in prs_raw
+        if p.state == "merged" and p.merged_at and p.created_at
+    ]
+    avg_merge_days = round(sum(merge_times_days) / len(merge_times_days), 1) if merge_times_days else None
+
+    # ── Musical evolution: BPM timeline ────────────────────────────────────
+    _BPM_RE = _re.compile(r'\b(?:bpm|tempo)[:\s=](\d+)', _re.IGNORECASE)
+    bpm_points: list[dict[str, Any]] = []
+    for c in commits_raw:
+        m = _BPM_RE.search(c.message or "")
+        if m:
+            bpm_val = int(m.group(1))
+            if 20 <= bpm_val <= 300:
+                bpm_points.append({"ts": c.timestamp.isoformat(), "bpm": bpm_val})
+
+    # Build SVG polyline for BPM — 600×80 viewport
+    bpm_svg: str = ""
+    if len(bpm_points) >= 2:
+        bpms = [p["bpm"] for p in bpm_points]
+        bpm_min, bpm_max = min(bpms), max(bpms)
+        bpm_range = max(bpm_max - bpm_min, 10)
+        pts: list[str] = []
+        for i, p in enumerate(bpm_points):
+            x = round(i / (len(bpm_points) - 1) * 580 + 10, 1)
+            y = round((1 - (p["bpm"] - bpm_min) / bpm_range) * 60 + 10, 1)
+            pts.append(f"{x},{y}")
+        bpm_svg = " ".join(pts)
+
+    # Key signature changes timeline
+    _KEY_RE = _re.compile(r'\b(?:key|signature)[:\s=]([A-G][b#]?\s*(?:major|minor|maj|min)?)', _re.IGNORECASE)
+    key_changes: list[dict[str, str]] = []
+    for c in commits_raw:
+        m = _KEY_RE.search(c.message or "")
+        if m:
+            key_changes.append({"ts": c.timestamp.date().isoformat(), "key": m.group(1).strip()})
+
+    # ── Session analytics ───────────────────────────────────────────────────
+    total_sessions = len(sessions_raw)
+    active_sessions = sum(1 for s in sessions_raw if s.is_active)
+    session_durations_h: list[float] = [
+        (s.ended_at - s.started_at).total_seconds() / 3600
+        for s in sessions_raw
+        if s.ended_at and s.started_at and not s.is_active
+    ]
+    avg_session_h = round(sum(session_durations_h) / len(session_durations_h), 1) if session_durations_h else 0
+
+    location_counts: dict[str, int] = {}
+    for s in sessions_raw:
+        loc = (s.location or "").strip()
+        if loc:
+            location_counts[loc] = location_counts.get(loc, 0) + 1
+    top_locations = sorted(location_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    all_participants: set[str] = set()
+    for s in sessions_raw:
+        for p in (s.participants or []):
+            if p:
+                all_participants.add(p)
+
+    # ── Release cadence ─────────────────────────────────────────────────────
+    stable_releases = sum(1 for r in releases_raw if not r.is_prerelease and not r.is_draft)
+    prerelease_count = sum(1 for r in releases_raw if r.is_prerelease)
+    draft_count = sum(1 for r in releases_raw if r.is_draft)
+    recent_releases: list[dict[str, Any]] = [
+        {
+            "tag": r.tag,
+            "title": r.title or r.tag,
+            "is_prerelease": r.is_prerelease,
+            "is_draft": r.is_draft,
+            "date": r.created_at.date().isoformat() if r.created_at else "",
+        }
+        for r in releases_raw[:6]
+    ]
+
+    # ── Velocity metrics ────────────────────────────────────────────────────
+    commits_last_30 = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=30))
+    )
+    commits_last_7 = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=7))
+    )
+    # Average commits per week (using last 12 weeks)
+    commits_last_84 = sum(
+        1 for c in commits_raw
+        if c.timestamp.date() >= (today - _td(days=84))
+    )
+    avg_commits_per_week = round(commits_last_84 / 12, 1)
+
+    # ── Top-level stats ─────────────────────────────────────────────────────
+    total_commits = len(commits_raw)
+    total_branches = len(branches_raw)
+    total_releases = len(releases_raw)
+    unique_contributors = len(author_commit_counts)
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "insights",
+        # Stats bar
+        "total_commits": total_commits,
+        "total_branches": total_branches,
+        "total_releases": total_releases,
+        "total_sessions": total_sessions,
+        "star_count": star_count,
+        "fork_count": fork_count,
+        "unique_contributors": unique_contributors,
+        # Velocity
+        "commits_last_7": commits_last_7,
+        "commits_last_30": commits_last_30,
+        "avg_commits_per_week": avg_commits_per_week,
+        "commits_last_year": commits_last_year,
+        # Heatmap
+        "heatmap_weeks": heatmap_weeks,
+        # Branch activity
+        "branch_bars": branch_bars,
+        # Contributor bars
+        "contributor_bars": contributor_bars,
+        # Issue health
+        "open_issues": open_issues,
+        "closed_issues": closed_issues,
+        "total_issues": total_issues,
+        "issue_close_rate": issue_close_rate,
+        # PR health
+        "open_prs": open_prs,
+        "merged_prs": merged_prs,
+        "closed_prs": closed_prs,
+        "total_prs": total_prs,
+        "pr_merge_rate": pr_merge_rate,
+        "avg_merge_days": avg_merge_days,
+        # Musical evolution
+        "bpm_points": bpm_points,
+        "bpm_svg": bpm_svg,
+        "bpm_min": min((p["bpm"] for p in bpm_points), default=0),
+        "bpm_max": max((p["bpm"] for p in bpm_points), default=0),
+        "key_changes": key_changes,
+        # Sessions
+        "active_sessions": active_sessions,
+        "avg_session_h": avg_session_h,
+        "top_locations": top_locations,
+        "unique_participants": len(all_participants),
+        # Releases
+        "stable_releases": stable_releases,
+        "prerelease_count": prerelease_count,
+        "draft_count": draft_count,
+        "recent_releases": recent_releases,
     }
     ctx.update(nav_ctx)
     return json_or_html(
@@ -3400,7 +4219,7 @@ async def blob_page(
     obj = await musehub_repository.get_object_by_path(db, repo_id, path)
 
     lang = _detect_language(path)
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     is_binary = ext in _BLOB_BINARY_TYPES
     is_midi = ext in (".mid", ".midi")
     size_bytes: int = obj.size_bytes if obj is not None else 0
@@ -3412,7 +4231,7 @@ async def blob_page(
     # Read text content for small non-binary files so we can SSR line numbers.
     # Use asyncio.to_thread so the blocking file read does not stall the event loop.
     content: str | None = None
-    if obj is not None and not is_binary and os.path.exists(obj.disk_path):
+    if obj is not None and not is_binary and Path(obj.disk_path).exists():
         _disk_path = obj.disk_path
 
         def _read_file() -> str:
@@ -3510,37 +4329,111 @@ async def activity_page(
     per_page: int = Query(30, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the repo-level activity feed page with full SSR and HTMX fragment support.
+    """Render the repo-level activity feed with a rich, date-grouped timeline.
 
-    Fetches events server-side and renders them directly, eliminating the
-    client-side JS fetch loop.  HTMX filter and pagination requests receive
-    only the ``activity_rows.html`` fragment; direct browser navigation receives
-    the full page extending ``base.html``.
+    Pre-fetches events, per-type counts, unique actor count, and date range in
+    parallel.  Groups events by calendar date for the template.  HTMX fragment
+    requests receive only the ``activity_rows.html`` fragment (event list +
+    filter pills + pagination); direct browser nav gets the full page.
 
     No JWT required — activity data is publicly readable.
     """
+    from datetime import date as _date, timedelta as _td
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    feed = await musehub_events.list_events(
-        db,
-        repo_id,
-        event_type=event_type or None,
-        page=page,
-        page_size=per_page,
+
+    # ── Parallel queries ────────────────────────────────────────────────────
+    async def _q_feed() -> Any:
+        return await musehub_events.list_events(
+            db, repo_id,
+            event_type=event_type or None,
+            page=page,
+            page_size=per_page,
+        )
+
+    async def _q_type_counts() -> dict[str, int]:
+        rows = (await db.execute(
+            sa_select(
+                musehub_db.MusehubEvent.event_type,
+                func.count().label("cnt"),
+            ).where(musehub_db.MusehubEvent.repo_id == repo_id)
+            .group_by(musehub_db.MusehubEvent.event_type)
+        )).all()
+        return {r.event_type: r.cnt for r in rows}
+
+    async def _q_unique_actors() -> int:
+        return await db.scalar(
+            sa_select(func.count(musehub_db.MusehubEvent.actor.distinct()))
+            .where(musehub_db.MusehubEvent.repo_id == repo_id)
+        ) or 0
+
+    async def _q_date_range() -> tuple[Any, Any]:
+        row = (await db.execute(
+            sa_select(
+                func.min(musehub_db.MusehubEvent.created_at),
+                func.max(musehub_db.MusehubEvent.created_at),
+            ).where(musehub_db.MusehubEvent.repo_id == repo_id)
+        )).first()
+        return (row[0] if row else None, row[1] if row else None)
+
+    feed, type_counts, unique_actors, (first_event_at, last_event_at) = await asyncio.gather(
+        _q_feed(), _q_type_counts(), _q_unique_actors(), _q_date_range(),
     )
+
+    # ── Group events by calendar date ───────────────────────────────────────
+    today     = _date.today()
+    yesterday = today - _td(days=1)
+
+    def _date_label(dt: Any) -> str:
+        d = dt.date() if hasattr(dt, "date") else dt
+        if d == today:
+            return "Today"
+        if d == yesterday:
+            return "Yesterday"
+        return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+    event_groups: list[dict[str, Any]] = []
+    current_label: str | None = None
+    current_group: dict[str, Any] = {}
+    for ev in feed.events:
+        lbl = _date_label(ev.created_at)
+        if lbl != current_label:
+            current_label = lbl
+            current_group = {"label": lbl, "events": []}
+            event_groups.append(current_group)
+        current_group["events"].append(ev)
+
     total_pages = max(1, (feed.total + per_page - 1) // per_page)
-    ctx: dict[str, object] = {
+
+    # Build per-type pill data sorted by count desc
+    type_pills: list[dict[str, Any]] = [
+        {"type": t, "count": type_counts.get(t, 0)}
+        for t in sorted(musehub_events.KNOWN_EVENT_TYPES, key=lambda x: type_counts.get(x, 0), reverse=True)
+    ]
+    total_all = sum(type_counts.values())
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "activity",
+        # Feed
         "events": feed.events,
+        "event_groups": event_groups,
         "total": feed.total,
+        "total_all": total_all,
         "page": page,
         "per_page": per_page,
         "total_pages": total_pages,
+        # Filters
         "event_type": event_type or "",
         "event_types": sorted(musehub_events.KNOWN_EVENT_TYPES),
+        "type_pills": type_pills,
+        # Stats
+        "unique_actors": unique_actors,
+        "first_event_at": first_event_at,
+        "last_event_at": last_event_at,
     }
     ctx.update(nav_ctx)
     return await htmx_fragment_or_full(

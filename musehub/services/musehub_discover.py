@@ -20,7 +20,6 @@ across Postgres and SQLite (tests), the check is done server-side via a
 ``cast(tags, Text).ilike`` pattern rather than JSON containment operators, which
 differ between engines and are not needed at this scale.
 """
-from __future__ import annotations
 
 import logging
 from typing import Literal

@@ -1,5 +1,4 @@
 """Write executors: create_pr, merge_pr, create_pr_comment, submit_pr_review."""
-from __future__ import annotations
 
 import logging
 

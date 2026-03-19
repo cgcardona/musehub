@@ -3,8 +3,9 @@
 Exposes the protocol version, hash, event schemas, and MCP tool schemas
 so clients can detect contract drift without reading source code.
 """
-
 from __future__ import annotations
+
+
 
 from fastapi import APIRouter
 

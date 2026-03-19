@@ -11,8 +11,9 @@ Wire-format rules:
   - Serialise with ``model_dump(by_alias=True, exclude_none=True)``.
   - ``extra="forbid"`` enforces the strict outbound contract.
 """
-
 from __future__ import annotations
+
+
 
 from typing import Literal
 
