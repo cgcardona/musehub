@@ -4,212 +4,355 @@
 {% block title %}{{ release.title or release.tag }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
-  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="{{ base_url }}">{{ repo_slug }}</a> /
   <a href="{{ base_url }}/releases">releases</a> /
-  {{ release.tag[:30] }}
+  {{ release.tag }}
 {% endblock %}
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block body_extra %}
-<script src="/static/vendor/wavesurfer.min.js"></script>
-<script src="/static/audio-player.js"></script>
+{% block page_json %}{"page": "release-detail"}{% endblock %}
+
+{% block page_data %}
+window.__releaseCfg = {
+  repoId:   {{ repo_id | tojson }},
+  tag:      {{ tag | tojson }},
+  base:     {{ base_url | tojson }},
+  owner:    {{ owner | tojson }},
+  audioUrl: {{ release.download_urls.get("mp3") | tojson }},
+};
 {% endblock %}
 
 {% block content %}
-<div class="release-nav-row">
-  <a href="{{ base_url }}/releases">← Back to releases</a>
-  <div class="release-nav-right">
-    <a class="btn btn-ghost btn-sm rss-btn"
-       href="/musehub/repos/{{ repo_id }}/releases.rss"
-       title="Subscribe via RSS">&#9112; RSS</a>
-  </div>
-</div>
+<div class="content-wide" style="padding-top: var(--space-4)">
 
-<div class="card">
-  <!-- Title + badges -->
-  <div class="release-header">
-    <h1 class="release-title">{{ release.title or release.tag }}</h1>
-    <div class="release-badges">
-      <span class="badge badge-release">{{ release.tag }}</span>
-      {% if release.is_prerelease %}
-        <span class="badge-prerelease" title="Pre-release build">Pre-release</span>
-      {% endif %}
-      {% if release.is_draft %}
-        <span class="badge-draft" title="Draft — not yet publicly visible">Draft</span>
-      {% endif %}
-    </div>
-  </div>
+  {# ── Header card ──────────────────────────────────────────────────────────── #}
+  {%- set state_cls = "is-draft" if release.is_draft else ("is-prerelease" if release.is_prerelease else "is-stable") %}
+  <div class="rd-header {{ state_cls }}">
+    <div class="rd-header-body">
 
-  <!-- Meta row -->
-  <div class="meta-row">
-    {% if release.author %}
-    <div class="meta-item">
-      <span class="meta-label">Author</span>
-      <span class="meta-value">
-        <span class="author-avatar">{{ release.author[0] | upper }}</span>
-        <a href="/{{ release.author | urlencode }}">{{ release.author }}</a>
-      </span>
-    </div>
-    {% endif %}
-    <div class="meta-item">
-      <span class="meta-label">Released</span>
-      <span class="meta-value">{{ release.created_at | fmtdate }}</span>
-    </div>
-    {% if release.commit_id %}
-    <div class="meta-item">
-      <span class="meta-label">Commit</span>
-      <span class="meta-value">
-        <a href="{{ base_url }}/commits/{{ release.commit_id }}" style="font-family:monospace">
-          {{ release.commit_id | shortsha }}
-        </a>
-      </span>
-    </div>
-    {% endif %}
-    <div class="meta-item">
-      <span class="meta-label">Signature</span>
-      {% if release.gpg_signature %}
-        <span class="meta-value gpg-badge gpg-verified" title="GPG-signed tag">🔓 Verified</span>
-      {% else %}
-        <span class="meta-value gpg-badge gpg-unverified" title="No GPG signature">🔒 Unverified</span>
-      {% endif %}
-    </div>
-  </div>
+      {# Title + badges #}
+      <div class="rd-title-row">
+        <h1 class="rd-title">{{ release.title or release.tag }}</h1>
+        <span class="rd-tag-badge">{{ release.tag }}</span>
+        {%- if release.is_prerelease %}
+        <span class="rd-prerelease-badge">⚠ Pre-release</span>
+        {%- endif %}
+        {%- if release.is_draft %}
+        <span class="rd-draft-badge">✏ Draft</span>
+        {%- endif %}
+      </div>
 
-  {# Audio player container — WaveSurfer JS initialises here (issue #583) #}
-  {% if release.download_urls.mp3 %}
-  <div id="release-audio-player"
-       class="release-audio-section"
-       data-url="{{ release.download_urls.mp3 }}">
-    <h2 class="section-heading">🎵 Listen</h2>
-    <div class="audio-player-wrap">
-      <div id="ap-waveform"></div>
-      <audio id="audio-element" src="{{ release.download_urls.mp3 }}" preload="none"></audio>
-      <div class="audio-controls" style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2)">
-        <button id="ap-play" class="btn btn-primary" type="button" disabled>▶ Play</button>
-        <span id="ap-time" style="font-family:monospace;font-size:var(--font-size-sm);color:var(--text-muted)">0:00</span>
-        <a class="btn btn-secondary btn-sm" href="{{ release.download_urls.mp3 }}" download>⬇ Download MP3</a>
+      {# Meta columns #}
+      <div class="rd-meta">
+        {%- if release.author %}
+        <div class="rd-meta-item">
+          <span class="rd-meta-label">Author</span>
+          <span class="rd-meta-value">
+            <span class="rd-avatar">{{ release.author[0] | upper }}</span>
+            <a href="/{{ release.author }}" style="color:var(--text-primary);text-decoration:none">{{ release.author }}</a>
+          </span>
+        </div>
+        {%- endif %}
+        <div class="rd-meta-item">
+          <span class="rd-meta-label">Released</span>
+          <span class="rd-meta-value">{{ release.created_at | fmtdate }}</span>
+        </div>
+        {%- if release.commit_id %}
+        <div class="rd-meta-item">
+          <span class="rd-meta-label">Commit</span>
+          <span class="rd-meta-value">
+            <a href="{{ base_url }}/commits/{{ release.commit_id }}"
+               class="rd-commit-sha">{{ release.commit_id[:8] }}</a>
+          </span>
+        </div>
+        {%- endif %}
+        <div class="rd-meta-item">
+          <span class="rd-meta-label">Signature</span>
+          <span class="rd-meta-value">
+            {%- if release.gpg_signature %}
+            <span class="rd-gpg-badge verified">🔓 Verified</span>
+            {%- else %}
+            <span class="rd-gpg-badge unverified">🔒 Unverified</span>
+            {%- endif %}
+          </span>
+        </div>
+        <div class="rd-meta-item">
+          <span class="rd-meta-label">Status</span>
+          <span class="rd-meta-value">
+            {%- if release.is_draft %}Draft
+            {%- elif release.is_prerelease %}Pre-release
+            {%- else %}Stable
+            {%- endif %}
+          </span>
+        </div>
+      </div>
+
+    </div>
+
+    {# Stats ribbon #}
+    <div class="rd-stats">
+      <div class="rd-stat">
+        <span class="rd-stat-value">{{ total_downloads }}</span>
+        <span class="rd-stat-label">Downloads</span>
+      </div>
+      <div class="rd-stat">
+        <span class="rd-stat-value">{{ assets | length }}</span>
+        <span class="rd-stat-label">Assets</span>
+      </div>
+      <div class="rd-stat">
+        <span class="rd-stat-value">{{ available_formats | length }}</span>
+        <span class="rd-stat-label">Formats</span>
+      </div>
+      <div class="rd-stat">
+        <span class="rd-stat-value"
+              style="color: {% if release.is_draft %}var(--text-muted){% elif release.is_prerelease %}#f0a500{% else %}#3fb950{% endif %}">
+          {%- if release.is_draft %}Draft{%- elif release.is_prerelease %}Pre-release{%- else %}Stable{%- endif %}
+        </span>
+        <span class="rd-stat-label">Channel</span>
       </div>
     </div>
-  </div>
-  {% endif %}
 
-  <!-- Release notes (Markdown body) -->
-  {% if release.body %}
-  <div class="release-notes-section">
-    <h2 class="section-heading">Release Notes</h2>
-    <div class="release-notes">{{ release.body | markdown | safe }}</div>
-  </div>
-  {% endif %}
-
-  <!-- Download packages -->
-  <h2 class="section-heading" style="margin-top:var(--space-4)">Download Packages</h2>
-  <div class="download-grid">
-    <div class="download-card">
-      <span class="pkg-name">Full MIDI</span>
-      <span class="pkg-desc">All tracks as a single .mid file</span>
-      {% if release.download_urls.midi_bundle %}
-        <a class="btn btn-secondary btn-sm" href="{{ release.download_urls.midi_bundle }}" download>⬇ Download</a>
-      {% else %}
-        <span class="pkg-unavailable">Not available</span>
-      {% endif %}
-    </div>
-    <div class="download-card">
-      <span class="pkg-name">MIDI Stems</span>
-      <span class="pkg-desc">Individual track stems (zip)</span>
-      {% if release.download_urls.stems %}
-        <a class="btn btn-secondary btn-sm" href="{{ release.download_urls.stems }}" download>⬇ Download</a>
-      {% else %}
-        <span class="pkg-unavailable">Not available</span>
-      {% endif %}
-    </div>
-    <div class="download-card">
-      <span class="pkg-name">MP3 Mix</span>
-      <span class="pkg-desc">Full mix audio render</span>
-      {% if release.download_urls.mp3 %}
-        <a class="btn btn-secondary btn-sm" href="{{ release.download_urls.mp3 }}" download>⬇ Download MP3</a>
-      {% else %}
-        <span class="pkg-unavailable">Not available</span>
-      {% endif %}
-    </div>
-    <div class="download-card">
-      <span class="pkg-name">MusicXML</span>
-      <span class="pkg-desc">Notation export</span>
-      {% if release.download_urls.musicxml %}
-        <a class="btn btn-secondary btn-sm" href="{{ release.download_urls.musicxml }}" download>⬇ Download</a>
-      {% else %}
-        <span class="pkg-unavailable">Not available</span>
-      {% endif %}
-    </div>
-    <div class="download-card">
-      <span class="pkg-name">Metadata</span>
-      <span class="pkg-desc">JSON: tempo, key, arrangement</span>
-      {% if release.download_urls.metadata %}
-        <a class="btn btn-secondary btn-sm" href="{{ release.download_urls.metadata }}" download>⬇ Download</a>
-      {% else %}
-        <span class="pkg-unavailable">Not available</span>
-      {% endif %}
+    {# Actions bar #}
+    <div class="rd-actions">
+      <a href="{{ base_url }}/releases" class="btn btn-ghost btn-sm">← All releases</a>
+      <a class="btn btn-ghost btn-sm rd-rss-btn"
+         href="/musehub/repos/{{ repo_id }}/releases.rss"
+         title="Subscribe to release feed">⏹ RSS</a>
+      {%- if release.commit_id %}
+      <a href="{{ base_url }}/commits/{{ release.commit_id }}" class="btn btn-ghost btn-sm">
+        📝 View commit {{ release.commit_id[:8] }}
+      </a>
+      {%- endif %}
     </div>
   </div>
-</div>
 
-<!-- Assets panel -->
-<div class="card">
-  <h2 class="section-heading" style="margin-bottom:var(--space-3)">📥 Assets</h2>
-  {% if assets %}
-    {% for asset in assets %}
-    <div class="asset-row">
-      <div class="asset-info">
-        <span class="asset-icon">📄</span>
-        <div>
-          <a class="asset-name" href="{{ asset.download_url }}" download>{{ asset.name }}</a>
-          {% if asset.label %}<span class="text-muted text-sm"> — {{ asset.label }}</span>{% endif %}
-          <div class="asset-meta">
-            {% if asset.size %}<span>{{ asset.size | filesizeformat }}</span>{% endif %}
-            <span>⬇ {{ asset.download_count }} download{{ 's' if asset.download_count != 1 else '' }}</span>
+  {# ── Two-column layout ────────────────────────────────────────────────────── #}
+  <div class="rd-layout">
+
+    {# ═══ Main column ════════════════════════════════════════════════════════ #}
+    <div class="rd-main">
+
+      {# Audio preview — only if mp3 URL present #}
+      {%- set mp3_url = release.download_urls.get("mp3") %}
+      {%- if mp3_url %}
+      <div class="rd-section" id="rd-audio-section">
+        <div class="rd-section-header">
+          <span>🎵</span>
+          <span>Audio Preview</span>
+          <span class="rd-section-count">{{ release.tag }}</span>
+        </div>
+        <div class="rd-section-body">
+          {# SSR audio shell — TypeScript wires play/progress/time controls #}
+          <audio id="rd-audio" preload="none" style="display:none">
+            <source src="{{ mp3_url }}" type="audio/mpeg">
+          </audio>
+
+          {# Error state — shown by TS if audio fails; hidden initially #}
+          <div class="rd-audio-error" id="rd-audio-error">
+            <span>🔇</span>
+            <span>Audio preview unavailable for this release.</span>
+            <a href="{{ mp3_url }}" download class="btn btn-ghost btn-sm" style="margin-left:auto">
+              ⬇ Download anyway
+            </a>
+          </div>
+
+          {# Player controls #}
+          <div class="rd-player" id="rd-player">
+            <div class="rd-player-row">
+              <button class="rd-play-btn" id="rd-play-btn" type="button" disabled title="Play / Pause">▶</button>
+              <div class="rd-progress-wrap" id="rd-progress-wrap">
+                <div class="rd-progress-fill" id="rd-progress-fill"></div>
+              </div>
+              <span class="rd-time" id="rd-time">Loading…</span>
+            </div>
+          </div>
+
+          <div class="rd-audio-actions">
+            <a href="{{ mp3_url }}" class="btn btn-secondary btn-sm" download>⬇ Download MP3</a>
+            <a href="{{ base_url }}/listen/{{ release.commit_id or '' }}"
+               class="btn btn-ghost btn-sm" target="_blank">🎧 Open player ↗</a>
           </div>
         </div>
       </div>
-      <a class="btn btn-secondary btn-sm" href="{{ asset.download_url }}" download>⬇ Download</a>
-    </div>
-    {% endfor %}
-  {% else %}
-    <p class="text-muted text-sm">No assets attached to this release.</p>
-  {% endif %}
-</div>
-{% endblock %}
+      {%- endif %}
 
-{% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const tag    = {{ tag | tojson }};
-const base   = {{ base_url | tojson }};
-const owner  = {{ owner | tojson }};
-const repoSlug = {{ repo_slug | tojson }};
-{% endblock %}
+      {# Release notes #}
+      {%- if release.body %}
+      <div class="rd-section">
+        <div class="rd-section-header">
+          <span>📋</span>
+          <span>Release Notes</span>
+        </div>
+        <div class="rd-notes-body">{{ release.body | markdown | safe }}</div>
+      </div>
+      {%- endif %}
 
-{% block page_script %}
-{% raw %}
-// Comments section is handled by separate JS (remains client-side).
-// Audio player is initialised by audio-player.js when #release-audio-player is present.
-(function () {
-  'use strict';
-  const playerEl = document.getElementById('release-audio-player');
-  if (playerEl && typeof AudioPlayer !== 'undefined') {
-    const url = playerEl.dataset.url;
-    AudioPlayer.init({
-      waveformEl:  document.getElementById('ap-waveform'),
-      playBtnEl:   document.getElementById('ap-play'),
-      timeCurEl:   document.getElementById('ap-time'),
-    }).load(url);
-  }
+      {# Download packages grid #}
+      <div class="rd-section">
+        <div class="rd-section-header">
+          <span>📦</span>
+          <span>Download Packages</span>
+          <span class="rd-section-count">{{ available_formats | length }} available</span>
+        </div>
+        <div class="rd-dl-grid">
 
-  // Load reactions and comments via existing JS helpers.
-  if (typeof loadReactions === 'function') {
-    loadReactions('release', tag, 'release-reactions');
-  }
-  if (typeof initRepoNav === 'function') {
-    initRepoNav(repoId);
-  }
-})();
-{% endraw %}
+          {%- set packages = [
+            ("midi_bundle", "🎹", "Full MIDI",   "All tracks as a single .mid file"),
+            ("stems",       "🎛", "MIDI Stems",   "Individual track stems (zip)"),
+            ("mp3",         "🎵", "MP3 Mix",      "Full mix audio render"),
+            ("musicxml",    "🎼", "MusicXML",     "Notation export"),
+            ("metadata",    "📊", "Metadata",     "JSON: tempo, key, arrangement"),
+          ] %}
+
+          {%- for key, icon, name, desc in packages %}
+          {%- set dl_url = release.download_urls.get(key) %}
+          <div class="rd-dl-card {% if not dl_url %}unavailable{% endif %}">
+            <span class="rd-dl-icon">{{ icon }}</span>
+            <span class="rd-dl-name">{{ name }}</span>
+            <span class="rd-dl-desc">{{ desc }}</span>
+            {%- if dl_url %}
+            <a class="btn btn-secondary btn-sm" href="{{ dl_url }}" download style="margin-top:var(--space-2)">⬇ Download</a>
+            {%- else %}
+            <span class="rd-dl-unavail">Not included in this release</span>
+            {%- endif %}
+          </div>
+          {%- endfor %}
+
+        </div>
+      </div>
+
+      {# Assets #}
+      <div class="rd-section">
+        <div class="rd-section-header">
+          <span>📥</span>
+          <span>Assets</span>
+          <span class="rd-section-count">{{ assets | length }}</span>
+        </div>
+        {%- if assets %}
+        {%- for asset in assets %}
+        <div class="rd-asset-row">
+          <div class="rd-asset-info">
+            <span class="rd-asset-icon">📄</span>
+            <div>
+              <a class="rd-asset-name" href="{{ asset.download_url }}" download>{{ asset.name }}</a>
+              {%- if asset.label %}
+              <span style="color:var(--text-muted);font-size:var(--font-size-xs)"> — {{ asset.label }}</span>
+              {%- endif %}
+              <div class="rd-asset-meta">
+                {%- if asset.size %}<span>{{ asset.size | filesizeformat }}</span>{%- endif %}
+                <span>⬇ {{ asset.download_count }} download{{ 's' if asset.download_count != 1 else '' }}</span>
+                {%- if asset.content_type %}
+                <span>{{ asset.content_type }}</span>
+                {%- endif %}
+              </div>
+            </div>
+          </div>
+          <a class="btn btn-secondary btn-sm" href="{{ asset.download_url }}" download>⬇ Download</a>
+        </div>
+        {%- endfor %}
+        {%- else %}
+        <div class="rd-no-assets">No additional assets attached to this release.</div>
+        {%- endif %}
+      </div>
+
+    </div>{# /rd-main #}
+
+    {# ═══ Sidebar ════════════════════════════════════════════════════════════ #}
+    <aside class="rd-sidebar">
+
+      {# Release summary #}
+      <div class="rd-sidebar-card">
+        <div class="rd-sidebar-header">Release info</div>
+        <div class="rd-sidebar-body">
+          <div class="rd-sidebar-row">
+            <span class="rd-sidebar-key">Tag</span>
+            <span class="rd-tag-badge" style="font-size:0.65rem;padding:1px 7px">{{ release.tag }}</span>
+          </div>
+          <div class="rd-sidebar-row">
+            <span class="rd-sidebar-key">Channel</span>
+            <span class="rd-sidebar-val"
+                  style="color: {% if release.is_draft %}var(--text-muted){% elif release.is_prerelease %}#f0a500{% else %}#3fb950{% endif %}">
+              {%- if release.is_draft %}Draft{%- elif release.is_prerelease %}Pre-release{%- else %}Stable{%- endif %}
+            </span>
+          </div>
+          {%- if release.author %}
+          <div class="rd-sidebar-row">
+            <span class="rd-sidebar-key">Author</span>
+            <span class="rd-sidebar-val">{{ release.author }}</span>
+          </div>
+          {%- endif %}
+          <div class="rd-sidebar-row">
+            <span class="rd-sidebar-key">Published</span>
+            <span class="rd-sidebar-val" style="font-size:var(--font-size-xs)">{{ release.created_at | fmtdate }}</span>
+          </div>
+          <div class="rd-sidebar-row">
+            <span class="rd-sidebar-key">Downloads</span>
+            <span class="rd-sidebar-val">{{ total_downloads }}</span>
+          </div>
+          <div class="rd-sidebar-row">
+            <span class="rd-sidebar-key">Formats</span>
+            <span class="rd-sidebar-val">{{ available_formats | length }}</span>
+          </div>
+        </div>
+      </div>
+
+      {# GPG / trust #}
+      <div class="rd-sidebar-card">
+        <div class="rd-sidebar-header">Signature</div>
+        <div class="rd-sidebar-body">
+          {%- if release.gpg_signature %}
+          <span class="rd-gpg-badge verified" style="width:100%;justify-content:center;display:flex">🔓 GPG Verified</span>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:var(--space-1)">
+            This release was signed and verified.
+          </div>
+          {%- else %}
+          <span class="rd-gpg-badge unverified" style="width:100%;justify-content:center;display:flex">🔒 Unverified</span>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:var(--space-1)">
+            No GPG signature present.
+          </div>
+          {%- endif %}
+        </div>
+      </div>
+
+      {# Available formats #}
+      {%- if available_formats %}
+      <div class="rd-sidebar-card">
+        <div class="rd-sidebar-header">Available formats</div>
+        <div class="rd-sidebar-body">
+          {%- set fmt_labels = {
+            "midi_bundle": ("🎹", "MIDI Bundle"),
+            "stems":       ("🎛", "Stems"),
+            "mp3":         ("🎵", "MP3 Mix"),
+            "musicxml":    ("🎼", "MusicXML"),
+            "metadata":    ("📊", "Metadata"),
+          } %}
+          {%- for fmt in available_formats %}
+          {%- set fmt_info = fmt_labels.get(fmt, ("📄", fmt | title)) %}
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-xs);padding:2px 0">
+            <span>{{ fmt_info[0] }}</span>
+            <span style="color:var(--text-primary)">{{ fmt_info[1] }}</span>
+          </div>
+          {%- endfor %}
+        </div>
+      </div>
+      {%- endif %}
+
+      {# RSS subscribe #}
+      <div class="rd-sidebar-card">
+        <div class="rd-sidebar-header">Subscribe</div>
+        <div class="rd-sidebar-body">
+          <a href="/musehub/repos/{{ repo_id }}/releases.rss"
+             class="btn btn-ghost btn-sm rd-rss-btn" style="width:100%;justify-content:center">
+            ⏹ RSS Feed
+          </a>
+        </div>
+      </div>
+
+    </aside>
+
+  </div>{# /rd-layout #}
+
+</div>{# /content-wide #}
 {% endblock %}

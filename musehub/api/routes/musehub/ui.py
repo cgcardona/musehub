@@ -1423,12 +1423,14 @@ async def issue_detail_page(
     number: int,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the issue detail page with SSR body and HTMX comment threading.
+    """Render the issue detail page.
 
-    Fetches the issue, comments, labels, milestones, and linked PRs server-side.
-    HTMX requests receive only the comment fragment; direct navigation receives
-    the full page that extends base.html.
+    Fetches issue, comments, labels, milestones, linked PRs, and prev/next issue
+    navigation in parallel.  Parses musical refs from the issue body server-side
+    so the template needs no client-side JS for content rendering.
     """
+    import re as _re
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
     issue = await musehub_issues.get_issue(db, repo_id, number)
@@ -1438,31 +1440,136 @@ async def issue_detail_page(
             detail=f"Issue #{number} not found",
         )
 
-    comment_list = await musehub_issues.list_comments(db, issue.issue_id)
-    comments = [c.model_dump() for c in comment_list.comments]
+    # ── Parallel queries ────────────────────────────────────────────────────────
+    async def _q_comments() -> list[dict[str, Any]]:
+        cl = await musehub_issues.list_comments(db, issue.issue_id)
+        return [c.model_dump(mode="json") for c in cl.comments]
 
-    milestone_list = await musehub_issues.list_milestones(db, repo_id, state="open")
-    milestones_data = [m.model_dump() for m in milestone_list.milestones]
+    async def _q_milestones() -> list[dict[str, Any]]:
+        ml = await musehub_issues.list_milestones(db, repo_id, state="open")
+        return [m.model_dump(mode="json") for m in ml.milestones]
 
-    label_rows = (
-        await db.execute(
+    async def _q_labels() -> list[dict[str, str]]:
+        rows = (await db.execute(
             sa_select(label_db.MusehubLabel)
             .where(label_db.MusehubLabel.repo_id == repo_id)
             .order_by(label_db.MusehubLabel.name)
-        )
-    ).scalars().all()
-    labels_data = [{"name": r.name, "color": r.color} for r in label_rows]
+        )).scalars().all()
+        return [{"name": r.name, "color": r.color} for r in rows]
 
-    ctx: dict[str, object] = {
+    async def _q_linked_prs() -> list[dict[str, Any]]:
+        tag = f"#{number}"
+        rows = (await db.execute(
+            sa_select(musehub_db.MusehubPullRequest)
+            .where(
+                musehub_db.MusehubPullRequest.repo_id == repo_id,
+                (musehub_db.MusehubPullRequest.title.contains(tag))
+                | (musehub_db.MusehubPullRequest.body.contains(tag)),
+            )
+            .order_by(musehub_db.MusehubPullRequest.created_at.desc())
+            .limit(5)
+        )).scalars().all()
+        return [
+            {
+                "pr_id": r.pr_id,
+                "title": r.title,
+                "state": r.state,
+                "from_branch": r.from_branch,
+                "to_branch": r.to_branch,
+            }
+            for r in rows
+        ]
+
+    async def _q_nav() -> tuple[int | None, int | None]:
+        prev_num = await db.scalar(
+            sa_select(musehub_db.MusehubIssue.number)
+            .where(
+                musehub_db.MusehubIssue.repo_id == repo_id,
+                musehub_db.MusehubIssue.number < number,
+            )
+            .order_by(musehub_db.MusehubIssue.number.desc())
+            .limit(1)
+        )
+        next_num = await db.scalar(
+            sa_select(musehub_db.MusehubIssue.number)
+            .where(
+                musehub_db.MusehubIssue.repo_id == repo_id,
+                musehub_db.MusehubIssue.number > number,
+            )
+            .order_by(musehub_db.MusehubIssue.number.asc())
+            .limit(1)
+        )
+        return prev_num, next_num
+
+    comments, milestones_data, labels_data, linked_prs, (prev_number, next_number) = (
+        await asyncio.gather(
+            _q_comments(), _q_milestones(), _q_labels(), _q_linked_prs(), _q_nav(),
+        )
+    )
+
+    # ── Parse musical refs from the issue body ──────────────────────────────────
+    _MUS_RE = _re.compile(r"\b(track|section|beats):([A-Za-z0-9_\-]+)\b", _re.IGNORECASE)
+    _ref_icons: dict[str, str] = {"track": "🎵", "section": "🎼", "beats": "🥁"}
+    body_refs: list[dict[str, str]] = [
+        {
+            "type": m.group(1).lower(),
+            "value": m.group(2),
+            "icon": _ref_icons.get(m.group(1).lower(), "🎵"),
+            "raw": m.group(0),
+        }
+        for m in _MUS_RE.finditer(issue.body or "")
+    ]
+
+    # Collect unique musical refs from all comments too
+    seen: set[str] = {r["raw"] for r in body_refs}
+    all_refs: list[dict[str, str]] = list(body_refs)
+    for c in comments:
+        for ref in (c.get("musical_refs") or []):
+            raw = ref.get("raw", "")
+            if raw and raw not in seen:
+                seen.add(raw)
+                all_refs.append({
+                    "type": ref.get("type", ""),
+                    "value": ref.get("value", ""),
+                    "icon": _ref_icons.get(ref.get("type", ""), "🎵"),
+                    "raw": raw,
+                })
+
+    # Derive issue type from well-known label names
+    _type_map: dict[str, tuple[str, str]] = {
+        "bug":           ("🐛", "Bug"),
+        "feature":       ("✨", "Feature"),
+        "enhancement":   ("⬆", "Enhancement"),
+        "question":      ("❓", "Question"),
+        "documentation": ("📖", "Docs"),
+        "performance":   ("⚡", "Performance"),
+        "discussion":    ("💬", "Discussion"),
+    }
+    issue_type: tuple[str, str] | None = None
+    for lbl in (issue.labels or []):
+        key = lbl.lower().replace(" ", "-")
+        if key in _type_map:
+            issue_type = _type_map[key]
+            break
+
+    issue_dict = issue.model_dump(mode="json")
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "issues",
-        "issue": issue.model_dump(),
+        "issue": issue_dict,
         "comments": comments,
         "labels_data": labels_data,
         "milestones_data": milestones_data,
+        "linked_prs": linked_prs,
+        "prev_number": prev_number,
+        "next_number": next_number,
+        "body_refs": body_refs,
+        "all_refs": all_refs,
+        "issue_type": issue_type,
         "breadcrumb_data": _breadcrumbs(
             (owner, f"/{owner}"),
             (repo_slug, base_url),
@@ -2708,15 +2815,27 @@ async def release_detail_page(
     assets_resp = await musehub_releases.list_release_assets(db, release.release_id, tag)
     page_url = str(request.url)
     jsonld_script = render_jsonld_script(jsonld_release(release, repo, page_url))
-    ctx: dict[str, object] = {
+
+    # Serialize to plain dicts so templates can use | tojson safely
+    release_dict = release.model_dump(mode="json")
+    assets_data = [a.model_dump(mode="json") for a in assets_resp.assets]
+    total_downloads = sum(a.download_count or 0 for a in assets_resp.assets)
+
+    # Count which download package formats are present
+    dl_urls: dict[str, str] = release_dict.get("download_urls") or {}
+    available_formats = [k for k, v in dl_urls.items() if v]
+
+    ctx: dict[str, Any] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "tag": tag,
         "base_url": base_url,
         "current_page": "releases",
-        "release": release,
-        "assets": assets_resp.assets,
+        "release": release_dict,
+        "assets": assets_data,
+        "total_downloads": total_downloads,
+        "available_formats": available_formats,
         "jsonld_script": jsonld_script,
     }
     ctx.update(nav_ctx_release)

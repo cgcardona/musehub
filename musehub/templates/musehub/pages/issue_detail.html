@@ -1,137 +1,353 @@
 {% extends "musehub/base.html" %}
+{% from "musehub/macros/label.html" import label_chip %}
 
-{% block title %}Issue #{{ issue.number }} · {{ issue.title }}{% endblock %}
+{%- set state_cls = "is-open" if issue.state == "open" else "is-closed" %}
+{%- set state_icon = "●" if issue.state == "open" else "✓" %}
+
+{% block title %}Issue #{{ issue.number }} · {{ issue.title }} — {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
-  {% for crumb in breadcrumb_data %}
-    {% if crumb.url %}
-      <a href="{{ crumb.url }}">{{ crumb.label }}</a> /
-    {% else %}
-      {{ crumb.label }}
-    {% endif %}
-  {% endfor %}
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="{{ base_url }}">{{ repo_slug }}</a> /
+  <a href="{{ base_url }}/issues">issues</a> / #{{ issue.number }}
 {% endblock %}
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
+{% block page_json %}{"page": "issue-detail"}{% endblock %}
+
+{% block page_data %}
+window.__issueCfg = {
+  repoId:  {{ repo_id | tojson }},
+  issueId: {{ issue.issue_id | tojson }},
+  number:  {{ issue.number }},
+  base:    {{ base_url | tojson }},
+  state:   {{ issue.state | tojson }},
+};
+{% endblock %}
+
 {% block content %}
-<div style="margin-bottom:12px">
-  <a href="{{ base_url }}/issues">&larr; Back to issues</a>
-</div>
+<div class="content-wide" style="padding-top: var(--space-4)">
 
-<div class="issue-detail-grid">
-  <main>
-    {# Issue header #}
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <h1 style="margin:0">{{ issue.title }}</h1>
-        <span class="badge badge-{{ issue.state }}">#{{ issue.number }}</span>
-        <span class="badge badge-{{ issue.state }}">{{ issue.state }}</span>
+  {# ── Header card ──────────────────────────────────────────────────────────── #}
+  <div class="id-header {{ state_cls }}">
+    <div class="id-header-body">
+
+      {# Title row #}
+      <div class="id-title-row">
+        <h1 class="id-title">{{ issue.title }}</h1>
+        <span class="id-number">#{{ issue.number }}</span>
+        <span class="id-state-badge {{ state_cls }}">
+          {{ state_icon }} {{ issue.state | title }}
+        </span>
+        {%- if issue_type %}
+        <span class="id-type-badge">{{ issue_type[0] }} {{ issue_type[1] }}</span>
+        {%- endif %}
       </div>
-      <div style="display:flex;gap:8px;flex-shrink:0">
-        {% if issue.state == 'open' %}
-        <form hx-post="{{ base_url }}/issues/{{ issue.number }}/close"
-              hx-push-url="true"
-              style="display:inline">
-          <button type="submit" class="btn btn-secondary">Close issue</button>
-        </form>
-        {% else %}
-        <form hx-post="{{ base_url }}/issues/{{ issue.number }}/reopen"
-              hx-push-url="true"
-              style="display:inline">
-          <button type="submit" class="btn btn-secondary">Reopen issue</button>
-        </form>
-        {% endif %}
+
+      {# Author + date meta #}
+      <div class="id-meta-row">
+        <a href="/{{ issue.author }}" class="id-author-link" style="display:flex;align-items:center;gap:var(--space-1)">
+          <span class="id-avatar">{{ issue.author[0] | upper if issue.author else '?' }}</span>
+          {{ issue.author or "unknown" }}
+        </a>
+        <span class="id-meta-sep">·</span>
+        <span>opened {{ issue.created_at | fmtrelative }}</span>
+        {%- if issue.closed_at %}
+        <span class="id-meta-sep">·</span>
+        <span>closed {{ issue.closed_at | fmtrelative }}</span>
+        {%- endif %}
+        {%- if issue.assignee %}
+        <span class="id-meta-sep">·</span>
+        <span>assigned to
+          <a href="/{{ issue.assignee }}" class="id-author-link">{{ issue.assignee }}</a>
+        </span>
+        {%- endif %}
       </div>
-    </div>
 
-    {# Meta line #}
-    <p style="color:#8b949e;font-size:12px;margin-bottom:var(--space-3,16px)">
-      Opened {{ issue.created_at | fmtdate }}
-      {% if issue.author %} by <strong>{{ issue.author }}</strong>{% endif %}
-      {% if issue.closed_at %} · Closed {{ issue.closed_at | fmtdate }}{% endif %}
-      · {{ issue.comment_count }} comment{{ 's' if issue.comment_count != 1 else '' }}
-    </p>
-
-    {# Labels #}
-    {% if issue.labels %}
-    <div style="margin-bottom:var(--space-3,16px);display:flex;flex-wrap:wrap;gap:6px">
-      {% from "musehub/macros/label.html" import label_chip %}
-      {% for lbl in issue.labels %}
-        {% set lbl_obj = labels_data | selectattr('name', 'equalto', lbl) | first | default({'color': '#8b949e'}) %}
+      {# Labels #}
+      {%- if issue.labels %}
+      <div class="id-labels-row">
+        {%- for lbl in issue.labels %}
+        {%- set lbl_obj = labels_data | selectattr('name', 'equalto', lbl) | first | default({'color': '#8b949e'}) %}
         {{ label_chip(lbl, lbl_obj.color) }}
-      {% endfor %}
-    </div>
-    {% endif %}
+        {%- endfor %}
+      </div>
+      {%- endif %}
 
-    {# Issue body — rendered Markdown #}
-    <div class="card issue-body" style="margin-bottom:var(--space-4,24px)">
-      {% if issue.body %}
-        {{ issue.body | markdown | safe }}
-      {% else %}
-        <em style="color:#8b949e">No description provided.</em>
-      {% endif %}
     </div>
 
-    {# Comment thread — HTMX target for new comments #}
-    <h2 style="font-size:1rem;border-bottom:1px solid var(--border,#30363d);padding-bottom:8px;margin-bottom:12px">
-      &#128172; Discussion ({{ comments | length }})
-    </h2>
-    <div id="issue-comments">
-      {% include "musehub/fragments/issue_comments.html" %}
-    </div>
-
-    {# New comment form — hx-post → refreshes comment thread #}
-    <div class="card" style="margin-top:var(--space-3,16px)">
-      <form hx-post="{{ base_url }}/issues/{{ issue.number }}/comments"
-            hx-target="#issue-comments"
-            hx-swap="innerHTML"
-            hx-on::after-request="this.reset()">
-        <textarea name="body" class="form-input" rows="4"
-                  placeholder="Leave a comment… Use track:bass, section:chorus, beats:16-24 for musical refs."
-                  style="width:100%;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
-          <button type="submit" class="btn btn-primary">Comment</button>
-        </div>
-      </form>
-    </div>
-  </main>
-
-  {# Right sidebar — SSR labels / milestone / linked info #}
-  <aside>
-    <div class="sidebar-section">
-      <p class="sidebar-section-title">Labels</p>
-      {% from "musehub/macros/label.html" import label_chip %}
-      {% if issue.labels %}
-        {% for lbl in issue.labels %}
-          {% set lbl_obj = labels_data | selectattr('name', 'equalto', lbl) | first | default({'color': '#8b949e'}) %}
-          {{ label_chip(lbl, lbl_obj.color) }}
-        {% endfor %}
-      {% else %}
-        <span style="font-size:11px;color:#8b949e">None yet</span>
-      {% endif %}
-    </div>
-
-    {% if issue.milestone_id %}
-    {% set ms = milestones_data | selectattr('milestone_id', 'equalto', issue.milestone_id) | first | default(None) %}
-    {% if ms %}
-    {% from "musehub/macros/milestone.html" import milestone_progress %}
-    <div class="sidebar-section">
-      <p class="sidebar-section-title">Milestone</p>
-      {{ milestone_progress(ms) }}
-    </div>
-    {% endif %}
-    {% endif %}
-
-    {% if issue.assignee %}
-    <div class="sidebar-section">
-      <p class="sidebar-section-title">Assignee</p>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--accent,#58a6ff);color:#0d1117;font-size:11px;font-weight:700;flex-shrink:0">{{ issue.assignee[0] | upper }}</span>
-        <span>{{ issue.assignee }}</span>
+    {# Stats ribbon #}
+    <div class="id-stats">
+      <div class="id-stat">
+        <span class="id-stat-value">{{ comments | length }}</span>
+        <span class="id-stat-label">Comments</span>
+      </div>
+      <div class="id-stat">
+        <span class="id-stat-value">{{ issue.labels | length }}</span>
+        <span class="id-stat-label">Labels</span>
+      </div>
+      <div class="id-stat">
+        <span class="id-stat-value">{{ all_refs | length }}</span>
+        <span class="id-stat-label">Musical refs</span>
+      </div>
+      <div class="id-stat">
+        <span class="id-stat-value">{{ linked_prs | length }}</span>
+        <span class="id-stat-label">Linked PRs</span>
+      </div>
+      <div class="id-stat">
+        <span class="id-stat-value"
+              style="color: {% if issue.state == 'open' %}#3fb950{% else %}var(--text-muted){% endif %}">
+          {{ issue.state | title }}
+        </span>
+        <span class="id-stat-label">Status</span>
       </div>
     </div>
-    {% endif %}
-  </aside>
-</div>
+
+    {# Close / Reopen actions #}
+    <div class="id-header-actions">
+      {%- if issue.state == "open" %}
+      <form hx-post="{{ base_url }}/issues/{{ issue.number }}/close" hx-push-url="true">
+        <button type="submit" class="btn btn-secondary btn-sm">✓ Close issue</button>
+      </form>
+      {%- else %}
+      <form hx-post="{{ base_url }}/issues/{{ issue.number }}/reopen" hx-push-url="true">
+        <button type="submit" class="btn btn-primary btn-sm">↺ Reopen issue</button>
+      </form>
+      {%- endif %}
+      <a href="{{ base_url }}/issues" class="btn btn-ghost btn-sm">← All issues</a>
+    </div>
+  </div>
+
+  {# ── Two-column layout ────────────────────────────────────────────────────── #}
+  <div class="id-layout">
+
+    {# ═══ Main column ════════════════════════════════════════════════════════ #}
+    <div class="id-main">
+
+      {# Musical context panel — only shown if refs found #}
+      {%- if all_refs %}
+      <div class="id-musical-panel">
+        <div class="id-panel-header">
+          <span>🎵</span>
+          <h2 class="id-panel-title">Musical References</h2>
+          <span class="id-panel-count">{{ all_refs | length }}</span>
+        </div>
+        <div class="id-panel-body">
+          <div class="id-refs-grid">
+            {%- for ref in all_refs %}
+            <div class="id-ref-item ref-{{ ref.type }}">
+              <span class="id-ref-icon">{{ ref.icon }}</span>
+              <div class="id-ref-info">
+                <span class="id-ref-type ref-{{ ref.type }}">{{ ref.type | title }}</span>
+                <span class="id-ref-value">{{ ref.value }}</span>
+              </div>
+            </div>
+            {%- endfor %}
+          </div>
+          {%- if all_refs %}
+          <div style="margin-top:var(--space-2);font-size:0.65rem;color:var(--text-muted)">
+            Use <code style="font-family:var(--font-mono);background:var(--bg-overlay);border:1px solid var(--border-default);border-radius:3px;padding:0 4px">track:bass</code>,
+            <code style="font-family:var(--font-mono);background:var(--bg-overlay);border:1px solid var(--border-default);border-radius:3px;padding:0 4px">section:chorus</code>, or
+            <code style="font-family:var(--font-mono);background:var(--bg-overlay);border:1px solid var(--border-default);border-radius:3px;padding:0 4px">beats:16-24</code>
+            in comments to link to specific musical elements.
+          </div>
+          {%- endif %}
+        </div>
+      </div>
+      {%- endif %}
+
+      {# Issue body #}
+      <div class="id-body-card">
+        <div class="id-body-header">
+          <span class="id-avatar-lg">{{ issue.author[0] | upper if issue.author else '?' }}</span>
+          <span class="id-body-author">{{ issue.author or "unknown" }}</span>
+          <span style="font-weight:400;color:var(--text-muted)">
+            &nbsp;commented {{ issue.created_at | fmtrelative }}
+          </span>
+        </div>
+        {%- if issue.body %}
+        <div class="id-body-content">{{ issue.body | markdown | safe }}</div>
+        {%- else %}
+        <div class="id-body-empty">No description provided.</div>
+        {%- endif %}
+      </div>
+
+      {# Comment thread #}
+      <div class="id-comments-section">
+        <div class="id-comments-header">
+          <span>💬</span>
+          <span>Discussion</span>
+          <span class="id-comments-count">{{ comments | length }}</span>
+        </div>
+        <div id="issue-comments">
+          {% include "musehub/fragments/issue_comments.html" %}
+        </div>
+        {# Comment form #}
+        <div class="id-comment-form">
+          <form hx-post="{{ base_url }}/issues/{{ issue.number }}/comments"
+                hx-target="#issue-comments"
+                hx-swap="innerHTML"
+                hx-on::after-request="this.reset()">
+            <div class="id-form-author-row">
+              <span class="id-avatar-lg" style="margin-top:2px">?</span>
+              <div style="flex:1;min-width:0">
+                <textarea name="body"
+                          class="id-textarea"
+                          rows="4"
+                          placeholder="Leave a comment… Use track:bass, section:chorus, beats:16-24 for musical refs."></textarea>
+                <div class="id-form-hint">
+                  Reference musical elements with
+                  <code>track:name</code> · <code>section:name</code> · <code>beats:start-end</code>
+                </div>
+              </div>
+            </div>
+            <div class="id-form-actions">
+              <button type="submit" class="btn btn-primary">Comment</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>{# /id-main #}
+
+    {# ═══ Sidebar ════════════════════════════════════════════════════════════ #}
+    <aside class="id-sidebar">
+
+      {# Status #}
+      <div class="id-sidebar-card">
+        <div class="id-sidebar-header">Status</div>
+        <div class="id-sidebar-body">
+          <span class="id-state-badge {{ state_cls }}" style="width:100%;justify-content:center;display:flex">
+            {{ state_icon }} {{ issue.state | title }}
+          </span>
+          <div style="margin-top:var(--space-2);font-size:var(--font-size-xs);color:var(--text-muted)">
+            Opened {{ issue.created_at | fmtdate }}
+            {%- if issue.closed_at %}
+            <br>Closed {{ issue.closed_at | fmtdate }}
+            {%- endif %}
+          </div>
+        </div>
+      </div>
+
+      {# Assignee #}
+      {%- if issue.assignee %}
+      <div class="id-sidebar-card">
+        <div class="id-sidebar-header">Assignee</div>
+        <div class="id-sidebar-body">
+          <div class="id-assignee">
+            <span class="id-avatar-lg">{{ issue.assignee[0] | upper }}</span>
+            <a href="/{{ issue.assignee }}" class="id-assignee-name id-author-link">{{ issue.assignee }}</a>
+          </div>
+        </div>
+      </div>
+      {%- else %}
+      <div class="id-sidebar-card">
+        <div class="id-sidebar-header">Assignee</div>
+        <div class="id-sidebar-body" style="color:var(--text-muted);font-size:var(--font-size-xs)">
+          No assignee
+        </div>
+      </div>
+      {%- endif %}
+
+      {# Labels #}
+      <div class="id-sidebar-card">
+        <div class="id-sidebar-header">Labels</div>
+        <div class="id-sidebar-body" style="display:flex;flex-wrap:wrap;gap:var(--space-1)">
+          {%- if issue.labels %}
+          {%- for lbl in issue.labels %}
+          {%- set lbl_obj = labels_data | selectattr('name', 'equalto', lbl) | first | default({'color': '#8b949e'}) %}
+          {{ label_chip(lbl, lbl_obj.color) }}
+          {%- endfor %}
+          {%- else %}
+          <span style="color:var(--text-muted);font-size:var(--font-size-xs)">None yet</span>
+          {%- endif %}
+        </div>
+      </div>
+
+      {# Milestone #}
+      {%- if issue.milestone_id %}
+      {%- set ms = milestones_data | selectattr('milestone_id', 'equalto', issue.milestone_id) | first | default(None) %}
+      {%- if ms %}
+      <div class="id-sidebar-card">
+        <div class="id-sidebar-header">Milestone</div>
+        <div class="id-sidebar-body">
+          <div class="id-milestone-title">{{ ms.title }}</div>
+          {%- set total_ms = (ms.open_issues | default(0)) + (ms.closed_issues | default(0)) %}
+          {%- set pct = ((ms.closed_issues | default(0)) / total_ms * 100) | round(0) | int if total_ms else 0 %}
+          <div class="id-ms-track">
+            <div class="id-ms-fill" style="width:{{ pct }}%"></div>
+          </div>
+          <div class="id-ms-stats">
+            <span>{{ pct }}% complete</span>
+            <span>·</span>
+            <span>{{ ms.open_issues | default(0) }} open</span>
+            <span>·</span>
+            <span>{{ ms.closed_issues | default(0) }} closed</span>
+          </div>
+          {%- if ms.due_on %}
+          <div style="margin-top:var(--space-1);font-size:0.65rem;color:var(--text-muted)">
+            Due: {{ ms.due_on | fmtdate }}
+          </div>
+          {%- endif %}
+        </div>
+      </div>
+      {%- endif %}
+      {%- endif %}
+
+      {# Linked PRs #}
+      {%- if linked_prs %}
+      <div class="id-sidebar-card">
+        <div class="id-sidebar-header">Linked pull requests</div>
+        <div class="id-sidebar-body">
+          {%- for pr in linked_prs %}
+          <div class="id-linked-pr">
+            <span class="id-pr-dot {{ pr.state }}">
+              {%- if pr.state == "merged" %}●{%- elif pr.state == "open" %}○{%- else %}✕{%- endif %}
+            </span>
+            <a href="{{ base_url }}/pulls/{{ pr.pr_id }}" class="id-pr-title">
+              {{ pr.title | truncate(55) }}
+            </a>
+          </div>
+          {%- endfor %}
+        </div>
+      </div>
+      {%- endif %}
+
+      {# Issue navigation #}
+      {%- if prev_number or next_number %}
+      <div class="id-sidebar-card">
+        <div class="id-sidebar-header">Navigation</div>
+        <div class="id-sidebar-body">
+          <div class="id-nav">
+            {%- if prev_number %}
+            <a href="{{ base_url }}/issues/{{ prev_number }}" class="id-nav-btn">
+              <span class="id-nav-dir">← Previous</span>
+              <span class="id-nav-num">#{{ prev_number }}</span>
+            </a>
+            {%- else %}
+            <span class="id-nav-btn" style="opacity:0.35;pointer-events:none">
+              <span class="id-nav-dir">← Previous</span>
+            </span>
+            {%- endif %}
+            {%- if next_number %}
+            <a href="{{ base_url }}/issues/{{ next_number }}" class="id-nav-btn" style="text-align:right">
+              <span class="id-nav-dir">Next →</span>
+              <span class="id-nav-num">#{{ next_number }}</span>
+            </a>
+            {%- else %}
+            <span class="id-nav-btn" style="opacity:0.35;pointer-events:none;text-align:right">
+              <span class="id-nav-dir">Next →</span>
+            </span>
+            {%- endif %}
+          </div>
+        </div>
+      </div>
+      {%- endif %}
+
+    </aside>
+
+  </div>{# /id-layout #}
+
+</div>{# /content-wide #}
 {% endblock %}
