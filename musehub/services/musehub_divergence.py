@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -90,7 +90,7 @@ _DIMENSION_PATTERNS: dict[str, tuple[str, ...]] = {
 # ---------------------------------------------------------------------------
 
 
-class MuseHubDivergenceLevel(str, Enum):
+class MuseHubDivergenceLevel(StrEnum):
     """Qualitative label for a per-dimension or overall divergence score.
 
     Thresholds mirror the CLI divergence engine for consistency.
@@ -107,7 +107,7 @@ class MuseHubDivergenceLevel(str, Enum):
     HIGH = "HIGH"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MuseHubDimensionDivergence:
     """Divergence score and description for a single musical dimension.
 
@@ -128,7 +128,7 @@ class MuseHubDimensionDivergence:
     branch_b_commits: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MuseHubDivergenceResult:
     """Full musical divergence report between two MuseHub branches.
 

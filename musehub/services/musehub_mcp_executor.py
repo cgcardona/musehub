@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from musehub.contracts.json_types import JSONValue
@@ -59,7 +59,7 @@ Callers pattern-match on these to build appropriate error messages:
 """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MusehubToolResult:
     """Result of executing a single musehub_* MCP tool.
 
@@ -114,7 +114,7 @@ _EXTRA_MIME: dict[str, str] = {
 
 def _mime_for_path(path: str) -> str:
     """Resolve MIME type from a file path extension."""
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     if ext in _EXTRA_MIME:
         return _EXTRA_MIME[ext]
     guessed, _ = mimetypes.guess_type(path)

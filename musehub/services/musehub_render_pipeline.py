@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderPipelineResult:
     """Summary of a single render pipeline execution for one commit.
 

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import Field
@@ -39,7 +39,7 @@ router = APIRouter()
 # ── Permission model ──────────────────────────────────────────────────────────
 
 
-class Permission(str, Enum):
+class Permission(StrEnum):
     """Collaborator permission levels in ascending order of authority."""
 
     read = "read"

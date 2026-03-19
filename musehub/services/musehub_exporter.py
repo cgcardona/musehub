@@ -26,10 +26,10 @@ from __future__ import annotations
 import io
 import json
 import logging
-import os
 import zipfile
+from pathlib import Path
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class ExportFormat(str, Enum):
+class ExportFormat(StrEnum):
     """Supported export formats for a MuseHub repo snapshot.
 
     midi — Audio MIDI (.mid); the native Muse format.
@@ -74,7 +74,7 @@ class ObjectIndexEntry(TypedDict):
     size_bytes: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExportResult:
     """Fully packaged export artifact ready for streaming to the client.
 
@@ -268,7 +268,7 @@ async def export_repo_at_ref(
     candidates = [
         o
         for o in repo_objects
-        if os.path.splitext(o.path)[1].lower() in valid_exts
+        if Path(o.path).suffix.lower() in valid_exts
         and _matches_sections(o.path, sections)
     ]
 
@@ -281,7 +281,7 @@ async def export_repo_at_ref(
     artifacts: list[tuple[str, bytes]] = []
     for obj in candidates:
         raw_obj = await musehub_repository.get_object_row(session, repo_id, obj.object_id)
-        if raw_obj is None or not os.path.exists(raw_obj.disk_path):
+        if raw_obj is None or not Path(raw_obj.disk_path).exists():
             logger.warning(
                 "⚠️ Object %s missing from disk (path=%s) — skipping",
                 obj.object_id,
@@ -290,7 +290,7 @@ async def export_repo_at_ref(
             continue
         with open(raw_obj.disk_path, "rb") as fh:
             data = fh.read()
-        artifacts.append((os.path.basename(obj.path), data))
+        artifacts.append((Path(obj.path).name, data))
 
     if not artifacts:
         return "no_matching_objects"

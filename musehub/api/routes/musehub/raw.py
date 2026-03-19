@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-import os
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -64,7 +64,7 @@ def _resolve_mime(path: str) -> str:
     so that audio/midi is always returned for .mid files regardless of OS
     configuration.
     """
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     if ext in _MIME_MAP:
         return _MIME_MAP[ext]
     guessed, _ = mimetypes.guess_type(path)
@@ -130,7 +130,7 @@ async def raw_file(
             detail=f"No object at path '{path}' in ref '{ref}'",
         )
 
-    if not os.path.exists(obj.disk_path):
+    if not Path(obj.disk_path).exists():
         logger.warning(
             "⚠️ Object at path '%s' exists in DB but missing from disk: %s",
             path,
@@ -141,7 +141,7 @@ async def raw_file(
             detail="Object file has been removed from storage",
         )
 
-    filename = os.path.basename(obj.path)
+    filename = Path(obj.path).name
     media_type = _resolve_mime(obj.path)
     logger.debug("✅ Serving raw file '%s' (%s) from repo %s", path, media_type, repo_id[:8])
     return FileResponse(

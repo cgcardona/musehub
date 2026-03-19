@@ -76,7 +76,7 @@ _MIN_NOTE_PX: int = 1
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PianoRollRenderResult:
     """Outcome of a single piano roll render operation.
 

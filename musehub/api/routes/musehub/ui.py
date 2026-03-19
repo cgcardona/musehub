@@ -68,7 +68,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -153,7 +153,7 @@ def _detect_language(path: str) -> str:
     the correct syntax-highlighting hint for the client-side enhancer.
     Returns an empty string for unrecognised extensions.
     """
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     return _LANG_MAP.get(ext, "")
 
 
@@ -1728,8 +1728,6 @@ async def listen_track_page(
 
     No JWT required — HTML shell; JS handles auth for private repos.
     """
-    import os
-
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
     objects = await musehub_repository.list_objects(db, repo_id)
 
@@ -1746,10 +1744,10 @@ async def listen_track_page(
     full_mix_url: str | None = None
 
     if target_obj:
-        stem = os.path.splitext(os.path.basename(target_obj.path))[0]
+        stem = Path(target_obj.path).stem
         piano_roll_url: str | None = None
         for p, oid in object_map.items():
-            if os.path.splitext(p)[1].lower() in image_exts and os.path.splitext(os.path.basename(p))[0] == stem:
+            if Path(p).suffix.lower() in image_exts and Path(p).stem == stem:
                 piano_roll_url = f"{api_base}/objects/{oid}/content"
                 break
         tracks = [
@@ -4222,7 +4220,7 @@ async def blob_page(
     obj = await musehub_repository.get_object_by_path(db, repo_id, path)
 
     lang = _detect_language(path)
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     is_binary = ext in _BLOB_BINARY_TYPES
     is_midi = ext in (".mid", ".midi")
     size_bytes: int = obj.size_bytes if obj is not None else 0
@@ -4234,7 +4232,7 @@ async def blob_page(
     # Read text content for small non-binary files so we can SSR line numbers.
     # Use asyncio.to_thread so the blocking file read does not stall the event loop.
     content: str | None = None
-    if obj is not None and not is_binary and os.path.exists(obj.disk_path):
+    if obj is not None and not is_binary and Path(obj.disk_path).exists():
         _disk_path = obj.disk_path
 
         def _read_file() -> str:

@@ -12,7 +12,7 @@ Depth levels control how much data is returned:
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import Field
@@ -20,7 +20,7 @@ from pydantic import Field
 from musehub.models.base import CamelModel
 
 
-class ContextDepth(str, Enum):
+class ContextDepth(StrEnum):
     """Depth level controlling how much data the context endpoint returns."""
 
     brief = "brief"
@@ -28,7 +28,7 @@ class ContextDepth(str, Enum):
     verbose = "verbose"
 
 
-class ContextFormat(str, Enum):
+class ContextFormat(StrEnum):
     """Wire format for the context response."""
 
     json = "json"
