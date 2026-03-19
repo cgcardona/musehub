@@ -699,6 +699,37 @@ async def commits_list_page(
     )
     rows = (await db.execute(rows_stmt)).scalars().all()
 
+    # ── Server-side badge extraction (eliminates client-side FOUC) ──────────
+    import re as _re
+    _TEMPO_RE_C  = _re.compile(r'\b(\d{2,3})\s*(?:bpm|BPM)\b')
+    _KEY_RE_C    = _re.compile(r'\b([A-G][b#]?(?:m(?:aj(?:or)?)?|min(?:or)?|M)?)\b')
+    _EMOTION_RE_C= _re.compile(r'emotion:([\w-]+)', _re.IGNORECASE)
+    _STAGE_RE_C  = _re.compile(r'stage:([\w-]+)', _re.IGNORECASE)
+    _INSTR_RE_C  = _re.compile(
+        r'\b(piano|bass|drums?|keys|strings?|guitar|synth|pad|lead|brass|'
+        r'horn|flute|cello|violin|organ|arp|vocals?|percussion|kick|snare|hihat|hi-hat|clap)\b',
+        _re.IGNORECASE,
+    )
+
+    def _commit_badges(msg: str) -> list[dict[str, str]]:
+        b: list[dict[str, str]] = []
+        tm = _TEMPO_RE_C.search(msg)
+        if tm:
+            b.append({"cls": "chip-tempo", "label": f"♩ {tm.group(1)} BPM"})
+        km = _KEY_RE_C.search(msg)
+        if km:
+            b.append({"cls": "chip-key", "label": f"🎵 {km.group(1)}"})
+        em = _EMOTION_RE_C.search(msg)
+        if em:
+            b.append({"cls": "chip-emotion", "label": f"💜 {em.group(1)}"})
+        sm = _STAGE_RE_C.search(msg)
+        if sm:
+            b.append({"cls": "chip-stage", "label": sm.group(1)})
+        instrs = sorted({m.group(1).lower() for m in _INSTR_RE_C.finditer(msg)})[:3]
+        if instrs:
+            b.append({"cls": "chip-instr", "label": " · ".join(instrs)})
+        return b
+
     # Build CommitResponse objects inline — same mapping as the service layer.
     commits = [
         CommitResponse(
@@ -711,6 +742,11 @@ async def commits_list_page(
             snapshot_id=r.snapshot_id,
         )
         for r in rows
+    ]
+    # Enrich commits with SSR badge data (avoids client-side badge injection FOUC).
+    commits_enriched: list[dict[str, Any]] = [
+        {**c.model_dump(mode="json"), "badges": _commit_badges(c.message)}
+        for c in commits
     ]
 
     # ── Distinct authors for the filter dropdown ──────────────────────────────
@@ -746,7 +782,7 @@ async def commits_list_page(
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "commits",
-        "commits": commits,
+        "commits": commits_enriched,
         "total": total,
         "page": page,
         "per_page": per_page,
