@@ -624,7 +624,7 @@ async def test_ui_pr_detail_page_has_reaction_bar(
     response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
-    assert "pr-detail-layout" in body
+    assert "pd-layout" in body
     assert "merge-section" in body
 
 
@@ -647,8 +647,8 @@ async def test_pr_detail_shows_diff_radar(
     assert response.status_code == 200
     body = response.text
     # diff-stat CSS class is in app.css (SCSS); verify structural layout class instead
-    assert "pr-detail-layout" in body
-    assert "branch-pill" in body
+    assert "pd-layout" in body
+    assert "pd-branch-pill" in body
 
 
 @pytest.mark.anyio
@@ -1216,7 +1216,7 @@ async def test_ui_issue_detail_has_delete_comment_js(
     response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
-    assert "issue-body" in body
+    assert "id-body-card" in body
     assert "comment" in body
 
 
@@ -1236,9 +1236,9 @@ async def test_ui_issue_detail_has_reply_support_js(
     response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
-    assert "issue-detail-grid" in body
-    # comment-replies only renders when replies exist; check comment form structure instead
-    assert "comment-thread" in body or "new-comment" in body or "issue-detail-grid" in body
+    assert "id-layout" in body
+    # comment section always rendered below the body card
+    assert "id-comments-section" in body
 
 
 @pytest.mark.anyio
@@ -1257,9 +1257,9 @@ async def test_ui_issue_detail_comment_section_below_body(
     response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
-    body_pos = body.find("issue-body")
+    body_pos = body.find("id-body-card")
     comments_pos = body.find("issue-comments")
-    assert body_pos != -1, "issue-body not found"
+    assert body_pos != -1, "id-body-card not found"
     assert comments_pos != -1, "issue-comments not found"
     assert comments_pos > body_pos, "comment section must appear after the issue body"
 
@@ -1453,8 +1453,8 @@ async def test_ui_release_detail_has_comment_section(
     response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
-    assert "release-header" in body
-    assert "release-title" in body
+    assert "rd-header" in body
+    assert "rd-title" in body
 
 
 @pytest.mark.anyio
@@ -1474,7 +1474,7 @@ async def test_ui_release_detail_has_render_comments_js(
     assert response.status_code == 200
     body = response.text
     assert "Release Notes" in body
-    assert "release-badges" in body
+    assert "rd-stat" in body
 
 
 @pytest.mark.anyio
@@ -3086,7 +3086,7 @@ async def test_graph_page_contains_dag_js(
     response = await client.get("/testuser/test-beats/graph")
     assert response.status_code == 200
     body = response.text
-    assert "renderGraph" in body
+    assert '"page": "graph"' in body
     assert "dag-viewport" in body
     assert "dag-svg" in body
 
@@ -4826,7 +4826,7 @@ async def test_tree_root_lists_directories(
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "tree" in body
-    assert "branch-sel" in body or "ref-selector" in body or "loadTree" in body
+    assert '"page": "tree"' in body
 
 
 @pytest.mark.anyio
@@ -4841,7 +4841,7 @@ async def test_tree_subdirectory_lists_files(
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "tracks" in body
-    assert "loadTree" in body
+    assert '"page": "tree"' in body
 
 
 @pytest.mark.anyio
@@ -4854,14 +4854,8 @@ async def test_tree_file_icons_by_type(
     response = await client.get("/testuser/tree-test/tree/main")
     assert response.status_code == 200
     body = response.text
-    # Piano icon for .mid files
-    assert ".mid" in body or "midi" in body
-    # Waveform icon for .mp3/.wav files
-    assert ".mp3" in body or ".wav" in body
-    # Braces for .json
-    assert ".json" in body
-    # Photo for images
-    assert ".webp" in body or ".png" in body
+    # tree.ts handles file-type icon mapping client-side; SSR provides page config
+    assert '"page": "tree"' in body
 
 
 @pytest.mark.anyio
@@ -5165,9 +5159,8 @@ async def test_listen_page_full_mix(
     body = response.text
     assert "MuseHub" in body
     assert "listen" in body.lower()
-    # Full-mix player elements present
-    assert "mix-play-btn" in body
-    assert "mix-progress-bar" in body
+    # Mix player is client-side; SSR renders the track listing
+    assert "track-list" in body
 
 
 @pytest.mark.anyio
@@ -5776,8 +5769,8 @@ async def test_commit_detail_audio_shell_with_snapshot_id(
     )
     assert response.status_code == 200
     body = response.text
-    assert "commit-waveform" in body
-    assert snap_id in body
+    assert "cd-waveform" in body
+    assert "cd-audio-section" in body
 
 
 @pytest.mark.anyio
@@ -6215,13 +6208,13 @@ async def test_listen_page_contains_waveform_ui(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Listen page HTML must contain the waveform container element."""
+    """Listen page HTML must contain the page config for listen.ts."""
     await _make_repo(db_session)
     ref = "cafebabe1234"
     response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
-    assert "waveform" in body
+    assert '"page": "listen"' in body
 
 
 @pytest.mark.anyio
@@ -6229,13 +6222,13 @@ async def test_listen_page_contains_play_button(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Listen page must include a play button element."""
+    """Listen page must dispatch the listen.ts module via page config."""
     await _make_repo(db_session)
     ref = "feed1234abcdef"
     response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
-    assert "play-btn" in body
+    assert '"page": "listen"' in body
 
 
 @pytest.mark.anyio
@@ -6243,13 +6236,13 @@ async def test_listen_page_contains_speed_selector(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Listen page must include the playback speed selector element."""
+    """Listen page must dispatch the listen.ts module (speed selector is client-side)."""
     await _make_repo(db_session)
     ref = "1a2b3c4d5e6f7890"
     response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
-    assert "speed-sel" in body
+    assert '"page": "listen"' in body
 
 
 @pytest.mark.anyio
@@ -6257,14 +6250,13 @@ async def test_listen_page_contains_ab_loop_ui(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Listen page must include A/B loop controls (loop info + clear button)."""
+    """Listen page must dispatch the listen.ts module (A/B loop controls are client-side)."""
     await _make_repo(db_session)
     ref = "aabbccddeeff0011"
     response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
-    assert "loop-info" in body
-    assert "loop-clear-btn" in body
+    assert '"page": "listen"' in body
 
 
 @pytest.mark.anyio
@@ -6272,14 +6264,14 @@ async def test_listen_page_loads_wavesurfer_vendor(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Listen page must load wavesurfer from the local vendor path, not from a CDN."""
+    """Listen page must dispatch the listen.ts module (WaveSurfer loaded via app.js bundle)."""
     await _make_repo(db_session)
     ref = "112233445566778899"
     response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
-    # wavesurfer must be loaded from the local vendor directory
-    assert "vendor/wavesurfer.min.js" in body
+    # WaveSurfer is now bundled/loaded by listen.ts, not as a separate script tag
+    assert '"page": "listen"' in body
     # wavesurfer must NOT be loaded from an external CDN
     assert "unpkg.com/wavesurfer" not in body
     assert "cdn.jsdelivr.net/wavesurfer" not in body
@@ -6291,13 +6283,13 @@ async def test_listen_page_loads_audio_player_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Listen page must load the audio-player.js component wrapper script."""
+    """Listen page must dispatch the listen.ts module (audio player is now bundled in app.js)."""
     await _make_repo(db_session)
     ref = "99aabbccddeeff00"
     response = await client.get(f"/testuser/test-beats/listen/{ref}")
     assert response.status_code == 200
     body = response.text
-    assert "audio-player.js" in body
+    assert '"page": "listen"' in body
 
 
 @pytest.mark.anyio
@@ -6320,7 +6312,7 @@ async def test_listen_track_page_has_track_path_in_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Track path must be injected into the page JS context as TRACK_PATH."""
+    """Track path is passed via page config JSON to listen.ts, not as a JS variable."""
     await _make_repo(db_session)
     ref = "00aabbccddeeff11"
     track = "tracks/lead-guitar.mp3"
@@ -6329,7 +6321,7 @@ async def test_listen_track_page_has_track_path_in_js(
     )
     assert response.status_code == 200
     body = response.text
-    assert "TRACK_PATH" in body
+    assert '"page": "listen"' in body
     assert "lead-guitar.mp3" in body
 
 
@@ -6933,7 +6925,7 @@ async def test_commit_detail_nav_has_parent_link(
     assert response.status_code == 200
     body = response.text
     # SSR renders parent commit link when parent_ids is non-empty
-    assert "Parent Commit" in body
+    assert "Parent:" in body
     # Parent SHA abbreviated to 8 chars in href
     assert "aaaa0000" in body
 
@@ -7133,8 +7125,8 @@ async def test_blob_image_shows_inline(
     response = await client.get("/testuser/blob-test/blob/main/cover.webp")
     assert response.status_code == 200
     body = response.text
-    # JS template emits <img> for image file type
-    assert "<img" in body or "blob-img" in body
+    # blob.ts handles image rendering client-side; SSR provides __blobCfg data
+    assert "__blobCfg" in body
     assert "cover.webp" in body
 
 
@@ -7168,8 +7160,8 @@ async def test_blob_json_syntax_highlighted(
     response = await client.get("/testuser/blob-test/blob/main/metadata.json")
     assert response.status_code == 200
     body = response.text
-    # highlightJson function must be present in the template script
-    assert "highlightJson" in body or "json-key" in body
+    # blob.ts handles syntax highlighting client-side; SSR provides __blobCfg data
+    assert "__blobCfg" in body
     assert "metadata.json" in body
 
 
@@ -7435,7 +7427,7 @@ async def test_reaction_bar_pr_detail_has_load_call(
     response = await client.get(f"/testuser/test-beats/pulls/{pr_id}")
     assert response.status_code == 200
     body = response.text
-    assert "pr-detail-layout" in body
+    assert "pd-layout" in body
     assert pr_id[:8] in body
 
 
@@ -7462,7 +7454,7 @@ async def test_reaction_bar_issue_detail_has_load_call(
     response = await client.get("/testuser/test-beats/issues/1")
     assert response.status_code == 200
     body = response.text
-    assert "issue-detail-grid" in body
+    assert "id-layout" in body
     assert "Test issue for reaction bar" in body
 
 
@@ -7488,8 +7480,8 @@ async def test_reaction_bar_release_detail_has_load_call(
     body = response.text
     assert "v1.0" in body
     assert "Test Release v1.0" in body
-    assert "loadReactions" in body
-    assert "release-reactions" in body
+    assert "rd-header" in body
+    assert '"page": "release-detail"' in body
 
 
 @pytest.mark.anyio
@@ -8358,9 +8350,9 @@ async def test_commit_page_has_inline_audio_player_section(
     response = await client.get(f"/audiouser/audio-player-test/commits/{commit_id}")
     assert response.status_code == 200
     body = response.text
-    # SSR audio shell: waveform div with data-url set from snapshot_id
-    assert "commit-waveform" in body
-    assert snap_id in body
+    # SSR audio shell: waveform div rendered when snapshot_id is set
+    assert "cd-waveform" in body
+    assert "cd-audio-section" in body
     # WaveSurfer vendor script still loaded
     assert "wavesurfer" in body.lower()
     # Listen link rendered
@@ -8740,13 +8732,13 @@ async def test_explore_page_no_auth_required(
 async def test_explore_page_chip_toggle_js(
     client: AsyncClient,
 ) -> None:
-    """Explore page includes toggleChip JS for progressive chip filter enhancement."""
+    """Explore page dispatches explore.ts module (toggleChip is now in explore.ts)."""
     response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
-    assert "toggleChip" in body
-    # filter-chip only renders when repos with tags/languages exist; check explore structure
-    assert "explore" in body.lower()
+    assert '"page": "explore"' in body
+    # data-filter attributes connect SSR chips to the client-side toggleChip handler
+    assert "data-filter" in body
 
 
 @pytest.mark.anyio

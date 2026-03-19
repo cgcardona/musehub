@@ -534,7 +534,7 @@ async def test_search_page_renders(
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "MuseHub" in body
-    assert "Search Commits" in body
+    assert "sr-hero" in body
     assert 'name="q"' in body
     assert 'name="mode"' in body
     assert "keyword" in body
