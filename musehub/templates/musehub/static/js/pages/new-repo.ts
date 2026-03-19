@@ -79,7 +79,62 @@ function initVisibilityCards(): void {
   });
 }
 
+async function submitWizard(e: Event): Promise<void> {
+  e.preventDefault();
+  const btn     = document.getElementById('submit-btn') as HTMLButtonElement | null;
+  const errorEl = document.getElementById('submit-error') as HTMLElement | null;
+  if (errorEl) errorEl.style.display = 'none';
+
+  const owner   = (document.getElementById('f-owner')       as HTMLInputElement).value.trim();
+  const name    = (document.getElementById('f-name')        as HTMLInputElement).value.trim();
+  const desc    = (document.getElementById('f-description') as HTMLTextAreaElement).value.trim();
+  const license = (document.getElementById('f-license')     as HTMLSelectElement).value || null;
+  const branchEl = document.getElementById('f-branch') as HTMLInputElement | null;
+  const branch  = branchEl ? (branchEl.value.trim() || 'main') : 'main';
+  const init    = (document.getElementById('f-initialize')  as HTMLInputElement).checked;
+  const visEl   = document.querySelector<HTMLInputElement>('input[name="visibility"]:checked');
+  const vis     = visEl ? visEl.value : 'private';
+
+  // Collect topics from Alpine.js data
+  const alpineRoot = document.querySelector('.wizard-layout') as (Element & { _x_dataStack?: Array<{ topics: string[] }> }) | null;
+  const topics: string[] = (alpineRoot?._x_dataStack?.[0])
+    ? [...alpineRoot._x_dataStack[0].topics]
+    : [];
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+  try {
+    const w = window as Record<string, unknown>;
+    const token = typeof w.getToken === 'function' ? (w.getToken as () => string)() : '';
+    if (!token) {
+      if (typeof w.showTokenForm === 'function') (w.showTokenForm as (msg: string) => void)('Sign in to create a repository.');
+      return;
+    }
+    const res = await fetch('/new', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner, name, description: desc, visibility: vis, license,
+                             topics, tags: [], initialize: init, defaultBranch: branch }),
+    });
+    if (res.status === 401 || res.status === 403) {
+      if (typeof w.showTokenForm === 'function') (w.showTokenForm as (msg: string) => void)('Session expired — re-enter your JWT.');
+      return;
+    }
+    const data = await res.json() as { redirect?: string; detail?: string };
+    if (res.status === 201) {
+      window.location.href = data.redirect!;
+      return;
+    }
+    if (errorEl) { errorEl.textContent = '❌ ' + (data.detail || 'Failed to create repository.'); errorEl.style.display = ''; }
+  } catch (ex) {
+    if (errorEl) { errorEl.textContent = '❌ ' + (ex instanceof Error ? ex.message : String(ex)); errorEl.style.display = ''; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Create repository'; }
+  }
+}
+
 export function initNewRepo(_data: NewRepoData): void {
   initTagInput('tag-input-container', 'tags-hidden');
   initVisibilityCards();
+  const form = document.getElementById('wizard-form') as HTMLFormElement | null;
+  form?.addEventListener('submit', (e) => void submitWizard(e));
 }

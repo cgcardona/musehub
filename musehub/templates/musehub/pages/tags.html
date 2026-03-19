@@ -254,20 +254,4 @@
 
 {% endblock %}
 
-{% block page_script %}
-<script>
-(function () {
-  const input   = document.getElementById('tag-search');
-  const tagList = document.getElementById('tag-list');
-  if (!input || !tagList) return;
-
-  input.addEventListener('input', function () {
-    const q = input.value.toLowerCase();
-    tagList.querySelectorAll('.tag-card').forEach(function (card) {
-      const name = (card.dataset.tagName || '').toLowerCase();
-      card.style.display = !q || name.includes(q) ? '' : 'none';
-    });
-  });
-})();
-</script>
-{% endblock %}
+{% block page_json %}{"page": "tags"}{% endblock %}

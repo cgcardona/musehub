@@ -31,6 +31,22 @@ import { initPRDetail }     from './pages/pr-detail.ts';
 import { initCommits }      from './pages/commits.ts';
 import { initIssueDetail }   from './pages/issue-detail.ts';
 import { initReleaseDetail } from './pages/release-detail.ts';
+import { initGraph }         from './pages/graph.ts';
+import { initDiff }          from './pages/diff.ts';
+import { initSettings }      from './pages/settings.ts';
+import { initExplore }       from './pages/explore.ts';
+import { initBranches }      from './pages/branches.ts';
+import { initTags }          from './pages/tags.ts';
+import { initSessions }      from './pages/sessions.ts';
+import { initReleaseList }   from './pages/release-list.ts';
+import { initBlob }          from './pages/blob.ts';
+import { initScore }         from './pages/score.ts';
+import { initForks }         from './pages/forks.ts';
+import { initNotifications } from './pages/notifications.ts';
+import { initFeed }          from './pages/feed.ts';
+import { initCompare }       from './pages/compare.ts';
+import { initTree }          from './pages/tree.ts';
+import { initContext }       from './pages/context.ts';
 
 // Register page modules — keyed by the "page" field in the #page-data JSON.
 type PageData = Record<string, unknown>;
@@ -55,6 +71,22 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'commits':       () => initCommits(),
   'issue-detail':    () => initIssueDetail(),
   'release-detail':  () => initReleaseDetail(),
+  'graph':           () => initGraph(),
+  'diff':            () => initDiff(),
+  'settings':        () => initSettings(),
+  'explore':         () => initExplore(),
+  'branches':        () => initBranches(),
+  'tags':            () => initTags(),
+  'sessions':        () => initSessions(),
+  'release-list':    () => initReleaseList(),
+  'blob':            () => initBlob(),
+  'score':           () => initScore(),
+  'forks':           () => initForks(),
+  'notifications':   () => initNotifications(),
+  'feed':            () => initFeed(),
+  'compare':         () => initCompare(),
+  'tree':            (d) => initTree(d),
+  'context':         (d) => initContext(d),
 };
 
 // Attach to window so musehub.ts dispatchPageModule() can reach it.

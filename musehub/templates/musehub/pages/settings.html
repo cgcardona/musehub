@@ -11,13 +11,9 @@
 {% include "musehub/partials/repo_nav.html" %}
 {% endblock %}
 
-{% block page_data %}
-const repoId      = {{ repo_id | tojson }};
-const owner       = {{ owner | tojson }};
-const repoSlug    = {{ repo_slug | tojson }};
-const base        = {{ base_url | tojson }};
-const apiBase     = '/api/v1/repos/' + repoId;
-{% endblock %}
+{% block page_json %}{"page": "settings"}{% endblock %}
+
+{% block page_data %}window.__settingsCfg = { repoId: {{ repo_id | tojson }}, owner: {{ owner | tojson }}, repoSlug: {{ repo_slug | tojson }}, base: {{ base_url | tojson }}, fullName: {{ (owner ~ "/" ~ repo_slug) | tojson }} };{% endblock %}
 
 {% block content %}
 {% set s = settings %}
@@ -84,11 +80,10 @@ const apiBase     = '/api/v1/repos/' + repoId;
             <div class="tag-input-container" id="topics-container">
               {% if s and s.topics %}
                 {% for topic in s.topics %}
-                <span class="tag-pill">{{ topic }}<button type="button" class="tag-pill-remove" onclick="this.parentElement.remove()">&times;</button></span>
+                <span class="tag-pill">{{ topic }}<button type="button" class="tag-pill-remove" data-action="remove-pill">&times;</button></span>
                 {% endfor %}
               {% endif %}
-              <input class="tag-text-input" id="topic-input" placeholder="Add topic…" maxlength="50"
-                     onkeydown="onTopicKey(event)"/>
+              <input class="tag-text-input" id="topic-input" placeholder="Add topic…" maxlength="50"/>
             </div>
           </div>
 
@@ -142,7 +137,7 @@ const apiBase     = '/api/v1/repos/' + repoId;
               <option value="write" selected>Write</option>
               <option value="admin">Admin</option>
             </select>
-            <button class="btn btn-primary" onclick="inviteCollaborator()">Invite</button>
+            <button class="btn btn-primary" data-action="invite-collaborator">Invite</button>
           </div>
           <span id="invite-msg" style="font-size:13px;display:none;margin-top:8px"></span>
         </div>
@@ -303,18 +298,12 @@ const apiBase     = '/api/v1/repos/' + repoId;
           The name you entered does not match.
         </span>
       </div>
-      <form hx-delete="/api/v1/repos/{{ repo_id }}"
+      <form id="delete-repo-form"
+            hx-delete="/api/v1/repos/{{ repo_id }}"
             hx-target="#danger-msg"
             hx-swap="innerHTML"
             hx-push-url="true"
-            x-on:htmx:before-request="
-              const val = document.getElementById('confirm-delete-name').value.trim();
-              const expected = '{{ owner }}/{{ repo_slug }}';
-              if (val !== expected) {
-                document.getElementById('delete-name-error').style.display = 'block';
-                event.preventDefault();
-              }
-            ">
+            data-expected="{{ owner }}/{{ repo_slug }}">
         <div class="confirm-modal-actions">
           <button type="button" class="btn btn-secondary" x-on:click="deleteOpen = false">Cancel</button>
           <button type="submit" class="btn" style="background:#f85149;color:#fff;border:none">Delete forever</button>
@@ -324,62 +313,4 @@ const apiBase     = '/api/v1/repos/' + repoId;
   </div>
 
 </div>{# /x-data wrapper #}
-{% endblock %}
-
-{% block page_script %}
-{% raw %}
-// ── Topic tag input ───────────────────────────────────────────────────────
-function onTopicKey(e) {
-  if (e.key === 'Enter' || e.key === ',') {
-    e.preventDefault();
-    const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const container = document.getElementById('topics-container');
-    if (val && container) {
-      const pill = document.createElement('span');
-      pill.className = 'tag-pill';
-      pill.innerHTML = val + '<button type="button" class="tag-pill-remove" onclick="this.parentElement.remove()">&times;</button>';
-      container.insertBefore(pill, e.target);
-      e.target.value = '';
-    }
-  } else if (e.key === 'Backspace' && e.target.value === '') {
-    const container = document.getElementById('topics-container');
-    const pills = container ? container.querySelectorAll('.tag-pill') : [];
-    if (pills.length > 0) pills[pills.length - 1].remove();
-  }
-}
-
-// ── Collaborators helpers ─────────────────────────────────────────────────
-window.inviteCollaborator = async function() {
-  const username = document.getElementById('invite-username').value.trim();
-  const role     = document.getElementById('invite-role').value;
-  const msgEl    = document.getElementById('invite-msg');
-  if (!username || !msgEl) return;
-  try {
-    const token = typeof getToken === 'function' ? getToken() : null;
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    const resp = await fetch('/api/v1/repos/' + repoId + '/collaborators', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ username, role }),
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-      msgEl.textContent = '❌ ' + (err.detail || 'Invite failed.');
-      msgEl.style.color = '#f85149';
-    } else {
-      document.getElementById('invite-username').value = '';
-      msgEl.textContent = '✅ Invited ' + username;
-      msgEl.style.color = '#3fb950';
-      htmx.trigger('#collaborators-list', 'load');
-    }
-    msgEl.style.display = 'block';
-    setTimeout(() => { msgEl.style.display = 'none'; }, 5000);
-  } catch (e) {
-    msgEl.textContent = '❌ ' + e.message;
-    msgEl.style.color = '#f85149';
-    msgEl.style.display = 'block';
-  }
-}
-{% endraw %}
 {% endblock %}

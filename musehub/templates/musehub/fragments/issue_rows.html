@@ -77,7 +77,7 @@
 
       {# Checkbox #}
       <input type="checkbox" class="issue-row-check" name="selected" value="{{ issue.issue_id }}"
-             onchange="toggleIssueSelect('{{ issue.issue_id }}', this.checked)"/>
+             data-issue-toggle="{{ issue.issue_id }}"/>
 
       {# State icon #}
       <div class="issue-state-circle issue-state-circle-{{ issue.state }}">

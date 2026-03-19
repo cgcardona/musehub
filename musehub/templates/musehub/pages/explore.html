@@ -5,9 +5,11 @@
 {% block title %}Explore{% endblock %}
 {% block breadcrumb %}Explore{% endblock %}
 
+{% block page_json %}{"page": "explore"}{% endblock %}
+
 {% block token_form %}
   <button class="btn btn-secondary btn-sm mobile-filter-toggle"
-          onclick="document.querySelector('.explore-sidebar').classList.toggle('open')">
+          data-action="toggle-sidebar">
     &#9776; Filters
   </button>
 
@@ -28,7 +30,7 @@
           <label class="sidebar-sort-option">
             <input type="radio" name="sort" value="{{ value }}"
                    {% if sort == value %}checked{% endif %}
-                   onchange="this.form.requestSubmit()">
+                   data-autosubmit>
             {{ label }}
           </label>
           {% endfor %}
@@ -43,8 +45,7 @@
               <a href="#"
                  class="filter-chip {% if tag in selected_langs %}active{% endif %}"
                  data-filter="lang"
-                 data-value="{{ tag | e }}"
-                 onclick="toggleChip(event,'lang','{{ tag | e }}')">{{ tag }}</a>
+                 data-value="{{ tag | e }}">{{ tag }}</a>
               {% endfor %}
             </div>
             {# Chip selections are tracked via URL params by toggleChip(), not hidden inputs #}
@@ -56,7 +57,7 @@
         <!-- License -->
         <div class="sidebar-section">
           <p class="sidebar-section-title">License</p>
-          <select name="license" class="sidebar-select" onchange="this.form.requestSubmit()">
+          <select name="license" class="sidebar-select" data-autosubmit>
             {% for opt in license_options %}
             <option value="{{ opt | e }}" {% if selected_license == opt %}selected{% endif %}>
               {{ opt if opt else 'Any license' }}
@@ -74,8 +75,7 @@
               <a href="#"
                  class="filter-chip {% if t in selected_topics %}active{% endif %}"
                  data-filter="topic"
-                 data-value="{{ t | e }}"
-                 onclick="toggleChip(event,'topic','{{ t | e }}')">{{ t }}</a>
+                 data-value="{{ t | e }}">{{ t }}</a>
               {% endfor %}
             </div>
             {# Topic selections are tracked via URL params by toggleChip(), not hidden inputs #}
@@ -103,46 +103,3 @@
   </div>
 {% endblock %}
 
-{% block page_script %}
-{% raw %}
-// ── Strip empty fields before GET form submits so URLs stay clean ────────────
-document.getElementById('filter-form').addEventListener('submit', function() {
-  Array.from(this.elements).forEach(function(el) {
-    if ((el.tagName === 'SELECT' || el.tagName === 'INPUT') && el.value === '') {
-      el.disabled = true;
-    }
-  });
-});
-
-// ── Chip toggle — reads/writes the URL directly so multi-select is reliable ──
-// pushURL is not supported in htmx.ajax() context, so we call history.pushState()
-// manually first. This ensures window.location.search is correct for every
-// subsequent click — each chip always sees the full accumulated filter state.
-window.toggleChip = function(evt, filterName, value) {
-  evt.preventDefault();
-
-  var params  = new URLSearchParams(window.location.search);
-  var current = params.getAll(filterName);
-
-  if (current.indexOf(value) !== -1) {
-    // Deselect: rebuild the list without this value
-    params.delete(filterName);
-    current.filter(function(v) { return v !== value; })
-           .forEach(function(v) { params.append(filterName, v); });
-    evt.currentTarget.classList.remove('active');
-  } else {
-    // Select: add this value
-    params.append(filterName, value);
-    evt.currentTarget.classList.add('active');
-  }
-
-  var url = '/explore?' + params.toString();
-
-  // Push URL first so the next chip click reads the correct accumulated state
-  history.pushState({}, '', url);
-
-  // Fetch only the repo grid fragment
-  htmx.ajax('GET', url, { target: '#repo-grid', swap: 'innerHTML' });
-};
-{% endraw %}
-{% endblock %}

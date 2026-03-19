@@ -4,6 +4,8 @@
 
 {% block breadcrumb %}<a href="/explore">Explore</a> / New repository{% endblock %}
 
+{% block page_json %}{"page": "new-repo"}{% endblock %}
+
 {% block content %}
 <div class="wizard-layout" x-data="{
   visibility: 'private',
@@ -31,7 +33,7 @@
     <p class="wizard-subtitle">A repository contains all your project's files, commit history, and collaboration records.</p>
   </div>
 
-  <form id="wizard-form" onsubmit="submitWizard(event)">
+  <form id="wizard-form">
 
     {# Owner / repo name row with HTMX availability check #}
     <div class="form-group">
@@ -155,57 +157,3 @@
 </div>
 {% endblock %}
 
-{% block body_extra %}
-<script>
-// Minimal form submission — keeps JWT in localStorage, avoids form-action redirect.
-async function submitWizard(e) {
-  e.preventDefault();
-  const btn = document.getElementById('submit-btn');
-  const errorEl = document.getElementById('submit-error');
-  if (errorEl) errorEl.style.display = 'none';
-
-  const owner    = document.getElementById('f-owner').value.trim();
-  const name     = document.getElementById('f-name').value.trim();
-  const desc     = document.getElementById('f-description').value.trim();
-  const license  = document.getElementById('f-license').value || null;
-  const branch   = document.getElementById('f-branch') ? document.getElementById('f-branch').value.trim() || 'main' : 'main';
-  const init     = document.getElementById('f-initialize').checked;
-  const visEl    = document.querySelector('input[name="visibility"]:checked');
-  const vis      = visEl ? visEl.value : 'private';
-
-  // Collect topics from Alpine.js data
-  const alpineRoot = document.querySelector('.wizard-layout');
-  const topics = (alpineRoot && alpineRoot._x_dataStack && alpineRoot._x_dataStack[0])
-    ? [...alpineRoot._x_dataStack[0].topics] : [];
-
-  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
-  try {
-    const token = typeof getToken === 'function' ? getToken() : '';
-    if (!token) {
-      if (typeof showTokenForm === 'function') showTokenForm('Sign in to create a repository.');
-      return;
-    }
-    const res = await fetch('/new', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ owner, name, description: desc, visibility: vis, license,
-                             topics, tags: [], initialize: init, defaultBranch: branch }),
-    });
-    if (res.status === 401 || res.status === 403) {
-      if (typeof showTokenForm === 'function') showTokenForm('Session expired — re-enter your JWT.');
-      return;
-    }
-    const data = await res.json();
-    if (res.status === 201) {
-      window.location.href = data.redirect;
-      return;
-    }
-    if (errorEl) { errorEl.textContent = '❌ ' + (data.detail || 'Failed to create repository.'); errorEl.style.display = ''; }
-  } catch (ex) {
-    if (errorEl) { errorEl.textContent = '❌ ' + ex.message; errorEl.style.display = ''; }
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Create repository'; }
-  }
-}
-</script>
-{% endblock %}
