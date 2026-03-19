@@ -5,6 +5,7 @@ Supports PostgreSQL (production) and SQLite (development).
 """
 from __future__ import annotations
 
+
 import logging
 from typing import AsyncGenerator
 

@@ -37,6 +37,7 @@ structured error dict when the caller lacks access.
 """
 from __future__ import annotations
 
+
 import logging
 import re
 from typing import TypedDict, Required, NotRequired

@@ -1,6 +1,5 @@
 """MuseHub MCP server — routes musehub_* tool calls to the executor layer."""
 
-from __future__ import annotations
 
 import json
 import logging

@@ -14,7 +14,6 @@ Boundary rules:
 - May import Pydantic response models from musehub.models.musehub.
 - May import the packager to resolve download URLs.
 """
-from __future__ import annotations
 
 import logging
 

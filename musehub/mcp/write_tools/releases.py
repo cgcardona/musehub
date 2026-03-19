@@ -1,5 +1,4 @@
 """Write executor for release operations: create_release."""
-from __future__ import annotations
 
 import logging
 

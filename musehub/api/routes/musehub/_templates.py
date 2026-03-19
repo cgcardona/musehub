@@ -16,7 +16,6 @@ Stack: Jinja2 (server-side rendering) · HTMX 2.x (partial swaps, hx-boost) ·
        Alpine.js 3.x (client-side reactivity). Extensions loaded globally in
        base.html: json-enc, response-targets.
 """
-from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path

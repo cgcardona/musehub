@@ -27,7 +27,6 @@ and paginate via ?page=N — the infrastructure is already designed for it.
 Performance: all queries use lightweight column projections (no ORM lazy-loading).
 The endpoint is unauthenticated and suitable for public crawlers.
 """
-from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone

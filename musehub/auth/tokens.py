@@ -6,6 +6,7 @@ Tokens are self-contained and don't require database storage.
 """
 from __future__ import annotations
 
+
 import hashlib
 import jwt
 from datetime import datetime, timedelta, timezone

@@ -13,7 +13,6 @@ Excluded fields (advisory / meta / visual / runtime):
   assigned_color, existing_track_id.
 """
 
-from __future__ import annotations
 
 import dataclasses
 import hashlib

@@ -16,6 +16,7 @@ for mutating operations. The repository owner cannot be removed as a collaborato
 """
 from __future__ import annotations
 
+
 import logging
 import uuid
 from enum import StrEnum

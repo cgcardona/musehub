@@ -11,7 +11,6 @@ hub philosophy where discovery is a zero-friction entry point.
 
 Star/unstar requires a valid JWT so we can track which user starred which repo.
 """
-from __future__ import annotations
 
 import logging
 

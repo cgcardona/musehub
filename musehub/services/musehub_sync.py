@@ -16,7 +16,6 @@ Boundary rules (same as musehub_repository):
 - May import ORM models from musehub.db.musehub_models.
 - May import Pydantic models from musehub.models.musehub.
 """
-from __future__ import annotations
 
 import base64
 import logging

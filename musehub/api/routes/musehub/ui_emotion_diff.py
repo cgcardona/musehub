@@ -26,7 +26,6 @@ SSR approach:
 
 Auto-discovered by the package ``__init__.py`` — do NOT edit that file.
 """
-from __future__ import annotations
 
 import logging
 import math

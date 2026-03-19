@@ -15,6 +15,7 @@ Eight prompts are defined:
 """
 from __future__ import annotations
 
+
 import json
 from typing import TypedDict, Required, NotRequired
 

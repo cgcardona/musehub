@@ -14,7 +14,6 @@ router (``musehub.api.routes.musehub.__init__``) so that public-repo files
 can be fetched without a Bearer token — matching GitHub's raw.githubusercontent
 semantics. The privacy check is enforced inside the handler itself.
 """
-from __future__ import annotations
 
 import logging
 import mimetypes

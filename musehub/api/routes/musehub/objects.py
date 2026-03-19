@@ -20,7 +20,6 @@ renderer in the browser.
 
 All endpoints require a valid JWT Bearer token.
 """
-from __future__ import annotations
 
 import logging
 import mimetypes

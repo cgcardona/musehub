@@ -23,7 +23,6 @@ No business logic lives here — all persistence is delegated to
 musehub.services.musehub_repository, musehub.services.musehub_credits,
 and musehub.services.musehub_context.
 """
-from __future__ import annotations
 
 import logging
 

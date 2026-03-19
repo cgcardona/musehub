@@ -11,7 +11,6 @@ Two audiences, one URL:
 Bot detection adds ``X-MuseHub-JSON-Available`` to responses for known bot
 User-Agents so they know content negotiation is supported.
 """
-from __future__ import annotations
 
 import logging
 import re

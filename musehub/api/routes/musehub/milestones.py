@@ -13,6 +13,7 @@ Deleting a milestone sets milestone_id = NULL on associated issues (not cascade 
 """
 from __future__ import annotations
 
+
 import logging
 from datetime import datetime
 

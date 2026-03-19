@@ -1,8 +1,14 @@
 # MuseHub
 
+![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red?logo=sqlalchemy)
+
 **MuseHub** — the music composition version control platform powered by Muse VCS.
 
 GitHub for music. Push commits, open pull requests, track issues, browse public repos, publish releases, and give AI agents complete programmatic access via a best-in-class MCP integration.
+
+> **Requirements:** Python 3.14+ · PostgreSQL 16+ · Node.js 22+
 
 ## URL scheme
 

@@ -19,7 +19,6 @@ Read endpoints use optional auth — visibility is gated by repo visibility.
 No business logic lives here — all persistence is delegated to
 ``musehub.services.musehub_releases``.
 """
-from __future__ import annotations
 
 import logging
 

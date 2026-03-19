@@ -22,7 +22,6 @@ SSR approach:
   embedded directly in the Jinja2 template. No client-side JS chart library is
   required — HTMX handles any dynamic interactions.
 """
-from __future__ import annotations
 
 import logging
 import math

@@ -53,8 +53,9 @@ time — it raises ``RecursionError``. The fix is a *named* recursive
 ``JSONObject`` stay inside internal code. ``wrap``/``unwrap`` cross the
 boundary exactly once per request/response.
 """
-
 from __future__ import annotations
+
+
 
 from pydantic import RootModel
 

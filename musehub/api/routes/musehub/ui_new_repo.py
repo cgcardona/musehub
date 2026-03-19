@@ -24,7 +24,6 @@ The POST handler delegates all persistence to
 ``musehub.services.musehub_repository.create_repo``, keeping this handler
 thin per the routes-as-thin-adapters architecture rule.
 """
-from __future__ import annotations
 
 import logging
 

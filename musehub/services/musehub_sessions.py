@@ -13,7 +13,6 @@ Design notes:
   but the foreign key is not enforced at DB level — commits may arrive out of
   order relative to sessions.
 """
-from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone

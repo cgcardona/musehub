@@ -28,7 +28,6 @@ Boundary rules
 - Must NOT import StateStore, executor, MCP tools, or handlers.
 - May import ``musehub.db.musehub_models``.
 """
-from __future__ import annotations
 
 import logging
 import re

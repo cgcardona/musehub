@@ -7,7 +7,6 @@
 ``MCP_TOOLS``                    — combined list of all registered MCP tools.
 ``TOOL_CATEGORIES``              — maps tool name → category string.
 """
-from __future__ import annotations
 
 from musehub.contracts.mcp_types import MCPToolDef
 from musehub.mcp.tools.musehub import (

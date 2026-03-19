@@ -16,6 +16,7 @@ publicly discoverable without login — matching the behaviour of GitHub profile
 """
 from __future__ import annotations
 
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

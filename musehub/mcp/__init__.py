@@ -1,5 +1,4 @@
 """MCP (Model Context Protocol) tools for MuseHub."""
-from __future__ import annotations
 
 from musehub.mcp.tools import MUSEHUB_TOOLS, MUSEHUB_TOOL_NAMES
 

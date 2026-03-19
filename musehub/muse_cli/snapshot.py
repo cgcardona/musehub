@@ -6,7 +6,6 @@ because MuseHub test fixtures use them to generate deterministic IDs.
 
 TODO(musehub-extraction): remove when MuseHub is extracted.
 """
-from __future__ import annotations
 
 import hashlib
 

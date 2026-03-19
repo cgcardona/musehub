@@ -20,7 +20,6 @@ Progress flow:
   Tool calls ``await ctx.progress(token, value, total, label)``.
   This pushes a ``notifications/progress`` SSE event without blocking.
 """
-from __future__ import annotations
 
 import asyncio
 import logging

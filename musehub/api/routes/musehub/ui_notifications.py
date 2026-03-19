@@ -31,6 +31,7 @@ module exposes a ``router`` attribute.  No changes to ``__init__.py`` needed.
 """
 from __future__ import annotations
 
+
 import logging
 from datetime import datetime, timezone
 

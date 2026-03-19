@@ -19,7 +19,6 @@ Design contract
 ``AsyncSessionLocal`` is imported at module level so tests can patch it as
 ``musehub.services.musehub_mcp_executor.AsyncSessionLocal``.
 """
-from __future__ import annotations
 
 import logging
 import mimetypes

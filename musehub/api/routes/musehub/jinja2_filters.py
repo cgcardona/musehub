@@ -18,7 +18,6 @@ Route handlers import the ready-to-use instance:
 
     from musehub.api.routes.musehub._templates import templates
 """
-from __future__ import annotations
 
 from datetime import datetime, timezone
 

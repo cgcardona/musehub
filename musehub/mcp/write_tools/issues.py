@@ -1,5 +1,4 @@
 """Write executors for issue operations: create_issue, update_issue, create_issue_comment."""
-from __future__ import annotations
 
 import logging
 

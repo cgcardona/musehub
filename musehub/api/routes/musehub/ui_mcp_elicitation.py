@@ -25,7 +25,6 @@ Security:
     cross-session hijacking.
   - Only allow-listed platform slugs are accepted (no open redirects).
 """
-from __future__ import annotations
 
 import logging
 

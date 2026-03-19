@@ -19,7 +19,6 @@ Auth:
   JavaScript reads a token from ``localStorage`` only for write actions
   (e.g. "Contribute upstream").
 """
-from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone

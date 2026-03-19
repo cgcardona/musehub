@@ -5,7 +5,6 @@ Reduces DB hits on every authenticated request. Cache key is token hash;
 value is whether the token is revoked. TTL is configurable; on revoke
 we clear the cache so revocation is visible on the next request.
 """
-from __future__ import annotations
 
 import time
 

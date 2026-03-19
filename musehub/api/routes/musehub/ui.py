@@ -64,7 +64,6 @@ using a token stored in ``localStorage``.
 
 The embed route sets ``X-Frame-Options: ALLOWALL`` for cross-origin iframe use.
 """
-from __future__ import annotations
 
 import asyncio
 import logging

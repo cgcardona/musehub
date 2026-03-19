@@ -30,6 +30,7 @@ Boundary rules
 """
 from __future__ import annotations
 
+
 import hashlib
 import logging
 from typing import NamedTuple, TypedDict

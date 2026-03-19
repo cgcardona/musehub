@@ -4,7 +4,6 @@ MuseHub API
 Standalone FastAPI application for the music composition version control platform.
 GitHub for music — push commits, open pull requests, track issues, publish releases.
 """
-from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager

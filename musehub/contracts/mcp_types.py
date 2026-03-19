@@ -49,6 +49,7 @@ stdio JSON-RPC server continue to use the TypedDict variants.
 """
 from __future__ import annotations
 
+
 from typing import Literal, NotRequired, Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field

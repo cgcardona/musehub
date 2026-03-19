@@ -16,6 +16,7 @@ until the musehub_stash service module is introduced in a later batch.
 """
 from __future__ import annotations
 
+
 import logging
 import uuid
 from datetime import datetime, timezone

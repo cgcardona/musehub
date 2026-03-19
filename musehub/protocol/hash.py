@@ -8,7 +8,6 @@ Computes a SHA-256 hash of:
 The hash changes if and only if the wire contract changes.
 """
 
-from __future__ import annotations
 
 import hashlib
 import json

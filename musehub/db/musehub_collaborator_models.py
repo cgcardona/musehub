@@ -5,6 +5,7 @@ the owner. Permission levels: read | write | admin (default: write).
 """
 from __future__ import annotations
 
+
 import uuid
 from datetime import datetime, timezone
 

@@ -17,7 +17,6 @@ Priority order when a request arrives:
 2. No HTMX header, or no fragment_template provided → return full page
 """
 
-from __future__ import annotations
 
 import json
 

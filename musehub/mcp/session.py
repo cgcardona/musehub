@@ -10,7 +10,6 @@ Design: In-process only. Documented upgrade path to Redis for multi-replica
 deployments — replace the module-level ``_SESSIONS`` dict with a Redis hash
 and use ``asyncio.Event`` cross-process synchronisation.
 """
-from __future__ import annotations
 
 import asyncio
 import logging

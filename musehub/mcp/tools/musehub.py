@@ -19,7 +19,6 @@ Naming convention:
 All tools carry ``server_side: True`` so the dispatcher routes them to the
 executor layer rather than forwarding to a connected DAW.
 """
-from __future__ import annotations
 
 from musehub.contracts.mcp_types import MCPToolDef
 

@@ -20,7 +20,6 @@ Design constraints:
 
 Result type: ``PianoRollRenderResult`` — registered in docs/reference/type_contracts.md.
 """
-from __future__ import annotations
 
 import io
 import logging

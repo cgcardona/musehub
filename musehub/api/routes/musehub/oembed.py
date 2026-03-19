@@ -38,7 +38,6 @@ URL patterns accepted:
 Returns 404 for non-matching URLs so oEmbed consumers distinguish
 supported from unsupported URLs gracefully.
 """
-from __future__ import annotations
 
 import logging
 import re

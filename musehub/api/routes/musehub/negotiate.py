@@ -23,7 +23,6 @@ Design rationale:
 - JSON keys use camelCase via Pydantic ``by_alias=True``, matching the existing
   ``/api/v1/musehub/...`` convention so agents have a uniform contract.
 """
-from __future__ import annotations
 
 import logging
 from typing import Any

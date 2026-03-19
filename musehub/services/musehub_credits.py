@@ -13,7 +13,6 @@ Design decisions:
   count (most prolific first), by recency (most recently active first), and
   alphabetical (predictable scanning order).
 """
-from __future__ import annotations
 
 import logging
 from collections import defaultdict

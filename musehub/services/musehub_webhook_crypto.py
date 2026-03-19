@@ -24,7 +24,6 @@ Set MUSE_WEBHOOK_SECRET_KEY to that value in your .env or secret manager.
 Rotate keys by re-encrypting all secrets and updating the env var; Fernet tokens
 carry the key version so future decryption needs the matching key.
 """
-from __future__ import annotations
 
 import logging
 

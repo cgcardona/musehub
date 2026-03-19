@@ -16,7 +16,6 @@ had to be made in two places, creating a divergence risk.
 This service owns all of that logic. Both handlers are now thin call-through
 wrappers around ``build_track_listing()``.
 """
-from __future__ import annotations
 
 from pathlib import Path
 
