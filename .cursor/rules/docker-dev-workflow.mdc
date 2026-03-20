@@ -1,0 +1,55 @@
+---
+description: All development, testing, and QA must happen inside the Docker container — never on the host Mac.
+alwaysApply: true
+---
+
+# Docker-First Development
+
+MuseHub targets Linux (production). **Never run Python, pytest, or any app command directly on the host Mac.** Always exec into the container.
+
+## The Workflow
+
+```
+┌─ Write code (host Mac, any editor)
+│
+├─ Run / test (Docker container only)
+│   docker compose exec musehub pytest ...
+│   docker compose exec musehub alembic upgrade head
+│   docker compose exec musehub python scripts/seed_musehub.py
+│
+└─ Commit + push only after tests pass in the container
+```
+
+## Before Every Commit
+
+```bash
+# 1. Run the full relevant test suite inside the container
+docker compose exec musehub pytest tests/test_mcp_dispatcher.py \
+  tests/test_mcp_musehub.py tests/test_mcp_elicitation.py -q
+
+# 2. Confirm exit code 0, then commit
+git add -A && git commit -m "..."
+git push origin dev
+```
+
+## ❌ Never Do This
+
+```bash
+pytest tests/           # host Mac — wrong Python, missing deps
+python musehub/...      # host Mac — wrong environment
+pip install ...         # host Mac — install inside the container instead
+```
+
+## ✅ Always Do This
+
+```bash
+docker compose exec musehub pytest tests/ -q
+docker compose exec musehub pip install <pkg>   # then add to pyproject.toml
+docker compose logs musehub                     # check app logs
+```
+
+## Why
+
+- Production runs Linux; the container matches it exactly.
+- All dependencies (`slowapi`, `asyncpg`, etc.) are only installed inside the container.
+- Tests that pass on the host may fail in CI (and vice versa). Container = CI parity.
