@@ -1,31 +1,30 @@
 """Wire protocol endpoint tests.
 
-Covers the three Muse CLI transport endpoints:
-    GET  /wire/repos/{repo_id}/refs
-    POST /wire/repos/{repo_id}/push
-    POST /wire/repos/{repo_id}/fetch
+Covers the three Muse CLI transport endpoints (Git-style URLs):
+    GET  /{owner}/{slug}/refs
+    POST /{owner}/{slug}/push
+    POST /{owner}/{slug}/fetch
 
 And the content-addressed CDN endpoint:
     GET  /o/{object_id}
+
+Remote URL format (same pattern as Git):
+    muse remote add origin https://musehub.ai/cgcardona/muse
 """
 from __future__ import annotations
 
 import base64
-import json
+import os
 import uuid
 from datetime import datetime, timezone
 
-import os
-import tempfile
-
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.auth.tokens import create_access_token
 from musehub.db import musehub_models as db
-from tests.factories import create_repo as factory_create_repo, create_branch as factory_create_branch
+from tests.factories import create_repo as factory_create_repo
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -95,8 +94,8 @@ def wire_headers(auth_wire_token: str) -> dict[str, str]:
 # ── refs endpoint ──────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_refs_returns_404_for_unknown_repo(client: AsyncClient) -> None:
-    resp = await client.get("/wire/repos/nonexistent-repo-id/refs")
+async def test_refs_returns_404_for_unknown_owner_slug(client: AsyncClient) -> None:
+    resp = await client.get("/no-such-owner/no-such-slug/refs")
     assert resp.status_code == 404
 
 
@@ -114,7 +113,9 @@ async def test_refs_returns_branch_heads(
     db_session.add(branch)
     await db_session.commit()
 
-    resp = await client.get(f"/wire/repos/{repo.repo_id}/refs")
+    owner = repo.owner
+    slug = repo.slug
+    resp = await client.get(f"/{owner}/{slug}/refs")
     assert resp.status_code == 200
     data = resp.json()
     assert data["repo_id"] == repo.repo_id
@@ -124,12 +125,28 @@ async def test_refs_returns_branch_heads(
 
 
 @pytest.mark.asyncio
+async def test_refs_url_is_owner_slash_slug(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """Confirm the remote URL pattern matches Git: /{owner}/{slug}/refs — no /wire/ prefix."""
+    repo = await factory_create_repo(db_session, slug="git-style-test")
+    owner, slug = repo.owner, repo.slug
+
+    resp = await client.get(f"/{owner}/{slug}/refs")
+    assert resp.status_code == 200
+    # Should NOT need /wire/ in the path
+    resp_wire = await client.get(f"/wire/repos/{repo.repo_id}/refs")
+    assert resp_wire.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_refs_empty_repo_has_empty_branch_heads(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
     repo = await factory_create_repo(db_session, slug="empty-test")
-    resp = await client.get(f"/wire/repos/{repo.repo_id}/refs")
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/refs")
     assert resp.status_code == 200
     data = resp.json()
     assert data["branch_heads"] == {}
@@ -141,7 +158,7 @@ async def test_refs_empty_repo_has_empty_branch_heads(
 async def test_push_requires_auth(client: AsyncClient, db_session: AsyncSession) -> None:
     repo = await factory_create_repo(db_session, slug="push-auth-test")
     resp = await client.post(
-        f"/wire/repos/{repo.repo_id}/push",
+        f"/{repo.owner}/{repo.slug}/push",
         json={"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"},
     )
     assert resp.status_code in (401, 403)
@@ -153,11 +170,11 @@ async def test_push_404_for_unknown_repo(
     wire_headers: dict,
 ) -> None:
     resp = await client.post(
-        "/wire/repos/does-not-exist/push",
+        "/nobody/no-such-repo/push",
         json={"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"},
         headers=wire_headers,
     )
-    assert resp.status_code == 422  # wire service returns ok=False → 422
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -185,7 +202,7 @@ async def test_push_ingests_commit_and_branch(
         "force": False,
     }
     resp = await client.post(
-        f"/wire/repos/{repo.repo_id}/push",
+        f"/{repo.owner}/{repo.slug}/push",
         json=payload,
         headers=wire_headers,
     )
@@ -209,10 +226,10 @@ async def test_push_is_idempotent(
         "bundle": {"commits": [commit], "snapshots": [], "objects": []},
         "branch": "main",
     }
-
-    resp1 = await client.post(f"/wire/repos/{repo.repo_id}/push", json=payload, headers=wire_headers)
+    url = f"/{repo.owner}/{repo.slug}/push"
+    resp1 = await client.post(url, json=payload, headers=wire_headers)
     assert resp1.status_code == 200
-    resp2 = await client.post(f"/wire/repos/{repo.repo_id}/push", json=payload, headers=wire_headers)
+    resp2 = await client.post(url, json=payload, headers=wire_headers)
     assert resp2.status_code == 200
 
 
@@ -232,14 +249,14 @@ async def test_push_non_fast_forward_rejected(
     db_session.add(branch)
     await db_session.commit()
 
-    # Push a commit that does NOT have existing_commit_id as parent
+    # Push a commit without existing_commit_id as parent
     new_commit = _make_commit(repo.repo_id, parent=None)
     payload = {
         "bundle": {"commits": [new_commit], "snapshots": [], "objects": []},
         "branch": "main",
         "force": False,
     }
-    resp = await client.post(f"/wire/repos/{repo.repo_id}/push", json=payload, headers=wire_headers)
+    resp = await client.post(f"/{repo.owner}/{repo.slug}/push", json=payload, headers=wire_headers)
     assert resp.status_code == 422
     assert "non-fast-forward" in resp.json()["detail"]
 
@@ -266,7 +283,7 @@ async def test_push_force_overwrites_branch(
         "branch": "main",
         "force": True,
     }
-    resp = await client.post(f"/wire/repos/{repo.repo_id}/push", json=payload, headers=wire_headers)
+    resp = await client.post(f"/{repo.owner}/{repo.slug}/push", json=payload, headers=wire_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["ok"] is True
@@ -278,7 +295,7 @@ async def test_push_force_overwrites_branch(
 @pytest.mark.asyncio
 async def test_fetch_404_for_unknown_repo(client: AsyncClient) -> None:
     resp = await client.post(
-        "/wire/repos/no-such-repo/fetch",
+        "/nobody/no-such-repo/fetch",
         json={"want": [], "have": []},
     )
     assert resp.status_code == 404
@@ -290,9 +307,8 @@ async def test_fetch_empty_want_returns_empty_bundle(
     db_session: AsyncSession,
 ) -> None:
     repo = await factory_create_repo(db_session, slug="fetch-empty-test")
-
     resp = await client.post(
-        f"/wire/repos/{repo.repo_id}/fetch",
+        f"/{repo.owner}/{repo.slug}/fetch",
         json={"want": [], "have": []},
     )
     assert resp.status_code == 200
@@ -307,7 +323,6 @@ async def test_fetch_returns_missing_commits(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """After a push, fetch should return the pushed commits when wanted."""
     repo = await factory_create_repo(db_session, slug="fetch-commits-test")
     commit_id = uuid.uuid4().hex
     commit_row = db.MusehubCommit(
@@ -331,7 +346,7 @@ async def test_fetch_returns_missing_commits(
     await db_session.commit()
 
     resp = await client.post(
-        f"/wire/repos/{repo.repo_id}/fetch",
+        f"/{repo.owner}/{repo.slug}/fetch",
         json={"want": [commit_id], "have": []},
     )
     assert resp.status_code == 200
@@ -349,9 +364,11 @@ async def test_object_cdn_returns_404_for_missing(client: AsyncClient) -> None:
     assert resp.status_code == 404
 
 
+# ── unit tests ─────────────────────────────────────────────────────────────────
+
 @pytest.mark.asyncio
 async def test_wire_models_parse_correctly() -> None:
-    """Unit test: WireBundle Pydantic parsing from dict mirrors Muse CLI format."""
+    """WireBundle Pydantic parsing mirrors Muse CLI format."""
     from musehub.models.wire import WireBundle, WirePushRequest
 
     commit_dict = {
@@ -381,7 +398,29 @@ async def test_topological_sort_orders_parents_first() -> None:
 
     c1 = WireCommit(commit_id="parent", message="parent")
     c2 = WireCommit(commit_id="child", message="child", parent_commit_id="parent")
-    # Pass in reverse order
     sorted_ = _topological_sort([c2, c1])
     ids = [c.commit_id for c in sorted_]
     assert ids.index("parent") < ids.index("child")
+
+
+@pytest.mark.asyncio
+async def test_remote_url_format_matches_git_pattern(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    """The remote URL is /{owner}/{slug} — no /wire/ prefix, no UUID.
+
+    This mirrors Git:
+        git remote add origin https://github.com/owner/repo
+    versus UUID-based alternatives like:
+        muse remote add origin https://musehub.ai/wire/repos/550e8400-.../
+    """
+    repo = await factory_create_repo(db_session, slug="url-format-test")
+
+    # /{owner}/{slug}/refs must work
+    resp = await client.get(f"/{repo.owner}/{repo.slug}/refs")
+    assert resp.status_code == 200
+
+    # The response confirms which repo was resolved — no UUID needed in the URL
+    data = resp.json()
+    assert data["repo_id"] == repo.repo_id
