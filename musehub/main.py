@@ -52,6 +52,10 @@ from musehub.api.routes import musehub as musehub_router_pkg
 from musehub.api.routes.mcp import router as mcp_router
 from musehub.api.routes.musehub.ui_view import view_router as musehub_ui_view_router
 from musehub.api.routes.musehub.ui_view import redirect_router as musehub_ui_redirect_router
+from musehub.api.routes.wire import router as wire_router
+from musehub.api.routes.api.repos import router as api_repos_router
+from musehub.api.routes.api.identities import router as api_identities_router
+from musehub.api.routes.api.search import router as api_search_router
 from musehub.db import init_db, close_db
 
 
@@ -201,6 +205,16 @@ app.mount(
     StaticFiles(directory=str(_STATIC_DIR)),
     name="static",
 )
+
+# Wire protocol — /wire/repos/{repo_id}/refs|push|fetch
+# Must come before /{owner}/{repo_slug} wildcard.
+app.include_router(wire_router)
+
+# Clean REST API — /api/repos, /api/identities, /api/search
+# Registered before /api/v1 so the concrete prefix is matched first.
+app.include_router(api_repos_router)
+app.include_router(api_identities_router)
+app.include_router(api_search_router)
 
 # Fixed-prefix subrouters registered BEFORE the main musehub router
 # so their concrete paths are matched first, not shadowed by /{owner}/{repo_slug}.
