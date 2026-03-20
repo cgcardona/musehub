@@ -7,10 +7,10 @@ capability. When running without a session they degrade gracefully.
 
 Tools in this module:
 
-  musehub_compose_with_preferences
+  musehub_create_with_preferences  (formerly musehub_compose_with_preferences)
     Form-mode: collects key, tempo, mood, genre, then generates a full
     composition plan (chord progressions, structure, tempo map) as a Muse
-    project scaffold.
+    project scaffold. Currently implements the MIDI domain workflow.
 
   musehub_review_pr_interactive
     Form-mode: collects dimension focus and review depth before running a
@@ -80,9 +80,9 @@ async def execute_compose_with_preferences(
             ok=False,
             error_code="elicitation_unavailable",
             error_message=(
-                "musehub_compose_with_preferences requires an active session "
+                "musehub_create_with_preferences requires an active session "
                 "(Mcp-Session-Id header) and a client with elicitation capability. "
-                "Use musehub_create_repo with explicit key/tempo arguments instead."
+                "Use musehub_create_repo with explicit arguments instead."
             ),
         )
 

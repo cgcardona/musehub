@@ -61,7 +61,7 @@ a {
 }
 
 a:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 /* -------------------------------------------------------------------------
@@ -231,11 +231,11 @@ h3 {
  * Cards
  * ------------------------------------------------------------------------- */
 .card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-base);
-  padding: var(--space-4);
-  margin-bottom: var(--space-4);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .artifact-card {
@@ -270,19 +270,18 @@ h3 {
 .repo-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--space-3);
+  gap: 12px;
 }
 
 .repo-card {
   position: relative;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-top: 3px solid var(--color-accent);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
   cursor: pointer;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
-              transform var(--transition-fast);
+  transition: border-color 0.15s, border-left-color 0.15s, background 0.15s;
   text-decoration: none;
   display: flex;
   flex-direction: column;
@@ -290,8 +289,9 @@ h3 {
   color: inherit;
 
   &:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
+    border-color: var(--border-default);
+    border-left-color: var(--color-accent);
+    background: rgba(255,255,255,0.02);
     text-decoration: none;
     color: inherit;
   }
@@ -1086,7 +1086,7 @@ pre code {
 }
 
 .commit-msg a { color: var(--text-primary); }
-.commit-msg a:hover { color: var(--color-accent); }
+.commit-msg a:hover { color: var(--color-accent); text-decoration: none; }
 
 .commit-meta {
   font-size: var(--font-size-xs);
@@ -1391,12 +1391,7 @@ pre code {
   color: var(--color-accent, #58a6ff);
 }
 
-/* ── HTMX loading indicator ────────────────────────────────────────────────
-   The #htmx-loading bar (defined in base.html) becomes visible whenever an
-   HTMX request is in-flight. HTMX adds .htmx-request to <body> during the
-   request and removes it on completion. */
-.htmx-request #htmx-loading { display: block !important; }
-.htmx-request.htmx-indicator { display: block !important; }
+/* ── HTMX loading indicator — managed in _tokens.scss ──────────────────── */
 
 /* =========================================================================
  * Muse protocol design language components
@@ -1670,11 +1665,17 @@ pre code {
   cursor: pointer;
 }
 .sort-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
-.sort-btn.sort-active,
-.sort-active {
-  background: var(--color-accent) !important;
-  color: #fff !important;
-  border-color: var(--color-accent) !important;
+.sort-btn.sort-active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+// Standalone .sort-active (not on a .sort-btn) scoped to known containers
+.sort-controls .sort-active,
+.filter-bar .sort-active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
 }
 
 /* ── HTMX indicator (new_repo, settings) ────────────────────────────────── */
@@ -1730,7 +1731,8 @@ pre code {
   flex-direction: column;
   gap: var(--space-3);
 }
-.comment-reply { margin-bottom: 0 !important; }
+// Inside .comment-replies the gap handles spacing; kill any inherited margin.
+.comment-replies .comment-reply { margin-bottom: 0; }
 .reply-form { margin-top: var(--space-2); }
 .comment-textarea { width: 100%; font-family: var(--font-sans); font-size: var(--font-size-sm); }
 .comment-form-actions { display: flex; gap: var(--space-2); margin-top: var(--space-1); }

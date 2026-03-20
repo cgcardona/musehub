@@ -1,6 +1,6 @@
 {% extends "musehub/base.html" %}
 
-{% block title %}{{ short_id }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block title %}{{ commit_type ~ ': ' if commit_type else '' }}{{ short_id }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
   <a href="/{{ owner }}">{{ owner }}</a> /
@@ -11,234 +11,502 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "commit-detail"}{% endblock %}
+{% block page_json %}{"page": "commit-detail", "repoId": {{ repo_id | tojson }}, "commitId": {{ commit_id | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "baseUrl": {{ base_url | tojson }}, "audioUrl": {{ audio_url | tojson }}, "viewerType": {{ (domain.viewer_type if domain else 'generic') | tojson }}, "structuredDelta": {{ structured_delta | tojson if structured_delta else 'null' }}, "snapshotDiff": {{ snapshot_diff | tojson if snapshot_diff else 'null' }}, "provenance": {{ provenance | tojson }}, "commitType": {{ commit_type | tojson }}, "isBreaking": {{ is_breaking | tojson }}}{% endblock %}
 
-{% block page_data %}
-window.__commitCfg = {
-  repoId:    {{ repo_id | tojson }},
-  commitId:  {{ commit_id | tojson }},
-  shortId:   {{ short_id | tojson }},
-  base:      {{ base_url | tojson }},
-  audioUrl:  {{ audio_url | tojson }},
-  viewerType: {{ (domain.viewer_type if domain else 'generic') | tojson }},
-};
-{% endblock %}
+{# ── Helpers ─────────────────────────────────────────────────────────────── #}
+{% macro semver_badge(bump, breaking) %}
+{% if breaking %}<span class="cd3-sv cd3-sv-breaking">BREAKING</span>
+{% elif bump == 'major' %}<span class="cd3-sv cd3-sv-major">major</span>
+{% elif bump == 'minor' %}<span class="cd3-sv cd3-sv-minor">minor</span>
+{% elif bump == 'patch' %}<span class="cd3-sv cd3-sv-patch">patch</span>
+{% endif %}
+{% endmacro %}
+
+{% macro type_badge(t) %}
+{% if t %}<span class="cd3-type cd3-ct-{{ t }}">{{ t }}</span>{% endif %}
+{% endmacro %}
+
+{% macro op_dot(op) %}
+{% if op == 'insert' %}<span class="cd3-op-dot cd3-op-add">+</span>
+{% elif op == 'delete' %}<span class="cd3-op-dot cd3-op-del">−</span>
+{% elif op in ('replace', 'patch') %}<span class="cd3-op-dot cd3-op-mod">~</span>
+{% else %}<span class="cd3-op-dot cd3-op-unk">·</span>
+{% endif %}
+{% endmacro %}
+
+{% macro kind_chip(summary) %}
+{% set s = summary | lower %}
+{% if 'class' in s %}<span class="cd3-kind cd3-k-class">class</span>
+{% elif 'method' in s %}<span class="cd3-kind cd3-k-method">method</span>
+{% elif 'function' in s or 'func' in s %}<span class="cd3-kind cd3-k-func">func</span>
+{% elif 'variable' in s or 'constant' in s %}<span class="cd3-kind cd3-k-var">var</span>
+{% elif 'import' in s %}<span class="cd3-kind cd3-k-import">import</span>
+{% endif %}
+{% endmacro %}
 
 {% block content %}
-<div class="content-wide" style="padding-top: var(--space-4)">
+<div class="cd3-layout">
 
-  {# ── Commit Header ────────────────────────────────────────────────────── #}
-  <div class="cd-header">
+  {# ══════════════════════════════════════════ Main column ════════════════ #}
+  <main class="cd3-main">
 
-    {# Top bar: chips + action buttons #}
-    <div class="cd-header-top">
-      <div class="cd-header-chips">
+    {# ── Commit header ─────────────────────────────────────────────────── #}
+    <div class="cd3-header {% if is_breaking %}cd3-breaking-border{% endif %}">
 
-        {# Render/audio status — only shown for MIDI domain #}
-        {%- if domain and domain.viewer_type == 'piano_roll' %}
-        {%- if render_status == "ready" %}
-        <span class="cd-render-badge ready">🎧 Audio ready</span>
-        {%- else %}
-        <span class="cd-render-badge none">No audio</span>
-        {%- endif %}
-        {%- endif %}
+      <div class="cd3-header-top">
+        <div class="cd3-badges">
+          {{ type_badge(commit_type) }}
+          {{ semver_badge(provenance.sem_ver_bump, is_breaking) }}
+          {% if commit_scope %}<span class="cd3-scope">{{ commit_scope }}</span>{% endif %}
+          <span class="cd3-branch-pill">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            {{ commit.branch or "main" }}
+          </span>
+          {% if branch_position %}<span class="cd3-pos-pill">#{{ branch_position }} / {{ branch_commit_count }}</span>{% endif %}
+        </div>
+        <div class="cd3-header-actions">
+          <a href="{{ base_url }}/commits/{{ commit.commit_id }}/diff" class="btn btn-secondary btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Diff
+          </a>
+          {% if audio_url %}
+          <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-listen btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Play
+          </a>
+          {% endif %}
+        </div>
+      </div>
 
-        {# Branch #}
-        <span class="cd-branch-pill">⑂ {{ commit.branch or "—" }}</span>
+      <h1 class="cd3-subject">{{ commit_subject }}</h1>
 
-        {# SHA with copy #}
-        <span class="cd-sha-chip" id="cd-sha-chip" title="{{ commit_id }}">
+      {% if commit_body %}
+      <div class="cd3-body">
+        {% for para in commit_body.split('\n\n') %}
+        <p>{{ para | replace('\n', ' ') | trim }}</p>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="cd3-meta-row">
+        {% if provenance.is_agent %}
+        <span class="cd3-avatar cd3-av-agent" title="Agent commit">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+        </span>
+        {% elif commit.author %}
+        <span class="cd3-avatar cd3-av-human">{{ commit.author[0] | upper }}</span>
+        {% else %}
+        <span class="cd3-avatar cd3-av-unk">?</span>
+        {% endif %}
+
+        {% if commit.author %}<a href="/{{ commit.author }}" class="cd3-author">{{ commit.author }}</a>{% else %}<span class="cd3-author cd3-muted">unknown</span>{% endif %}
+        <span class="cd3-sep">·</span>
+        <span class="cd3-time">{{ commit.timestamp | fmtrelative }}</span>
+        <span class="cd3-date">{{ commit.timestamp | fmtdate }}</span>
+        <span class="cd3-sep">·</span>
+        <span class="cd3-sha" id="cd3-sha" title="{{ commit_id }}">
           {{ short_id }}
-          <button class="cd-copy-btn" data-sha="{{ commit_id }}" title="Copy full SHA">⎘</button>
+          <button class="cd3-copy-btn" onclick="navigator.clipboard.writeText('{{ commit_id }}')" title="Copy SHA">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
         </span>
-
-        {# Branch position #}
-        {%- if branch_position %}
-        <span style="font-size:var(--font-size-xs);color:var(--text-muted)">
-          #{{ branch_position }} of {{ branch_commit_count }} on this branch
-        </span>
-        {%- endif %}
-
+        {% if commit.parent_ids %}
+        <span class="cd3-sep">·</span>
+        <span class="cd3-muted" style="font-size:11px">parent</span>
+        {% for p in commit.parent_ids %}
+        <a href="{{ base_url }}/commits/{{ p }}" class="cd3-parent-chip">{{ p[:8] }}</a>
+        {% endfor %}
+        {% endif %}
       </div>
 
-      <div class="cd-actions">
-        <a href="{{ base_url }}/commits/{{ commit.commit_id }}/diff"
-           class="btn btn-secondary btn-sm">⊕ Diff</a>
-        {%- if domain and domain.viewer_type == 'piano_roll' and audio_url %}
-        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-secondary btn-sm">🎧 Play ↗</a>
-        {%- elif domain and domain.viewer_type == 'symbol_graph' %}
-        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-secondary btn-sm">⬡ Graph ↗</a>
-        {%- else %}
-        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-ghost btn-sm">⊞ View ↗</a>
-        {%- endif %}
+    </div>
+
+    {# ── Dimension strip ────────────────────────────────────────────────── #}
+    {# The unique value of Muse: semantic metrics Git cannot produce. #}
+    {% if dims.sym_total > 0 or dims.files_changed > 0 %}
+    <div class="cd3-dims">
+      {% if dims.sym_added > 0 %}
+      <div class="cd3-dim-card cd3-dim-add">
+        <div class="cd3-dim-num">+{{ dims.sym_added }}</div>
+        <div class="cd3-dim-label">symbol{{ 's' if dims.sym_added != 1 else '' }} added</div>
       </div>
-    </div>
-
-    {# Commit message #}
-    <div class="cd-header-body">
-      <h1 class="cd-title">{{ commit.message }}</h1>
-
-      {# Author · date · parent SHA(s) #}
-      <div class="cd-header-meta">
-        <a href="/{{ commit.author }}" class="cd-author-link">
-          <span class="cd-author-avatar">{{ commit.author[0] | upper if commit.author else '?' }}</span>
-          {{ commit.author or "unknown" }}
-        </a>
-        <span class="cd-meta-sep">·</span>
-        <span>{{ commit.timestamp | fmtrelative }}</span>
-        <span style="color:var(--text-muted)">{{ commit.timestamp | fmtdate }}</span>
-
-        {%- if commit.parent_ids %}
-        <span class="cd-meta-sep">·</span>
-        <span style="font-size:var(--font-size-xs);color:var(--text-muted)">Parent:</span>
-        {%- for p in commit.parent_ids %}
-        <a href="{{ base_url }}/commits/{{ p }}" class="cd-parent-link">{{ p[:8] }}</a>
-        {%- if not loop.last %}<span>,</span>{%- endif %}
-        {%- endfor %}
-        {%- endif %}
+      {% endif %}
+      {% if dims.sym_modified > 0 %}
+      <div class="cd3-dim-card cd3-dim-mod">
+        <div class="cd3-dim-num">~{{ dims.sym_modified }}</div>
+        <div class="cd3-dim-label">symbol{{ 's' if dims.sym_modified != 1 else '' }} modified</div>
       </div>
-    </div>
-
-    {# Branch position track #}
-    {%- if branch_position and branch_commit_count %}
-    {%- set pos_pct = ((branch_commit_count - branch_position + 1) / branch_commit_count * 100) | round(1) %}
-    <div class="cd-branch-pos">
-      <span>Newest</span>
-      <div class="cd-pos-track">
-        <div class="cd-pos-fill" style="width: {{ pos_pct }}%"></div>
+      {% endif %}
+      {% if dims.sym_removed > 0 %}
+      <div class="cd3-dim-card cd3-dim-del">
+        <div class="cd3-dim-num">−{{ dims.sym_removed }}</div>
+        <div class="cd3-dim-label">symbol{{ 's' if dims.sym_removed != 1 else '' }} removed</div>
       </div>
-      <span>Oldest</span>
-      <span style="margin-left: var(--space-2)">{{ pos_pct }}% from newest</span>
+      {% endif %}
+      {% if dims.files_changed > 0 %}
+      <div class="cd3-dim-card cd3-dim-files">
+        <div class="cd3-dim-num">{{ dims.files_changed }}</div>
+        <div class="cd3-dim-label">file{{ 's' if dims.files_changed != 1 else '' }} changed</div>
+      </div>
+      {% endif %}
+      {% if dims.total_files > 0 %}
+      <div class="cd3-dim-card cd3-dim-snap">
+        <div class="cd3-dim-num">{{ dims.total_files }}</div>
+        <div class="cd3-dim-label">files in snapshot</div>
+      </div>
+      {% endif %}
+      {% if dims.dead_code_removed > 0 %}
+      <div class="cd3-dim-card cd3-dim-dead">
+        <div class="cd3-dim-num">−{{ dims.dead_code_removed }}</div>
+        <div class="cd3-dim-label">dead symbol{{ 's' if dims.dead_code_removed != 1 else '' }} removed</div>
+      </div>
+      {% elif dims.sym_total > 0 %}
+      <div class="cd3-dim-card cd3-dim-clean">
+        <div class="cd3-dim-num">0</div>
+        <div class="cd3-dim-label">dead code introduced</div>
+      </div>
+      {% endif %}
+      {% if dims.test_runs > 0 %}
+      <div class="cd3-dim-card cd3-dim-test">
+        <div class="cd3-dim-num">{{ dims.test_runs }}</div>
+        <div class="cd3-dim-label">test run{{ 's' if dims.test_runs != 1 else '' }}</div>
+      </div>
+      {% endif %}
     </div>
-    {%- endif %}
+    {% endif %}
 
-  </div>{# /cd-header #}
-
-  {# ── Domain State Changes ─────────────────────────────────────────────── #}
-  {%- if dimensions %}
-  <div class="cd-dim-panel">
-    <div class="cd-dim-header">
-      {%- if domain and domain.viewer_type == 'piano_roll' %}
-      <span>🎵</span>
-      <h2 class="cd-dim-title">Musical Changes</h2>
-      {%- elif domain and domain.viewer_type == 'symbol_graph' %}
-      <span>⬡</span>
-      <h2 class="cd-dim-title">Symbol Changes</h2>
-      {%- else %}
-      <span>◈</span>
-      <h2 class="cd-dim-title">State Changes</h2>
-      {%- endif %}
-      <span class="cd-overall-badge">
-        {%- set overall_pct = (overall_change * 100) | round(0) | int %}
-        Overall: {{ overall_pct }}%
-        {%- if commit.parent_ids %} vs parent{%- else %} (root commit){%- endif %}
-      </span>
-    </div>
-    <div class="cd-dim-body">
-      {%- for dim in dimensions %}
-      {%- set pct = (dim.score * 100) | round(0) | int %}
-      <div class="cd-dim-row" data-target="{{ pct }}" data-level="{{ dim.label }}">
-        <span class="cd-dim-icon">◈</span>
-        <span class="cd-dim-name">{{ dim.dimension | replace('_', ' ') | title }}</span>
-        <div class="cd-dim-track">
-          <div class="cd-dim-fill level-{{ dim.label }}" style="width: {{ pct }}%"></div>
+    {# ── Semantic Changes: file → class hierarchy ───────────────────────── #}
+    {# This is what Git cannot show: structured, semantic change cards. #}
+    {% if structured_delta and structured_delta.ops %}
+    <div class="cd3-section">
+      <div class="cd3-section-hd">
+        <div class="cd3-section-title-row">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-accent)"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span class="cd3-section-title">Semantic Changes</span>
+          <span class="cd3-section-pill">{{ structured_delta.domain or 'code' }}</span>
+          {% if dims.sym_total %}<span class="cd3-section-pill cd3-pill-count">{{ dims.sym_total }} symbol{{ 's' if dims.sym_total != 1 else '' }}</span>{% endif %}
         </div>
-        <span class="cd-dim-pct">{{ pct }}%</span>
-        <span class="cd-dim-level level-{{ dim.label }}">{{ dim.label }}</span>
       </div>
-      {%- endfor %}
-    </div>
-  </div>
-  {%- endif %}
 
-  {# ── Audio Preview — MIDI domain only ─────────────────────────────────── #}
-  {%- if audio_url and domain and domain.viewer_type == 'piano_roll' %}
-  <div class="cd-audio-panel" id="cd-audio-section">
-    <div class="cd-audio-header">
-      <span>🎧</span>
-      <h2 class="cd-dim-title" style="margin:0">Audio Preview</h2>
-      <div class="cd-audio-actions">
-        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-ghost btn-sm" target="_blank">Open player ↗</a>
+      {% for file_op in structured_delta.ops %}
+      {% set ext = file_op.address.rsplit('.', 1)[-1].lower() if '.' in file_op.address.split('/')[-1] else '' %}
+      <div class="cd3-file-card cd3-file-{{ file_op.op }}">
+        {# File header row #}
+        <div class="cd3-file-hd">
+          {{ op_dot(file_op.op) }}
+          <a href="{{ base_url }}/blob/{{ short_id }}/{{ file_op.address }}" class="cd3-file-path">{{ file_op.address }}</a>
+          {% if ext %}<span class="cd3-ext">.{{ ext }}</span>{% endif %}
+          {% if file_op.child_summary %}<span class="cd3-file-summary">{{ file_op.child_summary }}</span>{% endif %}
+        </div>
+
+        {# Symbol hierarchy: group by "parent" (everything before the first dot after ::) #}
+        {% if file_op.child_ops %}
+        {% set ns = namespace(last_parent='') %}
+        <div class="cd3-sym-tree">
+          {% for sym in file_op.child_ops %}
+          {% set addr = sym.address.split('::')[-1] if '::' in sym.address else sym.address %}
+          {% set is_child = '.' in addr %}
+          {% set parent = addr.split('.')[0] if is_child else '' %}
+
+          {% if not is_child %}
+          {# Top-level symbol: class, function, or standalone #}
+          <div class="cd3-sym-row cd3-sym-top cd3-sym-{{ sym.op }}">
+            {{ op_dot(sym.op) }}
+            <span class="cd3-sym-name">{{ addr }}</span>
+            {{ kind_chip(sym.content_summary or '') }}
+            {% if sym.content_summary %}
+            <span class="cd3-sym-desc">{{ sym.content_summary | replace('added ', '') | replace('modified ', '') | replace('removed ', '') }}</span>
+            {% endif %}
+          </div>
+          {% set ns.last_parent = addr %}
+          {% else %}
+          {# Child symbol: method/property under a class #}
+          <div class="cd3-sym-row cd3-sym-child cd3-sym-{{ sym.op }}">
+            <span class="cd3-sym-indent">
+              <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1v7h8"/></svg>
+            </span>
+            {{ op_dot(sym.op) }}
+            <span class="cd3-sym-name cd3-sym-child-name">{{ addr.split('.')[-1] }}</span>
+            {{ kind_chip(sym.content_summary or '') }}
+            {% if sym.content_summary %}
+            <span class="cd3-sym-desc">{{ sym.content_summary | replace('added ', '') | replace('modified ', '') | replace('removed ', '') }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Files Changed (compact) ────────────────────────────────────────── #}
+    {% set n_added = snapshot_diff.added | length %}
+    {% set n_modified = snapshot_diff.modified | length %}
+    {% set n_removed = snapshot_diff.removed | length %}
+    {% set n_changed = n_added + n_modified + n_removed %}
+    {% if n_changed > 0 %}
+    <div class="cd3-section">
+      <div class="cd3-section-hd">
+        <div class="cd3-section-title-row">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-success)"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          <span class="cd3-section-title">Files Changed</span>
+          <span class="cd3-section-pill">{{ snapshot_diff.total_files }} in snapshot</span>
+        </div>
+        <div class="cd3-tally">
+          {% if n_added %}<span class="cd3-tally-add">+{{ n_added }}</span>{% endif %}
+          {% if n_modified %}<span class="cd3-tally-mod">~{{ n_modified }}</span>{% endif %}
+          {% if n_removed %}<span class="cd3-tally-del">−{{ n_removed }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="cd3-file-list">
+        {% for path in snapshot_diff.added %}
+        <div class="cd3-fl-row cd3-fl-add">
+          <span class="cd3-fl-dot">+</span>
+          <a href="{{ base_url }}/blob/{{ short_id }}/{{ path }}" class="cd3-fl-path">{{ path }}</a>
+          {% set fext = path.rsplit('.', 1)[-1].lower() if '.' in path.split('/')[-1] else '' %}
+          {% if fext %}<span class="cd3-ext">.{{ fext }}</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% for path in snapshot_diff.modified %}
+        <div class="cd3-fl-row cd3-fl-mod">
+          <span class="cd3-fl-dot">~</span>
+          <a href="{{ base_url }}/blob/{{ short_id }}/{{ path }}" class="cd3-fl-path">{{ path }}</a>
+          {% set fext = path.rsplit('.', 1)[-1].lower() if '.' in path.split('/')[-1] else '' %}
+          {% if fext %}<span class="cd3-ext">.{{ fext }}</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% for path in snapshot_diff.removed %}
+        <div class="cd3-fl-row cd3-fl-del">
+          <span class="cd3-fl-dot">−</span>
+          <span class="cd3-fl-path cd3-fl-gone">{{ path }}</span>
+          {% set fext = path.rsplit('.', 1)[-1].lower() if '.' in path.split('/')[-1] else '' %}
+          {% if fext %}<span class="cd3-ext">.{{ fext }}</span>{% endif %}
+        </div>
+        {% endfor %}
       </div>
     </div>
-    <div class="cd-audio-body">
-      <div class="cd-waveform" id="cd-waveform" data-audio-url="{{ audio_url }}">
-        <span>🎵 Loading waveform…</span>
+    {% endif %}
+
+    {# ── Audio Preview (MIDI domain) ───────────────────────────────────── #}
+    {% if audio_url and domain and domain.viewer_type == 'piano_roll' %}
+    <div class="cd3-section">
+      <div class="cd3-section-hd">
+        <div class="cd3-section-title-row">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--color-accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span class="cd3-section-title">Audio Preview</span>
+        </div>
+        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-ghost btn-sm" style="font-size:11px">Open player ↗</a>
       </div>
-      <div class="cd-audio-controls">
-        <button class="cd-play-btn" id="cd-play-btn" type="button" title="Play / Pause">▶</button>
-        <span class="cd-time" id="cd-time">0:00</span>
-        <span style="font-size:var(--font-size-xs);color:var(--text-muted);margin-left:var(--space-2)">
-          Snapshot: <code style="font-family:var(--font-mono)">{{ commit.snapshot_id[:8] if commit.snapshot_id else '—' }}</code>
+      <div class="cd3-audio-wrap">
+        <div class="cd3-waveform" id="cd-waveform" data-audio-url="{{ audio_url }}">
+          <span style="color:var(--text-muted);font-size:12px">Loading waveform…</span>
+        </div>
+        <div class="cd3-audio-ctrl">
+          <button class="cd3-play-btn" id="cd-play-btn" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+          <span class="cd3-time" id="cd-time">0:00</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Commit navigation ─────────────────────────────────────────────── #}
+    <div class="cd3-nav">
+      {% if older_commit %}
+      <a href="{{ base_url }}/commits/{{ older_commit.commit_id }}" class="cd3-nav-card cd3-nav-older">
+        <span class="cd3-nav-dir">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Older
+        </span>
+        <span class="cd3-nav-msg">{{ (older_commit.message.split('\n')[0] if '\n' in older_commit.message else older_commit.message) | truncate(65, True, '…') }}</span>
+        <span class="cd3-nav-sha">{{ older_commit.commit_id[:8] }}</span>
+      </a>
+      {% else %}
+      <div class="cd3-nav-card cd3-nav-disabled">
+        <span class="cd3-nav-dir">← Older</span>
+        <span class="cd3-nav-msg cd3-muted">Oldest on {{ commit.branch }}</span>
+      </div>
+      {% endif %}
+
+      <a href="{{ base_url }}/commits" class="cd3-nav-all">All commits</a>
+
+      {% if newer_commit %}
+      <a href="{{ base_url }}/commits/{{ newer_commit.commit_id }}" class="cd3-nav-card cd3-nav-newer">
+        <span class="cd3-nav-dir">
+          Newer
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </span>
+        <span class="cd3-nav-msg">{{ (newer_commit.message.split('\n')[0] if '\n' in newer_commit.message else newer_commit.message) | truncate(65, True, '…') }}</span>
+        <span class="cd3-nav-sha">{{ newer_commit.commit_id[:8] }}</span>
+      </a>
+      {% else %}
+      <div class="cd3-nav-card cd3-nav-disabled" style="text-align:right">
+        <span class="cd3-nav-dir">Newer →</span>
+        <span class="cd3-nav-msg cd3-muted">Latest on {{ commit.branch }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+
+  </main>
+
+  {# ══════════════════════════════════════════ Sidebar ════════════════════ #}
+  <aside class="cd3-sidebar">
+
+    {# ── Provenance ────────────────────────────────────────────────────── #}
+    <div class="card cd3-side-card">
+      <div class="cd3-side-hd">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <h3 class="cd3-side-title">Provenance</h3>
+      </div>
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Author</span>
+        <span class="cd3-prov-val">
+          {% if provenance.is_agent %}
+          <span class="cd3-id-agent">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+            Agent
+          </span>
+          {% else %}
+          <span class="cd3-id-human">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            {{ commit.author or 'Human' }}
+          </span>
+          {% endif %}
         </span>
       </div>
+      {% if provenance.sem_ver_bump and provenance.sem_ver_bump != 'none' %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Version bump</span>
+        <span class="cd3-prov-val">{{ semver_badge(provenance.sem_ver_bump, is_breaking) }}</span>
+      </div>
+      {% endif %}
+      {% if provenance.agent_id %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Agent</span>
+        <span class="cd3-prov-val cd3-mono">{{ provenance.agent_id | truncate(24, True, '…') }}</span>
+      </div>
+      {% endif %}
+      {% if provenance.model_id %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Model</span>
+        <span class="cd3-prov-val cd3-mono">{{ provenance.model_id | truncate(24, True, '…') }}</span>
+      </div>
+      {% endif %}
+      {% if provenance.toolchain_id %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Toolchain</span>
+        <span class="cd3-prov-val cd3-mono">{{ provenance.toolchain_id | truncate(24, True, '…') }}</span>
+      </div>
+      {% endif %}
+      {% if provenance.test_runs > 0 %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Tests</span>
+        <span class="cd3-prov-val" style="color:var(--color-success)">✓ {{ provenance.test_runs }} run{{ 's' if provenance.test_runs != 1 }}</span>
+      </div>
+      {% endif %}
+      {% if provenance.reviewed_by %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Reviewed</span>
+        <div class="cd3-prov-val">{% for r in provenance.reviewed_by %}<span class="cd3-reviewer">{{ r }}</span>{% endfor %}</div>
+      </div>
+      {% endif %}
+      {% if provenance.breaking_changes %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Breaking</span>
+        <div class="cd3-prov-val" style="flex-direction:column;gap:2px">
+          {% for bc in provenance.breaking_changes %}<span style="color:#ef4444;font-size:10px;font-family:var(--font-mono)">{{ bc }}</span>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if provenance.signature %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Signed</span>
+        <span class="cd3-prov-val" style="color:var(--color-success)">✓ Verified</span>
+      </div>
+      {% endif %}
     </div>
-  </div>
-  {%- endif %}
 
-  {# ── Sibling Navigation ───────────────────────────────────────────────── #}
-  <div class="cd-nav">
-    {%- if older_commit %}
-    <a href="{{ base_url }}/commits/{{ older_commit.commit_id }}" class="cd-nav-card">
-      <span class="cd-nav-dir">← Older commit</span>
-      <span class="cd-nav-message">{{ older_commit.message | truncate(70) }}</span>
-      <span class="cd-nav-sha">{{ older_commit.commit_id[:8] }}</span>
-    </a>
-    {%- else %}
-    <div class="cd-nav-card" style="opacity:0.4;pointer-events:none">
-      <span class="cd-nav-dir">← Older commit</span>
-      <span class="cd-nav-message" style="color:var(--text-muted)">This is the oldest commit on {{ commit.branch }}</span>
-    </div>
-    {%- endif %}
-
-    <a href="{{ base_url }}/commits" class="cd-nav-back">↑ All commits</a>
-
-    {%- if newer_commit %}
-    <a href="{{ base_url }}/commits/{{ newer_commit.commit_id }}" class="cd-nav-card" style="text-align:right">
-      <span class="cd-nav-dir">Newer commit →</span>
-      <span class="cd-nav-message">{{ newer_commit.message | truncate(70) }}</span>
-      <span class="cd-nav-sha">{{ newer_commit.commit_id[:8] }}</span>
-    </a>
-    {%- else %}
-    <div class="cd-nav-card" style="opacity:0.4;pointer-events:none;text-align:right">
-      <span class="cd-nav-dir">Newer commit →</span>
-      <span class="cd-nav-message" style="color:var(--text-muted)">This is the latest commit on {{ commit.branch }}</span>
-    </div>
-    {%- endif %}
-  </div>
-
-  {# ── Comments ─────────────────────────────────────────────────────────── #}
-  <div class="cd-comment-section">
-    <div class="cd-comment-header">
-      <span>💬</span>
-      <h2 class="cd-comment-title">Comments</h2>
-      <span class="cd-comment-count">{{ comments | length }}</span>
-    </div>
-    <div class="cd-comment-body">
-      <div id="commit-comments">
-        {% include "musehub/fragments/commit_comments.html" %}
+    {# ── Snapshot ──────────────────────────────────────────────────────── #}
+    {% if commit.snapshot_id %}
+    <div class="card cd3-side-card">
+      <div class="cd3-side-hd">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <h3 class="cd3-side-title">Snapshot</h3>
+      </div>
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">ID</span>
+        <span class="cd3-prov-val cd3-mono" style="font-size:10px;word-break:break-all">{{ commit.snapshot_id[:16] }}…</span>
+      </div>
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Files</span>
+        <span class="cd3-prov-val">{{ snapshot_diff.total_files }}</span>
+      </div>
+      <div style="padding:var(--space-2) var(--space-4) var(--space-3)">
+        <a href="{{ base_url }}/tree/{{ short_id }}" class="btn btn-ghost btn-sm" style="font-size:11px;width:100%">Browse tree at this commit →</a>
       </div>
     </div>
-    <div class="cd-comment-form">
-      <form hx-post="{{ base_url }}/commits/{{ commit.commit_id }}/comments"
-            hx-target="#commit-comments"
-            hx-swap="innerHTML"
-            hx-on::after-request="this.reset()">
-        <textarea name="body" class="cd-textarea" rows="4"
-                  placeholder="Leave a comment about this commit…"></textarea>
-        <div style="margin-top: var(--space-2)">
-          <button type="submit" class="btn btn-primary">Comment</button>
+    {% endif %}
+
+    {# ── Commit SHA / parents ──────────────────────────────────────────── #}
+    <div class="card cd3-side-card">
+      <div class="cd3-side-hd">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+        <h3 class="cd3-side-title">Commit</h3>
+      </div>
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">SHA</span>
+        <span class="cd3-prov-val cd3-mono" style="font-size:10px;word-break:break-all">{{ commit_id[:32] }}…</span>
+      </div>
+      {% if commit.parent_ids %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Parent{{ 's' if commit.parent_ids | length > 1 }}</span>
+        <div class="cd3-prov-val">
+          {% for p in commit.parent_ids %}
+          <a href="{{ base_url }}/commits/{{ p }}" class="cd3-parent-chip">{{ p[:8] }}</a>
+          {% endfor %}
         </div>
-      </form>
+      </div>
+      {% endif %}
+      <div class="cd3-prov-row">
+        <span class="cd3-prov-label">Branch</span>
+        <span class="cd3-prov-val">{{ commit.branch or '—' }}</span>
+      </div>
     </div>
+
+  </aside>
+</div>
+
+{# ── Discussion ─────────────────────────────────────────────────────────── #}
+<div class="cd3-discussion">
+  <div class="cd3-disc-hd">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <h2 class="cd3-disc-title">{{ comments | length }} comment{{ 's' if comments | length != 1 else '' }}</h2>
   </div>
 
-</div>{# /content-wide #}
+  <div id="commit-comments" class="cd3-comment-list">
+    {% include "musehub/fragments/commit_comments.html" %}
+  </div>
+
+  <form class="cd3-comment-form"
+        hx-post="/api/v1/repos/{{ repo_id }}/comments"
+        hx-target="#commit-comments"
+        hx-swap="innerHTML"
+        hx-vals='{"target_type": "commit", "target_id": "{{ commit_id }}"}'
+        hx-on::after-request="this.reset()">
+    <textarea name="body" class="cd3-comment-input" placeholder="Leave a comment…" rows="3" required></textarea>
+    <div class="cd3-comment-actions">
+      <button type="submit" class="btn btn-primary btn-sm">Comment</button>
+    </div>
+  </form>
+</div>
 {% endblock %}
 
 {% block body_extra %}
-{# WaveSurfer — only for MIDI domain audio preview #}
-{%- if audio_url and domain and domain.viewer_type == 'piano_roll' %}
+{% if audio_url and domain and domain.viewer_type == 'piano_roll' %}
 <script src="/static/vendor/wavesurfer.min.js"></script>
-{%- endif %}
+{% endif %}
 {% endblock %}

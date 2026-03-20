@@ -553,7 +553,7 @@ def _create_session_from_initialize(
 
 # Tools that may use elicitation or progress streaming (SSE required).
 _SSE_TOOL_NAMES: frozenset[str] = frozenset({
-    "musehub_compose_with_preferences",
+    "musehub_create_with_preferences",
     "musehub_review_pr_interactive",
     "musehub_connect_streaming_platform",
     "musehub_connect_daw_cloud",

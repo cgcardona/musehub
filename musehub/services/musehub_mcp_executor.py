@@ -1394,8 +1394,13 @@ async def execute_muse_pull(
 async def execute_muse_remote(
     owner: str,
     slug: str,
+    ref: str | None = None,
 ) -> MusehubToolResult:
-    """Return the remote URL and push/pull endpoints for a MuseHub repo."""
+    """Return the remote URL, push/pull endpoints, and clone command for a MuseHub repo.
+
+    Covers both 'muse remote -v' and 'muse clone' use cases. The optional ``ref``
+    parameter is appended to the clone command (``--branch <ref>``) when provided.
+    """
     if (err := _check_db_available()) is not None:
         return err
 
@@ -1411,15 +1416,20 @@ async def execute_muse_remote(
         hub_url = "https://musehub.ai"
         remote_url = f"{hub_url}/{owner}/{slug}"
         api_base = f"{hub_url}/api/v1/repos/{repo.repo_id}"
+        ref_part = f" --branch {ref}" if ref else ""
 
         return MusehubToolResult(ok=True, data={
             "repo_id": repo.repo_id,
-            "name": "origin",
+            "owner": repo.owner,
+            "slug": repo.slug,
+            "name": repo.name,
             "remote_url": remote_url,
             "push_url": f"{api_base}/push",
             "pull_url": f"{api_base}/pull",
-            "clone_command": f"muse clone {remote_url}",
+            "clone_url": remote_url,
+            "clone_command": f"muse clone {remote_url}{ref_part}",
             "add_remote_command": f"muse remote add origin {remote_url}",
+            "visibility": repo.visibility,
         })
 
 

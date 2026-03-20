@@ -2,12 +2,13 @@
 
 {% block title %}Create a new repository{% endblock %}
 
-{% block breadcrumb %}<a href="/explore">Explore</a> / New repository{% endblock %}
+{# Full-bleed — hero is edge-to-edge, form body is self-constrained #}
+{% block container_extra_class %} page-container{% endblock %}
 
 {% block page_json %}{"page": "new-repo"}{% endblock %}
 
 {% block content %}
-<div class="wizard-layout" x-data="{
+<div class="nr-page" x-data="{
   visibility: 'private',
   topics: [],
   topicInput: '',
@@ -28,158 +29,205 @@
   }
 }">
 
-  <div class="wizard-header">
-    <h1 class="wizard-title">Create a new repository</h1>
-    <p class="wizard-subtitle">A repository versions a multidimensional state space — MIDI compositions, source code, genomic sequences, or any domain you choose. It contains all snapshots, commits, branches, and collaboration records.</p>
+  {# ── Hero ─────────────────────────────────────────────────────────────────── #}
+  <div class="nr-hero">
+    <div class="nr-hero-inner">
+      {% if domain %}
+      <a href="/domains/{{ domain.scoped_id }}" class="nr-back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        {{ domain.scoped_id }}
+      </a>
+      <h1 class="nr-hero-title">New {{ domain.display_name }} repository</h1>
+      <p class="nr-hero-sub">Version a {{ domain.display_name }} state space — {{ domain.dimension_count }} dimension{% if domain.dimension_count != 1 %}s{% endif %} tracked per commit. Every snapshot, branch, and collaboration record lives here.</p>
+      {% else %}
+      <div class="nr-hero-eyebrow">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        New repository
+      </div>
+      <h1 class="nr-hero-title">Create a new repository</h1>
+      <p class="nr-hero-sub">Version a multidimensional state space — MIDI compositions, source code, genomic sequences, or any domain. Every snapshot, commit, branch, and collaboration record lives here.</p>
+      {% endif %}
+    </div>
   </div>
 
-  <form id="wizard-form">
+  {# ── Form body ─────────────────────────────────────────────────────────────── #}
+  <div class="nr-body">
+    <form id="wizard-form">
 
-    {# Owner / repo name row with HTMX availability check #}
-    <div class="form-group">
-      <label class="form-label">Owner &amp; repository name <span class="required">*</span></label>
-      <div class="form-description">Choose your username as the owner. The name determines the URL.</div>
-      <div class="owner-name-row">
-        <input class="form-input owner-input" id="f-owner" name="owner" type="text"
-               placeholder="your-username"
-               pattern="^[a-z0-9]([a-z0-9\-]{0,62}[a-z0-9])?$"
-               required maxlength="64"
-               title="Lowercase letters, numbers, and hyphens only; no leading/trailing hyphens"/>
-        <span class="owner-sep">/</span>
-        <input class="form-input name-input" id="f-name" name="name" type="text"
-               placeholder="my-composition"
-               required maxlength="255"
-               hx-get="/new/check"
-               hx-trigger="input changed delay:300ms"
-               hx-target="#name-check"
-               hx-indicator="#name-check-indicator"
-               hx-include="#f-owner, #f-name"
-               hx-vals='js:{"owner": document.getElementById("f-owner").value, "slug": event.target.value}'/>
-        <span id="name-check-indicator" class="htmx-indicator" aria-label="Checking…">⏳</span>
-        <span id="name-check"></span>
-      </div>
-    </div>
-
-    {# Description #}
-    <div class="form-group">
-      <label class="form-label" for="f-description">Description</label>
-      <div class="form-description">A short summary shown on the explore page and your profile.</div>
-      <textarea class="form-input" id="f-description" name="description" rows="2" maxlength="350"
-                placeholder="Describe what state this repository versions…" style="resize:vertical"></textarea>
-    </div>
-
-    <hr class="wizard-divider"/>
-
-    {# Domain plugin selection #}
-    <div class="form-group">
-      <label class="form-label" for="f-domain">Domain plugin</label>
-      <div class="form-description">
-        Choose the Muse domain plugin that defines the state space for this repository.
-        Each domain declares its own dimensions, viewer, and insight capabilities.
-        <a href="/domains" class="form-link" target="_blank">Browse all domains →</a>
-      </div>
-      <select class="form-input domain-select" id="f-domain" name="domain" style="max-width:420px">
-        <option value="">Generic (no domain)</option>
-        {% for d in available_domains %}
-        <option value="{{ d.domain_id }}"
-          data-viewer="{{ d.viewer_type }}"
-          data-dims="{{ d.dimension_count }}">
-          {{ d.display_name }} ({{ d.scoped_id }}) — {{ d.dimension_count }} dimension{% if d.dimension_count != 1 %}s{% endif %}
-        </option>
-        {% endfor %}
-      </select>
-      <div class="domain-select-hint" id="domain-hint" hidden>
-        <span id="domain-hint-viewer"></span>
-        <a href="#" id="domain-hint-link" class="form-link" target="_blank">View domain →</a>
-      </div>
-    </div>
-
-    <hr class="wizard-divider"/>
-
-    {# Visibility — Alpine.js radio toggle (minimal stateful UI) #}
-    <div class="form-group">
-      <label class="form-label">Visibility <span class="required">*</span></label>
-      <div class="visibility-row">
-        <label class="visibility-card"
-               :class="{ selected: visibility === 'public' }">
-          <input type="radio" name="visibility" value="public" x-model="visibility"
-                 style="display:none"/>
-          <div class="visibility-icon">🌍</div>
-          <div class="visibility-card-title">Public</div>
-          <div class="visibility-card-desc">Anyone on MuseHub can view this repository.</div>
-        </label>
-        <label class="visibility-card selected"
-               :class="{ selected: visibility === 'private' }">
-          <input type="radio" name="visibility" value="private" x-model="visibility"
-                 style="display:none"/>
-          <div class="visibility-icon">🔒</div>
-          <div class="visibility-card-title">Private</div>
-          <div class="visibility-card-desc">Only you and your collaborators can view this repository.</div>
-        </label>
-      </div>
-    </div>
-
-    <hr class="wizard-divider"/>
-
-    {# License — server-rendered dropdown #}
-    <div class="form-group">
-      <label class="form-label" for="f-license">License</label>
-      <div class="form-description">Tell others what they can and cannot do with your work.</div>
-      <select class="form-input" id="f-license" name="license" style="max-width:380px">
-        {% for value, label in licenses %}
-          <option value="{{ value }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    {# Topics — Alpine.js tag chip input #}
-    <div class="form-group">
-      <label class="form-label">Topics</label>
-      <div class="form-description">Tag your repo for discovery. Press <kbd>Enter</kbd> or <kbd>,</kbd> to add.</div>
-      <div class="tag-input-container" @click="$refs.topicInput.focus()">
-        <template x-for="(t, i) in topics" :key="i">
-          <span class="tag-pill">
-            <span x-text="t"></span>
-            <button type="button" class="tag-pill-remove" @click.stop="removeTopic(i)">&times;</button>
-          </span>
-        </template>
-        <input class="tag-text-input" x-ref="topicInput" x-model="topicInput"
-               placeholder="genomics, CRISPR, neural…"
-               @keydown="onTopicKey($event)"
-               @input="topicInput.endsWith(',') && addTopic(topicInput)"/>
-      </div>
-    </div>
-
-    <hr class="wizard-divider"/>
-
-    {# Initialize repository #}
-    <div class="form-group">
-      <label class="form-label">Initialise this repository</label>
-      <div class="form-checkbox-row">
-        <input type="checkbox" id="f-initialize" x-model="showBranch" checked/>
-        <div>
-          <div class="form-checkbox-label">Add an initial commit</div>
-          <div class="form-checkbox-desc">Creates an empty "Initial commit" so the repository is immediately browsable.</div>
+      {# ── 1. Identity ──────────────────────────────────────────────────────── #}
+      <section class="nr-section">
+        <div class="nr-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Identity
         </div>
-      </div>
-      <div class="branch-row" x-show="showBranch">
-        <label class="form-label" for="f-branch">Default branch name</label>
-        <input class="form-input" id="f-branch" name="defaultBranch" type="text" value="main"
-               maxlength="255" style="max-width:240px" placeholder="main"/>
-      </div>
-    </div>
 
-    <hr class="wizard-divider"/>
+        <div class="nr-field">
+          <label class="nr-label">Owner &amp; repository name <span class="nr-req">*</span></label>
+          <p class="nr-desc">Choose your username as the owner. The name determines the URL.</p>
+          <div class="nr-owner-row">
+            <input class="nr-input nr-owner-input" id="f-owner" name="owner" type="text"
+                   placeholder="your-username"
+                   pattern="^[a-z0-9]([a-z0-9\-]{0,62}[a-z0-9])?$"
+                   required maxlength="64"
+                   title="Lowercase letters, numbers, and hyphens only; no leading/trailing hyphens"/>
+            <span class="nr-sep">/</span>
+            <input class="nr-input nr-name-input" id="f-name" name="name" type="text"
+                   placeholder="my-composition"
+                   required maxlength="255"
+                   hx-get="/new/check"
+                   hx-trigger="input changed delay:300ms"
+                   hx-target="#name-check"
+                   hx-indicator="#name-check-indicator"
+                   hx-include="#f-owner, #f-name"
+                   hx-vals='js:{"owner": document.getElementById("f-owner").value, "slug": event.target.value}'/>
+            <span id="name-check-indicator" class="htmx-indicator">
+              <svg class="nr-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            </span>
+            <span id="name-check"></span>
+          </div>
+        </div>
 
-    {# Form actions #}
-    <div class="wizard-actions">
-      <button class="btn btn-primary" type="submit" id="submit-btn">
-        Create repository
-      </button>
-      <a class="btn btn-secondary" href="/explore">Cancel</a>
-      <span class="submit-error" id="submit-error" style="display:none"></span>
-    </div>
-  </form>
+        <div class="nr-field">
+          <label class="nr-label" for="f-description">Description</label>
+          <p class="nr-desc">A short summary shown on the explore page and your profile.</p>
+          <textarea class="nr-input nr-textarea" id="f-description" name="description"
+                    rows="2" maxlength="350"
+                    placeholder="Describe what state this repository versions…"></textarea>
+        </div>
+      </section>
+
+      {# ── 2. Domain plugin ──────────────────────────────────────────────────── #}
+      <section class="nr-section">
+        <div class="nr-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Domain plugin
+        </div>
+        {% if domain %}
+        {# Domain is locked — set from URL context #}
+        <input type="hidden" name="domainScopedId" value="{{ domain.scoped_id }}"/>
+        <div class="nr-domain-locked">
+          <div class="nr-domain-locked__badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            {{ domain.scoped_id }}
+          </div>
+          <span class="nr-domain-locked__meta">{{ domain.dimension_count }} dimension{% if domain.dimension_count != 1 %}s{% endif %} · {{ domain.viewer_type }}</span>
+          <a href="/domains/{{ domain.scoped_id }}" class="nr-link" target="_blank">View domain →</a>
+        </div>
+        {% else %}
+        <p class="nr-desc">
+          Choose the Muse domain plugin that defines the state space for this repository.
+          Each domain declares its own dimensions, viewer, and insight capabilities.
+          <a href="/domains" class="nr-link" target="_blank">Browse all domains →</a>
+        </p>
+        {% endif %}
+      </section>
+
+      {# ── 3. Visibility ─────────────────────────────────────────────────────── #}
+      <section class="nr-section">
+        <div class="nr-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Visibility <span class="nr-req">*</span>
+        </div>
+        <div class="nr-vis-grid">
+          <label class="nr-vis-card" :class="{ 'nr-vis-card--selected': visibility === 'public' }">
+            <input type="radio" name="visibility" value="public" x-model="visibility"/>
+            <div class="nr-vis-icon nr-vis-icon--public">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </div>
+            <div>
+              <div class="nr-vis-title">Public</div>
+              <div class="nr-vis-desc">Anyone on MuseHub can view this repository.</div>
+            </div>
+          </label>
+          <label class="nr-vis-card nr-vis-card--selected" :class="{ 'nr-vis-card--selected': visibility === 'private' }">
+            <input type="radio" name="visibility" value="private" x-model="visibility"/>
+            <div class="nr-vis-icon nr-vis-icon--private">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div>
+              <div class="nr-vis-title">Private</div>
+              <div class="nr-vis-desc">Only you and your collaborators can view this repository.</div>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      {# ── 4. Discovery ──────────────────────────────────────────────────────── #}
+      <section class="nr-section">
+        <div class="nr-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Discovery
+        </div>
+
+        <div class="nr-field">
+          <label class="nr-label" for="f-license">License</label>
+          <p class="nr-desc">Tell others what they can and cannot do with your work.</p>
+          <div class="nr-select-wrap nr-select-wrap--sm">
+            <select class="nr-select" id="f-license" name="license">
+              {% for value, label in licenses %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <svg class="nr-select-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+
+        <div class="nr-field">
+          <label class="nr-label">Topics</label>
+          <p class="nr-desc">Tag your repo for discovery. Press <kbd class="nr-kbd">Enter</kbd> or <kbd class="nr-kbd">,</kbd> to add.</p>
+          <div class="nr-tag-input" @click="$refs.topicInput.focus()">
+            <template x-for="(t, i) in topics" :key="i">
+              <span class="nr-tag">
+                <span x-text="t"></span>
+                <button type="button" class="nr-tag-remove" @click.stop="removeTopic(i)">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </span>
+            </template>
+            <input class="nr-tag-text" x-ref="topicInput" x-model="topicInput"
+                   placeholder="genomics, CRISPR, neural…"
+                   @keydown="onTopicKey($event)"
+                   @input="topicInput.endsWith(',') && addTopic(topicInput)"/>
+          </div>
+        </div>
+      </section>
+
+      {# ── 5. Initialisation ─────────────────────────────────────────────────── #}
+      <section class="nr-section">
+        <div class="nr-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Initialisation
+        </div>
+        <div class="nr-toggle-row">
+          <label class="nr-toggle">
+            <input type="checkbox" id="f-initialize" x-model="showBranch" checked/>
+            <span class="nr-toggle__track"><span class="nr-toggle__thumb"></span></span>
+          </label>
+          <div>
+            <div class="nr-toggle-label">Add an initial commit</div>
+            <div class="nr-toggle-desc">Creates an empty "Initial commit" so the repository is immediately browsable.</div>
+          </div>
+        </div>
+
+        <div class="nr-branch-row" x-show="showBranch">
+          <label class="nr-label" for="f-branch">Default branch name</label>
+          <input class="nr-input nr-input--sm" id="f-branch" name="defaultBranch" type="text"
+                 value="main" maxlength="255" placeholder="main"/>
+        </div>
+      </section>
+
+      {# ── Actions ───────────────────────────────────────────────────────────── #}
+      <div class="nr-actions">
+        <button class="nr-btn nr-btn--primary" type="submit" id="submit-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Create repository
+        </button>
+        <a class="nr-btn nr-btn--ghost" href="/explore">Cancel</a>
+        <span class="nr-submit-error" id="submit-error" style="display:none"></span>
+      </div>
+
+    </form>
+  </div>
+
 </div>
 {% endblock %}
-

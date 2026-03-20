@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/app.css?v={{ static_version }}">
   <script>document.documentElement.classList.add('css-ready')</script>
   <title>{% block title %}MuseHub{% endblock %} — MuseHub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
@@ -37,11 +37,6 @@
   <div id="htmx-loading" class="htmx-indicator" aria-hidden="true"></div>
 
   {% include "musehub/partials/navbar.html" %}
-
-  <div class="breadcrumb-bar">
-    <span class="breadcrumb">{% block breadcrumb %}{% endblock %}</span>
-    {% include "musehub/partials/breadcrumbs.html" %}
-  </div>
 
   {% block repo_nav %}{% endblock %}
 
@@ -81,8 +76,7 @@
     </button>
   </div>
 
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ static_version }}"></script>
   {# page_json: JSON data bridge for new TypeScript page modules (read by musehub.ts dispatchPageModule) #}
   <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>
   {#

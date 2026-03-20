@@ -1,0 +1,45 @@
+{#
+  collaborator_rows — bare collaborator list fragment for HTMX partial updates.
+
+  Rendered for both the initial {% include %} inside collaborators_settings.html
+  and for subsequent HTMX requests (HX-Request: true) that refresh the list
+  after invite/remove actions.
+
+  Context
+  -------
+  collaborators : list[MusehubCollaborator]
+    ORM rows. Keys used: user_id, permission, invited_by, invited_at, repo_id.
+  repo_id : str
+    Used to build the DELETE API URL for each row's remove button.
+#}
+{% if collaborators %}
+{% for c in collaborators %}
+<div class="collab-row" id="collab-{{ c.user_id }}">
+  <div class="collab-identity">
+    <span class="collab-avatar">{{ (c.user_id or '?')[0] | upper }}</span>
+    <div class="collab-info">
+      <span class="collab-uid">{{ c.user_id }}</span>
+      {% if c.invited_by %}
+      <span class="collab-meta">Invited by {{ c.invited_by }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="collab-actions">
+    <span class="perm-badge badge-perm-{{ c.permission }}">
+      {{ c.permission }}{% if c.permission == 'owner' %} 👑{% endif %}
+    </span>
+    {% if c.permission != 'owner' %}
+    <form hx-delete="/api/v1/repos/{{ repo_id }}/collaborators/{{ c.user_id }}"
+          hx-target="#collaborator-rows"
+          hx-swap="innerHTML"
+          hx-confirm="Remove {{ c.user_id }} from this repository?"
+          style="display:inline">
+      <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="collab-empty">No collaborators yet. Invite someone above.</p>
+{% endif %}

@@ -29,7 +29,7 @@ window.__commitsCfg = {
   <!-- ── Page header ── -->
   <div class="commits-header">
     <div style="display:flex;align-items:center;gap:var(--space-3)">
-      <h1>📄 Commits</h1>
+      <h1>Commits</h1>
       <span class="badge" style="font-size:var(--font-size-xs)">{{ total }}</span>
       {% set n_active = [filter_author, filter_q, filter_date_from, filter_date_to, filter_tag] | select | list | length %}
       {% if n_active %}
@@ -107,7 +107,10 @@ window.__commitsCfg = {
     <button id="compare-toggle-btn" class="btn btn-secondary btn-sm">⊞ Compare</button>
 
     <!-- DAG graph link -->
-    <a href="{{ base_url }}/graph" class="btn btn-secondary btn-sm">🌐 DAG Graph</a>
+    <a href="{{ base_url }}/graph" class="btn btn-secondary btn-sm">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      DAG Graph
+    </a>
   </div>
 
   <!-- ── Compare strip (shown when compare mode is active) ── -->

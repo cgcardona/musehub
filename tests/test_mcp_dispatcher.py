@@ -8,9 +8,9 @@ Covers:
   - prompts/get: known prompt assembly and unknown prompt error
   - Batch request handling
   - Notification handling (no id → returns None)
-  - Tool catalogue completeness (43 tools)
+  - Tool catalogue completeness (40 tools)
   - Resource catalogue completeness (12 static, 17 templated)
-  - Prompt catalogue completeness (12 prompts)
+  - Prompt catalogue completeness (10 prompts)
   - MCP 2025-11-25: elicitation capability in initialize, new notifications
 """
 from __future__ import annotations
@@ -116,15 +116,15 @@ async def test_notification_returns_none() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tools_list_returns_43_tools() -> None:
-    """tools/list should return all 43 registered tools."""
+async def test_tools_list_returns_40_tools() -> None:
+    """tools/list should return all 40 registered tools."""
     resp = await handle_request(_req("tools/list"))
     assert resp is not None
     result = resp["result"]
     assert isinstance(result, dict)
     tools = result["tools"]
     assert isinstance(tools, list)
-    assert len(tools) == 43  # 23 read + 15 write + 5 elicitation
+    assert len(tools) == 40  # 20 read + 15 write + 5 elicitation
 
 
 @pytest.mark.asyncio
@@ -148,9 +148,9 @@ async def test_tools_list_all_have_required_fields() -> None:
         assert "annotations" in tool, f"Missing MCP 2025-11-25 annotations for {tool.get('name')}"
 
 
-def test_tool_catalogue_has_43_tools() -> None:
-    """The MCP_TOOLS list must contain exactly 43 tools."""
-    assert len(MCP_TOOLS) == 43
+def test_tool_catalogue_has_40_tools() -> None:
+    """The MCP_TOOLS list must contain exactly 40 tools."""
+    assert len(MCP_TOOLS) == 40
 
 
 def test_write_tool_names_all_in_catalogue() -> None:
@@ -216,15 +216,15 @@ async def test_tools_call_read_tool_with_mock_executor() -> None:
     """Read tools should delegate to the executor and return text content."""
     mock_result = MagicMock()
     mock_result.ok = True
-    mock_result.data = {"repo_id": "r123", "branches": [], "recent_commits": [], "total_commits": 0, "branch_count": 0}
+    mock_result.data = {"repo_id": "r123", "branches": []}
 
     with patch(
-        "musehub.services.musehub_mcp_executor.execute_browse_repo",
+        "musehub.services.musehub_mcp_executor.execute_list_branches",
         new_callable=AsyncMock,
         return_value=mock_result,
     ):
         resp = await handle_request(
-            _req("tools/call", {"name": "musehub_browse_repo", "arguments": {"repo_id": "r123"}})
+            _req("tools/call", {"name": "musehub_list_branches", "arguments": {"repo_id": "r123"}})
         )
 
     assert resp is not None
@@ -322,21 +322,21 @@ async def test_resources_read_me_requires_auth() -> None:
 
 
 @pytest.mark.asyncio
-async def test_prompts_list_returns_12_prompts() -> None:
-    """prompts/list should return all 12 workflow prompts."""
+async def test_prompts_list_returns_10_prompts() -> None:
+    """prompts/list should return all 10 workflow prompts."""
     resp = await handle_request(_req("prompts/list"))
     assert resp is not None
     prompts = resp["result"]["prompts"]
-    assert len(prompts) == 12
+    assert len(prompts) == 10
 
 
 def test_prompt_catalogue_completeness() -> None:
-    """PROMPT_CATALOGUE must have exactly 12 entries."""
-    assert len(PROMPT_CATALOGUE) == 12
+    """PROMPT_CATALOGUE must have exactly 10 entries."""
+    assert len(PROMPT_CATALOGUE) == 10
 
 
 def test_prompt_names_are_correct() -> None:
-    """All 12 expected prompt names must be present."""
+    """All 10 expected prompt names must be present."""
     names = {p["name"] for p in PROMPT_CATALOGUE}
     assert "musehub/orientation" in names
     assert "musehub/contribute" in names
@@ -348,8 +348,6 @@ def test_prompt_names_are_correct() -> None:
     assert "musehub/release_to_world" in names
     assert "musehub/domain-discovery" in names
     assert "musehub/domain-authoring" in names
-    assert "musehub/agent-onboard" in names
-    assert "musehub/push-workflow" in names
 
 
 @pytest.mark.asyncio
@@ -395,7 +393,7 @@ async def test_prompts_get_unknown_returns_method_not_found() -> None:
 
 
 def test_get_prompt_all_prompts_assemble() -> None:
-    """All 8 prompts should assemble without raising exceptions."""
+    """All 10 prompts should assemble without raising exceptions."""
     for prompt_def in PROMPT_CATALOGUE:
         name = prompt_def["name"]
         result = get_prompt(name, {"repo_id": "test-id", "pr_id": "pr-id", "owner": "user", "slug": "repo"})

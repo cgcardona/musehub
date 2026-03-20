@@ -1,6 +1,6 @@
 """MCP tool registry for MuseHub tools (reads + writes + elicitation).
 
-``MUSEHUB_TOOLS``                — all 32 musehub_* tool definitions.
+``MUSEHUB_TOOLS``                — all 40 musehub_* / muse_* tool definitions.
 ``MUSEHUB_TOOL_NAMES``           — set of all tool names for routing.
 ``MUSEHUB_WRITE_TOOL_NAMES``     — set of write/interactive tool names (auth required).
 ``MUSEHUB_ELICITATION_TOOL_NAMES`` — set of elicitation-powered tool names.

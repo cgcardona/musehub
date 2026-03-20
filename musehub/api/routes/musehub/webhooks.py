@@ -187,7 +187,7 @@ async def redeliver_delivery(
             db, repo_id=repo_id, webhook_id=webhook_id, delivery_id=delivery_id
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
 
     await db.commit()
     return result

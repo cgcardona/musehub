@@ -3,10 +3,10 @@
 Prompts teach agents how to chain Tools and Resources to accomplish multi-step
 collaboration goals on MuseHub across any Muse domain.
 
-Eleven prompts are defined:
-  musehub/orientation       — essential onboarding for any new agent (domain-agnostic)
-  musehub/contribute        — end-to-end contribution workflow
-  musehub/create            — create new domain state (replaces musehub/compose)
+Ten prompts are defined:
+  musehub/orientation       — essential onboarding for any caller; pass caller_type='agent' for agent-specific guidance
+  musehub/contribute        — end-to-end contribution workflow including authentication and push setup
+  musehub/create            — create new domain state (domain-agnostic)
   musehub/review_pr         — dimension-aware PR review workflow
   musehub/issue_triage      — issue triage workflow
   musehub/release_prep      — release preparation workflow
@@ -14,7 +14,6 @@ Eleven prompts are defined:
   musehub/release_to_world  — full elicitation-powered release + distribution pipeline
   musehub/domain-discovery  — discover and evaluate Muse domain plugins
   musehub/domain-authoring  — build and publish a new Muse domain plugin
-  musehub/agent-onboard     — onboard an AI agent as a first-class Muse citizen
 """
 from __future__ import annotations
 
@@ -70,15 +69,25 @@ PROMPT_CATALOGUE: list[MCPPromptDef] = [
         "name": "musehub/orientation",
         "description": (
             "Explains MuseHub's model (repos, commits, branches, domains, multidimensional state) "
-            "and which tools to use for what. The essential first read for any new agent or human."
+            "and which tools to use for what. The essential first read for any new caller. "
+            "Pass caller_type='agent' for agent-specific guidance including JWT auth, "
+            "rate limits, agent onboarding, and the read-modify-commit cycle."
         ),
-        "arguments": [],
+        "arguments": [
+            {
+                "name": "caller_type",
+                "description": "Caller type: 'human' (default) or 'agent'. Tailors the orientation content.",
+                "required": False,
+            },
+        ],
     },
     {
         "name": "musehub/contribute",
         "description": (
-            "End-to-end contribution workflow: discover repo → browse → open issue → "
-            "push commit → create PR → request review → merge."
+            "End-to-end contribution workflow: authenticate → set up remote → "
+            "discover repo → orient via get_context → open issue → "
+            "push commit → create PR → request review → merge. "
+            "Includes push setup (auth, remote config, muse_push) as a prerequisite step."
         ),
         "arguments": [
             {
@@ -232,52 +241,6 @@ PROMPT_CATALOGUE: list[MCPPromptDef] = [
             },
         ],
     },
-    {
-        "name": "musehub/agent-onboard",
-        "description": (
-            "Onboard an AI agent as a first-class Muse citizen (MCP 2025-11-25). "
-            "Covers: authenticating with an agent JWT → reading the MCP resource catalogue "
-            "→ discovering domains → creating or forking a repo → running the first "
-            "read-modify-commit cycle → understanding rate limits and agent-specific claims."
-        ),
-        "arguments": [
-            {
-                "name": "agent_name",
-                "description": "Identifier or name of the agent being onboarded.",
-                "required": False,
-            },
-            {
-                "name": "domain",
-                "description": "Domain scoped ID the agent will primarily work with.",
-                "required": False,
-            },
-        ],
-    },
-    {
-        "name": "musehub/push-workflow",
-        "description": (
-            "Step-by-step guide for pushing a local Muse repository to MuseHub. "
-            "Covers authentication setup, remote configuration, and the push command. "
-            "Use this when an agent or user needs to publish work to MuseHub for the first time."
-        ),
-        "arguments": [
-            {
-                "name": "repo_id",
-                "description": "UUID of the target MuseHub repository (if already created).",
-                "required": False,
-            },
-            {
-                "name": "owner",
-                "description": "Repository owner username.",
-                "required": False,
-            },
-            {
-                "name": "slug",
-                "description": "Repository slug.",
-                "required": False,
-            },
-        ],
-    },
 ]
 
 PROMPT_NAMES: set[str] = {p["name"] for p in PROMPT_CATALOGUE}
@@ -299,7 +262,7 @@ def get_prompt(name: str, arguments: dict[str, str] | None = None) -> MCPPromptR
     args = arguments or {}
 
     if name == "musehub/orientation":
-        return _orientation()
+        return _orientation(args.get("caller_type", "human"))
     if name == "musehub/contribute":
         return _contribute(args.get("repo_id", ""), args.get("owner", ""), args.get("slug", ""))
     if name in ("musehub/create", "musehub/compose"):
@@ -318,10 +281,6 @@ def get_prompt(name: str, arguments: dict[str, str] | None = None) -> MCPPromptR
         return _domain_discovery(args.get("use_case", ""))
     if name == "musehub/domain-authoring":
         return _domain_authoring(args.get("domain_name", ""))
-    if name == "musehub/agent-onboard":
-        return _agent_onboard(args.get("agent_name", ""), args.get("domain", ""))
-    if name == "musehub/push-workflow":
-        return _push_workflow(args.get("repo_id", ""), args.get("owner", ""), args.get("slug", ""))
     return None
 
 
@@ -332,13 +291,51 @@ def _msg(role: str, text: str) -> MCPPromptMessage:
     return {"role": role, "content": {"type": "text", "text": text.strip()}}
 
 
-def _orientation() -> MCPPromptResult:
+def _orientation(caller_type: str = "human") -> MCPPromptResult:
+    is_agent = caller_type == "agent"
+    description = (
+        "MuseHub agent orientation — essential onboarding guide (agent edition)."
+        if is_agent else
+        "MuseHub orientation — essential onboarding guide."
+    )
+    agent_section = """
+## Agent-specific guidance
+
+### Authentication
+Agent tokens carry additional claims that unlock higher rate limits and agent-specific
+activity tracking in the event feed.
+
+```
+musehub_whoami()                                    # confirm current auth status
+musehub_create_agent_token(agent_name='my-bot/1.0') # mint a long-lived agent JWT
+```
+
+The response includes the exact CLI command to store it:
+```
+muse config set musehub.token <token>
+```
+
+### Agent onboarding workflow
+1. `musehub_whoami()` — confirm authentication
+2. `musehub_list_domains(verified=true)` — discover domains for your task
+3. `musehub_get_domain(scoped_id='@author/slug')` — read domain capabilities
+4. `musehub_create_repo(name=..., domain=...)` or `musehub_fork_repo(repo_id=...)` — get a repo
+5. `musehub_get_context(repo_id=...)` — read full state before any write
+6. Push changes via PR workflow: `musehub_create_pr` → `musehub_submit_pr_review` → `musehub_merge_pr`
+
+### Rate limits and agent behaviour
+- Agent JWTs receive a higher base rate limit tier
+- Agent activity appears in the repository event stream with an "agent" badge
+- Prefer **read resources** over tools for repeated lookups (resources are cacheable)
+- Always read before writing — `musehub_get_context` is your oracle
+""" if is_agent else ""
+
     return {
-        "description": "MuseHub agent orientation — essential onboarding guide.",
+        "description": description,
         "messages": [
-            _msg("user", "Explain MuseHub and how I should use it as an agent."),
-            _msg("assistant", """
-# MuseHub Agent Orientation
+            _msg("user", f"Explain MuseHub and how I should use it{'as an AI agent' if is_agent else ''}."),
+            _msg("assistant", f"""
+# MuseHub Orientation{"  — Agent Edition" if is_agent else ""}
 
 MuseHub is the collaboration hub for **Muse** — the world's first domain-agnostic,
 multi-dimensional version control system. Where Git tracks text files, Muse tracks
@@ -352,7 +349,7 @@ for both humans and AI agents as first-class citizens.
 
 | Concept  | Description |
 |----------|-------------|
-| **Repo** | A named project owned by a user. Identified by UUID or {owner}/{slug}. |
+| **Repo** | A named project owned by a user. Identified by UUID or {{owner}}/{{slug}}. |
 | **Domain** | A plugin that defines the state model for a repo. Scoped as `@author/slug`. |
 | **Branch** | A named pointer to a commit. Default branch is usually `main`. |
 | **Commit** | A snapshot of all multidimensional state at a point in time. |
@@ -371,11 +368,17 @@ for both humans and AI agents as first-class citizens.
 - Resource `musehub://trending` — top repos by star count
 - Resource `muse://domains` — full domain registry
 
-### Reading a repo
-1. `musehub_browse_repo(repo_id)` — orientation snapshot
-2. `musehub_get_context(repo_id)` — full AI context document
-3. `musehub_get_domain_insights(repo_id, dimension='overview')` — cross-domain stats
-4. `musehub_get_view(repo_id, ref='main')` — full multidimensional state payload
+### Reading a repo (always start here)
+1. `musehub_get_context(repo_id)` — the oracle: domain plugin, branches, commits, artifact inventory
+2. `musehub_get_domain_insights(repo_id, dimension='overview')` — computed analytics and scores
+3. `musehub_get_view(repo_id, ref='main')` — full structured state payload for the domain viewer
+
+### Addressing repos
+All repo-scoped tools accept either `repo_id` (UUID) or `owner` + `slug`:
+```
+musehub_get_context(repo_id='a3f2-...')
+musehub_get_context(owner='cgcardona', slug='jazz-standards')  # same result
+```
 
 ### Browsing history
 - `musehub_list_branches` → `musehub_list_commits` → `musehub_get_commit`
@@ -396,7 +399,7 @@ for both humans and AI agents as first-class citizens.
 | Use | When |
 |-----|------|
 | **Resource** (`musehub://...`, `muse://...`) | Cacheable reads — prefer for repeated lookups |
-| **Tool** (`musehub_*`) | Mutations (write tools) or when you need fresh data |
+| **Tool** (`musehub_*`, `muse_*`) | Mutations (write tools) or when you need fresh / filtered data |
 
 ## Muse documentation resources
 
@@ -407,9 +410,9 @@ for both humans and AI agents as first-class citizens.
 | `muse://docs/crdt` | CRDT merge semantics |
 | `muse://docs/domains` | Domain plugin authoring guide |
 | `muse://docs/merge` | Merge algorithm deep dive |
-
-Always read `musehub/orientation` or fetch `musehub://trending` first to ground yourself.
-For domain-specific work, call `musehub_get_domain` before creating any state.
+{agent_section}
+Always call `musehub_get_context` before creating or modifying state.
+For domain-specific work, call `musehub_get_domain` before creating any repos.
 """),
         ],
     }
@@ -417,33 +420,62 @@ For domain-specific work, call `musehub_get_domain` before creating any state.
 
 def _contribute(repo_id: str, owner: str, slug: str) -> MCPPromptResult:
     repo_ref = f"{owner}/{slug}" if owner and slug else repo_id or "<repo_id>"
+    rid = repo_id or "<repo_id>"
+    owner_str = owner or "<owner>"
+    slug_str = slug or "<slug>"
     return {
-        "description": f"End-to-end contribution workflow for {repo_ref}.",
+        "description": f"End-to-end contribution workflow for {repo_ref}, including push setup.",
         "messages": [
             _msg("user", f"Walk me through contributing to the MuseHub repository {repo_ref}."),
             _msg("assistant", f"""
 # Contribution Workflow for `{repo_ref}`
 
-Follow these steps to contribute a change to this repository.
+Follow these steps to contribute a change to this repository, from authentication through merge.
+
+## Step 0 — Confirm authentication and set up remote
+
+```
+musehub_whoami()
+```
+
+If `authenticated` is `false`, create an agent token:
+
+```
+musehub_create_agent_token(agent_name="my-agent/1.0", expires_in_days=90)
+```
+
+The response includes the storage command — run it in your terminal:
+
+```
+muse config set musehub.token <token>
+```
+
+Then add this repo as a remote:
+
+```
+muse_remote(owner="{owner_str}", slug="{slug_str}")
+# → copy the add_remote_command and run it locally
+# muse remote add origin https://musehub.ai/{repo_ref}
+```
 
 ## Step 1 — Orient yourself
 ```
-musehub_browse_repo(repo_id="{repo_id}")
-musehub_get_context(repo_id="{repo_id}")
+musehub_get_context(repo_id="{rid}")
 ```
-Read the repo overview, understand existing branches, recent commits, and the domain.
+This is the oracle: domain plugin, branches, recent commits, and artifact inventory.
+Read this carefully before creating anything.
 
 ## Step 2 — Understand the current state
 ```
-musehub_get_domain_insights(repo_id="{repo_id}", dimension="overview")
-musehub_get_view(repo_id="{repo_id}", ref="main")
+musehub_get_domain_insights(repo_id="{rid}", dimension="overview")
+musehub_get_view(repo_id="{rid}", ref="main")
 ```
 Check the domain dimensions, state structure, and commit history.
 
 ## Step 3 — Open an issue (optional but recommended)
 ```
 musehub_create_issue(
-    repo_id="{repo_id}",
+    repo_id="{rid}",
     title="<describe the state change you plan>",
     body="<context, what problem does it solve?>",
     labels=["enhancement"]
@@ -452,15 +484,32 @@ musehub_create_issue(
 
 ## Step 4 — Check branches and list recent commits
 ```
-musehub_list_branches(repo_id="{repo_id}")
-musehub_list_commits(repo_id="{repo_id}", branch="main", limit=5)
+musehub_list_branches(repo_id="{rid}")
+musehub_list_commits(repo_id="{rid}", branch="main", limit=5)
 ```
 
-## Step 5 — Create a pull request
-After your changes are committed to a feature branch:
+## Step 5 — Push your changes
+
+**Via the Muse CLI (local workflow):**
+```
+muse push origin <your-feature-branch>
+```
+
+**Via the MCP tool (agent-native, no local filesystem):**
+```
+muse_push(
+    repo_id="{rid}",
+    branch="<your-feature-branch>",
+    head_commit_id="<HEAD commit ID>",
+    commits=[...],
+    objects=[...]
+)
+```
+
+## Step 6 — Create a pull request
 ```
 musehub_create_pr(
-    repo_id="{repo_id}",
+    repo_id="{rid}",
     title="<short description of the change>",
     from_branch="<your-feature-branch>",
     to_branch="main",
@@ -468,10 +517,10 @@ musehub_create_pr(
 )
 ```
 
-## Step 6 — Add dimension-anchored PR comments
+## Step 7 — Add dimension-anchored PR comments
 ```
 musehub_create_pr_comment(
-    repo_id="{repo_id}",
+    repo_id="{rid}",
     pr_id="<pr_id>",
     body="Unexpected state divergence in this region.",
     dimension_ref={{"dimension": "<dim_name>", "<key>": "<value>"}}
@@ -480,9 +529,9 @@ musehub_create_pr_comment(
 The shape of `dimension_ref` is defined by the repo's domain plugin.
 Call `musehub_get_domain` to learn the available dimensions and their ref schemas.
 
-## Step 7 — Merge when approved
+## Step 8 — Merge when approved
 ```
-musehub_merge_pr(repo_id="{repo_id}", pr_id="<pr_id>")
+musehub_merge_pr(repo_id="{rid}", pr_id="<pr_id>")
 ```
 """),
         ],
@@ -797,7 +846,7 @@ musehub_create_repo(
 )
 ```
 
-Optionally use `musehub_compose_with_preferences()` to interactively scaffold
+Optionally use `musehub_create_with_preferences()` to interactively scaffold
 the initial state via elicitation.
 
 ## Phase 3 — Explore the state viewer
@@ -1105,188 +1154,3 @@ remains valid — repos using it continue to work. New repos can opt into the ne
     }
 
 
-def _agent_onboard(agent_name: str, domain: str) -> MCPPromptResult:
-    agent = agent_name or "the agent"
-    domain_hint = f" (primary domain: `{domain}`)" if domain else ""
-    return {
-        "description": f"Onboarding guide for {agent} as a first-class Muse citizen{domain_hint}.",
-        "messages": [
-            _msg("user", f"Help me onboard {agent} to MuseHub as an AI agent{domain_hint}."),
-            _msg("assistant", f"""\
-# Agent Onboarding — First-Class Muse Citizen{domain_hint}
-
-MuseHub and Muse treat AI agents as first-class citizens from day one.
-This guide walks {agent} through everything needed to operate fully and autonomously.
-
-## Step 1 — Authenticate with an agent JWT
-
-Agent tokens carry additional claims that unlock higher rate limits and agent-specific
-activity tracking. Authenticate via:
-- `POST /api/v1/auth/token` with `token_type: "agent"` claim in the payload
-- Or use the existing OAuth flow; agent-type JWTs are automatically detected
-
-## Step 2 — Discover the MCP entry point
-
-Any MuseHub HTML page exposes the MCP endpoint in its `<head>`:
-```html
-<link rel="muse-mcp" href="https://musehub.com/mcp">
-<link rel="muse-resource" href="muse://docs/overview">
-```
-
-Connect to the MCP server at `/mcp` using Streamable HTTP (MCP 2025-11-25).
-
-## Step 3 — Read the resource catalogue
-
-```
-muse://docs/overview      — What Muse is
-muse://docs/protocol      — Muse protocol specification
-muse://docs/domains       — Domain plugin authoring
-muse://domains            — Full domain registry (JSON)
-musehub://trending        — Top repos right now
-```
-
-## Step 4 — Discover domains relevant to your task
-
-```
-musehub_list_domains(query="{domain or '<your task domain>'}", verified=true)
-musehub_get_domain(scoped_id="{domain or '@author/slug'}")
-```
-
-Understanding the domain manifest is essential before creating any state.
-
-## Step 5 — Create or fork a repo
-
-```
-# New repo
-musehub_create_repo(
-    name="<agent project name>",
-    domain="{domain or '@author/slug'}",
-    visibility="public"
-)
-
-# Or fork an existing one
-musehub_fork_repo(repo_id="<source_repo_id>")
-```
-
-## Step 6 — Run your first read-modify-commit cycle
-
-```
-# Read
-musehub_get_context(repo_id="<repo_id>")
-musehub_get_view(repo_id="<repo_id>", ref="main")
-
-# Modify (generate new state artifacts using domain's dimensional model)
-
-# Commit via PR
-musehub_create_pr(
-    repo_id="<repo_id>",
-    title="Agent: <description of change>",
-    from_branch="<agent-branch>",
-    to_branch="main",
-    body="<what changed and why>"
-)
-```
-
-## Step 7 — Use dimension_ref for precise PR comments
-
-When leaving review comments, always anchor to a specific dimension ref:
-```
-musehub_create_pr_comment(
-    repo_id="<repo_id>",
-    pr_id="<pr_id>",
-    body="<agent observation>",
-    dimension_ref={{"dimension": "<dim>", "<key>": "<value>"}}
-)
-```
-
-## Rate limits and agent behaviour
-
-- Agent JWTs receive a higher base rate limit tier
-- Agent activity appears in the repository event stream with an "agent" badge
-- Prefer **read resources** over tools for repeated lookups (resources are cacheable)
-- Always read before writing — `musehub_get_context` is your oracle
-
-## Tools summary for agents
-
-| Goal | Tool |
-|------|------|
-| Discover domains | `musehub_list_domains`, `musehub_get_domain` |
-| Read repo state | `musehub_get_context`, `musehub_get_view`, `musehub_get_domain_insights` |
-| Compare state | `musehub_compare` |
-| Create state | `musehub_create_repo`, commit via PR workflow |
-| Review changes | `musehub_get_pr`, `musehub_create_pr_comment`, `musehub_submit_pr_review` |
-
-{agent} is now a first-class Muse citizen.
-"""),
-        ],
-    }
-
-
-def _push_workflow(repo_id: str = "", owner: str = "", slug: str = "") -> MCPPromptResult:
-    target = f"{owner}/{slug}" if (owner and slug) else (repo_id or "<owner>/<slug>")
-    return {
-        "description": "Step-by-step guide for pushing a local Muse repository to MuseHub.",
-        "messages": [
-            _msg("user", f"How do I push my local Muse repo to MuseHub? Target: {target}"),
-            _msg("assistant", f"""\
-# MuseHub Push Workflow
-
-## Step 1 — Confirm authentication
-
-```
-musehub_whoami()
-```
-
-If `authenticated` is `false`, create an agent token:
-
-```
-musehub_create_agent_token(agent_name="my-agent/1.0", expires_in_days=90)
-```
-
-Store it with:
-
-```
-muse config set musehub.token <token>
-```
-
-## Step 2 — Create or find the remote repo
-
-Create if it doesn't exist:
-
-```
-musehub_create_repo(name="<repo name>", visibility="public")
-```
-
-Find an existing one:
-
-```
-muse_remote(owner="{owner or '<owner>'}", slug="{slug or '<slug>'}")
-```
-
-## Step 3 — Add remote and push (terminal)
-
-```
-muse remote add origin https://musehub.ai/{target}
-muse push origin main
-```
-
-## Step 4 — Push via MCP tool (agent-native)
-
-```
-muse_push(
-    repo_id="{repo_id or '<repo_id>'}",
-    branch="main",
-    head_commit_id="<HEAD commit ID>",
-    commits=[...],
-    objects=[...]
-)
-```
-
-## Step 5 — Verify
-
-```
-musehub_browse_repo(repo_id="{repo_id or '<repo_id>'}")
-```
-"""),
-        ],
-    }

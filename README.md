@@ -28,9 +28,9 @@ musehub/
   models/               Pydantic request/response models
   mcp/
     dispatcher.py       Async JSON-RPC 2.0 engine (no SDK dependency)
-    tools/              27-tool catalogue (15 read + 12 write)
-    resources.py        20 musehub:// resources (5 static + 15 templated)
-    prompts.py          6 workflow prompts
+    tools/              40-tool catalogue (20 read + 15 write + 5 elicitation)
+    resources.py        29 musehub:// resources (12 static + 17 templated)
+    prompts.py          10 workflow prompts
     write_tools/        Write executor modules (repos, issues, PRs, releases, social)
     stdio_server.py     stdio transport for local dev / Cursor IDE
   templates/musehub/    Jinja2 + HTMX + Alpine.js web UI
@@ -97,13 +97,15 @@ MuseHub implements the full [MCP 2025-11-25 specification](https://modelcontextp
 }
 ```
 
-### Tools — 32 total
+### Tools — 40 total
 
-**Read tools (15):** browse repos, list branches, list/get commits, compare refs, read files, get musical analysis, search in-repo, list/get issues, list/get PRs, list releases, search public repos, get full AI context.
+**Read tools (20):** list branches, list/get commits, compare refs, read files, search in-repo, list/get issues, list/get PRs, list releases, search public repos, get full AI context, get domain info, get domain insights, get dimension view, list domains, get whoami, muse pull, muse remote.
 
-**Write tools (12):** create/fork repos, create/update issues, comment on issues, create/merge PRs, inline PR comments, submit PR reviews, create releases, star repos, create labels.
+**Write tools (15):** create/fork repos, create/update issues, comment on issues, create/merge PRs, inline PR comments, submit PR reviews, create releases, star repos, create labels, create agent token, muse push, muse config.
 
-**Elicitation-powered tools (5, MCP 2025-11-25):** interactive composition planner, interactive PR review, streaming platform OAuth connect, cloud DAW OAuth connect, interactive release creator.
+**Elicitation-powered tools (5, MCP 2025-11-25):** interactive creation planner, interactive PR review, streaming platform OAuth connect, cloud DAW OAuth connect, interactive release creator.
+
+> All repo-scoped tools accept either `repo_id` (UUID) or `owner` + `slug` (human-readable) — the dispatcher resolves transparently.
 
 > Write and elicitation tools require `Authorization: Bearer <jwt>`. Elicitation tools also require an active session (`Mcp-Session-Id`). They degrade gracefully for stateless clients.
 
@@ -118,7 +120,7 @@ MuseHub implements the full [MCP 2025-11-25 specification](https://modelcontextp
 
 **Session lifecycle:** `POST initialize` → receive `Mcp-Session-Id` → include on all subsequent requests → `DELETE /mcp` to close.
 
-### Resources — 20 total
+### Resources — 29 total
 
 Cacheable, URI-addressable reads via the `musehub://` scheme.
 
@@ -145,20 +147,22 @@ Cacheable, URI-addressable reads via the `musehub://` scheme.
 | `musehub://repos/{owner}/{slug}/timeline` | Musical evolution timeline |
 | `musehub://users/{username}` | User profile + public repos |
 
-### Prompts — 8 total
+### Prompts — 10 total
 
 Workflow guides that teach agents how to chain tools and resources:
 
 | Prompt | Purpose |
 |--------|---------|
-| `musehub/orientation` | Essential onboarding — what MuseHub is and which tool to use for what |
-| `musehub/contribute` | End-to-end contribution: browse → issue → commit → PR → merge |
-| `musehub/compose` | Musical composition workflow with analysis and MIDI push |
+| `musehub/orientation` | Essential onboarding for humans and agents; pass `caller_type: "agent"` for agent-specific guidance |
+| `musehub/contribute` | End-to-end contribution: orient → issue → commit → PR → merge (includes auth/push setup) |
+| `musehub/create` | Create a new Muse project from scratch with domain selection |
 | `musehub/review_pr` | Musical PR review with track/region-level inline comments |
 | `musehub/issue_triage` | Triage open issues: label, assign, link to milestones |
 | `musehub/release_prep` | Prepare a release: merged PRs → release notes → publish |
-| `musehub/onboard` | **New** — interactive artist onboarding via elicitation |
-| `musehub/release_to_world` | **New** — full release + streaming distribution pipeline |
+| `musehub/onboard` | Interactive artist onboarding via elicitation |
+| `musehub/release_to_world` | Full release + streaming distribution pipeline |
+| `musehub/domain-discovery` | Discover and evaluate available domain plugins |
+| `musehub/domain-authoring` | Author a new domain plugin from scratch |
 
 ### What an agent can do
 
@@ -166,13 +170,13 @@ Workflow guides that teach agents how to chain tools and resources:
 1.  Discover repos     musehub://trending  or  musehub_search_repos
 2.  Understand a repo  musehub_get_context → musehub://repos/{owner}/{slug}/analysis/{ref}
 3.  Open an issue      musehub_create_issue
-4.  Push a fix         musehub_browse_repo → compose MIDI → musehub_create_pr
+4.  Push a fix         musehub_get_context → compose MIDI → musehub_create_pr
 5.  Review a PR        musehub_review_pr_interactive  (elicitation-powered)
 6.  Create release     musehub_create_release_interactive  (form + platform OAuth)
 7.  Build social graph musehub_star_repo, musehub_fork_repo
 8.  Connect platforms  musehub_connect_streaming_platform  (Spotify, SoundCloud, …)
 9.  Connect cloud DAW  musehub_connect_daw_cloud  (LANDR, Splice, Soundtrap, …)
-10. Compose with AI    musehub_compose_with_preferences  (interviews user, returns plan)
+10. Compose with AI    musehub_create_with_preferences  (interviews user, returns plan)
 ```
 
 Full reference: [`docs/reference/mcp.md`](docs/reference/mcp.md)

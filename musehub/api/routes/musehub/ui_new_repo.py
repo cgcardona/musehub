@@ -32,7 +32,7 @@ from fastapi import status as http_status
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401 (used in route dependency)
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
 
 from musehub.api.routes.musehub._templates import templates as _templates
 from musehub.api.routes.musehub.htmx_helpers import is_htmx
@@ -45,50 +45,59 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="", tags=["musehub-ui-new-repo"])
 
-# Licence options surfaced in the wizard dropdown.
-_LICENSES: list[tuple[str, str]] = [
+# License sets by domain type — code domains use OSS licenses, music/MIDI use
+# Creative Commons. The generic set is a union used as a fallback.
+_LICENSES_CODE: list[tuple[str, str]] = [
     ("", "No license"),
-    ("CC0", "CC0 — Public Domain Dedication"),
+    ("MIT", "MIT License"),
+    ("Apache-2.0", "Apache 2.0"),
+    ("GPL-3.0", "GNU GPL v3"),
+    ("AGPL-3.0", "AGPL v3"),
+    ("BSD-2-Clause", "BSD 2-Clause"),
+]
+
+_LICENSES_MUSIC: list[tuple[str, str]] = [
+    ("", "No license"),
+    ("CC0", "CC0 — Public Domain"),
     ("CC BY", "CC BY — Attribution"),
-    ("CC BY-SA", "CC BY-SA — Attribution-ShareAlike"),
-    ("CC BY-NC", "CC BY-NC — Attribution-NonCommercial"),
+    ("CC BY-SA", "CC BY-SA — ShareAlike"),
+    ("CC BY-NC", "CC BY-NC — NonCommercial"),
+    ("ARR", "All Rights Reserved"),
+]
+
+_LICENSES_GENERIC: list[tuple[str, str]] = [
+    ("", "No license"),
+    ("MIT", "MIT License"),
+    ("Apache-2.0", "Apache 2.0"),
+    ("GPL-3.0", "GNU GPL v3"),
+    ("CC0", "CC0 — Public Domain"),
+    ("CC BY", "CC BY — Attribution"),
+    ("CC BY-SA", "CC BY-SA — ShareAlike"),
     ("ARR", "All Rights Reserved"),
 ]
 
 
+def licenses_for_viewer_type(viewer_type: str) -> list[tuple[str, str]]:
+    """Return the appropriate license list for a given domain viewer type."""
+    if viewer_type == "symbol_graph":
+        return _LICENSES_CODE
+    if viewer_type == "piano_roll":
+        return _LICENSES_MUSIC
+    return _LICENSES_GENERIC
+
+
 @router.get(
     "/new",
-    response_class=HTMLResponse,
-    summary="New repo creation wizard",
-    operation_id="newRepoWizardPage",
+    summary="Redirect to domain browser — repos require a domain context",
+    operation_id="newRepoRedirect",
 )
-async def new_repo_page(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the SSR new repo creation wizard form.
+async def new_repo_redirect() -> Response:
+    """Every repository must belong to a domain.
 
-    License options and available domain plugins are rendered server-side.
-    Alpine.js handles the visibility radio toggle; HTMX handles the live name
-    availability check. Renders without auth so the page is always reachable.
+    Navigate to a domain's detail page and use the 'Create repository' button
+    to start the scoped creation wizard at /domains/@{author}/{slug}/new.
     """
-    domains_result = await musehub_domains.list_domains(db, page_size=50)
-    ctx: dict[str, object] = {
-        "title": "Create a new repository",
-        "licenses": _LICENSES,
-        "current_page": "new_repo",
-        "available_domains": [
-            {
-                "domain_id": d.domain_id,
-                "scoped_id": d.scoped_id,
-                "display_name": d.display_name,
-                "viewer_type": d.viewer_type,
-                "dimension_count": len(d.capabilities.get("dimensions", [])),
-            }
-            for d in domains_result.domains
-        ],
-    }
-    return _templates.TemplateResponse(request, "musehub/pages/new_repo.html", ctx)
+    return RedirectResponse(url="/domains", status_code=302)
 
 
 @router.post(

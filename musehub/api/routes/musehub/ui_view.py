@@ -292,7 +292,8 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
 
     commits_rows = (await db.execute(
         sa_select(musehub_db.MusehubCommit.author, musehub_db.MusehubCommit.timestamp,
-                  musehub_db.MusehubCommit.branch, musehub_db.MusehubCommit.message)
+                  musehub_db.MusehubCommit.branch, musehub_db.MusehubCommit.message,
+                  musehub_db.MusehubCommit.commit_meta)
         .where(musehub_db.MusehubCommit.repo_id == repo_id)
         .order_by(musehub_db.MusehubCommit.timestamp.desc())
     )).all()
@@ -364,6 +365,87 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
         for row in commits_rows[:10]
     ]
 
+    # ── Muse-exclusive semantic intelligence ──────────────────────────────────
+    import re as _re
+    _conv_re = _re.compile(r'^(\w+)(\([^)]*\))?(!)?:', _re.IGNORECASE)
+    _KNOWN_TYPES = {"feat", "fix", "refactor", "docs", "test", "chore", "perf", "ci", "build", "style"}
+
+    type_counts: dict[str, int] = {}
+    agent_count = 0
+    breaking_count = 0
+    semver_counts: dict[str, int] = {"major": 0, "minor": 0, "patch": 0, "none": 0}
+    sym_added_total = 0
+    sym_removed_total = 0
+    conventional_count = 0
+    breaking_commits: list[dict[str, str]] = []
+
+    for row in commits_rows:
+        meta: dict[str, Any] = dict(row.commit_meta or {}) if row.commit_meta else {}
+        msg = (row.message or "").strip()
+
+        # Conventional commit type
+        m = _conv_re.match(msg)
+        if m:
+            conventional_count += 1
+            ctype = m.group(1).lower()
+            if ctype not in _KNOWN_TYPES:
+                ctype = "other"
+        else:
+            ctype = "other"
+        type_counts[ctype] = type_counts.get(ctype, 0) + 1
+
+        # Agent authorship
+        if meta.get("agent_id"):
+            agent_count += 1
+
+        # Breaking change (bang suffix or explicit flag)
+        is_breaking = bool((m and m.group(3)) or meta.get("breaking_changes"))
+        if is_breaking:
+            breaking_count += 1
+            if len(breaking_commits) < 5:
+                breaking_commits.append({
+                    "message": msg[:80],
+                    "author": row.author or "",
+                    "date": row.timestamp.date().isoformat() if row.timestamp else "",
+                })
+
+        # Semver bump
+        bump = str(meta.get("sem_ver_bump") or "none").lower()
+        if bump not in semver_counts:
+            bump = "none"
+        semver_counts[bump] += 1
+
+        # Symbol velocity from structured_delta
+        delta: dict[str, Any] = meta.get("structured_delta") or {}
+        for file_op in delta.get("ops", []):
+            for child_op in (file_op.get("child_ops") or []):
+                op = child_op.get("op", "")
+                if op == "insert":
+                    sym_added_total += 1
+                elif op == "delete":
+                    sym_removed_total += 1
+
+    total_c = len(commits_rows)
+    conventional_pct = round(conventional_count / total_c * 100) if total_c else 0
+    agent_pct = round(agent_count / total_c * 100) if total_c else 0
+    human_count = total_c - agent_count
+
+    # Sort type_counts for display; ensure known types come first
+    _TYPE_ORDER = ["feat", "fix", "refactor", "docs", "test", "chore", "perf", "ci", "build", "style", "other"]
+    type_bars: list[dict[str, Any]] = []
+    max_type = max(type_counts.values(), default=1)
+    for t in _TYPE_ORDER:
+        cnt = type_counts.get(t, 0)
+        if cnt:
+            type_bars.append({
+                "name": t,
+                "count": cnt,
+                "pct": round(cnt / total_c * 100) if total_c else 0,
+                "bar_pct": round(cnt / max_type * 100),
+            })
+
+    sym_net = sym_added_total - sym_removed_total
+
     code_file_count = sum(
         1 for path, _ in objects_rows
         if Path(path).suffix.lstrip(".").lower() in _CODE_EXTS
@@ -386,6 +468,18 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
         "recent_commits": recent_commits,
         "total_size_kb": round(total_bytes / 1024),
         "avg_file_kb": round(total_bytes / max(total_files, 1) / 1024, 1),
+        # Muse-exclusive semantic intelligence
+        "type_bars": type_bars,
+        "agent_count": agent_count,
+        "human_count": human_count,
+        "agent_pct": agent_pct,
+        "breaking_count": breaking_count,
+        "breaking_commits": breaking_commits,
+        "semver_counts": semver_counts,
+        "sym_added_total": sym_added_total,
+        "sym_removed_total": sym_removed_total,
+        "sym_net": sym_net,
+        "conventional_pct": conventional_pct,
     }
 
 

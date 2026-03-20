@@ -13,13 +13,11 @@
 {# Out-of-band swap: updates the repo count badge without it being inside #repo-grid #}
 <span id="repo-count" hx-swap-oob="true" style="color:#8b949e">{{ total }} repositories</span>
 
-{% set dim_colors = ['--dim-a', '--dim-b', '--dim-c', '--dim-d', '--dim-e'] %}
 {% if repos %}
 <div class="repo-card-grid">
   {% for repo in repos %}
   <a href="/{{ repo.owner | urlencode }}/{{ repo.slug | urlencode }}"
-     class="repo-card"
-     style="border-top-color: var({{ dim_colors[loop.index0 % 5] }})">
+     class="repo-card">
     <div class="repo-card-header">
       <span class="repo-card-name">{{ repo.owner }}<span class="repo-card-sep">/</span>{{ repo.slug }}</span>
       {% if repo.domain_scoped_id is defined and repo.domain_scoped_id %}

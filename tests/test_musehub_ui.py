@@ -281,8 +281,8 @@ async def test_ui_commit_page_shows_artifact_links(
     # SSR: commit message and metadata appear server-side
     assert "Add bridge section" in body
     assert "testuser" in body
-    # Link to view page present
-    assert f"/view/{commit_id}" in body
+    # Diff link is always present (view/play link only appears when audio_url is set)
+    assert f"/commits/{commit_id}/diff" in body
 
 
 @pytest.mark.anyio
@@ -2504,21 +2504,6 @@ async def test_profile_forked_repos_no_auth_required(
     assert response.status_code != 401
 
 
-@pytest.mark.skip(reason="profile page now uses ui_user_profile.py inline renderer, not profile.html template")
-@pytest.mark.anyio
-async def test_profile_page_has_forked_section_js(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Profile HTML page includes the forked repos JS (loadForkedRepos, forked-section)."""
-    await _make_profile(db_session, "jsforkuser")
-    response = await client.get("/jsforkuser")
-    assert response.status_code == 200
-    body = response.text
-    assert "loadForkedRepos" in body
-    assert "forked-section" in body
-    assert "API_FORKS" in body
-    assert "forked from" in body
 
 
 # ---------------------------------------------------------------------------
@@ -2650,21 +2635,6 @@ async def test_profile_starred_repos_ordered_newest_first(
     assert data["starred"][1]["repo"]["slug"] == "track-alpha"
 
 
-@pytest.mark.skip(reason="profile page now uses ui_user_profile.py inline renderer, not profile.html template")
-@pytest.mark.anyio
-async def test_profile_page_has_starred_section_js(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Profile HTML page includes the starred repos JS (loadStarredRepos, starred-section)."""
-    await _make_profile(db_session, "jsstaruser")
-    response = await client.get("/jsstaruser")
-    assert response.status_code == 200
-    body = response.text
-    assert "loadStarredRepos" in body
-    assert "starred-section" in body
-    assert "API_STARRED" in body
-    assert "starredRepoCardHtml" in body
 
 
 # ---------------------------------------------------------------------------
@@ -2796,20 +2766,6 @@ async def test_profile_watched_repos_ordered_newest_first(
     assert data["watched"][1]["repo"]["slug"] == "song-alpha"
 
 
-@pytest.mark.skip(reason="profile page now uses ui_user_profile.py inline renderer, not profile.html template")
-@pytest.mark.anyio
-async def test_profile_page_has_watched_section_js(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Profile HTML page includes the watched repos JS (loadWatchedRepos, watched-section)."""
-    await _make_profile(db_session, "jswatchuser")
-    response = await client.get("/users/jswatchuser")
-    assert response.status_code == 200
-    body = response.text
-    assert "loadWatchedRepos" in body
-    assert "watched-section" in body
-    assert "API_WATCHED" in body
 
 
 @pytest.mark.anyio
@@ -4268,13 +4224,13 @@ async def test_ui_unknown_owner_slug_returns_404(
 
 @pytest.mark.anyio
 async def test_design_tokens_css_served(client: AsyncClient) -> None:
-    """GET /static/tokens.css must return 200 with CSS content-type.
+    """GET /static/app.css must return 200 with CSS design tokens.
 
-    Verifies the design token file is reachable at its canonical static path.
-    If this fails, every MuseHub page will render unstyled because the CSS
-    custom properties (--bg-base, --color-accent, etc.) will be missing.
+    All CSS (design tokens, components, layout, icons, music) is consolidated
+    into app.css. Verifies the bundle is reachable and contains the expected
+    custom properties (--bg-base, --color-accent, etc.).
     """
-    response = await client.get("/static/tokens.css")
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     body = response.text
@@ -4285,12 +4241,11 @@ async def test_design_tokens_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_components_css_served(client: AsyncClient) -> None:
-    """GET /static/components.css must return 200 with CSS content.
+    """GET /static/app.css contains component classes (.badge, .btn, .card).
 
-    Verifies the component class file is reachable. These classes (.card,
-    .badge, .btn, etc.) are used on every MuseHub page.
+    CSS is consolidated into app.css — no separate components.css file exists.
     """
-    response = await client.get("/static/components.css")
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     body = response.text
@@ -4301,8 +4256,8 @@ async def test_components_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_layout_css_served(client: AsyncClient) -> None:
-    """GET /static/layout.css must return 200."""
-    response = await client.get("/static/layout.css")
+    """GET /static/app.css contains layout classes (.container etc.)."""
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     assert ".container" in response.text
@@ -4310,8 +4265,8 @@ async def test_layout_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_icons_css_served(client: AsyncClient) -> None:
-    """GET /static/icons.css must return 200."""
-    response = await client.get("/static/icons.css")
+    """GET /static/app.css contains icon classes (.icon-mid etc.)."""
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     assert ".icon-mid" in response.text
@@ -4319,8 +4274,8 @@ async def test_icons_css_served(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_music_css_served(client: AsyncClient) -> None:
-    """GET /static/music.css must return 200."""
-    response = await client.get("/static/music.css")
+    """GET /static/app.css contains music viewer classes (.piano-roll etc.)."""
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     assert ".piano-roll" in response.text
@@ -4382,24 +4337,36 @@ async def test_responsive_meta_tag_present_issues_page(
 async def test_design_tokens_css_contains_dimension_colors(
     client: AsyncClient,
 ) -> None:
-    """tokens.css must define all five musical dimension color tokens.
+    """app.css must define all MIDI analysis dimension color tokens.
 
-    These tokens are used in piano rolls, radar charts, and diff heatmaps.
-    Missing tokens would break analysis page visualisations silently.
+    Two families of dimension tokens exist:
+    - Analysis dimensions (harmonic, rhythmic, melodic, structural, dynamic) —
+      used in radar charts and diff heatmaps.
+    - MIDI note dimensions (a–e) — used in piano roll track coloring.
+    Each dimension has a base token and a muted variant.
+    Missing tokens silently break analysis and piano roll visualisations.
     """
-    response = await client.get("/static/tokens.css")
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     body = response.text
+    # Analysis dimensions
     for dim in ("harmonic", "rhythmic", "melodic", "structural", "dynamic"):
-        assert f"--dim-{dim}:" in body, f"Missing dimension token --dim-{dim}"
+        assert f"--dim-{dim}:" in body, f"Missing analysis dimension token --dim-{dim}"
+        assert f"--dim-{dim}-muted:" in body, f"Missing muted variant --dim-{dim}-muted"
+    # MIDI note dimensions
+    for note in ("a", "b", "c", "d", "e"):
+        assert f"--dim-{note}:" in body, f"Missing MIDI note dimension token --dim-{note}"
+        assert f"--dim-{note}-muted:" in body, f"Missing muted variant --dim-{note}-muted"
+    # Base dimension color
+    assert "--dim-color:" in body, "Missing base --dim-color token"
 
 
 @pytest.mark.anyio
 async def test_design_tokens_css_contains_track_colors(
     client: AsyncClient,
 ) -> None:
-    """tokens.css must define all 8 track color tokens (--track-0 through --track-7)."""
-    response = await client.get("/static/tokens.css")
+    """app.css must define all 8 track color tokens (--track-0 through --track-7)."""
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     body = response.text
     for i in range(8):
@@ -4408,8 +4375,8 @@ async def test_design_tokens_css_contains_track_colors(
 
 @pytest.mark.anyio
 async def test_badge_variants_in_components_css(client: AsyncClient) -> None:
-    """components.css must define all required badge variants including .badge-clean and .badge-dirty."""
-    response = await client.get("/static/components.css")
+    """app.css must define all required badge variants including .badge-clean and .badge-dirty."""
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     body = response.text
     for variant in ("open", "closed", "merged", "active", "clean", "dirty"):
@@ -4418,8 +4385,8 @@ async def test_badge_variants_in_components_css(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_file_type_icons_in_icons_css(client: AsyncClient) -> None:
-    """icons.css must define icon classes for all required file types."""
-    response = await client.get("/static/icons.css")
+    """app.css must define icon classes for all required file types."""
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     body = response.text
     for ext in ("mid", "mp3", "wav", "json", "webp", "xml", "abc"):
@@ -6920,7 +6887,7 @@ async def test_commit_detail_nav_has_parent_link(
     assert response.status_code == 200
     body = response.text
     # SSR renders parent commit link when parent_ids is non-empty
-    assert "Parent:" in body
+    assert "Parent" in body
     # Parent SHA abbreviated to 8 chars in href
     assert "aaaa0000" in body
 
@@ -7622,8 +7589,8 @@ async def test_reaction_bar_components_css_has_styles(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """components.css must define .reaction-bar and .reaction-btn CSS classes."""
-    response = await client.get("/static/components.css")
+    """app.css must define .reaction-bar and .reaction-btn CSS classes."""
+    response = await client.get("/static/app.css")
     assert response.status_code == 200
     body = response.text
     assert ".reaction-bar" in body
@@ -8105,34 +8072,20 @@ async def _make_follow(
     return row
 
 
-@pytest.mark.skip(reason="profile page now uses ui_user_profile.py inline renderer, not profile.html template")
 @pytest.mark.anyio
 async def test_profile_page_has_followers_following_tabs(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Profile page must render Followers and Following tab buttons."""
+    """Profile page renders Followers and Following tab buttons."""
     await _make_profile(db_session, username="tabuser")
-    response = await client.get("/users/tabuser")
+    response = await client.get("/tabuser")
     assert response.status_code == 200
     body = response.text
-    assert "tab-btn-followers" in body
-    assert "tab-btn-following" in body
+    assert 'data-tab="followers"' in body
+    assert 'data-tab="following"' in body
 
 
-@pytest.mark.skip(reason="profile page now uses ui_user_profile.py inline renderer, not profile.html template")
-@pytest.mark.anyio
-async def test_profile_page_has_user_card_js(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Profile page must include userCardHtml and loadFollowTab JS helpers."""
-    await _make_profile(db_session, username="cardjsuser")
-    response = await client.get("/users/cardjsuser")
-    assert response.status_code == 200
-    body = response.text
-    assert "userCardHtml" in body
-    assert "loadFollowTab" in body
 
 
 @pytest.mark.anyio
@@ -8480,7 +8433,8 @@ async def test_commit_page_context_passes_listen_and_embed_urls(
     body = response.text
     assert "audioUrl" in body
     assert "viewerType" in body
-    assert f"/view/{commit_id}" in body
+    # /view/ link only appears for piano_roll domain repos; diff link is always present
+    assert f"/commits/{commit_id}/diff" in body
 
 
 # ---------------------------------------------------------------------------
@@ -8603,7 +8557,7 @@ async def test_explore_page_has_filter_sidebar(
     response = await client.get("/explore")
     assert response.status_code == 200
     body = response.text
-    assert "explore-sidebar" in body
+    assert "ex-sidebar" in body
     assert "Clear filters" in body
     assert "Sort by" in body
     assert "License" in body
@@ -8659,7 +8613,7 @@ async def test_explore_page_has_audio_preview_js(
     assert response.status_code == 200
     body = response.text
     assert "filter-form" in body
-    assert "explore-layout" in body
+    assert "ex-browse" in body
     assert "repo-grid" in body
 
 

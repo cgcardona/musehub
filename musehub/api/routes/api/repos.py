@@ -99,7 +99,7 @@ async def create_repo_endpoint(
     visibility = "private" if body.get("is_private") else "public"
 
     if not name:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="name is required")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="name is required")
 
     result = await create_repo(
         session,

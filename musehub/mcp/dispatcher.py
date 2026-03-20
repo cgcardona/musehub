@@ -263,19 +263,20 @@ def _handle_initialize(params: JSONObject) -> JSONObject:
             },
             "logging": {},
         },
-        "instructions": (
-            "MuseHub is the collaboration hub for Muse — the world's first "
-            "domain-agnostic, multi-dimensional version control system. "
-            "Muse tracks multidimensional state across any domain: MIDI (21 dimensions), "
-            "Code (10 languages), Genomics, Circuit Design, and any custom domain plugin. "
-            "Start with musehub_list_domains to discover domains, "
-            "musehub_browse_repo to explore repositories, "
-            "musehub_get_domain to read a domain manifest, "
-            "and musehub_get_view to inspect full multidimensional state. "
-            "Elicitation (MCP 2025-11-25) is fully supported for interactive workflows. "
-            "AI agents are first-class citizens: use an agent JWT for higher rate limits "
-            "and activity feed visibility."
-        ),
+            "instructions": (
+                "MuseHub is the collaboration hub for Muse — the world's first "
+                "domain-agnostic, multi-dimensional version control system. "
+                "Muse tracks multidimensional state across any domain: MIDI (21 dimensions), "
+                "Code (10 languages), Genomics, Circuit Design, and any custom domain plugin. "
+                "Start with musehub_get_context to orient yourself within a repository, "
+                "musehub_list_domains to discover domain plugins, "
+                "musehub_get_domain to read a domain manifest, "
+                "and musehub_get_view to inspect full multidimensional state. "
+                "All repo-scoped tools accept either repo_id (UUID) or owner + slug. "
+                "Elicitation (MCP 2025-11-25) is fully supported for interactive workflows. "
+                "AI agents are first-class citizens: use an agent JWT for higher rate limits "
+                "and activity feed visibility."
+            ),
     }
 
 
@@ -345,11 +346,43 @@ async def _handle_tools_call(
         agent_name=agent_name,
     )
 
+    # Resolve owner+slug → repo_id transparently so all repo-scoped tools
+    # can be called with either addressing scheme.
+    if not arguments.get("repo_id") and arguments.get("owner") and arguments.get("slug"):
+        resolved_id, resolve_err = await _resolve_repo_id(
+            str(arguments["owner"]), str(arguments["slug"])
+        )
+        if resolve_err:
+            return _tool_error(resolve_err)
+        arguments = {**arguments, "repo_id": resolved_id}
+
     try:
         return await _call_tool(name, arguments, ctx=ctx)
     except Exception as exc:
         logger.exception("Tool execution error (tool=%s): %s", name, exc)
         return _tool_error(f"Internal error executing tool '{name}': {exc}")
+
+
+async def _resolve_repo_id(owner: str, slug: str) -> tuple[str, str | None]:
+    """Resolve a repo_id from owner/slug addressing.
+
+    Returns ``(repo_id, None)`` on success or ``("", error_message)`` on failure.
+    Used so that all repo-scoped tools can accept either ``repo_id`` or
+    ``owner`` + ``slug`` interchangeably.
+    """
+    try:
+        from musehub.services.musehub_mcp_executor import _check_db_available
+        if (err := _check_db_available()) is not None:
+            return "", err.error_message or "Database unavailable"
+        from musehub.db.database import AsyncSessionLocal
+        from musehub.services import musehub_repository as _repo_svc
+        async with AsyncSessionLocal() as db:
+            repo = await _repo_svc.get_repo_by_owner_slug(db, owner, slug)
+            if repo is None:
+                return "", f"Repository '{owner}/{slug}' not found."
+            return repo.repo_id, None
+    except Exception as exc:
+        return "", f"Failed to resolve repository '{owner}/{slug}': {exc}"
 
 
 async def _call_tool(
@@ -399,9 +432,7 @@ async def _call_tool(
 
     # ── Read tools ────────────────────────────────────────────────────────────
 
-    if name == "musehub_browse_repo":
-        result = await exe.execute_browse_repo(_str("repo_id"))
-    elif name == "musehub_list_branches":
+    if name == "musehub_list_branches":
         result = await exe.execute_list_branches(_str("repo_id"))
     elif name == "musehub_list_commits":
         result = await exe.execute_list_commits(
@@ -411,11 +442,6 @@ async def _call_tool(
         )
     elif name == "musehub_read_file":
         result = await exe.execute_read_file(_str("repo_id"), _str("object_id"))
-    elif name == "musehub_get_analysis":
-        result = await exe.execute_get_analysis(
-            _str("repo_id"),
-            dimension=_str_or_none("dimension") or "overview",
-        )
     elif name == "musehub_search":
         result = await exe.execute_search(
             _str("repo_id"),
@@ -590,7 +616,7 @@ async def _call_tool(
 
     # ── Elicitation-powered tools (MCP 2025-11-25) ────────────────────────────
 
-    elif name == "musehub_compose_with_preferences":
+    elif name == "musehub_create_with_preferences":
         from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
         result = await execute_compose_with_preferences(
             repo_id=_str_or_none("repo_id"),
@@ -633,12 +659,6 @@ async def _call_tool(
             agent_name=_str("agent_name"),
             expires_in_days=_int("expires_in_days", 90),
         )
-    elif name == "muse_clone":
-        result = await exe.execute_muse_clone(
-            owner=_str("owner"),
-            slug=_str("slug"),
-            ref=_str_or_none("ref"),
-        )
     elif name == "muse_push":
         _raw_commits = arguments.get("commits")
         _raw_objects = arguments.get("objects")
@@ -662,6 +682,7 @@ async def _call_tool(
         result = await exe.execute_muse_remote(
             owner=_str("owner"),
             slug=_str("slug"),
+            ref=_str_or_none("ref"),
         )
     elif name == "muse_config":
         result = await exe.execute_muse_config(

@@ -50,87 +50,252 @@
 
   {% if domain.viewer_type == 'symbol_graph' and metrics %}
   {# ══════════════════════════════════════════════════════════════════════════
-     CODE DOMAIN INSIGHTS
+     MUSE-EXCLUSIVE SEMANTIC INTELLIGENCE — impossible with Git
   ══════════════════════════════════════════════════════════════════════════ #}
 
-  {# ── Hero stat cards ──────────────────────────────────────────────────── #}
+  <div class="ins-muse-banner">
+    <span class="ins-muse-badge">Muse exclusive</span>
+    <span class="ins-muse-banner-text">Semantic commit intelligence — structured metadata Git cannot express</span>
+  </div>
+
+  {# ── Top-level semantic stat strip ────────────────────────────────────── #}
   <div class="ins-stat-grid">
-    <div class="ins-stat-card ins-stat-card--commits">
-      <div class="ins-stat-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+    <div class="ins-stat-card">
+      <div class="ins-stat-icon ins-stat-icon--commits">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
       </div>
       <div class="ins-stat-body">
         <span class="ins-stat-value">{{ metrics.total_commits }}</span>
-        <span class="ins-stat-label">Commits</span>
+        <span class="ins-stat-label">Total commits</span>
       </div>
     </div>
-    <div class="ins-stat-card ins-stat-card--files">
-      <div class="ins-stat-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <div class="ins-stat-card">
+      <div class="ins-stat-icon ins-stat-icon--conventional">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
       <div class="ins-stat-body">
-        <span class="ins-stat-value">{{ metrics.total_files }}</span>
-        <span class="ins-stat-label">Files</span>
+        <span class="ins-stat-value">{{ metrics.conventional_pct }}%</span>
+        <span class="ins-stat-label">Conventional commits</span>
       </div>
     </div>
-    <div class="ins-stat-card ins-stat-card--contributors">
-      <div class="ins-stat-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <div class="ins-stat-card ins-stat-card--warning">
+      <div class="ins-stat-icon ins-stat-icon--breaking">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </div>
       <div class="ins-stat-body">
-        <span class="ins-stat-value">{{ metrics.contributor_count }}</span>
-        <span class="ins-stat-label">Contributors</span>
+        <span class="ins-stat-value">{{ metrics.breaking_count }}</span>
+        <span class="ins-stat-label">Breaking changes</span>
       </div>
     </div>
-    <div class="ins-stat-card ins-stat-card--branches">
-      <div class="ins-stat-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+    <div class="ins-stat-card ins-stat-card--agent">
+      <div class="ins-stat-icon ins-stat-icon--agent">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
       </div>
       <div class="ins-stat-body">
-        <span class="ins-stat-value">{{ metrics.total_branches }}</span>
-        <span class="ins-stat-label">Branches</span>
+        <span class="ins-stat-value">{{ metrics.agent_pct }}%</span>
+        <span class="ins-stat-label">Agent-authored</span>
       </div>
     </div>
-    <div class="ins-stat-card ins-stat-card--size">
-      <div class="ins-stat-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+    <div class="ins-stat-card">
+      <div class="ins-stat-icon ins-stat-icon--sym-add">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </div>
       <div class="ins-stat-body">
-        <span class="ins-stat-value">{{ metrics.total_size_kb }}KB</span>
-        <span class="ins-stat-label">Source size</span>
+        <span class="ins-stat-value">{{ metrics.sym_added_total }}</span>
+        <span class="ins-stat-label">Symbols added</span>
       </div>
     </div>
-    <div class="ins-stat-card ins-stat-card--tests">
-      <div class="ins-stat-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    <div class="ins-stat-card">
+      <div class="ins-stat-icon ins-stat-icon--sym-del">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </div>
       <div class="ins-stat-body">
-        <span class="ins-stat-value">{{ metrics.test_ratio }}%</span>
-        <span class="ins-stat-label">Test coverage proxy</span>
+        <span class="ins-stat-value">{{ metrics.sym_removed_total }}</span>
+        <span class="ins-stat-label">Symbols removed</span>
       </div>
     </div>
   </div>
 
-  {# ── Two column: language chart + contributors ─────────────────────────── #}
-  <div class="ins-two-col">
+  {# ── Three-column Muse intelligence row ───────────────────────────────── #}
+  <div class="ins-intel-row">
 
+    {# Commit DNA #}
+    <div class="ins-card">
+      <div class="ins-card-header">
+        <h3 class="ins-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Commit DNA
+        </h3>
+        <span class="ins-card-meta">by intent</span>
+      </div>
+      {% set type_colors = {'feat': '#3fb950', 'fix': '#f85149', 'refactor': '#58a6ff', 'docs': '#e3b341', 'test': '#a371f7', 'chore': '#8b949e', 'perf': '#79c0ff', 'ci': '#bc8cff', 'build': '#ffa657', 'style': '#ff7b72', 'other': '#484f58'} %}
+      <div class="ins-dna-stack">
+        {% for t in metrics.type_bars %}
+        <div class="ins-dna-seg" style="width:{{ t.pct }}%;background:{{ type_colors.get(t.name, '#484f58') }}" title="{{ t.name }}: {{ t.count }} commits ({{ t.pct }}%)"></div>
+        {% endfor %}
+      </div>
+      <div class="ins-type-list">
+        {% for t in metrics.type_bars %}
+        <div class="ins-type-row">
+          <span class="ins-type-dot" style="background:{{ type_colors.get(t.name, '#484f58') }}"></span>
+          <code class="ins-type-name">{{ t.name }}</code>
+          <div class="ins-lang-bar-track">
+            <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ t.bar_pct }}%;background:{{ type_colors.get(t.name, '#484f58') }};opacity:0.5;width:{{ t.bar_pct }}%"></div>
+          </div>
+          <span class="ins-type-count">{{ t.count }}</span>
+          <span class="ins-type-pct">{{ t.pct }}%</span>
+        </div>
+        {% endfor %}
+        {% if not metrics.type_bars %}
+        <p class="ins-empty-note">No conventional commits detected yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Human vs Agent #}
+    <div class="ins-card">
+      <div class="ins-card-header">
+        <h3 class="ins-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>
+          Authorship
+        </h3>
+        <span class="ins-card-meta">human vs agent</span>
+      </div>
+      <div class="ins-authorship">
+        <div class="ins-authorship-donut">
+          {% set r = 34 %}
+          {% set circ = 3.14159 * r * 2 %}
+          {% set agent_dash = (metrics.agent_pct / 100 * circ) | round(1) %}
+          <svg viewBox="0 0 100 100" class="ins-donut">
+            <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--border-subtle)" stroke-width="14"/>
+            <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="#3fb950" stroke-width="14"
+              stroke-dasharray="{{ circ - agent_dash }} {{ circ }}"
+              stroke-dashoffset="{{ circ / 4 }}"
+              stroke-linecap="round"/>
+            {% if metrics.agent_pct > 0 %}
+            <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="#bc8cff" stroke-width="14"
+              stroke-dasharray="{{ agent_dash }} {{ circ }}"
+              stroke-dashoffset="{{ circ / 4 - (circ - agent_dash) }}"
+              stroke-linecap="round"/>
+            {% endif %}
+            <text x="50" y="46" text-anchor="middle" fill="var(--text-primary)" font-size="14" font-weight="700" font-family="var(--font-mono)">{{ metrics.human_count }}</text>
+            <text x="50" y="59" text-anchor="middle" fill="var(--text-muted)" font-size="7">human</text>
+          </svg>
+        </div>
+        <div class="ins-authorship-legend">
+          <div class="ins-auth-row">
+            <span class="ins-auth-dot" style="background:#3fb950"></span>
+            <span class="ins-auth-label">Human</span>
+            <span class="ins-auth-count">{{ metrics.human_count }}</span>
+            <span class="ins-auth-pct">{{ 100 - metrics.agent_pct }}%</span>
+          </div>
+          <div class="ins-auth-row">
+            <span class="ins-auth-dot" style="background:#bc8cff"></span>
+            <span class="ins-auth-label">Agent (AI)</span>
+            <span class="ins-auth-count">{{ metrics.agent_count }}</span>
+            <span class="ins-auth-pct">{{ metrics.agent_pct }}%</span>
+          </div>
+        </div>
+      </div>
+      {% if metrics.agent_count == 0 %}
+      <p class="ins-empty-note" style="margin-top:var(--space-3)">No agent-authored commits detected. Push commits with <code>agent_id</code> in meta to track AI contributions.</p>
+      {% endif %}
+    </div>
+
+    {# Semver Arc + Breaking Changes #}
+    <div class="ins-card">
+      <div class="ins-card-header">
+        <h3 class="ins-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Semantic Version Arc
+        </h3>
+        <span class="ins-card-meta">bump distribution</span>
+      </div>
+      {% set sv = metrics.semver_counts %}
+      {% set sv_total = (sv.major + sv.minor + sv.patch + sv.none) | default(1) %}
+      <div class="ins-semver-bars">
+        {% for label, color, key in [('major', '#f85149', 'major'), ('minor', '#e3b341', 'minor'), ('patch', '#3fb950', 'patch'), ('none', '#484f58', 'none')] %}
+        {% set cnt = sv.get(key, 0) %}
+        {% set pct = (cnt / sv_total * 100) | round %}
+        <div class="ins-semver-row">
+          <span class="ins-semver-label" style="color:{{ color }}">{{ label }}</span>
+          <div class="ins-lang-bar-track">
+            <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ pct }}%;background:{{ color }};opacity:0.7;width:{{ pct }}%"></div>
+          </div>
+          <span class="ins-semver-count">{{ cnt }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% if metrics.breaking_count > 0 %}
+      <div class="ins-breaking-list">
+        <p class="ins-breaking-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          {{ metrics.breaking_count }} breaking change{{ 's' if metrics.breaking_count != 1 }}
+        </p>
+        {% for b in metrics.breaking_commits %}
+        <div class="ins-breaking-row">
+          <span class="ins-breaking-date">{{ b.date }}</span>
+          <span class="ins-breaking-msg">{{ b.message[:60] }}{% if b.message | length > 60 %}…{% endif %}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="ins-empty-note" style="margin-top:var(--space-3)">No breaking changes detected.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {# ── Symbol velocity ───────────────────────────────────────────────────── #}
+  {% if metrics.sym_added_total > 0 or metrics.sym_removed_total > 0 %}
+  <div class="ins-card ins-sym-velocity">
+    <div class="ins-card-header">
+      <h3 class="ins-card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Symbol Velocity
+      </h3>
+      <span class="ins-card-meta">AST-level churn across all commits — not just line counts</span>
+    </div>
+    <div class="ins-sym-stats">
+      <div class="ins-sym-stat ins-sym-stat--add">
+        <span class="ins-sym-stat-val">+{{ metrics.sym_added_total }}</span>
+        <span class="ins-sym-stat-label">symbols added</span>
+      </div>
+      <div class="ins-sym-divider"></div>
+      <div class="ins-sym-stat ins-sym-stat--del">
+        <span class="ins-sym-stat-val">−{{ metrics.sym_removed_total }}</span>
+        <span class="ins-sym-stat-label">symbols removed</span>
+      </div>
+      <div class="ins-sym-divider"></div>
+      <div class="ins-sym-stat ins-sym-stat--net {{ 'ins-sym-stat--positive' if metrics.sym_net >= 0 else 'ins-sym-stat--negative' }}">
+        <span class="ins-sym-stat-val">{{ '+' if metrics.sym_net >= 0 }}{{ metrics.sym_net }}</span>
+        <span class="ins-sym-stat-label">net symbol growth</span>
+      </div>
+    </div>
+    <p class="ins-detail-note">Symbols are functions, classes, methods, and variables tracked at the AST level by Muse. Unlike line diffs, symbol churn measures actual semantic change — refactors that move code without adding behaviour show net-zero symbol growth.</p>
+  </div>
+  {% endif %}
+
+  {# ── Standard code metrics ─────────────────────────────────────────────── #}
+  <div class="ins-section-divider">
+    <span>Code metrics</span>
+  </div>
+
+  <div class="ins-two-col">
     {# Language breakdown #}
     <div class="ins-card">
       <div class="ins-card-header">
         <h3 class="ins-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           Languages
         </h3>
-        <span class="ins-card-meta">{{ metrics.languages | length }} detected</span>
+        <span class="ins-card-meta">{{ metrics.languages | length }} detected · {{ metrics.total_files }} files · {{ metrics.total_size_kb }} KB</span>
       </div>
-
-      {# Stacked bar showing language proportions #}
       <div class="ins-lang-stack" title="Language distribution by file count">
         {% for lang in metrics.languages %}
         <div class="ins-lang-stack-seg" style="width:{{ lang.pct }}%;background:{{ lang.color }}" title="{{ lang.name }}: {{ lang.pct }}%"></div>
         {% endfor %}
       </div>
-
       <div class="ins-lang-list">
         {% for lang in metrics.languages %}
         <div class="ins-lang-row">
@@ -150,10 +315,10 @@
     <div class="ins-card">
       <div class="ins-card-header">
         <h3 class="ins-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           Contributors
         </h3>
-        <span class="ins-card-meta">by commit count</span>
+        <span class="ins-card-meta">{{ metrics.contributor_count }} total · by commit count</span>
       </div>
       <div class="ins-contributor-list">
         {% set max_c = metrics.top_contributors[0].commits if metrics.top_contributors else 1 %}
@@ -169,238 +334,7 @@
         {% endfor %}
       </div>
     </div>
-
   </div>
-
-  {# ── Dimension funnel ─────────────────────────────────────────────────── #}
-  {% if not active_dimension %}
-  <div class="ins-funnel-section">
-    <div class="ins-funnel-header">
-      <h2 class="ins-funnel-title">Explore Dimensions</h2>
-      <p class="ins-funnel-subtitle">Each dimension gives you a different lens into the codebase. Choose one to dive deeper.</p>
-    </div>
-    <div class="ins-dim-grid">
-      {% set dim_icons = {
-        'syntax':     '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
-        'semantics':  '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>',
-        'types':      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-        'tests':      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
-        'docs':       '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
-        'complexity': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
-        'deps':       '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
-        'security':   '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
-        'perf':       '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
-        'style':      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
-      } %}
-      {% for dim in domain.dimensions %}
-      <a class="ins-dim-card ins-dim-card--{{ loop.index0 % 6 }}"
-         href="/{{ owner }}/{{ repo_slug }}/insights/{{ ref }}/{{ dim.name }}">
-        <div class="ins-dim-card__icon">{{ dim_icons.get(dim.name | lower, '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>') | safe }}</div>
-        <div class="ins-dim-card__body">
-          <span class="ins-dim-card__name">{{ dim.name | title }}</span>
-          <p class="ins-dim-card__desc">{{ dim.description }}</p>
-        </div>
-        <span class="ins-dim-card__arrow">→</span>
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-
-  {% else %}
-  {# ── Dimension detail view ─────────────────────────────────────────────── #}
-  <div class="ins-detail">
-
-    {# Breadcrumb / back nav #}
-    <div class="ins-detail-nav">
-      <a href="/{{ owner }}/{{ repo_slug }}/insights/{{ ref }}" class="ins-detail-back">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-        All dimensions
-      </a>
-      <nav class="ins-dim-pills">
-    {% for dim in domain.dimensions %}
-    <a class="ins-dim-pill {% if (active_dimension | lower) == (dim.name | lower) %}ins-dim-pill--active{% endif %}"
-           href="/{{ owner }}/{{ repo_slug }}/insights/{{ ref }}/{{ dim.name }}"
-           title="{{ dim.description }}">
-          {{ dim.name | title }}
-        </a>
-        {% endfor %}
-      </nav>
-    </div>
-
-    {# Dimension header #}
-    {% for dim in domain.dimensions %}{% if (dim.name | lower) == (active_dimension | lower) %}
-    <div class="ins-detail-header">
-      <h2 class="ins-detail-title">{{ dim.name | title }}</h2>
-      <p class="ins-detail-desc">{{ dim.description }}</p>
-    </div>
-    {% endif %}{% endfor %}
-
-    {# ── Dimension-specific content ──────────────────────────────────────── #}
-
-    {% if active_dimension | lower == 'syntax' %}
-    <div class="ins-detail-content">
-      <div class="ins-card">
-        <div class="ins-card-header">
-          <h3 class="ins-card-title">Language Distribution</h3>
-          <span class="ins-card-meta">{{ metrics.total_files }} files across {{ metrics.languages | length }} languages</span>
-        </div>
-        <div class="ins-lang-stack" style="height:16px">
-          {% for lang in metrics.languages %}
-          <div class="ins-lang-stack-seg" style="width:{{ lang.pct }}%;background:{{ lang.color }}" title="{{ lang.name }}: {{ lang.pct }}%"></div>
-          {% endfor %}
-        </div>
-        <div class="ins-lang-list ins-lang-list--detail">
-          {% for lang in metrics.languages %}
-          <div class="ins-lang-row">
-            <span class="ins-lang-dot" style="background:{{ lang.color }}"></span>
-            <span class="ins-lang-name">{{ lang.name }}</span>
-            <div class="ins-lang-bar-track">
-              <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ lang.bar_pct }}%;background:{{ lang.color }};width:{{ lang.bar_pct }}%"></div>
-            </div>
-            <span class="ins-lang-count">{{ lang.count }} files</span>
-            <span class="ins-lang-pct">{{ lang.pct }}%</span>
-            <span class="ins-lang-size">{{ (lang.bytes / 1024) | round(1) }} KB</span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    {% elif active_dimension | lower == 'complexity' %}
-    <div class="ins-detail-content">
-      <div class="ins-card">
-        <div class="ins-card-header">
-          <h3 class="ins-card-title">Largest Files</h3>
-          <span class="ins-card-meta">File size as a complexity proxy · avg {{ metrics.avg_file_kb }} KB</span>
-        </div>
-        {% set max_size = metrics.largest_files[0].size if metrics.largest_files else 1 %}
-        <div class="ins-file-list">
-          {% for f in metrics.largest_files %}
-          <div class="ins-file-row">
-            <span class="ins-file-lang-dot" style="background:{{ loop.index0 % 2 == 0 and 'var(--color-accent)' or 'var(--color-warning)' }}"></span>
-            <span class="ins-file-path">{{ f.path }}</span>
-            <div class="ins-lang-bar-track" style="min-width:100px">
-              <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ (f.size / max_size * 100) | round }}%;background:var(--color-accent);opacity:0.5;width:{{ (f.size / max_size * 100) | round }}%"></div>
-            </div>
-            <span class="ins-file-size">{{ (f.size / 1024) | round(1) }} KB</span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="ins-card" style="margin-top:var(--space-3)">
-        <div class="ins-card-header"><h3 class="ins-card-title">Size Overview</h3></div>
-        <div class="ins-stat-mini-grid">
-          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.total_size_kb }} KB</span><span class="ins-stat-mini-label">Total source</span></div>
-          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.avg_file_kb }} KB</span><span class="ins-stat-mini-label">Avg file</span></div>
-          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ (metrics.largest_files[0].size / 1024) | round(1) }} KB</span><span class="ins-stat-mini-label">Largest file</span></div>
-          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.code_file_count }}</span><span class="ins-stat-mini-label">Code files</span></div>
-        </div>
-      </div>
-    </div>
-
-    {% elif active_dimension | lower == 'tests' %}
-    <div class="ins-detail-content">
-      <div class="ins-card">
-        <div class="ins-card-header">
-          <h3 class="ins-card-title">Test Coverage Proxy</h3>
-          <span class="ins-card-meta">Based on test file detection</span>
-        </div>
-        <div class="ins-big-metric">
-          <div class="ins-donut-wrap">
-            <svg class="ins-donut" viewBox="0 0 100 100">
-              {% set r = 38 %}
-              {% set circ = 3.14159 * r * 2 %}
-              {% set dash = (metrics.test_ratio / 100 * circ) | round(1) %}
-              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--border-subtle)" stroke-width="12"/>
-              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--color-success)" stroke-width="12"
-                stroke-dasharray="{{ dash }} {{ circ }}"
-                stroke-dashoffset="{{ circ / 4 }}"
-                stroke-linecap="round" class="ins-donut-fill"/>
-              <text x="50" y="46" text-anchor="middle" fill="var(--text-primary)" font-size="18" font-weight="700" font-family="var(--font-mono)">{{ metrics.test_ratio }}%</text>
-              <text x="50" y="60" text-anchor="middle" fill="var(--text-muted)" font-size="8">test ratio</text>
-            </svg>
-          </div>
-          <div class="ins-big-metric-details">
-            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.test_file_count }}</span><span class="ins-stat-mini-label">Test files detected</span></div>
-            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.code_file_count }}</span><span class="ins-stat-mini-label">Code files</span></div>
-            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.total_files }}</span><span class="ins-stat-mini-label">Total files</span></div>
-          </div>
-        </div>
-        <p class="ins-detail-note">Test ratio = test files ÷ code files. Patterns matched: <code>test_*</code>, <code>*_test.*</code>, <code>*.spec.*</code>, <code>tests/</code>, <code>__tests__/</code></p>
-      </div>
-    </div>
-
-    {% elif active_dimension | lower == 'docs' %}
-    <div class="ins-detail-content">
-      <div class="ins-card">
-        <div class="ins-card-header">
-          <h3 class="ins-card-title">Documentation Coverage</h3>
-          <span class="ins-card-meta">{{ metrics.doc_file_count }} doc files · {{ metrics.doc_ratio }}% of total</span>
-        </div>
-        <div class="ins-big-metric">
-          <div class="ins-donut-wrap">
-            <svg class="ins-donut" viewBox="0 0 100 100">
-              {% set r = 38 %}
-              {% set circ = 3.14159 * r * 2 %}
-              {% set dash = (metrics.doc_ratio / 100 * circ) | round(1) %}
-              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--border-subtle)" stroke-width="12"/>
-              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--color-info)" stroke-width="12"
-                stroke-dasharray="{{ dash }} {{ circ }}"
-                stroke-dashoffset="{{ circ / 4 }}"
-                stroke-linecap="round" class="ins-donut-fill"/>
-              <text x="50" y="46" text-anchor="middle" fill="var(--text-primary)" font-size="18" font-weight="700" font-family="var(--font-mono)">{{ metrics.doc_ratio }}%</text>
-              <text x="50" y="60" text-anchor="middle" fill="var(--text-muted)" font-size="8">docs</text>
-            </svg>
-          </div>
-          <div class="ins-big-metric-details">
-            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.doc_file_count }}</span><span class="ins-stat-mini-label">Doc files (.md .rst .txt)</span></div>
-            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.total_files }}</span><span class="ins-stat-mini-label">Total files</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {% else %}
-    {# Generic dimension — show recent commits and contributor breakdown #}
-    <div class="ins-detail-content">
-      <div class="ins-card">
-        <div class="ins-card-header">
-          <h3 class="ins-card-title">Recent Activity</h3>
-          <span class="ins-card-meta">{{ metrics.total_commits }} total commits</span>
-        </div>
-        <div class="ins-commit-list">
-          {% for c in metrics.recent_commits %}
-          <div class="ins-commit-row">
-            <span class="ins-commit-avatar">{{ c.author[0] | upper }}</span>
-            <div class="ins-commit-body">
-              <span class="ins-commit-msg">{{ c.message }}</span>
-              <span class="ins-commit-meta">{{ c.author }} · ⑂ {{ c.branch }}</span>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="ins-card" style="margin-top:var(--space-3)">
-        <div class="ins-card-header"><h3 class="ins-card-title">Contributors</h3></div>
-        <div class="ins-contributor-list">
-          {% set max_c = metrics.top_contributors[0].commits if metrics.top_contributors else 1 %}
-          {% for c in metrics.top_contributors %}
-          <div class="ins-contributor-row">
-            <span class="ins-contributor-avatar">{{ c.name[0] | upper }}</span>
-            <span class="ins-contributor-name">{{ c.name }}</span>
-            <div class="ins-lang-bar-track" style="flex:1">
-              <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ (c.commits / max_c * 100) | round }}%;background:var(--color-accent);opacity:0.6;width:{{ (c.commits / max_c * 100) | round }}%"></div>
-            </div>
-            <span class="ins-contributor-count">{{ c.commits }}</span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-  </div>{# /ins-detail #}
-  {% endif %}
 
   {% elif domain.viewer_type == 'piano_roll' %}
   {# ══════════════════════════════════════════════════════════════════════════

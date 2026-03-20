@@ -1,97 +1,237 @@
 {% extends "musehub/base.html" %}
 
-{% block title %}{{ owner }}/{{ repo_slug }} — {{ filename }}{% endblock %}
+{% block title %}{{ file_path }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
-  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
-  <a href="/{{ owner }}/{{ repo_slug }}/tree/{{ ref }}">{{ ref[:8] }}</a>
-  {% if file_path %}
-    {% set segments = file_path.split('/') %}
-    {% set ns = namespace(accumulated='') %}
-    {% for seg in segments[:-1] %}
-      {% if ns.accumulated %}
-        {% set ns.accumulated = ns.accumulated + '/' + seg %}
-      {% else %}
-        {% set ns.accumulated = seg %}
-      {% endif %}
-      / <a href="/{{ owner }}/{{ repo_slug }}/tree/{{ ref }}/{{ ns.accumulated }}">{{ seg }}</a>
-    {% endfor %}
-    / {{ filename }}
-  {% endif %}
+  <a href="/{{ owner }}">{{ owner }}</a> /
+  <a href="{{ base_url }}">{{ repo_slug }}</a> /
+  <a href="{{ base_url }}/tree/{{ ref }}">{{ ref[:8] }}</a>
+  {% for seg, href in path_segments %}
+  / <a href="{{ href }}">{{ seg }}</a>
+  {% endfor %}
+  / <span style="color:var(--text-primary)">{{ filename }}</span>
 {% endblock %}
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{# ── SSR content block ─────────────────────────────────────────────────────── #}
-{# Renders file header and content server-side so the page is useful without JS.
-   When blob_found is false the JS fallback still loads and shows an error.
-   When lines/is_midi/is_binary are set the relevant section renders statically.
-   NOTE: The {% if %} must be INSIDE the {% block %} — wrapping a block with {% if %}
-   in Jinja2 has no effect on whether the block overrides the parent template. #}
-{% block content %}
-{% if blob_found %}
-<div id="blob-ssr-content">
-  {# ── File header ──────────────────────────────────────────────────────────── #}
-  <div class="blob-header">
-    <div class="blob-filename">📄&nbsp;<code>{{ filename }}</code></div>
-    <div class="blob-meta">
-      <span title="Size">📄&nbsp;{{ size_bytes | filesizeformat }}</span>
-      {% if line_count %}<span>{{ line_count }} line{{ 's' if line_count != 1 else '' }}</span>{% endif %}
-      {% if lang %}<span class="blob-lang-badge">{{ lang }}</span>{% endif %}
-    </div>
-    <div class="blob-actions">
-      <a class="btn-blob btn-blob-secondary"
-         href="/musehub/repos/{{ repo_id }}/raw/{{ ref }}/{{ file_path }}"
-         download>⬇&nbsp;Raw</a>
-      {% if is_midi %}
-      <a class="btn-blob btn-blob-primary"
-         href="{{ base_url }}/piano-roll/{{ ref }}/{{ file_path }}">🎹&nbsp;Piano Roll</a>
-      {% endif %}
-    </div>
-  </div>
+{% block page_json %}{"page": "blob", "repoId": {{ repo_id | tojson }}, "ref": {{ ref | tojson }}, "filePath": {{ file_path | tojson }}, "objectId": {{ object_id | tojson }}}{% endblock %}
+{% block page_data %}window.__blobCfg = { repoId: {{ repo_id | tojson }}, ref: {{ ref | tojson }}, filePath: {{ file_path | tojson }}, filename: {{ filename | tojson }}, owner: {{ owner | tojson }}, repoSlug: {{ repo_slug | tojson }}, base: {{ base_url | tojson }}, ssrBlobRendered: {{ 'true' if blob_found else 'false' }} };{% endblock %}
 
-  {# ── Body ─────────────────────────────────────────────────────────────────── #}
-  <div class="blob-body" id="blob-ssr-body">
-    {% if is_midi %}
-      {# MIDI — player shell; JS enhances with actual playback if midi-player.js loads #}
-      <div class="blob-midi-banner">
-        <span class="blob-midi-icon">🎹</span>
-        <div class="blob-midi-title">{{ filename }}</div>
-        <div class="blob-midi-sub">MIDI file · {{ size_bytes | filesizeformat }}</div>
-        <div id="midi-player"
-             data-midi-url="/musehub/repos/{{ repo_id }}/raw/{{ ref }}/{{ file_path }}">
-          <a class="btn-blob btn-blob-primary"
-             href="{{ base_url }}/piano-roll/{{ ref }}/{{ file_path }}">🎹&nbsp;View in Piano Roll</a>
+{# ── File extension → language colour dot ─────────────────────────────────── #}
+{% macro lang_dot(lang) %}
+{% set ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else '' %}
+<span class="blob2-lang-dot blob2-ld-{{ ext }}" title="{{ lang }}"></span>
+{% endmacro %}
+
+{% block content %}
+<div class="blob2-layout">
+
+  {# ══════════════════════════════════════════ Main viewer ════════════════ #}
+  <div class="blob2-main">
+
+    {% if not blob_found %}
+    {# ── 404 ─────────────────────────────────────────────────────────── #}
+    <div class="blob2-not-found">
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+      <h2>File not found</h2>
+      <p><code>{{ file_path }}</code> does not exist at <code>{{ ref[:8] }}</code></p>
+      <a href="{{ base_url }}/tree/{{ ref }}" class="btn btn-secondary btn-sm">Browse tree</a>
+    </div>
+
+    {% else %}
+    {# ── File header bar ──────────────────────────────────────────────── #}
+    <div class="blob2-header">
+      <div class="blob2-header-left">
+        {% if lang %}{{ lang_dot(lang) }}{% endif %}
+        <span class="blob2-filename">{{ filename }}</span>
+        {% if lang %}<span class="blob2-lang-badge">{{ lang }}</span>{% endif %}
+      </div>
+      <div class="blob2-header-meta">
+        {% if line_count %}<span class="blob2-meta-pill">{{ line_count }} lines</span>{% endif %}
+        {% if size_bytes %}<span class="blob2-meta-pill">{{ size_bytes | filesizeformat }}</span>{% endif %}
+      </div>
+      <div class="blob2-header-actions">
+        {% if is_midi %}
+        <a href="{{ base_url }}/piano-roll/{{ ref }}/{{ file_path }}" class="btn btn-listen btn-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Piano Roll
+        </a>
+        {% endif %}
+        <a href="{{ base_url }}/raw/{{ ref }}/{{ file_path }}" class="btn btn-secondary btn-sm" hx-boost="false" target="_blank" rel="noopener">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Raw
+        </a>
+      </div>
+    </div>
+
+    {# ── Last-modified bar ────────────────────────────────────────────── #}
+    {% if last_commit %}
+    <div class="blob2-lastmod">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+      <a href="{{ base_url }}/commits/{{ last_commit_full }}" class="blob2-lastmod-sha">{{ last_commit }}</a>
+      <span class="blob2-lastmod-msg">{{ last_commit_msg | truncate(72, True, '…') }}</span>
+      {% if last_commit_author %}<span class="blob2-lastmod-author">{{ last_commit_author }}</span>{% endif %}
+      {% if last_commit_time %}<span class="blob2-lastmod-time">{{ last_commit_time | fmtrelative }}</span>{% endif %}
+    </div>
+    {% endif %}
+
+    {# ── Content area ─────────────────────────────────────────────────── #}
+    <div class="blob2-content" id="blob-content">
+      {% if is_midi %}
+      {# MIDI ── inline player shell + piano roll link #}
+      <div id="midi-player" class="blob2-midi-player" data-midi-url="{{ base_url }}/raw/{{ ref }}/{{ file_path }}">
+        <div class="blob2-midi-banner">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--color-accent);opacity:.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <div class="blob2-midi-info">
+            <div class="blob2-midi-filename">{{ filename }}</div>
+            <div class="blob2-midi-sub">MIDI · {{ size_bytes | filesizeformat }}</div>
+          </div>
+          <div class="blob2-midi-actions">
+            <a href="{{ base_url }}/piano-roll/{{ ref }}/{{ file_path }}" class="btn btn-listen">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Open Piano Roll
+            </a>
+          </div>
         </div>
       </div>
-    {% elif is_binary %}
-      {# Binary — download link only, no content to show #}
-      <div class="blob-binary-notice">
-        Binary file · {{ size_bytes | filesizeformat }} —
-        <a href="/musehub/repos/{{ repo_id }}/raw/{{ ref }}/{{ file_path }}" download>Download raw</a>
+
+      {% elif is_binary %}
+      {# Binary ── download only #}
+      <div class="blob2-binary-notice">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <p>Binary file · {{ size_bytes | filesizeformat }}</p>
+        <a href="{{ base_url }}/raw/{{ ref }}/{{ file_path }}" class="btn btn-primary btn-sm" hx-boost="false" download>Download</a>
       </div>
-    {% elif lines %}
-      {# Text file — server-rendered line-numbered table; blob.ts adds syntax highlighting via hljs #}
-      <div class="blob-viewer">
-        <table class="blob-line-table">
+
+      {% elif lines %}
+      {# Text/code ── SSR line-numbered table with syntax hint #}
+      <div class="blob2-viewer" id="blob-ssr-content" data-lang="{{ lang | lower }}">
+        <table class="blob2-line-table" id="blob-line-table">
           <tbody>
           {% for line in lines %}
           {% set i = loop.index %}
-          <tr id="L{{ i }}" class="blob-line">
-            <td class="blob-ln"><a href="#L{{ i }}">{{ i }}</a></td>
-            <td class="blob-code">{{ line | e }}</td>
+          <tr id="L{{ i }}" class="blob2-line">
+            <td class="blob2-ln"><a href="#L{{ i }}" class="blob2-ln-link">{{ i }}</a></td>
+            <td class="blob2-code">{{ line | e }}</td>
           </tr>
           {% endfor %}
           </tbody>
         </table>
       </div>
-    {% else %}
-      <p style="color:#8b949e;padding:24px">Empty file</p>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
-{% endblock %}
 
-{% block page_json %}{"page": "blob"}{% endblock %}
-{% block page_data %}window.__blobCfg = { repoId: {{ repo_id | tojson }}, ref: {{ ref | tojson }}, filePath: {{ file_path | tojson }}, filename: {{ filename | tojson }}, owner: {{ owner | tojson }}, repoSlug: {{ repo_slug | tojson }}, base: {{ base_url | tojson }}, ssrBlobRendered: {{ 'true' if blob_found else 'false' }} };{% endblock %}
+      {% else %}
+      <div class="blob2-empty">Empty file</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+
+  {# ══════════════════════════════════════════ Sidebar ════════════════════ #}
+  {% if blob_found %}
+  <aside class="blob2-sidebar">
+
+    {# ── Content address ──────────────────────────────────────────────── #}
+    <div class="card blob2-side-card">
+      <div class="blob2-side-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <h3 class="blob2-side-title">Content Address</h3>
+      </div>
+      <div class="blob2-addr-block">
+        <div class="blob2-addr-label">Object ID (SHA-256)</div>
+        <div class="blob2-addr-sha" id="blob2-obj-sha" title="{{ object_id }}">{{ object_id }}</div>
+        <button class="blob2-copy-btn" onclick="navigator.clipboard.writeText('{{ object_id }}')" title="Copy object ID">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <p class="blob2-addr-hint">This file is immutable and content-addressed. The same SHA always refers to the same bytes, across every clone and every time.</p>
+      </div>
+    </div>
+
+    {# ── File metadata ─────────────────────────────────────────────────── #}
+    <div class="card blob2-side-card">
+      <div class="blob2-side-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3 class="blob2-side-title">File Info</h3>
+      </div>
+      <div class="blob2-meta-rows">
+        <div class="blob2-meta-row">
+          <span class="blob2-meta-label">Path</span>
+          <span class="blob2-meta-val blob2-mono">{{ file_path }}</span>
+        </div>
+        {% if line_count %}
+        <div class="blob2-meta-row">
+          <span class="blob2-meta-label">Lines</span>
+          <span class="blob2-meta-val">{{ line_count }}</span>
+        </div>
+        {% endif %}
+        {% if size_bytes %}
+        <div class="blob2-meta-row">
+          <span class="blob2-meta-label">Size</span>
+          <span class="blob2-meta-val">{{ size_bytes | filesizeformat }}</span>
+        </div>
+        {% endif %}
+        {% if lang %}
+        <div class="blob2-meta-row">
+          <span class="blob2-meta-label">Language</span>
+          <span class="blob2-meta-val">{{ lang }}</span>
+        </div>
+        {% endif %}
+        <div class="blob2-meta-row">
+          <span class="blob2-meta-label">Ref</span>
+          <span class="blob2-meta-val blob2-mono">{{ ref[:8] }}</span>
+        </div>
+        {% if snapshot_id %}
+        <div class="blob2-meta-row">
+          <span class="blob2-meta-label">Snapshot</span>
+          <span class="blob2-meta-val blob2-mono">{{ snapshot_id[:12] }}…</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ── Last commit ───────────────────────────────────────────────────── #}
+    {% if last_commit %}
+    <div class="card blob2-side-card">
+      <div class="blob2-side-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+        <h3 class="blob2-side-title">Last Modified</h3>
+      </div>
+      <div class="blob2-lastcommit">
+        <a href="{{ base_url }}/commits/{{ last_commit_full }}" class="blob2-lc-sha">{{ last_commit }}</a>
+        <p class="blob2-lc-msg">{{ last_commit_msg | truncate(80, True, '…') }}</p>
+        <div class="blob2-lc-meta">
+          {% if last_commit_author %}<span class="blob2-lc-author">{{ last_commit_author }}</span>{% endif %}
+          {% if last_commit_time %}<span class="blob2-lc-time">{{ last_commit_time | fmtrelative }}</span>{% endif %}
+        </div>
+        <a href="{{ base_url }}/commits/{{ last_commit_full }}" class="btn btn-ghost btn-sm" style="font-size:11px;margin-top:var(--space-2)">View commit →</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Quick links ───────────────────────────────────────────────────── #}
+    <div class="card blob2-side-card">
+      <div class="blob2-side-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <h3 class="blob2-side-title">Links</h3>
+      </div>
+      <div class="blob2-links">
+        <a href="{{ base_url }}/tree/{{ ref }}" class="blob2-link-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Browse tree at {{ ref[:8] }}
+        </a>
+        <a href="{{ base_url }}/commits" class="blob2-link-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+          All commits
+        </a>
+        <a href="{{ base_url }}/raw/{{ ref }}/{{ file_path }}" class="blob2-link-item" hx-boost="false" target="_blank" rel="noopener">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          View raw
+        </a>
+      </div>
+    </div>
+
+  </aside>
+  {% endif %}
+
+</div>
+{% endblock %}

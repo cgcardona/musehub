@@ -3,139 +3,185 @@
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
 {% block title %}Explore{% endblock %}
-{% block breadcrumb %}Explore{% endblock %}
+{% block breadcrumb_bar %}{% endblock %}
+{% block content %}{% endblock %}
+{% block container_extra_class %}page-container{% endblock %}
 
 {% block page_json %}{"page": "explore"}{% endblock %}
 
-{% block content %}
-<div class="explore-hero">
-  <div class="explore-hero__inner">
-    <p class="explore-hero__kicker">Muse · Domain-Agnostic Version Control</p>
-    <h1 class="explore-hero__headline">
-      Version control for<br>
-      <span class="gradient-text">multidimensional state.</span>
-    </h1>
-    <p class="explore-hero__sub">
-      Not just Git. Any state space — MIDI (21 dimensions), code, genomics,
-      climate simulations, 3D design. Any agent, any domain, any scale.
-      This is a paradigm shift.
-    </p>
-    <div class="explore-hero__actions">
-      <a href="/new" class="btn btn-primary">Create repository</a>
-      <a href="/domains" class="btn btn-secondary">Browse domains</a>
-      <a href="/mcp/docs" class="btn btn-ghost">MCP for agents</a>
-    </div>
-    <div class="explore-hero__stats">
-      <div class="explore-hero-stat">
-        <span class="explore-hero-stat__value">21</span>
-        <span class="explore-hero-stat__label">MIDI dimensions</span>
-      </div>
-      <div class="explore-hero-stat">
-        <span class="explore-hero-stat__value">∞</span>
-        <span class="explore-hero-stat__label">domains possible</span>
-      </div>
-      <div class="explore-hero-stat">
-        <span class="explore-hero-stat__value">37</span>
-        <span class="explore-hero-stat__label">MCP tools</span>
-      </div>
-    </div>
-  </div>
-</div>
-{% endblock %}
-
 {% block token_form %}
-  <button class="btn btn-secondary btn-sm mobile-filter-toggle"
-          data-action="toggle-sidebar">
-    &#9776; Filters
-  </button>
 
-  <div class="explore-layout">
-    <!-- ── Filter sidebar ─────────────────────────────────── -->
-    <aside class="explore-sidebar card card-accent-top" style="padding:var(--space-4)">
-      <form id="filter-form" method="GET" action="/explore"
-            hx-get="/explore" hx-target="#repo-grid" hx-push-url="true">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
-          <strong style="font-size:14px">Filters</strong>
-          <a href="/explore" class="clear-filters-link" hx-boost="false">Clear filters</a>
+{# ── Hero — left-aligned, matches MCP hero style ─────────────────────────── #}
+<div class="ex-hero">
+  <div class="ex-hero-glow"></div>
+  <div class="ex-hero-inner">
+    <div class="ex-hero-left">
+
+      <h1 class="ex-hero-title">
+        Version control for<br>
+        <span class="gradient-text">multidimensional state.</span>
+      </h1>
+      <p class="ex-hero-sub">
+        The open hub for code, music, and every domain in between —
+        where agents and humans collaborate as equals.
+      </p>
+
+      {# ── Semantic search bar ───────────────────────────────────────────── #}
+      <div class="ex-search-box">
+        <div class="ex-search-field" id="ex-search-field">
+          <svg class="ex-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input id="ex-search-input" class="ex-search-input" type="text"
+                 placeholder="Search by meaning: 'recursive state machine', 'fix memory leak'…"
+                 autocomplete="off" spellcheck="false" aria-label="Semantic search">
+          <button class="ex-search-clear" id="ex-search-clear" type="button"
+                  aria-label="Clear search" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                 stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          <span class="ex-search-spinner" id="ex-search-spinner" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round" class="spin-icon"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          </span>
         </div>
 
-        <!-- Sort -->
-        <div class="sidebar-section">
-          <p class="sidebar-section-title">Sort by</p>
-          {% for value, label in sort_options %}
-          <label class="sidebar-sort-option">
-            <input type="radio" name="sort" value="{{ value }}"
-                   {% if sort == value %}checked{% endif %}
-                   data-autosubmit>
-            {{ label }}
-          </label>
+        {# Type toggle — revealed when search is active #}
+        <div class="ex-type-bar" id="ex-type-bar" style="display:none">
+          <span class="ex-type-label">Searching:</span>
+          <button class="ex-type-pill ex-type-pill--active" data-search-type="repos">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            Repos
+          </button>
+          <button class="ex-type-pill" data-search-type="commits">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round"><circle cx="12" cy="12" r="4"/>
+              <line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+            Commits
+          </button>
+          <span class="ex-semantic-indicator" id="ex-semantic-indicator" style="display:none">
+            <span class="ex-semantic-dot"></span>
+            vector search · ℝ¹⁵³⁶
+          </span>
+        </div>
+      </div>
+
+    </div>{# /ex-hero-left #}
+
+  </div>{# /ex-hero-inner #}
+</div>{# /ex-hero #}
+
+
+{# ── Semantic search results (injected by explore.ts) ───────────────────── #}
+<div id="ex-semantic-results" class="ex-semantic-results" style="display:none"></div>
+
+{# ── Browse — sidebar + grid ─────────────────────────────────────────────── #}
+<div class="ph-body ex-browse" id="ex-browse-layout">
+
+  {# Filter sidebar #}
+  <aside class="ex-sidebar ph-sidebar">
+    <form id="filter-form" method="GET" action="/explore"
+          hx-get="/explore" hx-target="#repo-grid" hx-push-url="true">
+
+      <div class="ph-sidebar-section ex-sidebar-header">
+        <div class="ex-sidebar-hd">
+          <span class="ph-sidebar-heading" style="margin-bottom:0">Browse</span>
+          <a href="/explore" class="ex-clear-link" hx-boost="false">Clear filters</a>
+        </div>
+      </div>
+
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Sort by</div>
+        {% for value, label in sort_options %}
+        <label class="ex-sort-option">
+          <input type="radio" name="sort" value="{{ value }}"
+                 {% if sort == value %}checked{% endif %}
+                 data-autosubmit>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+
+      {% if explore_domains %}
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Domains</div>
+        <div class="ex-domain-links">
+          {% for d in explore_domains %}
+          <a href="/domains/@{{ d.owner }}/{{ d.slug }}" class="ex-domain-link" hx-boost="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            {{ d.name }}
+          </a>
           {% endfor %}
         </div>
+      </div>
+      {% endif %}
 
-        <!-- Tags from repos -->
-        <div class="sidebar-section">
-          <p class="sidebar-section-title">Language / Domain Tags</p>
-          {% if muse_tag_chips %}
-            <div id="lang-chips">
-              {% for tag in muse_tag_chips %}
-              <a href="#"
-                 class="filter-chip {% if tag in selected_langs %}active{% endif %}"
-                 data-filter="lang"
-                 data-value="{{ tag | e }}">{{ tag }}</a>
-              {% endfor %}
-            </div>
-            {# Chip selections are tracked via URL params by toggleChip(), not hidden inputs #}
-          {% else %}
-            <p style="font-size:12px;color:var(--text-muted)">No tags yet</p>
-          {% endif %}
-        </div>
-
-        <!-- License -->
-        <div class="sidebar-section">
-          <p class="sidebar-section-title">License</p>
-          <select name="license" class="sidebar-select" data-autosubmit>
-            {% for opt in license_options %}
-            <option value="{{ opt | e }}" {% if selected_license == opt %}selected{% endif %}>
-              {{ opt if opt else 'Any license' }}
-            </option>
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Domain Tags</div>
+        {% if muse_tag_chips %}
+          <div id="lang-chips" class="ex-chip-group">
+            {% for tag in muse_tag_chips %}
+            <a href="#"
+               class="filter-chip {% if tag in selected_langs %}active{% endif %}"
+               data-filter="lang"
+               data-value="{{ tag | e }}">{{ tag }}</a>
             {% endfor %}
-          </select>
-        </div>
-
-        <!-- Topics from musehub_repos.tags -->
-        <div class="sidebar-section">
-          <p class="sidebar-section-title">Topics</p>
-          {% if topic_chips %}
-            <div id="topic-chips">
-              {% for t in topic_chips %}
-              <a href="#"
-                 class="filter-chip {% if t in selected_topics %}active{% endif %}"
-                 data-filter="topic"
-                 data-value="{{ t | e }}">{{ t }}</a>
-              {% endfor %}
-            </div>
-            {# Topic selections are tracked via URL params by toggleChip(), not hidden inputs #}
-          {% else %}
-            <p style="font-size:12px;color:var(--text-muted)">No topics yet</p>
-          {% endif %}
-        </div>
-      </form>
-    </aside>
-
-    <!-- ── Repo grid (HTMX target) ───────────────────────── -->
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
-        <div>
-          <p class="eyebrow" style="margin-bottom:4px">Multidimensional State</p>
-          <h2 style="margin:0">Explore Repositories</h2>
-        </div>
-        <span id="repo-count" style="color:#8b949e">{{ total }} repositories</span>
+          </div>
+        {% else %}
+          <p class="ex-empty-filter">—</p>
+        {% endif %}
       </div>
 
-      <div id="repo-grid">
-        {% include "musehub/fragments/repo_grid.html" %}
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">License</div>
+        <select name="license" class="sidebar-select" data-autosubmit>
+          {% for opt in license_options %}
+          <option value="{{ opt | e }}" {% if selected_license == opt %}selected{% endif %}>
+            {{ opt if opt else 'Any license' }}
+          </option>
+          {% endfor %}
+        </select>
       </div>
+
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Topics</div>
+        {% if topic_chips %}
+          <div id="topic-chips" class="ex-chip-group">
+            {% for t in topic_chips %}
+            <a href="#"
+               class="filter-chip {% if t in selected_topics %}active{% endif %}"
+               data-filter="topic"
+               data-value="{{ t | e }}">{{ t }}</a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="ex-empty-filter">—</p>
+        {% endif %}
+      </div>
+
+    </form>
+  </aside>
+
+  {# Main content — repo grid #}
+  <div class="ph-content">
+    <div class="ex-grid-header">
+      <h2 class="ex-grid-title">Explore Repositories</h2>
+      <span id="repo-count" class="ex-grid-count">{{ total }} repositories</span>
+    </div>
+
+    <div id="repo-grid">
+      {% include "musehub/fragments/repo_grid.html" %}
     </div>
   </div>
-{% endblock %}
 
+</div>{# /ph-body #}
+
+{% endblock %}

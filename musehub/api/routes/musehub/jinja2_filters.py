@@ -20,6 +20,7 @@ Route handlers import the ready-to-use instance:
 """
 
 from datetime import datetime, timezone
+from typing import Callable
 
 from jinja2 import Environment
 
@@ -255,6 +256,87 @@ def _markdown(value: str | None) -> str:
     return "\n".join(out)
 
 
+def _auto_code(text: str) -> str:
+    """Wrap code-like tokens in plain-text descriptions with <code> tags.
+
+    Each pattern is applied only to text *outside* already-emitted <code>
+    blocks, so nesting is impossible regardless of application order.
+
+    Patterns (applied in priority order):
+    1. Backtick strings:              `foo`              → <code>foo</code>
+    2. musehub_* function calls:      musehub_foo(x='y') → <code>musehub_foo(x='y')</code>
+    3. Standalone musehub_* names:    musehub_foo        → <code>musehub_foo</code>
+    4. Muse CLI sub-commands:         muse push          → <code>muse push</code>
+    5. Short single-quoted literals:  'main', 'v1.0'     → <code>'main'</code>
+
+    Returns str with embedded HTML — use |safe in templates.
+    Descriptions are server-controlled strings so there is no XSS risk.
+    """
+    import re as _re
+
+    _CODE_SPAN = _re.compile(r"<code>.*?</code>", _re.DOTALL)
+
+    def _sub_outside(pattern: str, repl: "str | Callable[..., str]", src: str) -> str:
+        """Apply *pattern* → *repl* only to text segments between <code> spans."""
+        result: list[str] = []
+        last = 0
+        for m in _CODE_SPAN.finditer(src):
+            chunk = src[last : m.start()]
+            result.append(_re.sub(pattern, repl, chunk))
+            result.append(m.group(0))  # keep existing code block verbatim
+            last = m.end()
+        result.append(_re.sub(pattern, repl, src[last:]))
+        return "".join(result)
+
+    # 1. Backtick strings
+    text = _sub_outside(r"`([^`]+)`", r"<code>\1</code>", text)
+
+    # 2. musehub_xxx(...) — full call, quoting angle brackets in args
+    def _wrap_call(m: "_re.Match[str]") -> str:
+        name, args = m.group(1), m.group(2)
+        safe_args = args.replace("<", "&lt;").replace(">", "&gt;")
+        return f"<code>{name}({safe_args})</code>"
+
+    text = _sub_outside(r"\b(musehub_[a-z_]+)\(([^)]*)\)", _wrap_call, text)
+
+    # 3. Standalone musehub_xxx names not followed by (
+    text = _sub_outside(r"\b(musehub_[a-z_]+)\b(?!\()", r"<code>\1</code>", text)
+
+    # 4. Muse CLI sub-commands
+    text = _sub_outside(
+        r"\b(muse\s+(?:push|pull|clone|remote|config|auth|commit|branch|log|diff|init))\b",
+        r"<code>\1</code>",
+        text,
+    )
+
+    # 5. Short single-quoted literals: 'main', 'v1.0', 'final-mix', etc.
+    text = _sub_outside(r"'([A-Za-z0-9][A-Za-z0-9_\-\.]{0,28})'", r"<code>'\1'</code>", text)
+
+    # 6. HTML-escape plain-text segments (& outside existing tags/entities)
+    def _escape_outside_tags(s: str) -> str:
+        parts: list[str] = []
+        i = 0
+        depth = 0
+        while i < len(s):
+            ch = s[i]
+            if ch == "<":
+                depth += 1
+                parts.append(ch)
+            elif ch == ">":
+                depth = max(0, depth - 1)
+                parts.append(ch)
+            elif depth > 0:
+                parts.append(ch)
+            elif ch == "&":
+                parts.append("&amp;")
+            else:
+                parts.append(ch)
+            i += 1
+        return "".join(parts)
+
+    return _escape_outside_tags(text)
+
+
 def register_musehub_filters(env: Environment) -> None:
     """Register all MuseHub custom Jinja2 filters on *env*.
 
@@ -262,7 +344,8 @@ def register_musehub_filters(env: Environment) -> None:
     shared ``Jinja2Templates`` instance. Do not call this directly.
 
     Available filters in every template: ``fmtdate``, ``fmtrelative``,
-    ``shortsha``, ``label_text_color``, ``filesizeformat``, ``markdown``.
+    ``shortsha``, ``label_text_color``, ``filesizeformat``, ``markdown``,
+    ``auto_code``.
     """
     env.filters["fmtdate"] = _fmtdate
     env.filters["fmtrelative"] = _fmtrelative
@@ -271,3 +354,4 @@ def register_musehub_filters(env: Environment) -> None:
     env.filters["note_name"] = _note_name
     env.filters["filesizeformat"] = _filesizeformat
     env.filters["markdown"] = _markdown
+    env.filters["auto_code"] = _auto_code

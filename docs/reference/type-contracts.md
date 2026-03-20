@@ -356,27 +356,29 @@ Schema keys: `compose_preferences`, `repo_creation`, `pr_review_focus`, `release
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `MUSEHUB_READ_TOOLS` | `list[MCPToolDef]` | 15 read-only tool definitions (browsing, search, inspect) |
-| `MUSEHUB_WRITE_TOOLS` | `list[MCPToolDef]` | 12 write tool definitions (create, update, merge, star) |
+| `MUSEHUB_READ_TOOLS` | `list[MCPToolDef]` | 20 read tool definitions (context, search, inspect, Muse CLI reads) |
+| `MUSEHUB_WRITE_TOOLS` | `list[MCPToolDef]` | 15 write tool definitions (create, update, merge, star, push) |
 | `MUSEHUB_ELICITATION_TOOLS` | `list[MCPToolDef]` | 5 elicitation-powered tool definitions (MCP 2025-11-25) |
-| `MUSEHUB_TOOLS` | `list[MCPToolDef]` | Combined catalogue of all 32 `musehub_*` tools |
+| `MUSEHUB_TOOLS` | `list[MCPToolDef]` | Combined catalogue of all 40 `musehub_*` and `muse_*` tools |
 | `MUSEHUB_TOOL_NAMES` | `set[str]` | All tool name strings for fast routing |
 | `MUSEHUB_WRITE_TOOL_NAMES` | `set[str]` | Write + interactive names; presence triggers JWT auth check |
 | `MUSEHUB_ELICITATION_TOOL_NAMES` | `set[str]` | Elicitation-powered names; require session |
 | `MCP_TOOLS` | `list[MCPToolDef]` | Full registered tool list |
 | `TOOL_CATEGORIES` | `dict[str, str]` | Maps tool name → `"musehub-read"`, `"musehub-write"`, or `"musehub-elicitation"` |
 
-**Read tools:** `musehub_browse_repo`, `musehub_list_branches`, `musehub_list_commits`,
-`musehub_read_file`, `musehub_get_analysis`, `musehub_search`, `musehub_get_context`,
-`musehub_get_commit`, `musehub_compare`, `musehub_list_issues`, `musehub_get_issue`,
-`musehub_list_prs`, `musehub_get_pr`, `musehub_list_releases`, `musehub_search_repos`
+**Read tools (20):** `musehub_get_context`, `musehub_list_branches`, `musehub_list_commits`,
+`musehub_read_file`, `musehub_search`, `musehub_get_commit`, `musehub_compare`,
+`musehub_list_issues`, `musehub_get_issue`, `musehub_list_prs`, `musehub_get_pr`,
+`musehub_list_releases`, `musehub_search_repos`, `musehub_list_domains`, `musehub_get_domain`,
+`musehub_get_domain_insights`, `musehub_get_view`, `musehub_whoami`, `muse_pull`, `muse_remote`
 
-**Write tools:** `musehub_create_repo`, `musehub_fork_repo`, `musehub_create_issue`,
+**Write tools (15):** `musehub_create_repo`, `musehub_fork_repo`, `musehub_create_issue`,
 `musehub_update_issue`, `musehub_create_issue_comment`, `musehub_create_pr`,
 `musehub_merge_pr`, `musehub_create_pr_comment`, `musehub_submit_pr_review`,
-`musehub_create_release`, `musehub_star_repo`, `musehub_create_label`
+`musehub_create_release`, `musehub_star_repo`, `musehub_create_label`,
+`musehub_create_agent_token`, `muse_push`, `muse_config`
 
-**Elicitation tools:** `musehub_compose_with_preferences`, `musehub_review_pr_interactive`,
+**Elicitation tools (5):** `musehub_create_with_preferences`, `musehub_review_pr_interactive`,
 `musehub_connect_streaming_platform`, `musehub_connect_daw_cloud`, `musehub_create_release_interactive`
 
 ### Resource Catalogue (`mcp/resources.py`)
@@ -887,9 +889,9 @@ MuseHub
 │
 ├── MCP Integration Layer (mcp/)
 │   ├── Tools (mcp/tools/)
-│   │   ├── MUSEHUB_READ_TOOLS      — 15 read tool definitions
-│   │   ├── MUSEHUB_WRITE_TOOLS     — 12 write tool definitions
-│   │   ├── MUSEHUB_TOOLS           — combined 27-tool catalogue
+│   │   ├── MUSEHUB_READ_TOOLS      — 20 read tool definitions
+│   │   ├── MUSEHUB_WRITE_TOOLS     — 15 write tool definitions
+│   │   ├── MUSEHUB_TOOLS           — combined 40-tool catalogue
 │   │   ├── MUSEHUB_TOOL_NAMES      — set[str] for routing
 │   │   ├── MUSEHUB_WRITE_TOOL_NAMES — set[str] auth-gated writes
 │   │   ├── MCP_TOOLS               — registered list (alias)
@@ -1143,24 +1145,27 @@ classDiagram
         "db_unavailable"
     }
     class MUSEHUB_READ_TOOLS {
-        <<list of MCPToolDef — 15 tools>>
-        musehub_browse_repo · musehub_list_branches
+        <<list of MCPToolDef — 20 tools>>
+        musehub_get_context · musehub_list_branches
         musehub_list_commits · musehub_read_file
-        musehub_get_analysis · musehub_search
-        musehub_get_context · musehub_get_commit
+        musehub_search · musehub_get_commit
         musehub_compare · musehub_list_issues
         musehub_get_issue · musehub_list_prs
         musehub_get_pr · musehub_list_releases
-        musehub_search_repos
+        musehub_search_repos · musehub_list_domains
+        musehub_get_domain · musehub_get_domain_insights
+        musehub_get_view · musehub_whoami
+        muse_pull · muse_remote
     }
     class MUSEHUB_WRITE_TOOLS {
-        <<list of MCPToolDef — 12 tools>>
+        <<list of MCPToolDef — 15 tools>>
         musehub_create_repo · musehub_fork_repo
         musehub_create_issue · musehub_update_issue
         musehub_create_issue_comment · musehub_create_pr
         musehub_merge_pr · musehub_create_pr_comment
         musehub_submit_pr_review · musehub_create_release
         musehub_star_repo · musehub_create_label
+        musehub_create_agent_token · muse_push · muse_config
     }
     class MCPDispatcher {
         +handle_request(raw, user_id) JSONObject | None

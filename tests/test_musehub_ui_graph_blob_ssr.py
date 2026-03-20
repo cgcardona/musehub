@@ -154,8 +154,8 @@ async def test_graph_page_shows_commit_count(
 
     response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
-    # Commit count is rendered server-side as a number in the stat span
-    assert "graph-stat-value" in response.text
+    # Commit count is rendered server-side as a number in the shared stat strip
+    assert "ph-stat-value" in response.text
 
 
 @pytest.mark.anyio
@@ -171,8 +171,8 @@ async def test_graph_page_shows_branch_count(
 
     response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
-    # Branch count is rendered server-side in the graph stats bar
-    assert "graph-stat-value" in response.text
+    # Branch count is rendered server-side in the shared stats strip
+    assert "ph-stat-value" in response.text
 
 
 # ---------------------------------------------------------------------------

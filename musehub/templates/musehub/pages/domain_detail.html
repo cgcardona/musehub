@@ -2,101 +2,111 @@
 
 {% block title %}{{ domain.display_name }} · Muse Domain{% endblock %}
 
-{% block breadcrumb %}
-<a href="/domains">Domains</a>
-<span class="breadcrumb-sep">/</span>
-<span class="breadcrumb-current">{{ domain.scoped_id }}</span>
-{% endblock %}
+{# Strip container padding — hero is full-bleed, we control padding internally #}
+{% block container_extra_class %} page-container{% endblock %}
 
 {% block page_json %}{"page": "domain-detail", "domainSlug": {{ domain.slug | tojson }}, "domainId": {{ domain.domain_id | tojson }}}{% endblock %}
 
 {% block content %}
 <div class="dd-page" data-domain-slug="{{ domain.slug }}">
 
-  {# ── Hero banner ────────────────────────────────────────────────────── #}
-  <div class="dd-hero">
+  {# ── Hero ────────────────────────────────────────────────────────────────── #}
+  <div class="ph-hero dd-hero">
     <div class="dd-hero__bg"></div>
-    <div class="dd-hero__content">
-      <div class="dd-hero__eyebrow">
-        <span class="domain-badge">{{ domain.scoped_id }}</span>
-        {% if domain.is_verified %}
-        <span class="dd-verified-badge">✓ Verified</span>
-        {% endif %}
-        {% if domain.is_deprecated %}
-        <span class="dd-deprecated-badge">⚠ Deprecated</span>
-        {% endif %}
-        <span class="dd-version">v{{ domain.version }}</span>
-      </div>
-      <h1 class="dd-hero__title">
-        <span class="dd-hero__icon">{% if domain.slug == 'midi' %}🎵{% elif domain.slug == 'code' %}⬡{% else %}◎{% endif %}</span>
-        {{ domain.display_name }}
-        <span class="dd-hero__subtitle">Domain</span>
-      </h1>
-      <p class="dd-hero__desc">{{ domain.description }}</p>
-      <div class="dd-hero__actions">
-        <button class="btn btn-primary dd-install-btn" id="dd-install-btn">
-          ↓ Install Domain
-        </button>
-        <a href="#dd-repos" class="btn btn-secondary">Browse Repos</a>
-        <a href="?format=json" class="btn btn-ghost" target="_blank">
-          JSON API ↗
-        </a>
+    <div class="ph-hero-inner">
+      <div class="ph-hero-left">
+        <div class="ph-hero-eyebrow">
+          <span class="domain-badge">{{ domain.scoped_id }}</span>
+          {% if domain.is_verified %}<span class="dd-verified-badge"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verified</span>{% endif %}
+          {% if domain.is_deprecated %}<span class="dd-deprecated-badge"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Deprecated</span>{% endif %}
+          <span class="dd-version">v{{ domain.version }}</span>
+        </div>
+        <h1 class="ph-hero-title dd-hero__title">
+          <span class="dd-hero__icon">
+            {% if domain.slug == 'midi' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            {% elif domain.slug == 'code' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            {% else %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+            {% endif %}
+          </span>
+          {{ domain.display_name }}
+          <span class="dd-hero__subtitle">Domain</span>
+        </h1>
+        <p class="ph-hero-sub">{{ domain.description }}</p>
+        <div class="ph-hero-actions">
+          <button class="dd-hero-btn dd-hero-btn--primary dd-install-btn" id="dd-install-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Install Domain
+          </button>
+          <a href="/domains/{{ domain.scoped_id }}/new" class="dd-hero-btn dd-hero-btn--secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create repository
+          </a>
+          <a href="#dd-repos" class="dd-hero-btn dd-hero-btn--ghost">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Browse Repos
+          </a>
+          <a href="?format=json" class="dd-hero-btn dd-hero-btn--ghost" target="_blank">
+            JSON API
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+          </a>
+        </div>
       </div>
     </div>
   </div>
 
-  {# ── Stats ribbon ───────────────────────────────────────────────────── #}
-  <div class="dd-stats-ribbon">
-    <div class="dd-stat-pill">
-      <span class="dd-stat-pill__value">{{ domain.dimensions | length }}</span>
-      <span class="dd-stat-pill__label">Dimensions</span>
+  {# ── Stats strip ─────────────────────────────────────────────────────────── #}
+  <div class="ph-stats-strip">
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ domain.dimensions | length }}</span>
+      <span class="ph-stat-label">Dimensions</span>
     </div>
-    <div class="dd-stat-pill">
-      <span class="dd-stat-pill__value">{{ domain.install_count }}</span>
-      <span class="dd-stat-pill__label">Repositories</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ domain.install_count }}</span>
+      <span class="ph-stat-label">Repositories</span>
     </div>
-    <div class="dd-stat-pill">
-      <span class="dd-stat-pill__value">{{ domain.viewer_type | replace("_", " ") | title }}</span>
-      <span class="dd-stat-pill__label">Viewer</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ domain.viewer_type | replace("_", " ") | title }}</span>
+      <span class="ph-stat-label">Viewer</span>
     </div>
-    <div class="dd-stat-pill">
-      <span class="dd-stat-pill__value">{{ domain.merge_semantics | upper if domain.merge_semantics else "—" }}</span>
-      <span class="dd-stat-pill__label">Merge</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ domain.merge_semantics | upper if domain.merge_semantics else "—" }}</span>
+      <span class="ph-stat-label">Merge</span>
     </div>
     {% if domain.artifact_types %}
-    <div class="dd-stat-pill">
-      <span class="dd-stat-pill__value">{{ domain.artifact_types | length }}</span>
-      <span class="dd-stat-pill__label">Artifact Types</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ domain.artifact_types | length }}</span>
+      <span class="ph-stat-label">Artifact Types</span>
     </div>
     {% endif %}
     {% if domain.supported_commands %}
-    <div class="dd-stat-pill">
-      <span class="dd-stat-pill__value">{{ domain.supported_commands | length }}</span>
-      <span class="dd-stat-pill__label">CLI Commands</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ domain.supported_commands | length }}</span>
+      <span class="ph-stat-label">CLI Commands</span>
     </div>
     {% endif %}
   </div>
 
-  {# ── Two-column body ────────────────────────────────────────────────── #}
-  <div class="dd-body">
+  {# ── Body: content (narrow left), sidebar (wide right) ─────────────────── #}
+  <div class="ph-body">
 
-    {# Main content column #}
-    <div class="dd-main">
+    {# ── Main content — col 1: 240px narrow left ───────────────────────────── #}
+    <div class="ph-content dd-main">
 
-      {# ── Dimensions ────────────────────────────────────────────────── #}
+      {# Dimensions #}
       {% if domain.dimensions %}
-      <section class="dd-section">
-        <div class="dd-section__hd">
-          <h2 class="dd-section__title">
-            <span class="dd-section__icon">⊞</span>
-            Dimensions
-            <span class="dd-section__count">{{ domain.dimensions | length }}</span>
-          </h2>
-          <p class="dd-section__desc">
-            Each dimension is independently mergeable — two agents editing different
-            dimensions of the same snapshot never produce a conflict.
-          </p>
+      <section class="ph-section">
+        <div class="ph-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dimensions
+          <span class="ph-count">{{ domain.dimensions | length }}</span>
         </div>
+        <p class="ph-section-desc">
+          Each dimension is independently mergeable — two agents editing different
+          dimensions of the same snapshot never produce a conflict.
+        </p>
         <div class="dd-dim-grid">
           {% for dim in domain.dimensions %}
           <div class="dd-dim-card dd-dim-color-{{ loop.index0 % 8 }}">
@@ -105,46 +115,106 @@
               <span class="dd-dim-card__name">{{ dim.name }}</span>
               {% if dim.unit %}<span class="dd-dim-card__unit">{{ dim.unit }}</span>{% endif %}
             </div>
-            {% if dim.description %}
-            <p class="dd-dim-card__desc">{{ dim.description }}</p>
-            {% endif %}
+            {% if dim.description %}<p class="dd-dim-card__desc">{{ dim.description }}</p>{% endif %}
           </div>
           {% endfor %}
         </div>
       </section>
       {% endif %}
 
-      {# ── CLI Commands ──────────────────────────────────────────────── #}
+    </div>{# /ph-content #}
+
+    {# ── Sidebar — col 2: 1fr wide right ───────────────────────────────────── #}
+    <aside class="ph-sidebar">
+
+      {# Repos — wide grid needs the full right column #}
+      <section class="ph-section" id="dd-repos">
+        <div class="ph-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          Public Repositories
+          <span class="ph-count">{{ repos_total }}</span>
+        </div>
+        {% if repos %}
+        <div class="dd-repo-grid">
+          {% for repo in repos %}
+          <a class="dd-repo-card" href="/{{ repo.owner }}/{{ repo.slug }}">
+            <div class="dd-repo-card__header">
+              <span class="dd-repo-card__name">{{ repo.owner }}/{{ repo.slug }}</span>
+              <span class="dd-repo-card__arrow">→</span>
+            </div>
+            {% if repo.description %}<p class="dd-repo-card__desc">{{ repo.description | truncate(100) }}</p>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% if repos_total > repos | length %}
+        <div class="dd-see-all">
+          <a class="dd-hero-btn dd-hero-btn--ghost" href="/explore?domain={{ domain.scoped_id }}">
+            See all {{ repos_total }} repositories
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+          </a>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="dd-repos-empty">
+          <div class="dd-repos-empty__icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </div>
+          <p>No public repositories using this domain yet.</p>
+          <a href="/domains/{{ domain.scoped_id }}/new" class="dd-hero-btn dd-hero-btn--secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create the first repository
+          </a>
+        </div>
+        {% endif %}
+      </section>
+
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Install</div>
+        <p class="dd-sidebar-desc">Add this domain plugin to your Muse workspace.</p>
+        <div class="dd-terminal dd-terminal--compact">
+          <div class="dd-terminal__chrome">
+            <span class="dd-terminal__dot dd-terminal__dot--red"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--yellow"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--green"></span>
+            <button class="dd-copy-btn" data-copy-id="install-cmd" title="Copy"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+          </div>
+          <pre class="dd-terminal__body" id="install-cmd">muse domain install {{ domain.scoped_id }}</pre>
+        </div>
+      </div>
+
       {% if domain.supported_commands %}
-      <section class="dd-section">
-        <h2 class="dd-section__title"><span class="dd-section__icon">⌘</span> CLI Commands</h2>
-        <div class="dd-terminal">
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          CLI Commands
+        </div>
+        <div class="dd-terminal dd-terminal--compact">
           <div class="dd-terminal__chrome">
             <span class="dd-terminal__dot dd-terminal__dot--red"></span>
             <span class="dd-terminal__dot dd-terminal__dot--yellow"></span>
             <span class="dd-terminal__dot dd-terminal__dot--green"></span>
             <span class="dd-terminal__title">muse</span>
-            <button class="dd-copy-btn" data-copy-id="cli-commands">Copy all</button>
+            <button class="dd-copy-btn" data-copy-id="cli-commands" title="Copy all"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
           </div>
           <pre class="dd-terminal__body" id="cli-commands">{% for cmd in domain.supported_commands %}$ {{ cmd }}{% if not loop.last %}
 {% endif %}{% endfor %}</pre>
         </div>
-      </section>
+      </div>
       {% endif %}
 
-      {# ── MCP / Agent integration ────────────────────────────────────── #}
-      <section class="dd-section">
-        <div class="dd-section__hd">
-          <h2 class="dd-section__title"><span class="dd-section__icon">⚡</span> Agent &amp; MCP Integration</h2>
-          <p class="dd-section__desc">Agents can discover and use this domain through the MuseHub MCP server — no configuration needed.</p>
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Agent &amp; MCP
         </div>
-        <div class="dd-terminal">
+        <p class="dd-sidebar-desc">Agents can discover and use this domain through the MuseHub MCP server — no configuration needed.</p>
+        <div class="dd-terminal dd-terminal--compact">
           <div class="dd-terminal__chrome">
             <span class="dd-terminal__dot dd-terminal__dot--red"></span>
             <span class="dd-terminal__dot dd-terminal__dot--yellow"></span>
             <span class="dd-terminal__dot dd-terminal__dot--green"></span>
             <span class="dd-terminal__title">MCP</span>
-            <button class="dd-copy-btn" data-copy-id="mcp-snippet">Copy</button>
+            <button class="dd-copy-btn" data-copy-id="mcp-snippet" title="Copy"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
           </div>
           <pre class="dd-terminal__body" id="mcp-snippet">// MCP tool — preferred for AI agents
 musehub_get_domain(scoped_id="{{ domain.scoped_id }}")
@@ -152,9 +222,6 @@ musehub_get_domain(scoped_id="{{ domain.scoped_id }}")
 // REST API — for programmatic access
 GET /api/v1/domains/{{ domain.scoped_id }}
 GET /api/v1/domains/{{ domain.scoped_id }}/repos
-
-// Human URL (also serves JSON via ?format=json or Accept header)
-GET /domains/{{ domain.scoped_id }}?format=json
 
 // MCP resource URI
 muse://domains/{{ domain.author_slug }}/{{ domain.slug }}
@@ -166,79 +233,11 @@ musehub_create_repo(
   domain="{{ domain.scoped_id }}"
 )</pre>
         </div>
-        <div class="dd-mcp-callout">
-          <span class="dd-mcp-callout__icon">🤖</span>
-          <div>
-            <strong>Agents-first design.</strong>
-            Every domain exposes a full MCP resource so AI agents can discover capabilities,
-            read manifests, and create repos without any human configuration.
-          </div>
-        </div>
-      </section>
-
-      {# ── Repos using this domain ────────────────────────────────────── #}
-      <section class="dd-section" id="dd-repos">
-        <div class="dd-section__hd">
-          <h2 class="dd-section__title">
-            <span class="dd-section__icon">📦</span>
-            Public Repositories
-            <span class="dd-section__count">{{ repos_total }}</span>
-          </h2>
-        </div>
-        {% if repos %}
-        <div class="dd-repo-grid">
-          {% for repo in repos %}
-          <a class="dd-repo-card" href="/{{ repo.owner }}/{{ repo.slug }}">
-            <div class="dd-repo-card__header">
-              <span class="dd-repo-card__name">{{ repo.owner }}/{{ repo.slug }}</span>
-              <span class="dd-repo-card__arrow">→</span>
-            </div>
-            {% if repo.description %}
-            <p class="dd-repo-card__desc">{{ repo.description | truncate(100) }}</p>
-            {% endif %}
-          </a>
-          {% endfor %}
-        </div>
-        {% if repos_total > repos | length %}
-        <div class="dd-see-all">
-          <a class="btn btn-secondary" href="/explore?domain={{ domain.scoped_id }}">
-            See all {{ repos_total }} repositories →
-          </a>
-        </div>
-        {% endif %}
-        {% else %}
-        <div class="dd-repos-empty">
-          <div class="dd-repos-empty__icon">📦</div>
-          <p>No public repositories using this domain yet.</p>
-          <a href="/new" class="btn btn-primary">Create the first repository →</a>
-        </div>
-        {% endif %}
-      </section>
-
-    </div>{# /dd-main #}
-
-    {# Sidebar #}
-    <aside class="dd-sidebar">
-
-      {# Install card #}
-      <div class="dd-sidebar-card dd-sidebar-card--install">
-        <h3 class="dd-sidebar-card__title">Install</h3>
-        <p class="dd-sidebar-card__sub">Add this domain plugin to your Muse workspace.</p>
-        <div class="dd-terminal dd-terminal--compact">
-          <div class="dd-terminal__chrome">
-            <span class="dd-terminal__dot dd-terminal__dot--red"></span>
-            <span class="dd-terminal__dot dd-terminal__dot--yellow"></span>
-            <span class="dd-terminal__dot dd-terminal__dot--green"></span>
-            <button class="dd-copy-btn" data-copy-id="install-cmd">Copy</button>
-          </div>
-          <pre class="dd-terminal__body" id="install-cmd">muse domain install {{ domain.scoped_id }}</pre>
-        </div>
       </div>
 
-      {# Artifact types #}
       {% if domain.artifact_types %}
-      <div class="dd-sidebar-card">
-        <h3 class="dd-sidebar-card__title">Artifact Types</h3>
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Artifact Types</div>
         <div class="dd-artifact-list">
           {% for mime in domain.artifact_types %}
           <span class="dd-artifact-badge">{{ mime }}</span>
@@ -247,50 +246,39 @@ musehub_create_repo(
       </div>
       {% endif %}
 
-      {# Manifest hash #}
       {% if domain.manifest_hash %}
-      <div class="dd-sidebar-card">
-        <h3 class="dd-sidebar-card__title">Manifest Hash</h3>
-        <p class="dd-sidebar-card__sub">Pin to this exact capability definition.</p>
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Manifest Hash</div>
+        <p class="dd-sidebar-desc">Pin to this exact capability definition.</p>
         <div class="dd-hash-block">
           <code class="dd-hash-code" id="manifest-hash">{{ domain.manifest_hash }}</code>
-          <button class="dd-hash-copy" data-copy-id="manifest-hash" title="Copy hash">⧉</button>
+          <button class="dd-hash-copy" data-copy-id="manifest-hash" title="Copy hash"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
         </div>
       </div>
       {% endif %}
 
-      {# MCP URI #}
-      <div class="dd-sidebar-card">
-        <h3 class="dd-sidebar-card__title">MCP Resource URI</h3>
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">MCP Resource URI</div>
         <div class="dd-hash-block">
           <code class="dd-hash-code" id="mcp-uri">muse://domains/{{ domain.scoped_id }}</code>
-          <button class="dd-hash-copy" data-copy-id="mcp-uri" title="Copy URI">⧉</button>
+          <button class="dd-hash-copy" data-copy-id="mcp-uri" title="Copy URI"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
         </div>
       </div>
 
-      {# Metadata #}
-      <div class="dd-sidebar-card">
-        <h3 class="dd-sidebar-card__title">Details</h3>
+      <div class="ph-sidebar-section">
+        <div class="ph-sidebar-heading">Details</div>
         <dl class="dd-meta-list">
-          <dt>Author</dt>
-          <dd>@{{ domain.author_slug }}</dd>
-          <dt>Version</dt>
-          <dd>{{ domain.version }}</dd>
-          <dt>Viewer</dt>
-          <dd>{{ domain.viewer_type | replace("_", " ") | title }}</dd>
-          {% if domain.merge_semantics %}
-          <dt>Merge</dt>
-          <dd>{{ domain.merge_semantics | upper }}</dd>
-          {% endif %}
-          {% if domain.created_at %}
-          <dt>Registered</dt>
-          <dd>{{ domain.created_at[:10] }}</dd>
-          {% endif %}
+          <dt>Author</dt><dd>@{{ domain.author_slug }}</dd>
+          <dt>Version</dt><dd>{{ domain.version }}</dd>
+          <dt>Viewer</dt><dd>{{ domain.viewer_type | replace("_", " ") | title }}</dd>
+          {% if domain.merge_semantics %}<dt>Merge</dt><dd>{{ domain.merge_semantics | upper }}</dd>{% endif %}
+          {% if domain.created_at %}<dt>Registered</dt><dd>{{ domain.created_at[:10] }}</dd>{% endif %}
         </dl>
       </div>
 
     </aside>
-  </div>{# /dd-body #}
+
+  </div>{# /ph-body #}
 
 </div>{# /dd-page #}
 {% endblock %}

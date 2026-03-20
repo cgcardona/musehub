@@ -15,7 +15,7 @@ Covers:
     - build_url_elicitation returns correct mode/url/elicitationId
 
   Tool routing (unit):
-    - musehub_compose_with_preferences: no session → elicitation_unavailable
+    - musehub_create_with_preferences: no session → elicitation_unavailable
     - musehub_review_pr_interactive: no session → elicitation_unavailable
     - musehub_connect_streaming_platform: no session → elicitation_unavailable
     - musehub_connect_daw_cloud: no session → elicitation_unavailable
@@ -323,7 +323,7 @@ async def test_progress_with_session_pushes_sse_event() -> None:
 
 @pytest.mark.anyio
 async def test_compose_with_preferences_no_session() -> None:
-    """musehub_compose_with_preferences without session must return error."""
+    """musehub_create_with_preferences without session must return error."""
     from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
 
     ctx = ToolCallContext(user_id=None, session=None)

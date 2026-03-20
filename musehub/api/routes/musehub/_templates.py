@@ -34,3 +34,10 @@ register_musehub_filters(templates.env)
 # These are available in every template without passing them in ctx.
 templates.env.globals["MUSE_VERSION"] = MUSE_VERSION
 templates.env.globals["now"] = lambda: datetime.now(timezone.utc)
+
+# Cache busting for static assets: ?v=... changes when build runs so browsers fetch fresh CSS/JS.
+_cache_id_path = Path(__file__).resolve().parent.parent.parent.parent / "templates" / "musehub" / "static" / ".cache-id"
+try:
+    templates.env.globals["static_version"] = _cache_id_path.read_text().strip() if _cache_id_path.exists() else ""
+except Exception:
+    templates.env.globals["static_version"] = ""
