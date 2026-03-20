@@ -46,7 +46,6 @@
   {% for issue in issues %}
     {%- set type_key = get_type(issue.labels) | trim -%}
     {%- set preview = body_preview(issue.body) | trim -%}
-    {%- set refs_html = musical_refs(issue.body) | trim -%}
     {%- set label_map = {} -%}
     {%- for lbl in labels_data -%}
       {%- set _ = label_map.update({lbl.name: lbl.color}) -%}

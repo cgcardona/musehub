@@ -100,7 +100,7 @@ async def _make_comment(
         author=author,
         body=body,
         parent_id=parent_id,
-        musical_refs=[],
+        state_refs=[],
     )
     db.add(comment)
     await db.commit()

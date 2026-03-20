@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     app_name: str = "Muse"
     app_version: str = _app_version_from_package()
     debug: bool = False
+    muse_env: str = "production"  # "test" | "development" | "production"
 
     # Server Configuration
     host: str = "0.0.0.0"

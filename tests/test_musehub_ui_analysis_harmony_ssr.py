@@ -36,7 +36,7 @@ _ANALYSIS_REF = "cafebeef00112233"
 _OWNER = "harmonyuser"
 _SLUG = "harmony-test-repo"
 _BASE = f"/{_OWNER}/{_SLUG}"
-_HARMONY_URL = f"{_BASE}/analysis/{_ANALYSIS_REF}/harmony"
+_HARMONY_URL = f"{_BASE}/insights/{_ANALYSIS_REF}/harmony"
 
 
 async def _make_repo(db_session: AsyncSession) -> str:

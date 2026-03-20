@@ -145,7 +145,7 @@ class TestMusehubToolsRegistered:
             )
 
     def test_all_tools_defined(self) -> None:
-        """All 32 MuseHub tools (15 read + 12 write + 5 elicitation) are defined."""
+        """All 36 MuseHub tools (15 read + 12 write + 5 elicitation + 4 domain) are defined."""
         expected_read = {
             "musehub_browse_repo",
             "musehub_list_branches",
@@ -162,6 +162,12 @@ class TestMusehubToolsRegistered:
             "musehub_get_pr",
             "musehub_list_releases",
             "musehub_search_repos",
+        }
+        expected_domain = {
+            "musehub_get_domain",
+            "musehub_get_domain_insights",
+            "musehub_get_view",
+            "musehub_list_domains",
         }
         expected_write = {
             "musehub_create_repo",
@@ -184,7 +190,7 @@ class TestMusehubToolsRegistered:
             "musehub_connect_daw_cloud",
             "musehub_create_release_interactive",
         }
-        assert MUSEHUB_TOOL_NAMES == expected_read | expected_write | expected_elicitation
+        assert MUSEHUB_TOOL_NAMES == expected_read | expected_write | expected_elicitation | expected_domain
 
 
 # ---------------------------------------------------------------------------

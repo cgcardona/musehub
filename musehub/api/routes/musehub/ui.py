@@ -584,8 +584,14 @@ async def repo_page(
     )
     # domain_meta as ordered pairs for the "Properties" sidebar (non-technical keys only)
     _META_SKIP = {"source_repo"}
+    _META_LABELS: dict[str, str] = {
+        "tempo_bpm": "BPM",
+        "key_signature": "Key",
+        "time_signature": "Time",
+        "duration_seconds": "Duration",
+    }
     domain_meta_display: list[tuple[str, str]] = [
-        (k.replace("_", " ").title(), str(v))
+        (_META_LABELS.get(k, k.replace("_", " ").title()), str(v))
         for k, v in ((orm_repo.domain_meta or {}) if orm_repo else {}).items()
         if k not in _META_SKIP and v
     ]

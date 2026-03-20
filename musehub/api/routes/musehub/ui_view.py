@@ -37,9 +37,10 @@ from starlette.responses import Response
 
 from musehub.api.routes.musehub._templates import templates as _templates
 from musehub.api.routes.musehub._nav_ctx import build_repo_nav_ctx
+from musehub.api.routes.musehub.htmx_helpers import htmx_fragment_or_full
 from musehub.db import get_db
 from musehub.db import musehub_models as musehub_db
-from musehub.services import musehub_repository, musehub_domains
+from musehub.services import musehub_repository, musehub_domains, musehub_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,7 @@ async def domain_viewer_page(
     owner: str,
     repo_slug: str,
     ref: str,
+    format: str = "html",
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Render the universal domain viewer for a repository at a given ref.
@@ -177,6 +179,10 @@ async def domain_viewer_page(
         "domainScopedId": domain_ctx["scoped_id"],
         "domainDisplayName": domain_ctx["display_name"],
     }
+
+    if format == "json":
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content=page_json)
 
     ctx: dict[str, object] = {
         "title": f"View · {owner}/{repo_slug}@{ref}",
@@ -211,7 +217,41 @@ async def domain_viewer_file_page(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Render the viewer for a specific file within the snapshot."""
-    return await domain_viewer_page(request, owner, repo_slug, ref, db)
+    repo = await musehub_repository.get_repo_by_owner_slug(db, owner, repo_slug)
+    if repo is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Repository not found.")
+
+    nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
+    domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
+
+    page_json: dict[str, object] = {
+        "repoId": repo.repo_id,
+        "owner": owner,
+        "slug": repo_slug,
+        "ref": ref,
+        "path": path,
+        "viewerType": domain_ctx["viewer_type"],
+        "domainScopedId": domain_ctx["scoped_id"],
+        "domainDisplayName": domain_ctx["display_name"],
+    }
+
+    ctx: dict[str, object] = {
+        "title": f"View · {owner}/{repo_slug}@{ref}/{path}",
+        "current_page": "view",
+        "repo": repo,
+        "owner": owner,
+        "repo_slug": repo_slug,
+        "ref": ref,
+        "path": path,
+        "domain": domain_ctx,
+        "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
+        **nav_ctx,
+    }
+    return _templates.TemplateResponse(
+        request, "musehub/pages/view.html", ctx,
+        headers={"X-Page-Json": str(page_json)},
+    )
 
 
 # ── Insights data helpers ─────────────────────────────────────────────────────
@@ -384,20 +424,35 @@ async def insights_dashboard_page(
     if domain_ctx["viewer_type"] == "symbol_graph":
         metrics = await _compute_code_insights(db, repo.repo_id)
 
+    # Pre-compute all dimension data for the dashboard cards
+    _DASHBOARD_DIMS = ["key", "tempo", "meter", "groove", "form", "dynamics", "emotion", "motifs", "contour"]
+    dim_map: dict[str, object] = {
+        dim: musehub_analysis.compute_dimension(dim, ref)
+        for dim in _DASHBOARD_DIMS
+    }
+
+    base_url = f"/{owner}/{repo_slug}"
     ctx: dict[str, object] = {
         "title": f"Insights · {owner}/{repo_slug}@{ref}",
         "current_page": "insights",
         "repo": repo,
+        "repo_id": repo.repo_id,
         "owner": owner,
         "repo_slug": repo_slug,
+        "base_url": base_url,
         "ref": ref,
         "domain": domain_ctx,
         "active_dimension": None,
         "metrics": metrics,
+        "dim_map": dim_map,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
         **nav_ctx,
     }
-    return _templates.TemplateResponse(request, "musehub/pages/insights.html", ctx)
+    return await htmx_fragment_or_full(
+        request, _templates, ctx,
+        full_template="musehub/pages/insights.html",
+        fragment_template="musehub/fragments/analysis/dashboard_content.html",
+    )
 
 
 @view_router.get(
@@ -427,17 +482,70 @@ async def insights_dimension_page(
     if domain_ctx["viewer_type"] == "symbol_graph":
         metrics = await _compute_code_insights(db, repo.repo_id)
 
+    base_url = f"/{owner}/{repo_slug}"
+    # Compute dimension-specific data using the correct function per dimension
+    _dim_key = dim.replace("-", "_")
+    if dim == "harmony":
+        dim_data: object = musehub_analysis.compute_harmony_analysis(repo_id=repo.repo_id, ref=ref)
+    elif dim == "emotion":
+        dim_data = musehub_analysis.compute_emotion_map(repo_id=repo.repo_id, ref=ref)
+    elif dim == "dynamics":
+        dim_data = musehub_analysis.compute_dynamics_page_data(repo_id=repo.repo_id, ref=ref)
+    else:
+        dim_data = musehub_analysis.compute_dimension(dim, ref)
     ctx: dict[str, object] = {
-        "title": f"{dim.title()} Insight · {owner}/{repo_slug}@{ref}",
+        "title": f"{dim.replace('-', ' ').title()} Insight · {owner}/{repo_slug}@{ref}",
         "current_page": "insights",
         "repo": repo,
+        "repo_id": repo.repo_id,
         "owner": owner,
         "repo_slug": repo_slug,
+        "base_url": base_url,
         "ref": ref,
         "domain": domain_ctx,
         "active_dimension": dim,
         "metrics": metrics,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
+        # Dimension-specific data keys expected by the dimension templates
+        f"{_dim_key}_data": dim_data,
         **nav_ctx,
     }
-    return _templates.TemplateResponse(request, "musehub/pages/insights.html", ctx)
+    # Use dimension-specific template if it exists, otherwise fall back to insights.html
+    _DIM_TEMPLATES: dict[str, str] = {
+        "key": "musehub/pages/analysis/key.html",
+        "tempo": "musehub/pages/analysis/tempo.html",
+        "meter": "musehub/pages/analysis/meter.html",
+        "groove": "musehub/pages/analysis/groove.html",
+        "form": "musehub/pages/analysis/form.html",
+        "harmony": "musehub/pages/analysis/harmony.html",
+        "contour": "musehub/pages/analysis/contour.html",
+        "dynamics": "musehub/pages/analysis/dynamics.html",
+        "motifs": "musehub/pages/analysis/motifs.html",
+        "chord_map": "musehub/pages/analysis/chord_map.html",
+        "chord-map": "musehub/pages/analysis/chord_map.html",
+        "context": "musehub/pages/analysis/context.html",
+        "emotion": "musehub/pages/analysis/emotion.html",
+        "compare": "musehub/pages/analysis/compare.html",
+        "divergence": "musehub/pages/analysis/divergence.html",
+    }
+    _DIM_FRAGMENTS: dict[str, str] = {
+        "key": "musehub/fragments/analysis/key_content.html",
+        "tempo": "musehub/fragments/analysis/tempo_content.html",
+        "meter": "musehub/fragments/analysis/meter_content.html",
+        "groove": "musehub/fragments/analysis/groove_content.html",
+        "form": "musehub/fragments/analysis/form_content.html",
+        "harmony": "musehub/fragments/analysis/harmony_content.html",
+        "contour": "musehub/fragments/analysis/contour_content.html",
+        "dynamics": "musehub/fragments/analysis/dynamics_content.html",
+        "motifs": "musehub/fragments/analysis/motifs_content.html",
+        "chord_map": "musehub/fragments/analysis/chord_map_content.html",
+        "chord-map": "musehub/fragments/analysis/chord_map_content.html",
+        "emotion": "musehub/fragments/analysis/emotion_content.html",
+    }
+    full_template = _DIM_TEMPLATES.get(dim, "musehub/pages/insights.html")
+    fragment_template = _DIM_FRAGMENTS.get(dim)
+    return await htmx_fragment_or_full(
+        request, _templates, ctx,
+        full_template=full_template,
+        fragment_template=fragment_template,
+    )

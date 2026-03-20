@@ -97,11 +97,21 @@ class MusehubRepo(Base):
         """MIDI key signature, e.g. 'F# minor'. Stored in domain_meta for V2 repos."""
         return (self.domain_meta or {}).get("key_signature")  # type: ignore[return-value]
 
+    @key_signature.setter
+    def key_signature(self, value: str | None) -> None:
+        self.domain_meta = dict(self.domain_meta or {})
+        self.domain_meta["key_signature"] = value
+
     @property
     def tempo_bpm(self) -> int | None:
         """MIDI tempo in BPM. Stored in domain_meta for V2 repos."""
         val = (self.domain_meta or {}).get("tempo_bpm")
         return int(val) if isinstance(val, (int, float, str)) else None
+
+    @tempo_bpm.setter
+    def tempo_bpm(self, value: int | None) -> None:
+        self.domain_meta = dict(self.domain_meta or {})
+        self.domain_meta["tempo_bpm"] = value
 
     branches: Mapped[list[MusehubBranch]] = relationship(
         "MusehubBranch", back_populates="repo", cascade="all, delete-orphan"

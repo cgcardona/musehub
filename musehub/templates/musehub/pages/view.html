@@ -116,6 +116,7 @@
   "owner": "{{ owner }}",
   "slug": "{{ repo_slug }}",
   "ref": "{{ ref }}",
+  {% if path %}"path": {{ path|tojson }},{% endif %}
   "viewerType": "{{ domain.viewer_type }}",
   "domainScopedId": {{ (domain.scoped_id or "")|tojson }},
   "domainDisplayName": {{ domain.display_name|tojson }}

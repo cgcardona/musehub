@@ -282,16 +282,22 @@ async def create_pr_comment(
     if pr is None:
         raise ValueError(f"Pull request {pr_id} not found in repo {repo_id}")
 
+    dimension_ref: dict[str, object] = {"type": target_type}
+    if target_track is not None:
+        dimension_ref["track"] = target_track
+    if target_beat_start is not None:
+        dimension_ref["beat_start"] = target_beat_start
+    if target_beat_end is not None:
+        dimension_ref["beat_end"] = target_beat_end
+    if target_note_pitch is not None:
+        dimension_ref["pitch"] = target_note_pitch
+
     comment = db.MusehubPRComment(
         pr_id=pr_id,
         repo_id=repo_id,
         author=author,
         body=body,
-        target_type=target_type,
-        target_track=target_track,
-        target_beat_start=target_beat_start,
-        target_beat_end=target_beat_end,
-        target_note_pitch=target_note_pitch,
+        dimension_ref=dimension_ref,
         parent_comment_id=parent_comment_id,
     )
     session.add(comment)

@@ -24,7 +24,7 @@ differ between engines and are not needed at this scale.
 import logging
 from typing import Any, Literal
 
-from sqlalchemy import Text, desc, func, or_, outerjoin, select
+from sqlalchemy import Integer, Text, desc, func, or_, outerjoin, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.db import musehub_models as db
@@ -132,13 +132,20 @@ async def list_public_repos(
             func.cast(db.MusehubRepo.domain_meta, Text).ilike(f"%{key.lower()}%")
         )
     if tempo_min is not None:
-        # tempo_bpm in domain_meta; approximate filter via tag text
+        # Extract tempo_bpm from domain_meta JSON for numeric comparison.
+        # json_extract works in SQLite and PostgreSQL (via ->>).
         base_q = base_q.where(
-            func.cast(db.MusehubRepo.domain_meta, Text).ilike(f"%tempo%")
+            func.cast(
+                func.json_extract(db.MusehubRepo.domain_meta, "$.tempo_bpm"),
+                Integer,
+            ) >= tempo_min
         )
     if tempo_max is not None:
         base_q = base_q.where(
-            func.cast(db.MusehubRepo.domain_meta, Text).ilike(f"%tempo%")
+            func.cast(
+                func.json_extract(db.MusehubRepo.domain_meta, "$.tempo_bpm"),
+                Integer,
+            ) <= tempo_max
         )
 
     # Multi-select language/instrument chips — filter by musehub_repos.tags JSON (OR across values).

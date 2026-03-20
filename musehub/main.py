@@ -130,9 +130,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="MuseHub API",
     version=settings.app_version,
-    # OpenAPI schema is only served in debug/dev. In production it is still
-    # machine-readable via the MCP spec at /mcp — agents should use that.
-    openapi_url="/api/v1/openapi.json" if settings.debug else None,
+    # OpenAPI schema served in debug/dev and test environments.
+    # In production (DEBUG=false, MUSE_ENV != "test") it is disabled — agents use /mcp instead.
+    openapi_url="/api/v1/openapi.json" if (settings.debug or settings.muse_env == "test") else None,
     description=(
         "**MuseHub** — the version control hub for multidimensional state, powered by Muse.\n\n"
         "Muse is a domain-agnostic version control system. Not just Git — any state space "

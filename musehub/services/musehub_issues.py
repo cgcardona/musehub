@@ -507,7 +507,7 @@ async def create_comment(
         author=author,
         body=body,
         parent_id=parent_id,
-        musical_refs=musical_refs,
+        state_refs=musical_refs,
     )
     session.add(comment)
     await session.flush()

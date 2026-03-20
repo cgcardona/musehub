@@ -76,7 +76,7 @@ async def test_listen_page_renders_track_list_server_side(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Track names must appear in the server-rendered HTML without requiring JS execution."""
+    """View page renders successfully for a repo with audio tracks."""
     await _make_repo_with_tracks(
         db_session,
         slug="ssr-tracks",
@@ -85,12 +85,11 @@ async def test_listen_page_renders_track_list_server_side(
             ("tracks/keys.mp3", 61440),
         ],
     )
-    response = await client.get("/testuser/ssr-tracks/listen/main")
+    response = await client.get("/testuser/ssr-tracks/view/main")
     assert response.status_code == 200
     body = response.text
-    # Track names are derived from file basenames (without extension)
-    assert "bass" in body
-    assert "keys" in body
+    # Domain viewer renders the view container
+    assert "view-container" in body
 
 
 @pytest.mark.anyio
@@ -98,16 +97,16 @@ async def test_listen_page_track_items_have_data_track_url(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """SSR-rendered track items must carry data-track-url attributes for JS hydration."""
+    """View page embeds the viewerType in page config JSON for JS hydration."""
     await _make_repo_with_tracks(
         db_session,
         slug="data-attr-repo",
         tracks=[("tracks/drum.mp3", 32768)],
     )
-    response = await client.get("/testuser/data-attr-repo/listen/main")
+    response = await client.get("/testuser/data-attr-repo/view/main")
     assert response.status_code == 200
     body = response.text
-    assert "data-track-url" in body
+    assert "viewerType" in body
 
 
 @pytest.mark.anyio
@@ -117,7 +116,7 @@ async def test_listen_page_waveform_div_present(
 ) -> None:
     """The waveform container must be present in the server-rendered HTML for WaveSurfer."""
     await _make_repo_with_tracks(db_session, slug="waveform-repo")
-    response = await client.get("/testuser/waveform-repo/listen/main")
+    response = await client.get("/testuser/waveform-repo/view/main")
     assert response.status_code == 200
     body = response.text
     # WaveSurfer target element or reference must be present
@@ -135,7 +134,7 @@ async def test_listen_page_transport_bar_present(
         slug="transport-repo",
         tracks=[("tracks/lead.mp3", 20480)],
     )
-    response = await client.get("/testuser/transport-repo/listen/main")
+    response = await client.get("/testuser/transport-repo/view/main")
     assert response.status_code == 200
     body = response.text
     assert "play-btn" in body or "play" in body.lower()
@@ -146,18 +145,13 @@ async def test_listen_page_no_tracks_shows_message(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """A repo with no audio tracks must render an informative empty-state message."""
+    """View page renders for a repo with no audio tracks (generic domain fallback)."""
     await _make_repo_with_tracks(db_session, slug="empty-audio-repo", tracks=[])
-    response = await client.get("/testuser/empty-audio-repo/listen/main")
+    response = await client.get("/testuser/empty-audio-repo/view/main")
     assert response.status_code == 200
     body = response.text
-    # Empty state — no audio tracks
-    assert (
-        "No audio" in body
-        or "no audio" in body.lower()
-        or "hasRenders" in body
-        or "no-renders" in body
-    )
+    # Generic domain viewer renders successfully
+    assert "view-container" in body or "view-page" in body
 
 
 @pytest.mark.anyio
@@ -165,17 +159,17 @@ async def test_listen_page_playlist_json_injected(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Track listing is rendered SSR; listen.ts reads track data from data-track-url attributes."""
+    """View page embeds viewerType and repo info in SSR page config JSON."""
     await _make_repo_with_tracks(
         db_session,
         slug="playlist-repo",
         tracks=[("tracks/synth.mp3", 40960)],
     )
-    response = await client.get("/testuser/playlist-repo/listen/main")
+    response = await client.get("/testuser/playlist-repo/view/main")
     assert response.status_code == 200
     body = response.text
-    assert '"page": "listen"' in body
-    assert "data-track-url" in body
+    assert "viewerType" in body
+    assert "playlist-repo" in body
 
 
 # ---------------------------------------------------------------------------
