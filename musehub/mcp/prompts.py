@@ -253,6 +253,31 @@ PROMPT_CATALOGUE: list[MCPPromptDef] = [
             },
         ],
     },
+    {
+        "name": "musehub/push-workflow",
+        "description": (
+            "Step-by-step guide for pushing a local Muse repository to MuseHub. "
+            "Covers authentication setup, remote configuration, and the push command. "
+            "Use this when an agent or user needs to publish work to MuseHub for the first time."
+        ),
+        "arguments": [
+            {
+                "name": "repo_id",
+                "description": "UUID of the target MuseHub repository (if already created).",
+                "required": False,
+            },
+            {
+                "name": "owner",
+                "description": "Repository owner username.",
+                "required": False,
+            },
+            {
+                "name": "slug",
+                "description": "Repository slug.",
+                "required": False,
+            },
+        ],
+    },
 ]
 
 PROMPT_NAMES: set[str] = {p["name"] for p in PROMPT_CATALOGUE}
@@ -295,6 +320,8 @@ def get_prompt(name: str, arguments: dict[str, str] | None = None) -> MCPPromptR
         return _domain_authoring(args.get("domain_name", ""))
     if name == "musehub/agent-onboard":
         return _agent_onboard(args.get("agent_name", ""), args.get("domain", ""))
+    if name == "musehub/push-workflow":
+        return _push_workflow(args.get("repo_id", ""), args.get("owner", ""), args.get("slug", ""))
     return None
 
 
@@ -1190,6 +1217,76 @@ musehub_create_pr_comment(
 | Review changes | `musehub_get_pr`, `musehub_create_pr_comment`, `musehub_submit_pr_review` |
 
 {agent} is now a first-class Muse citizen.
+"""),
+        ],
+    }
+
+
+def _push_workflow(repo_id: str = "", owner: str = "", slug: str = "") -> MCPPromptResult:
+    target = f"{owner}/{slug}" if (owner and slug) else (repo_id or "<owner>/<slug>")
+    return {
+        "description": "Step-by-step guide for pushing a local Muse repository to MuseHub.",
+        "messages": [
+            _msg("user", f"How do I push my local Muse repo to MuseHub? Target: {target}"),
+            _msg("assistant", f"""\
+# MuseHub Push Workflow
+
+## Step 1 — Confirm authentication
+
+```
+musehub_whoami()
+```
+
+If `authenticated` is `false`, create an agent token:
+
+```
+musehub_create_agent_token(agent_name="my-agent/1.0", expires_in_days=90)
+```
+
+Store it with:
+
+```
+muse config set musehub.token <token>
+```
+
+## Step 2 — Create or find the remote repo
+
+Create if it doesn't exist:
+
+```
+musehub_create_repo(name="<repo name>", visibility="public")
+```
+
+Find an existing one:
+
+```
+muse_remote(owner="{owner or '<owner>'}", slug="{slug or '<slug>'}")
+```
+
+## Step 3 — Add remote and push (terminal)
+
+```
+muse remote add origin https://musehub.ai/{target}
+muse push origin main
+```
+
+## Step 4 — Push via MCP tool (agent-native)
+
+```
+muse_push(
+    repo_id="{repo_id or '<repo_id>'}",
+    branch="main",
+    head_commit_id="<HEAD commit ID>",
+    commits=[...],
+    objects=[...]
+)
+```
+
+## Step 5 — Verify
+
+```
+musehub_browse_repo(repo_id="{repo_id or '<repo_id>'}")
+```
 """),
         ],
     }

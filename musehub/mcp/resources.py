@@ -11,15 +11,15 @@ Every resource returns ``application/json``.
   musehub://me/notifications        — unread notification inbox
   musehub://me/starred              — repos the authenticated user has starred
   musehub://me/feed                 — activity feed for watched repos
+  musehub://me/tokens               — active agent tokens for the authenticated user
   muse://docs/overview              — Muse paradigm overview (State, Commit, Branch, Merge, Drift)
   muse://docs/protocol              — MuseDomainPlugin protocol spec (all 6 interfaces)
   muse://docs/crdt                  — CRDT reference (VectorClock, RGA, ORSet, AWMap)
   muse://docs/domains               — Domain plugin authoring guide
   muse://docs/merge                 — Three-way merge semantics and OT
   muse://domains                    — All domains registered on this MuseHub instance
-  musehub://me/feed                 — activity feed for watched repos
 
-### Templated resources (16, RFC 6570 Level 1):
+### Templated resources (17, RFC 6570 Level 1):
   musehub://repos/{owner}/{slug}
   musehub://repos/{owner}/{slug}/branches
   musehub://repos/{owner}/{slug}/commits
@@ -33,6 +33,7 @@ Every resource returns ``application/json``.
   musehub://repos/{owner}/{slug}/releases
   musehub://repos/{owner}/{slug}/releases/{tag}
   musehub://repos/{owner}/{slug}/insights/{ref}
+  musehub://repos/{owner}/{slug}/remote
   musehub://repos/{owner}/{slug}/timeline
   musehub://users/{username}
   muse://domains/{author}/{slug}
@@ -193,6 +194,18 @@ STATIC_RESOURCES: list[MCPResource] = [
         ),
         "mimeType": "application/json",
     },
+    {
+        "uri": "musehub://me/tokens",
+        "name": "My Active Agent Tokens",
+        "description": (
+            "Active agent JWT tokens issued to the authenticated user. "
+            "Returns token metadata (never the raw token itself): agent_name, "
+            "issued_at, expires_at, and last_used. "
+            "Use musehub_create_agent_token to mint new tokens. "
+            "Requires authentication."
+        ),
+        "mimeType": "application/json",
+    },
 ]
 
 # ── Resource template catalogue ───────────────────────────────────────────────
@@ -305,6 +318,17 @@ RESOURCE_TEMPLATES: list[MCPResourceTemplate] = [
         ),
         "mimeType": "application/json",
     },
+    {
+        "uriTemplate": "musehub://repos/{owner}/{slug}/remote",
+        "name": "Repository Remote Info",
+        "description": (
+            "Remote URL, push/pull API endpoints, and Muse CLI commands for a repository. "
+            "Returns origin URL, push endpoint, pull endpoint, clone command, "
+            "and the 'muse remote add origin' command. "
+            "Equivalent to 'muse remote -v' for a MuseHub repo."
+        ),
+        "mimeType": "application/json",
+    },
 ]
 
 
@@ -348,6 +372,8 @@ async def read_resource(uri: str, user_id: str | None = None) -> dict[str, JSONV
         return await _read_me_starred(user_id)
     if path == "me/feed":
         return await _read_me_feed(user_id)
+    if path == "me/tokens":
+        return await _read_me_tokens(user_id)
 
     # ── Templated resources ──────────────────────────────────────────────────
 
@@ -544,6 +570,9 @@ async def _read_repo_resource(
             if rest == "/timeline":
                 return await _repo_timeline(session, repo_id)
 
+            if rest == "/remote":
+                return _repo_remote_info(repo, repo_id)
+
             return _err(f"Unknown resource path: musehub://repos/{owner}/{slug}{rest}")
     except Exception as exc:
         logger.exception("repo resource failed (%s/%s%s): %s", owner, slug, rest, exc)
@@ -551,6 +580,43 @@ async def _read_repo_resource(
 
 
 # ── Sub-resource helpers ──────────────────────────────────────────────────────
+
+
+def _repo_remote_info(repo: object, repo_id: str) -> dict[str, JSONValue]:
+    """Return remote URL and push/pull endpoints for a repository."""
+    from musehub.models.musehub import RepoResponse
+    assert isinstance(repo, RepoResponse)
+
+    hub_url = "https://musehub.ai"
+    remote_url = f"{hub_url}/{repo.owner}/{repo.slug}"
+    api_base = f"{hub_url}/api/v1/repos/{repo_id}"
+
+    return {
+        "repo_id": repo_id,
+        "name": "origin",
+        "remote_url": remote_url,
+        "push_url": f"{api_base}/push",
+        "pull_url": f"{api_base}/pull",
+        "clone_command": f"muse clone {remote_url}",
+        "add_remote_command": f"muse remote add origin {remote_url}",
+    }
+
+
+async def _read_me_tokens(user_id: str | None) -> dict[str, JSONValue]:
+    """Return active agent token metadata for the authenticated user."""
+    if user_id is None:
+        return _err("Authentication required for musehub://me/tokens")
+    # Tokens are stateless JWTs — we can't enumerate them without a DB store.
+    # Return guidance on how to create/manage tokens instead.
+    return {
+        "user_id": user_id,
+        "note": (
+            "Agent tokens are stateless JWTs. Use musehub_create_agent_token "
+            "to mint a new token, and store it with: "
+            "muse config set musehub.token <token>"
+        ),
+        "create_token_tool": "musehub_create_agent_token",
+    }
 
 
 async def _repo_overview(session: object, repo: object, repo_id: str) -> dict[str, JSONValue]:

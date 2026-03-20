@@ -1,6 +1,6 @@
-"""MuseHub MCP tool definitions — all 32 tools for AI agents (MCP 2025-11-25).
+"""MuseHub MCP tool definitions — all 43 tools for AI agents (MCP 2025-11-25).
 
-Covers the full MuseHub surface: reads (15), writes (12), and elicitation-powered
+Covers the full MuseHub surface: reads (24), writes (14), and elicitation-powered
 interactive tools (5).
 
 Elicitation-powered tools use the ToolCallContext to collect user preferences
@@ -550,6 +550,109 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "required": ["repo_id"],
         },
     },
+    {
+        "name": "musehub_whoami",
+        "server_side": True,
+        "description": (
+            "Return identity information for the currently authenticated caller. "
+            "Call this first to confirm authentication, get your user_id, "
+            "and see how many repos you own. "
+            "Works for both human users and AI agent tokens. "
+            "Returns {authenticated: false} when called without a Bearer token. "
+            "Example: musehub_whoami()."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "muse_clone",
+        "server_side": True,
+        "description": (
+            "Return the clone URL and Muse CLI command for a MuseHub repository. "
+            "Use this to get the information needed to run 'muse clone' locally, "
+            "or to fetch repo metadata before calling muse_pull. "
+            "Example: muse_clone(owner='cgcardona', slug='neo-soul-experiment')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "type": "string",
+                    "description": "Repository owner username.",
+                },
+                "slug": {
+                    "type": "string",
+                    "description": "Repository slug (URL-safe name).",
+                },
+                "ref": {
+                    "type": "string",
+                    "description": "Optional branch or tag to clone. Defaults to the default branch.",
+                },
+            },
+            "required": ["owner", "slug"],
+        },
+    },
+    {
+        "name": "muse_pull",
+        "server_side": True,
+        "description": (
+            "Fetch missing commits and objects from a MuseHub repository. "
+            "Equivalent to 'muse pull' — returns new commits and object metadata "
+            "since the given commit ID. Use since_commit_id to fetch incrementally. "
+            "Pass object_ids to download specific binary objects. "
+            "Example: muse_pull(repo_id='a3f2-...', branch='main', since_commit_id='abc123')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the source repository.",
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Branch to pull from. Defaults to the default branch.",
+                },
+                "since_commit_id": {
+                    "type": "string",
+                    "description": "Only return commits newer than this commit ID.",
+                },
+                "object_ids": {
+                    "type": "array",
+                    "description": "Specific object IDs to fetch (content-addressed).",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["repo_id"],
+        },
+    },
+    {
+        "name": "muse_remote",
+        "server_side": True,
+        "description": (
+            "Return the remote URL and API endpoints for a MuseHub repository. "
+            "Equivalent to 'muse remote -v' — returns the origin URL, "
+            "push/pull API endpoints, and the CLI commands to add this repo as a remote. "
+            "Example: muse_remote(owner='cgcardona', slug='neo-soul-experiment')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "type": "string",
+                    "description": "Repository owner username.",
+                },
+                "slug": {
+                    "type": "string",
+                    "description": "Repository slug (URL-safe name).",
+                },
+            },
+            "required": ["owner", "slug"],
+        },
+    },
 ]
 
 
@@ -969,6 +1072,126 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                 },
             },
             "required": ["repo_id", "name", "color"],
+        },
+    },
+    {
+        "name": "musehub_create_agent_token",
+        "server_side": True,
+        "description": (
+            "Mint a long-lived JWT agent token for programmatic MuseHub access. "
+            "Agent tokens have higher rate limits than user tokens and appear "
+            "with an 'agent' badge in the MuseHub activity feed. "
+            "After creating a token, store it with: muse config set musehub.token <token>. "
+            "Requires an authenticated session (the token is issued for the calling user). "
+            "Example: musehub_create_agent_token(agent_name='my-composer-bot/1.0', expires_in_days=90)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "agent_name": {
+                    "type": "string",
+                    "description": (
+                        "Human-readable agent identifier, e.g. 'my-bot/1.0'. "
+                        "Appears in the activity feed alongside agent actions."
+                    ),
+                },
+                "expires_in_days": {
+                    "type": "integer",
+                    "description": "Token validity in days (default: 90, max: 365).",
+                    "default": 90,
+                    "minimum": 1,
+                    "maximum": 365,
+                },
+            },
+            "required": ["agent_name"],
+        },
+    },
+    {
+        "name": "muse_push",
+        "server_side": True,
+        "description": (
+            "Push commits and binary objects to a MuseHub repository. "
+            "Equivalent to 'muse push' — uploads new commits and base64-encoded "
+            "binary objects in a single batch. Enforces fast-forward semantics "
+            "unless force=true. "
+            "Authentication required: call musehub_whoami or musehub_create_agent_token first. "
+            "Example: muse_push(repo_id='a3f2-...', branch='main', head_commit_id='abc123', "
+            "commits=[...], objects=[...])."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the target repository.",
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Target branch name (e.g. 'main').",
+                },
+                "head_commit_id": {
+                    "type": "string",
+                    "description": "SHA of the new HEAD commit after this push.",
+                },
+                "commits": {
+                    "type": "array",
+                    "description": (
+                        "List of CommitInput objects to push. Each has: "
+                        "commit_id (str), parent_ids (list[str]), message (str), "
+                        "author (str), timestamp (ISO-8601 str), snapshot_id (str)."
+                    ),
+                    "items": {"type": "object"},
+                },
+                "objects": {
+                    "type": "array",
+                    "description": (
+                        "List of ObjectInput objects to upload. Each has: "
+                        "object_id (str, e.g. 'sha256:abc...'), "
+                        "path (str, e.g. 'tracks/bass.mid'), "
+                        "content_b64 (str, base64-encoded bytes)."
+                    ),
+                    "items": {"type": "object"},
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Allow non-fast-forward push (overwrites remote head). Use with caution.",
+                    "default": False,
+                },
+            },
+            "required": ["repo_id", "branch", "head_commit_id"],
+        },
+    },
+    {
+        "name": "muse_config",
+        "server_side": True,
+        "description": (
+            "Read info about Muse configuration keys or generate a 'muse config set' command. "
+            "Equivalent to 'muse config get <key>' or 'muse config set <key> <value>'. "
+            "Call without arguments to list all known MuseHub-related config keys. "
+            "Pass key and value to get the exact CLI command to run. "
+            "Key examples: musehub.token, musehub.url, musehub.username, user.name. "
+            "Example: muse_config(key='musehub.token', value='eyJhbGc...')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "description": (
+                        "Configuration key to query or set "
+                        "(e.g. 'musehub.token', 'musehub.url', 'user.name'). "
+                        "Omit to list all known keys."
+                    ),
+                },
+                "value": {
+                    "type": "string",
+                    "description": (
+                        "When provided together with key, returns the CLI command "
+                        "'muse config set <key> <value>'."
+                    ),
+                },
+            },
+            "required": [],
         },
     },
 ]
