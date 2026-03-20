@@ -380,7 +380,7 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
     breaking_commits: list[dict[str, str]] = []
 
     for row in commits_rows:
-        meta: dict = dict(row.commit_meta or {}) if row.commit_meta else {}
+        meta: dict[str, Any] = dict(row.commit_meta or {}) if row.commit_meta else {}
         msg = (row.message or "").strip()
 
         # Conventional commit type
@@ -416,7 +416,7 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
         semver_counts[bump] += 1
 
         # Symbol velocity from structured_delta
-        delta: dict = meta.get("structured_delta") or {}
+        delta: dict[str, Any] = meta.get("structured_delta") or {}
         for file_op in delta.get("ops", []):
             for child_op in (file_op.get("child_ops") or []):
                 op = child_op.get("op", "")

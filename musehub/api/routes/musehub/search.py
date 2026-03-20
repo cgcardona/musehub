@@ -70,7 +70,7 @@ async def search_repos(
 
     if qdrant is not None:
         sem_hits = await qdrant_svc.semantic_search_repos(qdrant, q, limit=limit, domain=domain)
-        repo_ids = [h.get("repo_id") for h in sem_hits if h.get("repo_id")]
+        repo_ids: list[str] = [str(h["repo_id"]) for h in sem_hits if h.get("repo_id")]
         if repo_ids:
             repos = [r.model_dump(mode="json") for r in await musehub_discover.get_repos_by_ids(db, repo_ids)]
             semantic = bool(repos)

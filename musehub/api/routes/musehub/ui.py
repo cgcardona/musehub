@@ -69,7 +69,7 @@ import asyncio
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
@@ -581,15 +581,9 @@ async def repo_page(
         ref = await musehub_repository.resolve_head_ref(db, repo_id)
 
     # Fetch all SSR data in parallel (including tab counts for nav).
-    (
-        tree_response,
-        (commits, _),
-        branches,
-        releases,
-        pr_count_result,
-        issue_count_result,
-        repo_stats,
-    ) = await asyncio.gather(
+    from sqlalchemy.engine import CursorResult
+    from musehub.models.musehub import TreeListResponse, CommitResponse
+    _gathered = await asyncio.gather(
         musehub_repository.list_tree(db, repo_id, owner, repo_slug, ref, ""),
         musehub_repository.list_commits(db, repo_id, limit=8),
         musehub_repository.list_branches(db, repo_id),
@@ -608,6 +602,13 @@ async def repo_page(
         ),
         musehub_repository.get_repo_home_stats(db, repo_id, ref),
     )
+    tree_response = cast("TreeListResponse", _gathered[0])
+    commits = cast("list[CommitResponse]", cast("tuple[Any, Any]", _gathered[1])[0])
+    branches = cast("list[Any]", _gathered[2])
+    releases = cast("list[Any]", _gathered[3])
+    pr_count_result = cast("CursorResult[Any]", _gathered[4])
+    issue_count_result = cast("CursorResult[Any]", _gathered[5])
+    repo_stats = cast("dict[str, Any]", _gathered[6])
     tags_count = len(releases)
     nav_ctx: dict[str, Any] = {
         "repo_key": repo.key_signature or "",

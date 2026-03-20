@@ -20,6 +20,7 @@ Route handlers import the ready-to-use instance:
 """
 
 from datetime import datetime, timezone
+from typing import Callable
 
 from jinja2 import Environment
 
@@ -275,7 +276,7 @@ def _auto_code(text: str) -> str:
 
     _CODE_SPAN = _re.compile(r"<code>.*?</code>", _re.DOTALL)
 
-    def _sub_outside(pattern: str, repl: "str | callable", src: str) -> str:  # type: ignore[type-arg]
+    def _sub_outside(pattern: str, repl: "str | Callable[..., str]", src: str) -> str:
         """Apply *pattern* → *repl* only to text segments between <code> spans."""
         result: list[str] = []
         last = 0

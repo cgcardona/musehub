@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import logging
 import re
 from collections import deque
+from typing import Any
 
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1078,7 +1079,7 @@ async def list_commits_dag(
     nodes: list[DagNode] = []
     for cid in topo_order:
         row = row_map[cid]
-        raw_meta: dict = dict(row.commit_meta or {}) if row.commit_meta else {}
+        raw_meta: dict[str, Any] = dict(row.commit_meta or {}) if row.commit_meta else {}
 
         # Extract conventional-commit prefix from the message
         m = _conv_re.match((row.message or "").strip())
@@ -1094,7 +1095,7 @@ async def list_commits_dag(
         is_agent = bool(raw_meta.get("agent_id"))
 
         # Symbol operation counts from structured_delta
-        structured_delta: dict = raw_meta.get("structured_delta") or {}
+        structured_delta: dict[str, Any] = raw_meta.get("structured_delta") or {}
         sym_added = 0
         sym_removed = 0
         for file_op in structured_delta.get("ops", []):
@@ -1781,7 +1782,7 @@ async def get_snapshot_diff(
     repo_id: str,
     commit_snapshot_id: str | None,
     parent_snapshot_id: str | None,
-) -> dict[str, list[str]]:
+) -> dict[str, list[str] | int]:
     """Diff two snapshot manifests, returning file-level change lists.
 
     Returns a dict with:
