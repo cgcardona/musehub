@@ -460,7 +460,7 @@ async def _call_tool(
         result = await exe.execute_list_domains(
             query=_str_or_none("query"),
             viewer_type=_str_or_none("viewer_type"),
-            verified=arguments.get("verified") if "verified" in arguments else None,
+            verified=bool(arguments["verified"]) if "verified" in arguments else None,
             limit=_int("limit", 20),
             offset=_int("offset", 0),
         )
@@ -490,7 +490,6 @@ async def _call_tool(
             description=_str_or_none("description") or "",
             visibility=_str_or_none("visibility") or "public",
             tags=_list_str("tags") or None,
-            domain=_str_or_none("domain"),
             initialize=_bool("initialize", True),
         )
     elif name == "musehub_create_issue":
@@ -550,8 +549,8 @@ async def _call_tool(
             actor=user_id or "",
             target_type=str(_dim_ref.get("type", "general")),
             target_track=str(_dim_ref["track"]) if "track" in _dim_ref else None,
-            target_beat_start=float(_dim_ref["beat_start"]) if "beat_start" in _dim_ref else None,
-            target_beat_end=float(_dim_ref["beat_end"]) if "beat_end" in _dim_ref else None,
+            target_beat_start=float(_dim_ref["beat_start"]) if "beat_start" in _dim_ref else None,  # type: ignore[arg-type]
+            target_beat_end=float(_dim_ref["beat_end"]) if "beat_end" in _dim_ref else None,  # type: ignore[arg-type]
         )
     elif name == "musehub_submit_pr_review":
         from musehub.mcp.write_tools.pulls import execute_submit_pr_review
@@ -641,12 +640,14 @@ async def _call_tool(
             ref=_str_or_none("ref"),
         )
     elif name == "muse_push":
+        _raw_commits = arguments.get("commits")
+        _raw_objects = arguments.get("objects")
         result = await exe.execute_muse_push(
             repo_id=_str("repo_id"),
             branch=_str("branch"),
             head_commit_id=_str("head_commit_id"),
-            commits=arguments.get("commits") or [],
-            objects=arguments.get("objects") or [],
+            commits=list(_raw_commits) if isinstance(_raw_commits, list) else [],
+            objects=list(_raw_objects) if isinstance(_raw_objects, list) else [],
             force=_bool("force", False),
             user_id=user_id or "",
         )

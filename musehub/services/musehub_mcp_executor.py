@@ -24,7 +24,7 @@ import logging
 import mimetypes
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 from musehub.contracts.json_types import JSONValue
 from musehub.db.database import AsyncSessionLocal
@@ -44,6 +44,11 @@ MusehubErrorCode = Literal[
     "elicitation_unavailable",
     "elicitation_declined",
     "not_confirmed",
+    "invalid_scoped_id",
+    "unauthenticated",
+    "push_failed",
+    "non_fast_forward",
+    "pull_failed",
 ]
 """Enumeration of error codes returned by MuseHub MCP executors.
 
@@ -1116,7 +1121,7 @@ async def execute_get_domain(scoped_id: str) -> MusehubToolResult:
             "version": domain.version,
             "manifest_hash": domain.manifest_hash,
             "viewer_type": domain.viewer_type,
-            "capabilities": domain.capabilities,  # type: ignore[assignment]
+            "capabilities": cast(JSONValue, domain.capabilities),
             "install_count": domain.install_count,
             "is_verified": domain.is_verified,
             "is_deprecated": domain.is_deprecated,
@@ -1173,7 +1178,7 @@ async def execute_get_view(
                     "scoped_id": f"@{dom.author_slug}/{dom.slug}",
                     "display_name": dom.display_name,
                     "viewer_type": dom.viewer_type,
-                    "capabilities": dom.capabilities,  # type: ignore[assignment]
+                    "capabilities": cast(JSONValue, dom.capabilities),
                 }
 
         return MusehubToolResult(ok=True, data={
@@ -1310,7 +1315,7 @@ async def execute_muse_push(
         object_inputs = [_ObjectInput.model_validate(o) for o in objects]
 
         try:
-            result = await _sync_svc.ingest_push(
+            push_result = await _sync_svc.ingest_push(
                 session,
                 repo_id=repo_id,
                 branch=branch,
@@ -1325,12 +1330,12 @@ async def execute_muse_push(
             return MusehubToolResult(ok=True, data={
                 "repo_id": repo_id,
                 "branch": branch,
-                "head_commit_id": result.head_commit_id,
-                "commits_stored": result.commits_stored,
-                "objects_stored": result.objects_stored,
+                "remote_head": push_result.remote_head,
+                "commits_pushed": len(commit_inputs),
+                "objects_pushed": len(object_inputs),
             })
         except ValueError as exc:
-            code = "non_fast_forward" if "non_fast_forward" in str(exc) else "push_failed"
+            code: MusehubErrorCode = "non_fast_forward" if "non_fast_forward" in str(exc) else "push_failed"
             return MusehubToolResult(ok=False, error_code=code, error_message=str(exc))
 
 
@@ -1346,7 +1351,6 @@ async def execute_muse_pull(
 
     async with AsyncSessionLocal() as session:
         from musehub.services import musehub_repository as _repo_svc, musehub_sync as _sync_svc
-        from musehub.models.musehub import PullRequest as _PullRequest
 
         repo = await _repo_svc.get_repo(session, repo_id)
         if repo is None:
@@ -1355,21 +1359,33 @@ async def execute_muse_pull(
                 error_message=f"Repo {repo_id!r} not found.",
             )
 
-        resolved_branch = branch or str("main")
-        pull_req = _PullRequest(
-            branch=resolved_branch,
-            since_commit_id=since_commit_id,
-            object_ids=object_ids or [],
-        )
+        resolved_branch = branch or "main"
+        # compute_pull_delta uses have_commits/have_objects as exclusion lists.
+        # since_commit_id and object_ids are treated as "have" hints.
+        have_commits: list[str] = [since_commit_id] if since_commit_id else []
+        have_objects: list[str] = list(object_ids) if object_ids else []
 
         try:
-            result = await _sync_svc.fulfill_pull(session, repo_id=repo_id, body=pull_req)
+            pull_result = await _sync_svc.compute_pull_delta(
+                session,
+                repo_id=repo_id,
+                branch=resolved_branch,
+                have_commits=have_commits,
+                have_objects=have_objects,
+            )
+            commits_out: list[JSONValue] = [
+                cast(JSONValue, c.model_dump()) for c in pull_result.commits
+            ]
+            objects_out: list[JSONValue] = [
+                {"object_id": o.object_id, "path": o.path}
+                for o in pull_result.objects
+            ]
             return MusehubToolResult(ok=True, data={
                 "repo_id": repo_id,
                 "branch": resolved_branch,
-                "head_commit_id": result.head_commit_id,
-                "commits": [c.model_dump() for c in result.commits],
-                "objects": [{"object_id": o.object_id, "path": o.path} for o in result.objects],
+                "remote_head": pull_result.remote_head,
+                "commits": commits_out,
+                "objects": objects_out,
             })
         except Exception as exc:
             return MusehubToolResult(ok=False, error_code="pull_failed", error_message=str(exc))
@@ -1423,7 +1439,7 @@ async def execute_muse_config(
 
     if key is None:
         return MusehubToolResult(ok=True, data={
-            "config_keys": hub_config_keys,  # type: ignore[assignment]
+            "config_keys": cast(JSONValue, hub_config_keys),
             "hint": (
                 "Use 'muse config set <key> <value>' to configure Muse. "
                 "Run 'muse config list' to see all current values."
