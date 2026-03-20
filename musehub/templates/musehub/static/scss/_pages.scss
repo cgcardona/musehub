@@ -3693,6 +3693,19 @@ mark.sr-hl {
   margin: 0;
   width: 100%;
 }
+.nr-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
+  opacity: 0.75;
+  transition: opacity 0.15s;
+  &:hover { opacity: 1; }
+}
+
 .nr-hero-eyebrow {
   display: flex;
   align-items: center;
@@ -3812,6 +3825,34 @@ mark.sr-hl {
   margin-top: var(--space-2); font-size: 12px; color: var(--text-muted);
 }
 
+.nr-domain-locked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  &__meta {
+    color: var(--text-muted);
+    font-size: 11px;
+    flex: 1;
+  }
+}
+
 // ── Visibility cards ──────────────────────────────────────────────────────────
 .nr-vis-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
@@ -3899,21 +3940,38 @@ mark.sr-hl {
   color: var(--text-secondary);
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
+// ── Actions (match mcp-hero-btn / dd-hero-btn theme) ──────────────────────────
 .nr-actions { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
 .nr-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 600; padding: 8px 18px;
-  border-radius: var(--radius-sm); border: 1px solid var(--border-default);
-  cursor: pointer; transition: all 0.15s; text-decoration: none;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500; line-height: 1;
+  white-space: nowrap; text-decoration: none;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
+  svg { flex-shrink: 0; }
+
   &--primary {
-    background: var(--color-accent); border-color: var(--color-accent); color: #0d1117;
-    &:hover { opacity: 0.9; text-decoration: none; }
+    background: rgba(88, 166, 255, 0.12);
+    border: 1px solid rgba(88, 166, 255, 0.4);
+    color: var(--color-accent);
+    &:hover {
+      background: rgba(88, 166, 255, 0.2);
+      border-color: rgba(88, 166, 255, 0.7);
+      color: #79c0ff;
+    }
     &:disabled { opacity: 0.5; cursor: default; }
   }
+
   &--ghost {
-    background: transparent; color: var(--text-secondary);
-    &:hover { color: var(--text-primary); background: var(--bg-hover); text-decoration: none; }
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    &:hover {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: var(--border-default);
+      color: var(--text-secondary);
+    }
   }
 }
 .nr-submit-error { color: var(--color-danger, #f85149); font-size: 13px; }

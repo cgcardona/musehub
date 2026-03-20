@@ -172,6 +172,10 @@ class CreateRepoRequest(CamelModel):
         None,
         description="UUID of a public repo to copy topics/description/labels from; must be public",
     )
+    domain_scoped_id: str | None = Field(
+        None,
+        description="Scoped domain ID (e.g. '@cgcardona/midi') — always set when created via /domains/@author/slug/new",
+    )
 
 
 # ── Response models ───────────────────────────────────────────────────────────

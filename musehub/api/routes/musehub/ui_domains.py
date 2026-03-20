@@ -22,6 +22,7 @@ from starlette.responses import Response
 
 from musehub.api.routes.musehub._templates import templates as _templates
 from musehub.api.routes.musehub.json_alternate import add_json_available_header
+from musehub.api.routes.musehub.ui_new_repo import licenses_for_viewer_type
 from musehub.db import get_db
 from musehub.services import musehub_domains
 
@@ -185,3 +186,45 @@ async def domain_detail_page(
     resp = _templates.TemplateResponse(request, "musehub/pages/domain_detail.html", ctx)
     resp.headers["Link"] = f'<{api_url}>; rel="alternate"; type="application/json"'
     return add_json_available_header(resp, request)
+
+
+@router.get(
+    "/domains/@{author_slug}/{slug}/new",
+    response_class=HTMLResponse,
+    summary="Create a new repository within a domain context",
+    operation_id="newRepoDomainPage",
+)
+async def new_repo_domain_page(
+    request: Request,
+    author_slug: str,
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Render the domain-scoped repository creation wizard.
+
+    The domain is always known here, so the form locks the domain display,
+    pre-selects the appropriate license set (code vs. music vs. generic),
+    and removes the domain selector dropdown.
+    """
+    from fastapi import HTTPException
+
+    domain = await musehub_domains.get_domain_by_scoped_id(db, author_slug, slug)
+    if domain is None:
+        raise HTTPException(status_code=404, detail=f"Domain @{author_slug}/{slug} not found.")
+
+    domain_data: dict[str, object] = {
+        "scoped_id": domain.scoped_id,
+        "author_slug": domain.author_slug,
+        "slug": domain.slug,
+        "display_name": domain.display_name,
+        "viewer_type": domain.viewer_type,
+        "dimension_count": len(domain.capabilities.get("dimensions", [])),
+    }
+
+    ctx: dict[str, object] = {
+        "title": f"New {domain.display_name} repository",
+        "current_page": "domains",
+        "domain": domain_data,
+        "licenses": licenses_for_viewer_type(domain.viewer_type),
+    }
+    return _templates.TemplateResponse(request, "musehub/pages/new_repo.html", ctx)

@@ -32,12 +32,21 @@
   {# ── Hero ─────────────────────────────────────────────────────────────────── #}
   <div class="nr-hero">
     <div class="nr-hero-inner">
+      {% if domain %}
+      <a href="/domains/{{ domain.scoped_id }}" class="nr-back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        {{ domain.scoped_id }}
+      </a>
+      <h1 class="nr-hero-title">New {{ domain.display_name }} repository</h1>
+      <p class="nr-hero-sub">Version a {{ domain.display_name }} state space — {{ domain.dimension_count }} dimension{% if domain.dimension_count != 1 %}s{% endif %} tracked per commit. Every snapshot, branch, and collaboration record lives here.</p>
+      {% else %}
       <div class="nr-hero-eyebrow">
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         New repository
       </div>
       <h1 class="nr-hero-title">Create a new repository</h1>
       <p class="nr-hero-sub">Version a multidimensional state space — MIDI compositions, source code, genomic sequences, or any domain. Every snapshot, commit, branch, and collaboration record lives here.</p>
+      {% endif %}
     </div>
   </div>
 
@@ -93,29 +102,24 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           Domain plugin
         </div>
+        {% if domain %}
+        {# Domain is locked — set from URL context #}
+        <input type="hidden" name="domainScopedId" value="{{ domain.scoped_id }}"/>
+        <div class="nr-domain-locked">
+          <div class="nr-domain-locked__badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            {{ domain.scoped_id }}
+          </div>
+          <span class="nr-domain-locked__meta">{{ domain.dimension_count }} dimension{% if domain.dimension_count != 1 %}s{% endif %} · {{ domain.viewer_type }}</span>
+          <a href="/domains/{{ domain.scoped_id }}" class="nr-link" target="_blank">View domain →</a>
+        </div>
+        {% else %}
         <p class="nr-desc">
           Choose the Muse domain plugin that defines the state space for this repository.
           Each domain declares its own dimensions, viewer, and insight capabilities.
           <a href="/domains" class="nr-link" target="_blank">Browse all domains →</a>
         </p>
-        <div class="nr-select-wrap">
-          <select class="nr-select" id="f-domain" name="domain">
-            <option value="">Generic (no domain)</option>
-            {% for d in available_domains %}
-            <option value="{{ d.domain_id }}"
-              data-viewer="{{ d.viewer_type }}"
-              data-dims="{{ d.dimension_count }}">
-              {{ d.display_name }} ({{ d.scoped_id }}) — {{ d.dimension_count }} dimension{% if d.dimension_count != 1 %}s{% endif %}
-            </option>
-            {% endfor %}
-          </select>
-          <svg class="nr-select-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="nr-domain-hint" id="domain-hint" hidden>
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span id="domain-hint-viewer"></span>
-          <a href="#" id="domain-hint-link" class="nr-link" target="_blank">View domain →</a>
-        </div>
+        {% endif %}
       </section>
 
       {# ── 3. Visibility ─────────────────────────────────────────────────────── #}

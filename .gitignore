@@ -46,6 +46,8 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+# Cache-bust id written by npm run build (do not commit)
+musehub/templates/musehub/static/.cache-id
 nosetests.xml
 coverage.xml
 *.cover
