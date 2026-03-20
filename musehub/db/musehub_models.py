@@ -82,6 +82,12 @@ class MusehubRepo(Base):
     # allow_merge_commit, allow_squash_merge, allow_rebase_merge,
     # delete_branch_on_merge, default_branch.
     settings: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    # Default branch name (updated on each push to match CLI intent)
+    default_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="main")
+    # Last push timestamp — used for trending sort
+    pushed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
@@ -192,6 +198,8 @@ class MusehubCommit(Base):
         DateTime(timezone=True), nullable=False, index=True
     )
     snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Extra Muse-native commit fields stored as JSON (structured_delta, sem_ver_bump, etc.)
+    commit_meta: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
@@ -222,11 +230,90 @@ class MusehubObject(Base):
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Absolute path on the Hub server's filesystem where the bytes are stored
     disk_path: Mapped[str] = mapped_column(String(2048), nullable=False)
+    # Storage backend URI: "local://..." | "s3://bucket/key" | "r2://bucket/key"
+    # Null on legacy rows that predate the storage abstraction.
+    storage_uri: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
 
     repo: Mapped[MusehubRepo] = relationship("MusehubRepo", back_populates="objects")
+
+
+class MusehubSnapshot(Base):
+    """Immutable file-tree manifest stored alongside commits.
+
+    A snapshot captures the full state of a repo at a point in time as a
+    mapping of ``path → object_id``.  Snapshots are content-addressed by
+    their SHA and never mutated after creation.
+
+    The ``manifest`` JSON blob mirrors SnapshotDict from muse.core.store::
+
+        {"muse/core/pack.py": "sha256:abc123...", "pyproject.toml": "sha256:def456..."}
+    """
+
+    __tablename__ = "musehub_snapshots"
+
+    snapshot_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    repo_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("musehub_repos.repo_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # {path: object_id} mapping for this snapshot
+    manifest: Mapped[dict[str, str]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )
+
+
+class MusehubIdentity(Base):
+    """Unified identity — human, agent, or org.
+
+    Replaces the split between ``musehub_profiles`` (humans only) and ad-hoc
+    agent references.  All three identity types share one table so that
+    ``/{handle}`` resolves identically and the profile page renders adaptively.
+
+    ``identity_type`` values:
+        ``"human"``  — a person authenticated via JWT / personal access token
+        ``"agent"``  — an autonomous process (LLM, pipeline, CI bot)
+        ``"org"``    — an organisation; membership managed via a join table
+
+    Human identities carry an ``email``; agent identities carry ``agent_model``
+    and ``agent_capabilities`` so clients can inspect before attempting ops.
+    """
+
+    __tablename__ = "musehub_identities"
+    __table_args__ = (UniqueConstraint("handle", name="uq_musehub_identities_handle"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_uuid)
+    # URL-safe handle — forms /{handle} and /{handle}/{repo} paths
+    handle: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # "human" | "agent" | "org"
+    identity_type: Mapped[str] = mapped_column(String(16), nullable=False, default="human")
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Humans only
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    # Agents only
+    agent_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # JSON list of capability strings, e.g. ["push", "pull", "create-pr"]
+    agent_capabilities: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # Links to musehub_profiles for backwards-compat during migration
+    legacy_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now, onupdate=_utc_now
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+
 
 class MusehubMilestone(Base):
     """A milestone that groups issues within a repo.
