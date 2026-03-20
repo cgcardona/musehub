@@ -1,11 +1,11 @@
 ---
-description: All development, testing, and QA must happen inside the Docker container — never on the host Mac.
+description: MuseHub development, testing, and QA must happen inside the Docker container, not via the host Python.
 alwaysApply: true
 ---
 
-# Docker-First Development
+# Docker-First Development (MuseHub)
 
-MuseHub targets Linux (production). **Never run Python, pytest, or any app command directly on the host Mac.** Always exec into the container.
+MuseHub targets Linux (production) and its dependencies are only installed inside the container. **For this project, always exec into the container to run Python, pytest, or any app command** — not the host Mac's Python.
 
 ## The Workflow
 
@@ -32,12 +32,12 @@ git add -A && git commit -m "..."
 git push origin dev
 ```
 
-## ❌ Never Do This
+## ❌ Don't Do This for MuseHub
 
 ```bash
-pytest tests/           # host Mac — wrong Python, missing deps
-python musehub/...      # host Mac — wrong environment
-pip install ...         # host Mac — install inside the container instead
+pytest tests/           # host Python — missing deps (slowapi, asyncpg, etc.)
+python musehub/...      # host Python — wrong environment for this project
+pip install ...         # host pip — install inside the container instead
 ```
 
 ## ✅ Always Do This
