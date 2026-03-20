@@ -11,7 +11,7 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "commit-detail", "repoId": {{ repo_id | tojson }}, "commitId": {{ commit_id | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "baseUrl": {{ base_url | tojson }}, "structuredDelta": {{ structured_delta | tojson if structured_delta else 'null' }}, "snapshotDiff": {{ snapshot_diff | tojson if snapshot_diff else 'null' }}, "provenance": {{ provenance | tojson }}, "commitType": {{ commit_type | tojson }}, "isBreaking": {{ is_breaking | tojson }}}{% endblock %}
+{% block page_json %}{"page": "commit-detail", "repoId": {{ repo_id | tojson }}, "commitId": {{ commit_id | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "baseUrl": {{ base_url | tojson }}, "audioUrl": {{ audio_url | tojson }}, "viewerType": {{ (domain.viewer_type if domain else 'generic') | tojson }}, "structuredDelta": {{ structured_delta | tojson if structured_delta else 'null' }}, "snapshotDiff": {{ snapshot_diff | tojson if snapshot_diff else 'null' }}, "provenance": {{ provenance | tojson }}, "commitType": {{ commit_type | tojson }}, "isBreaking": {{ is_breaking | tojson }}}{% endblock %}
 
 {# ── Helpers ─────────────────────────────────────────────────────────────── #}
 {% macro semver_badge(bump, breaking) %}
@@ -478,6 +478,30 @@
     </div>
 
   </aside>
+</div>
+
+{# ── Discussion ─────────────────────────────────────────────────────────── #}
+<div class="cd3-discussion">
+  <div class="cd3-disc-hd">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <h2 class="cd3-disc-title">{{ comments | length }} comment{{ 's' if comments | length != 1 else '' }}</h2>
+  </div>
+
+  <div id="commit-comments" class="cd3-comment-list">
+    {% include "musehub/fragments/commit_comments.html" %}
+  </div>
+
+  <form class="cd3-comment-form"
+        hx-post="/api/v1/repos/{{ repo_id }}/comments"
+        hx-target="#commit-comments"
+        hx-swap="innerHTML"
+        hx-vals='{"target_type": "commit", "target_id": "{{ commit_id }}"}'
+        hx-on::after-request="this.reset()">
+    <textarea name="body" class="cd3-comment-input" placeholder="Leave a comment…" rows="3" required></textarea>
+    <div class="cd3-comment-actions">
+      <button type="submit" class="btn btn-primary btn-sm">Comment</button>
+    </div>
+  </form>
 </div>
 {% endblock %}
 

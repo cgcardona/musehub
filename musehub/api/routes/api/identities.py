@@ -66,12 +66,12 @@ async def create_identity(
     """
     handle = str(body.get("handle") or "").strip()
     if not handle:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="handle is required")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="handle is required")
 
     identity_type = body.get("identity_type", "human")
     if identity_type not in ("human", "agent", "org"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="identity_type must be human | agent | org",
         )
 

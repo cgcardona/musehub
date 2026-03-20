@@ -212,8 +212,9 @@ async def test_commit_detail_audio_shell_when_audio_url(
     status, body = await _get_detail(client, commit.commit_id)
 
     assert status == 200
-    assert "__commitCfg" in body
-    # audioUrl is only set for piano_roll domain repos; generic repos show null
+    # Page config is in the typed page-data JSON block (replaces old __commitCfg inline script)
+    assert 'id="page-data"' in body
+    # audioUrl is always present in the JSON block (null for non-piano_roll repos)
     assert "audioUrl" in body
     assert commit.commit_id in body
 

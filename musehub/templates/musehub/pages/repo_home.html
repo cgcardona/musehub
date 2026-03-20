@@ -294,6 +294,26 @@
         </div>
       </div>
 
+      {% if domain_meta_display %}
+      <div class="rh-meta-list">
+        {% for label, value in domain_meta_display %}
+        <div class="rh-meta-row">
+          <span class="rh-meta-lbl">{{ label }}</span>
+          <span class="rh-meta-val">{{ value }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if repo_license %}
+      <div class="rh-meta-list">
+        <div class="rh-meta-row">
+          <span class="rh-meta-lbl">License</span>
+          <span class="rh-meta-val">{{ repo_license }}</span>
+        </div>
+      </div>
+      {% endif %}
+
       {% if not (repo_license or domain_meta_display or (repo.tags or [])) %}
       <p class="rh-props-empty">No metadata yet.</p>
       {% endif %}

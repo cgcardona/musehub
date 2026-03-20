@@ -2,21 +2,13 @@
 
 Covers ``musehub/api/routes/musehub/ui_new_repo.py``:
 
-  GET /new
-  POST /new
-  GET /new/check
+  GET /new        — redirects to /domains (repos require a domain context)
+  POST /new       — create repo (JSON body, auth required)
+  GET /new/check  — name availability check
 
 Test matrix:
-  test_new_repo_page_returns_200 — GET returns HTTP 200 HTML
-  test_new_repo_page_no_auth_required — GET works without a JWT
-  test_new_repo_page_has_form — HTML contains the wizard form
-  test_new_repo_page_has_owner_input — HTML has owner input field
-  test_new_repo_page_has_visibility_options — HTML has Public/Private toggle
-  test_new_repo_page_has_license_options — JS references LICENSES constant
-  test_new_repo_page_has_topics_input — HTML has topics container
-  test_new_repo_page_has_initialize_checkbox — HTML has initialize checkbox
-  test_new_repo_page_has_branch_input — HTML has default branch input
-  test_new_repo_page_has_template_search — HTML has template search input
+  test_new_repo_page_redirects_to_domains — GET /new → 302 to /domains
+  test_new_repo_page_redirect_no_auth_required — redirect happens without a JWT
   test_check_available_returns_true — GET /new/check → available=true
   test_check_taken_returns_false — GET /new/check → available=false
   test_check_requires_owner_and_slug — GET /new/check → 422 when missing params
@@ -62,92 +54,27 @@ async def _seed_repo(
 
 
 # ---------------------------------------------------------------------------
-# GET /new — HTML wizard
+# GET /new — redirect (repos require a domain context)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
-async def test_new_repo_page_returns_200(client: AsyncClient) -> None:
-    """GET /new returns HTTP 200."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
+async def test_new_repo_page_redirects_to_domains(client: AsyncClient) -> None:
+    """GET /new → 302 redirect to /domains.
+
+    Repository creation is now domain-scoped; the standalone /new wizard
+    no longer exists. Users are directed to pick a domain first.
+    """
+    resp = await client.get("/new", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["location"].endswith("/domains")
 
 
 @pytest.mark.anyio
-async def test_new_repo_page_no_auth_required(client: AsyncClient) -> None:
-    """The wizard HTML shell is accessible without a JWT — consistent with all other UI pages."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    assert "text/html" in resp.headers.get("content-type", "")
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_form(client: AsyncClient) -> None:
-    """The wizard page contains the HTML wizard form."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    html = resp.text
-    assert "wizard-form" in html or "new_repo" in html or "Create" in html
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_owner_input(client: AsyncClient) -> None:
-    """The wizard page references the owner input field."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    assert "f-owner" in resp.text
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_visibility_options(client: AsyncClient) -> None:
-    """The wizard page has Public/Private visibility toggle."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    assert "Public" in resp.text
-    assert "Private" in resp.text
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_license_options(client: AsyncClient) -> None:
-    """The wizard page includes JS LICENSES constant with the expected license names."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    assert "CC0" in resp.text
-    assert "CC BY" in resp.text
-    assert "All Rights Reserved" in resp.text
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_topics_input(client: AsyncClient) -> None:
-    """The wizard page contains the topics tag input container."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    # SSR template uses tag-input-container + Alpine.js x-ref for the chip input
-    assert "tag-input-container" in resp.text or "topics-container" in resp.text or "topic" in resp.text.lower()
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_initialize_checkbox(client: AsyncClient) -> None:
-    """The wizard page has the 'Initialize this repository' checkbox."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    assert "f-initialize" in resp.text or "initialize" in resp.text.lower()
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_branch_input(client: AsyncClient) -> None:
-    """The wizard page has the default branch name input."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    assert "f-branch" in resp.text
-
-
-@pytest.mark.anyio
-async def test_new_repo_page_has_template_search(client: AsyncClient) -> None:
-    """The wizard page has the template repository search input."""
-    resp = await client.get("/new")
-    assert resp.status_code == 200
-    assert "template-search-input" in resp.text or "template" in resp.text.lower()
+async def test_new_repo_page_redirect_no_auth_required(client: AsyncClient) -> None:
+    """The redirect from /new does not require authentication."""
+    resp = await client.get("/new", follow_redirects=False)
+    assert resp.status_code == 302
 
 
 # ---------------------------------------------------------------------------
