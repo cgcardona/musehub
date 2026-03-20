@@ -1,25 +1,15 @@
-# Development overrides — bind-mount source code so changes take effect
-# without a full image rebuild. Loaded automatically by docker compose.
+# Development overrides — bind-mount source dirs so changes are reflected
+# immediately without rebuilding the image.
+#
+# Active automatically when you run `docker compose` from this directory.
+# Production deployments use docker-compose.yml alone (no override).
 services:
   musehub:
-    build:
-      context: .
-    working_dir: /app
+    environment:
+      DEBUG: "true"
     volumes:
       - ./musehub:/app/musehub
       - ./tests:/app/tests
-      - ./alembic:/app/alembic
+      - ./tools:/app/tools
       - ./scripts:/app/scripts
-      - ./tourdeforce:/app/tourdeforce
-      - musehub_data:/data
-    environment:
-      DEBUG: "true"
-      CORS_ORIGINS: '["http://localhost:10003", "muse://"]'
-      # Fallback dev/test secret (≥32 bytes for HMAC-SHA256) — override in .env for production
-      ACCESS_TOKEN_SECRET: "${ACCESS_TOKEN_SECRET:-dev-test-secret-change-in-prod!!}"
-    # Reload on code changes
-    command: >
-      uvicorn musehub.main:app
-      --host 0.0.0.0
-      --port 10003
-      --reload
+      - ./alembic:/app/alembic
