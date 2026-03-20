@@ -1,13 +1,5 @@
 {% extends "musehub/base.html" %}
 
-{%- set dim_icons = {
-    "melodic":    "🎵",
-    "harmonic":   "🎼",
-    "rhythmic":   "🥁",
-    "structural": "🏗",
-    "dynamic":    "📊",
-} %}
-
 {% block title %}{{ short_id }} · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
@@ -28,8 +20,7 @@ window.__commitCfg = {
   shortId:   {{ short_id | tojson }},
   base:      {{ base_url | tojson }},
   audioUrl:  {{ audio_url | tojson }},
-  listenUrl: {{ listen_url | tojson }},
-  embedUrl:  {{ embed_url | tojson }},
+  viewerType: {{ (domain.viewer_type if domain else 'generic') | tojson }},
 };
 {% endblock %}
 
@@ -43,11 +34,13 @@ window.__commitCfg = {
     <div class="cd-header-top">
       <div class="cd-header-chips">
 
-        {# Render/audio status #}
+        {# Render/audio status — only shown for MIDI domain #}
+        {%- if domain and domain.viewer_type == 'piano_roll' %}
         {%- if render_status == "ready" %}
         <span class="cd-render-badge ready">🎧 Audio ready</span>
         {%- else %}
         <span class="cd-render-badge none">No audio</span>
+        {%- endif %}
         {%- endif %}
 
         {# Branch #}
@@ -70,9 +63,14 @@ window.__commitCfg = {
 
       <div class="cd-actions">
         <a href="{{ base_url }}/commits/{{ commit.commit_id }}/diff"
-           class="btn btn-secondary btn-sm">⊕ Musical Diff</a>
-        <a href="{{ listen_url }}" class="btn btn-secondary btn-sm" target="_blank">🎧 Listen ↗</a>
-        <a href="{{ embed_url }}" class="btn btn-ghost btn-sm" target="_blank">⊞ Embed ↗</a>
+           class="btn btn-secondary btn-sm">⊕ Diff</a>
+        {%- if domain and domain.viewer_type == 'piano_roll' and audio_url %}
+        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-secondary btn-sm">🎧 Play ↗</a>
+        {%- elif domain and domain.viewer_type == 'symbol_graph' %}
+        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-secondary btn-sm">⬡ Graph ↗</a>
+        {%- else %}
+        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-ghost btn-sm">⊞ View ↗</a>
+        {%- endif %}
       </div>
     </div>
 
@@ -116,11 +114,20 @@ window.__commitCfg = {
 
   </div>{# /cd-header #}
 
-  {# ── Musical Changes ──────────────────────────────────────────────────── #}
+  {# ── Domain State Changes ─────────────────────────────────────────────── #}
+  {%- if dimensions %}
   <div class="cd-dim-panel">
     <div class="cd-dim-header">
+      {%- if domain and domain.viewer_type == 'piano_roll' %}
       <span>🎵</span>
       <h2 class="cd-dim-title">Musical Changes</h2>
+      {%- elif domain and domain.viewer_type == 'symbol_graph' %}
+      <span>⬡</span>
+      <h2 class="cd-dim-title">Symbol Changes</h2>
+      {%- else %}
+      <span>◈</span>
+      <h2 class="cd-dim-title">State Changes</h2>
+      {%- endif %}
       <span class="cd-overall-badge">
         {%- set overall_pct = (overall_change * 100) | round(0) | int %}
         Overall: {{ overall_pct }}%
@@ -131,8 +138,8 @@ window.__commitCfg = {
       {%- for dim in dimensions %}
       {%- set pct = (dim.score * 100) | round(0) | int %}
       <div class="cd-dim-row" data-target="{{ pct }}" data-level="{{ dim.label }}">
-        <span class="cd-dim-icon">{{ dim_icons.get(dim.dimension, "♩") }}</span>
-        <span class="cd-dim-name">{{ dim.dimension | title }}</span>
+        <span class="cd-dim-icon">◈</span>
+        <span class="cd-dim-name">{{ dim.dimension | replace('_', ' ') | title }}</span>
         <div class="cd-dim-track">
           <div class="cd-dim-fill level-{{ dim.label }}" style="width: {{ pct }}%"></div>
         </div>
@@ -142,15 +149,16 @@ window.__commitCfg = {
       {%- endfor %}
     </div>
   </div>
+  {%- endif %}
 
-  {# ── Audio Player ─────────────────────────────────────────────────────── #}
-  {%- if audio_url %}
+  {# ── Audio Preview — MIDI domain only ─────────────────────────────────── #}
+  {%- if audio_url and domain and domain.viewer_type == 'piano_roll' %}
   <div class="cd-audio-panel" id="cd-audio-section">
     <div class="cd-audio-header">
       <span>🎧</span>
       <h2 class="cd-dim-title" style="margin:0">Audio Preview</h2>
       <div class="cd-audio-actions">
-        <a href="{{ listen_url }}" class="btn btn-ghost btn-sm" target="_blank">Open player ↗</a>
+        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-ghost btn-sm" target="_blank">Open player ↗</a>
       </div>
     </div>
     <div class="cd-audio-body">
@@ -229,8 +237,8 @@ window.__commitCfg = {
 {% endblock %}
 
 {% block body_extra %}
-{# Load WaveSurfer library — initialization is handled by commit-detail.ts #}
-{%- if audio_url %}
+{# WaveSurfer — only for MIDI domain audio preview #}
+{%- if audio_url and domain and domain.viewer_type == 'piano_roll' %}
 <script src="/static/vendor/wavesurfer.min.js"></script>
 {%- endif %}
 {% endblock %}

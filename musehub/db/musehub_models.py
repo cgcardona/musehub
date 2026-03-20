@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models for MuseHub — the remote collaboration backend.
 
 Tables:
-- musehub_repos: Remote repos (one per project/musician)
+- musehub_repos: Remote repos (one per project, across any Muse domain)
 - musehub_branches: Named branch pointers inside a repo
 - musehub_commits: Remote commit records pushed from CLI clients
 - musehub_issues: Issue tracker entries per repo
@@ -10,7 +10,7 @@ Tables:
 - musehub_issue_milestones: Many-to-many join between issues and milestones
 - musehub_pull_requests: Pull requests proposing branch merges
 - musehub_pr_reviews: Formal reviews (approval / changes requested / dismissed) on PRs
-- musehub_pr_comments: Inline review comments on musical diffs within PRs
+- musehub_pr_comments: Inline review comments on dimensional diffs within PRs
 - musehub_objects: Content-addressed binary artifact storage
 - musehub_releases: Tagged releases
 - musehub_stars: Per-user repo starring (one row per user×repo pair)
@@ -18,7 +18,7 @@ Tables:
 - musehub_releases: Published version releases with download packages
 - musehub_webhooks: Registered webhook subscriptions per repo
 - musehub_webhook_deliveries: Delivery log for each webhook dispatch attempt
-- musehub_render_jobs: Render status tracking for auto-generated MP3/piano-roll artifacts
+- musehub_render_jobs: Render status tracking for auto-generated preview artifacts
 - musehub_events: Repo-level activity event stream (commits, PRs, issues, branches, tags, sessions)
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -51,9 +51,12 @@ class MusehubRepo(Base):
     Together they form the canonical /{owner}/{slug} URL scheme. The internal
     ``repo_id`` UUID remains the primary key — external URLs never expose it.
 
-    Music-semantic fields (key_signature, tempo_bpm, tags) are optional metadata
-    that musicians set to make their repos discoverable on the explore page.
-    Tags are free-form strings that encode genre, instrumentation, and mood.
+    ``domain_id`` links this repo to a registered Muse domain plugin
+    (e.g. ``@cgcardona/midi``, ``@cgcardona/code``). ``domain_meta`` is a
+    free-form JSON object for domain-specific metadata declared by that plugin —
+    for example, ``{"key_signature": "F# minor", "tempo_bpm": 120}`` for MIDI
+    or ``{"primary_language": "python", "entry_point": "main.py"}`` for code.
+    Tags are free-form strings that make repos discoverable on the explore page.
     """
 
     __tablename__ = "musehub_repos"
@@ -68,11 +71,12 @@ class MusehubRepo(Base):
     visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="private")
     owner_user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    # JSON list of free-form tag strings: genre ("jazz"), key ("F# minor"), instrument ("bass")
+    # JSON list of free-form tag strings for discovery
     tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
-    # Music-semantic metadata for filter-based discovery
-    key_signature: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    tempo_bpm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # FK to musehub_domains — null means the repo predates V2 or uses the generic domain
+    domain_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Domain-specific metadata blob declared by the domain plugin (replaces key_signature/tempo_bpm)
+    domain_meta: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
     # Feature-flag settings not covered by dedicated columns (JSON blob).
     # Keys: has_issues, has_projects, has_wiki, license, homepage_url,
     # allow_merge_commit, allow_squash_merge, allow_rebase_merge,
@@ -85,6 +89,19 @@ class MusehubRepo(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
+
+    # ── Compat shims — V1 had dedicated columns; V2 stores these in domain_meta ──
+
+    @property
+    def key_signature(self) -> str | None:
+        """MIDI key signature, e.g. 'F# minor'. Stored in domain_meta for V2 repos."""
+        return (self.domain_meta or {}).get("key_signature")  # type: ignore[return-value]
+
+    @property
+    def tempo_bpm(self) -> int | None:
+        """MIDI tempo in BPM. Stored in domain_meta for V2 repos."""
+        val = (self.domain_meta or {}).get("tempo_bpm")
+        return int(val) if val is not None else None
 
     branches: Mapped[list[MusehubBranch]] = relationship(
         "MusehubBranch", back_populates="repo", cascade="all, delete-orphan"
@@ -345,9 +362,10 @@ class MusehubIssueComment(Base):
     have ``parent_id=None``. Markdown body is stored verbatim; rendering
     happens client-side.
 
-    ``musical_refs`` is a JSON list of parsed musical context references
-    extracted from the body (e.g. ``track:bass``, ``section:chorus``,
-    ``beats:16-24``). Parsing is done at write time so reads are fast.
+    ``state_refs`` is a JSON list of domain-agnostic state references extracted
+    from the body at write time (e.g. ``{"type": "dimension", "value": "harmony"}``
+    for MIDI, ``{"type": "symbol", "value": "AuthService"}`` for code). The
+    domain plugin determines the reference schema; MuseHub stores it opaquely.
     """
 
     __tablename__ = "musehub_issue_comments"
@@ -371,8 +389,8 @@ class MusehubIssueComment(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     # Parent comment ID for threaded replies; null for top-level comments
     parent_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    # JSON list of parsed musical context dicts: {"type": "track"|"section"|"beats", "value": "..."}
-    musical_refs: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
+    # JSON list of domain-agnostic state reference dicts: {"type": str, "value": str}
+    state_refs: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now, index=True
@@ -465,14 +483,14 @@ class MusehubPRReview(Base):
 
 
 class MusehubPRComment(Base):
-    """Inline review comment on a musical diff within a pull request.
+    """Inline review comment on a dimensional diff within a pull request.
 
-    Supports four targeting granularities to let reviewers pinpoint exactly
-    what they're commenting on:
-      - ``general`` — whole PR (no positional target)
-      - ``track`` — a named instrument track (e.g. "bass", "keys")
-      - ``region`` — a beat range within a track (beat_start..beat_end)
-      - ``note`` — a single note event (track + beat + pitch)
+    Domain-agnostic targeting via ``dimension_ref`` — a JSON object whose schema
+    is defined by the repo's domain plugin. Examples:
+      - MIDI domain: ``{"dim": "harmony", "position": {"beat": 16, "beat_end": 24}}``
+      - Code domain: ``{"dim": "symbol", "symbol": "AuthService.login", "file": "auth.py"}``
+      - Genomics:    ``{"dim": "sequence", "start": 1024, "end": 2048}``
+      - General (no target): ``{}``
 
     ``parent_comment_id`` enables threaded replies. None means a top-level
     review comment. Replies carry the same ``pr_id`` so threads can be
@@ -492,15 +510,8 @@ class MusehubPRComment(Base):
     author: Mapped[str] = mapped_column(String(255), nullable=False)
     # Markdown-formatted review body
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    # Targeting: "general" | "track" | "region" | "note"
-    target_type: Mapped[str] = mapped_column(String(20), nullable=False, default="general")
-    # Instrument track name when target_type is "track", "region", or "note"
-    target_track: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Beat range for "region" targets (inclusive start, exclusive end)
-    target_beat_start: Mapped[float | None] = mapped_column(Float, nullable=True)
-    target_beat_end: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # MIDI pitch (0-127) for "note" targets
-    target_note_pitch: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Domain-agnostic dimension reference — schema defined by the domain plugin
+    dimension_ref: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
     # Parent comment ID for threaded replies; None for top-level comments
     parent_comment_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -993,14 +1004,17 @@ class MusehubDownloadEvent(Base):
 
 
 class MusehubRenderJob(Base):
-    """Render job record tracking the async generation of MP3 and piano-roll artifacts.
+    """Render job record tracking the async generation of preview and audio artifacts.
 
     One row is created per commit push. The render pipeline sets ``status`` as
     work progresses: ``pending`` → ``rendering`` → ``complete`` | ``failed``.
 
-    ``mp3_object_ids`` and ``image_object_ids`` are JSON lists of
+    ``audio_object_ids`` and ``preview_object_ids`` are JSON lists of
     ``musehub_objects.object_id`` values written by the render pipeline.
     They are empty until the job reaches ``complete`` or ``failed``.
+
+    ``artifact_count`` is the number of primary domain artifacts found in the
+    commit snapshot (e.g. MIDI files for @cgcardona/midi, source files for code).
 
     Design: idempotent by ``(repo_id, commit_id)`` — re-pushing the same
     commit does not create a second render job. The pipeline checks for an
@@ -1025,12 +1039,12 @@ class MusehubRenderJob(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
     # Human-readable error from the last failure; null when status != "failed".
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Number of MIDI objects found in the commit snapshot.
-    midi_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    # JSON list of object_ids for generated MP3 artifacts.
-    mp3_object_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
-    # JSON list of object_ids for generated piano-roll PNG artifacts.
-    image_object_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # Number of primary domain artifacts found in the commit snapshot.
+    artifact_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # JSON list of object_ids for generated audio artifacts (e.g. MP3 for MIDI domain).
+    audio_object_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # JSON list of object_ids for generated preview image artifacts (e.g. piano-roll PNG).
+    preview_object_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )

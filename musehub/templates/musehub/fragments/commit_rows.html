@@ -110,7 +110,7 @@
 
         <!-- Diff link -->
         <a href="{{ base_url }}/commits/{{ commit.commit_id }}/diff"
-           class="commit-meta-item" style="color:var(--color-accent);text-decoration:none" title="View musical diff">
+           class="commit-meta-item" style="color:var(--color-accent);text-decoration:none" title="View diff">
           ⊕ diff
         </a>
       </div>
@@ -165,7 +165,7 @@
   </p>
   {% else %}
   <p class="empty-title">No commits yet</p>
-  <p class="empty-desc">Push your first musical commit with <code>muse push</code> to see history here.</p>
+  <p class="empty-desc">Push your first commit with <code>muse push</code> to see history here.</p>
   {% endif %}
 </div>
 {% endif %}

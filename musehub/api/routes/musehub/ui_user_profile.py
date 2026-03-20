@@ -53,6 +53,19 @@ class HeatmapDay(CamelModel):
     date: str = Field(..., description="ISO date string (YYYY-MM-DD)")
     count: int = Field(0, ge=0, description="Commit count for this day")
     intensity: int = Field(0, ge=0, le=3, description="0=none 1=light 2=medium 3=dark")
+    domain_counts: dict[str, int] = Field(default_factory=dict, description="domain_id → commit count")
+    dominant_domain: str | None = Field(None, description="domain_id with most commits this day")
+
+
+class DomainStat(CamelModel):
+    """Per-domain activity summary shown on the profile page."""
+
+    domain_id: str | None = None
+    domain_name: str = "Unknown"
+    scoped_id: str | None = None
+    viewer_type: str = Field("generic", description="symbol_graph | piano_roll | generic")
+    repo_count: int = Field(0, ge=0)
+    commit_count: int = Field(0, ge=0)
 
 
 class HeatmapStats(CamelModel):
@@ -85,8 +98,13 @@ class PinnedRepoCard(CamelModel):
     description: str
     star_count: int = Field(0, ge=0)
     fork_count: int = Field(0, ge=0)
+    commit_count: int = Field(0, ge=0)
+    domain_id: str | None = None
+    domain_name: str | None = None
+    domain_viewer_type: str = Field("generic", description="symbol_graph | piano_roll | generic")
     language: str = Field("", description="Primary language tag derived from repo tags")
     primary_genre: str | None = Field(None, description="First genre tag on the repo, if any")
+    tags: list[str] = Field(default_factory=list)
 
 
 class ActivityEvent(CamelModel):
@@ -123,6 +141,7 @@ class EnhancedProfileResponse(CamelModel):
     # CC attribution string such as "Public Domain" or "CC BY 4.0"; None = all rights reserved
     cc_license: str | None = None
     heatmap: HeatmapStats
+    domain_stats: list[DomainStat] = Field(default_factory=list)
     badges: list[Badge]
     pinned_repos: list[PinnedRepoCard]
     activity: list[ActivityEvent]
@@ -164,7 +183,7 @@ def _compute_streaks(days: list[HeatmapDay]) -> tuple[int, int]:
 
 
 async def _build_heatmap(session: AsyncSession, user_id: str) -> HeatmapStats:
-    """Compute the 52-week contribution heatmap for ``user_id``."""
+    """Compute the 52-week contribution heatmap for ``user_id``, with per-domain breakdown."""
     today = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     cutoff = today - timedelta(weeks=_HEATMAP_WEEKS)
 
@@ -177,8 +196,13 @@ async def _build_heatmap(session: AsyncSession, user_id: str) -> HeatmapStats:
     )
     repo_ids = [row[0] for row in repo_result]
 
+    # Per-day total counts
     counts: dict[str, int] = {}
+    # Per-day per-domain counts: {date: {domain_id: count}}
+    domain_counts: dict[str, dict[str, int]] = {}
+
     if repo_ids:
+        # Total counts per day
         daily_result = await session.execute(
             select(
                 func.date(dbm.MusehubCommit.timestamp).label("day"),
@@ -192,12 +216,38 @@ async def _build_heatmap(session: AsyncSession, user_id: str) -> HeatmapStats:
         )
         counts = {str(row.day): int(row.cnt) for row in daily_result}
 
+        # Domain-broken-down counts per day (join with repos to get domain_id)
+        domain_daily_result = await session.execute(
+            select(
+                func.date(dbm.MusehubCommit.timestamp).label("day"),
+                dbm.MusehubRepo.domain_id.label("domain_id"),
+                func.count(dbm.MusehubCommit.commit_id).label("cnt"),
+            )
+            .join(dbm.MusehubRepo, dbm.MusehubCommit.repo_id == dbm.MusehubRepo.repo_id)
+            .where(
+                dbm.MusehubCommit.repo_id.in_(repo_ids),
+                dbm.MusehubCommit.timestamp >= cutoff,
+            )
+            .group_by(func.date(dbm.MusehubCommit.timestamp), dbm.MusehubRepo.domain_id)
+        )
+        for row in domain_daily_result:
+            date_str = str(row.day)
+            did = str(row.domain_id) if row.domain_id else "unknown"
+            if date_str not in domain_counts:
+                domain_counts[date_str] = {}
+            domain_counts[date_str][did] = int(row.cnt)
+
     days: list[HeatmapDay] = []
     cursor = cutoff
     while cursor <= today:
         iso = cursor.strftime("%Y-%m-%d")
         c = counts.get(iso, 0)
-        days.append(HeatmapDay(date=iso, count=c, intensity=_intensity(c)))
+        dc = domain_counts.get(iso, {})
+        dominant = max(dc, key=lambda k: dc[k]) if dc else None
+        days.append(HeatmapDay(
+            date=iso, count=c, intensity=_intensity(c),
+            domain_counts=dc, dominant_domain=dominant,
+        ))
         cursor += timedelta(days=1)
 
     total = sum(d.count for d in days)
@@ -210,19 +260,84 @@ async def _build_heatmap(session: AsyncSession, user_id: str) -> HeatmapStats:
     )
 
 
+async def _compute_domain_stats(session: AsyncSession, user_id: str) -> list[DomainStat]:
+    """Compute per-domain repo/commit counts for a user's repos."""
+    # Get all repos with their domain_id
+    repo_result = await session.execute(
+        select(dbm.MusehubRepo.repo_id, dbm.MusehubRepo.domain_id).where(
+            dbm.MusehubRepo.owner_user_id == user_id,
+            dbm.MusehubRepo.deleted_at.is_(None),
+        )
+    )
+    repo_rows = list(repo_result)
+    if not repo_rows:
+        return []
+
+    repo_ids = [r[0] for r in repo_rows]
+    domain_repo_count: dict[str | None, int] = {}
+    for _, did in repo_rows:
+        domain_repo_count[did] = domain_repo_count.get(did, 0) + 1
+
+    # Commit counts grouped by domain_id
+    commit_result = await session.execute(
+        select(
+            dbm.MusehubRepo.domain_id.label("domain_id"),
+            func.count(dbm.MusehubCommit.commit_id).label("cnt"),
+        )
+        .join(dbm.MusehubRepo, dbm.MusehubCommit.repo_id == dbm.MusehubRepo.repo_id)
+        .where(dbm.MusehubCommit.repo_id.in_(repo_ids))
+        .group_by(dbm.MusehubRepo.domain_id)
+    )
+    domain_commit_count: dict[str | None, int] = {
+        row.domain_id: int(row.cnt) for row in commit_result
+    }
+
+    # Resolve domain metadata from the domains table (raw SQL — no ORM model for this table)
+    all_domain_ids = [did for did in domain_repo_count.keys() if did is not None]
+    domain_meta: dict[str, tuple[str, str | None, str]] = {}  # id → (name, scoped_id, viewer_type)
+    if all_domain_ids:
+        from sqlalchemy import text as sa_text
+        placeholders = ", ".join(f":did_{i}" for i in range(len(all_domain_ids)))
+        params = {f"did_{i}": did for i, did in enumerate(all_domain_ids)}
+        domain_rows = await session.execute(
+            sa_text(
+                f"SELECT domain_id, display_name, author_slug, slug, viewer_type "
+                f"FROM musehub_domains WHERE domain_id IN ({placeholders})"
+            ),
+            params,
+        )
+        for row in domain_rows:
+            scoped = f"@{row.author_slug}/{row.slug}" if row.author_slug else row.slug
+            domain_meta[row.domain_id] = (row.display_name or "Unknown", scoped, row.viewer_type or "generic")
+
+    stats: list[DomainStat] = []
+    # Sort by commit count descending
+    for did, repo_count in sorted(domain_repo_count.items(), key=lambda x: domain_commit_count.get(x[0], 0), reverse=True):
+        meta = domain_meta.get(did or "", ("Unknown", None, "generic")) if did else ("Unknown", None, "generic")
+        stats.append(DomainStat(
+            domain_id=did,
+            domain_name=meta[0],
+            scoped_id=meta[1],
+            viewer_type=meta[2],
+            repo_count=repo_count,
+            commit_count=domain_commit_count.get(did, 0),
+        ))
+    return stats
+
+
 # ---------------------------------------------------------------------------
 # Badge helpers
 # ---------------------------------------------------------------------------
 
 _BADGE_DEFS: list[tuple[str, str, str, str]] = [
-    ("first_commit", "First Commit", "Made your first commit to MuseHub", "🎵"),
-    ("genre_pioneer", "Genre Pioneer", "Explored 3+ distinct tags across your repos", "🎸"),
-    ("100_commits", "100 Commits", "Reached 100 cumulative commits — serious dedication", "💯"),
-    ("collaborator", "Collaborator", "Contributed to 3+ repos you don't own", "🤝"),
-    ("fork_architect", "Fork Architect", "Had 5+ of your repos forked by others", "🌿"),
-    ("release_engineer", "Release Engineer", "Published 3+ official releases", "🚀"),
-    ("community_star", "Community Star", "Received 100+ reactions across your repos", "⭐"),
-    ("bach_scholar", "Bach Scholar", "Tagged a repo or commit with a Bach reference", "🎼"),
+    ("first_commit",      "First Commit",      "Made your first Muse commit",                         "◎"),
+    ("century",           "Century",            "Reached 100 cumulative commits — serious dedication", "💯"),
+    ("domain_explorer",   "Domain Explorer",    "Worked across 2+ distinct domains",                  "⬡"),
+    ("polymath",          "Polymath",           "Active in 3+ distinct domains",                      "◈"),
+    ("collaborator",      "Collaborator",       "Contributed to 3+ repos you don't own",              "⑂"),
+    ("pioneer",           "Pioneer",            "Explored 5+ distinct tags across your repos",        "🔭"),
+    ("release_engineer",  "Release Engineer",   "Published 3+ official releases",                     "⬆"),
+    ("community_star",    "Community Star",     "Received 100+ reactions across your repos",          "★"),
 ]
 
 
@@ -304,28 +419,22 @@ async def _compute_badges(
         )
         reaction_count = int(reaction_result.scalar() or 0)
 
-    # Bach Scholar: any repo has "bach" in its tags
-    has_bach = any("bach" in tag.lower() for tag in all_tags)
-    # Also check commit messages for "bach" if no tag found
-    if not has_bach and user_repo_ids:
-        bach_commit_result = await session.execute(
-            select(func.count(dbm.MusehubCommit.commit_id)).where(
-                dbm.MusehubCommit.repo_id.in_(user_repo_ids),
-                func.lower(dbm.MusehubCommit.message).contains("bach"),
-            )
-        )
-        has_bach = int(bach_commit_result.scalar() or 0) > 0
+    # Domain diversity: count distinct domain_ids across user's repos
+    distinct_domains: set[str] = set()
+    for repo in user_repos:
+        if repo.domain_id:
+            distinct_domains.add(repo.domain_id)
 
     # ── Map criteria to earned/not-earned ────────────────────────────────────
     criteria: dict[str, bool] = {
-        "first_commit": total_commits >= 1,
-        "genre_pioneer": len(all_tags) >= 3,
-        "100_commits": total_commits >= 100,
-        "collaborator": collab_repos >= 3,
-        "fork_architect": fork_count >= 5,
+        "first_commit":    total_commits >= 1,
+        "century":         total_commits >= 100,
+        "domain_explorer": len(distinct_domains) >= 2,
+        "polymath":        len(distinct_domains) >= 3,
+        "collaborator":    collab_repos >= 3,
+        "pioneer":         len(all_tags) >= 5,
         "release_engineer": release_count >= 3,
-        "community_star": reaction_count >= 100,
-        "bach_scholar": has_bach,
+        "community_star":  reaction_count >= 100,
     }
 
     return [
@@ -402,6 +511,36 @@ async def _build_pinned_repos(
     )
     fork_counts = {row.source_repo_id: int(row.cnt) for row in fork_result}
 
+    # Commit counts per pinned repo
+    commit_counts: dict[str, int] = {}
+    if ordered_ids:
+        commit_result = await session.execute(
+            select(
+                dbm.MusehubCommit.repo_id,
+                func.count(dbm.MusehubCommit.commit_id).label("cnt"),
+            )
+            .where(dbm.MusehubCommit.repo_id.in_(ordered_ids))
+            .group_by(dbm.MusehubCommit.repo_id)
+        )
+        commit_counts = {row.repo_id: int(row.cnt) for row in commit_result}
+
+    # Domain metadata for pinned repos (raw SQL — no ORM model for musehub_domains)
+    domain_ids = list({r.domain_id for r in ordered if r.domain_id})
+    domain_info: dict[str, tuple[str, str]] = {}  # domain_id → (name, viewer_type)
+    if domain_ids:
+        from sqlalchemy import text as sa_text
+        placeholders = ", ".join(f":did_{i}" for i in range(len(domain_ids)))
+        params = {f"did_{i}": did for i, did in enumerate(domain_ids)}
+        domain_rows = await session.execute(
+            sa_text(
+                f"SELECT domain_id, display_name, viewer_type "
+                f"FROM musehub_domains WHERE domain_id IN ({placeholders})"
+            ),
+            params,
+        )
+        for row in domain_rows:
+            domain_info[row.domain_id] = (row.display_name or "Unknown", row.viewer_type or "generic")
+
     return [
         PinnedRepoCard(
             repo_id=r.repo_id,
@@ -411,8 +550,13 @@ async def _build_pinned_repos(
             description=r.description or "",
             star_count=star_counts.get(r.repo_id, 0),
             fork_count=fork_counts.get(r.repo_id, 0),
+            commit_count=commit_counts.get(r.repo_id, 0),
+            domain_id=r.domain_id,
+            domain_name=domain_info.get(r.domain_id or "", ("Unknown", "generic"))[0] if r.domain_id else None,
+            domain_viewer_type=domain_info.get(r.domain_id or "", ("Unknown", "generic"))[1] if r.domain_id else "generic",
             language=next((t for t in (r.tags or []) if "lang:" in t.lower()), ""),
             primary_genre=_extract_genre(r.tags or []),
+            tags=list(r.tags or [])[:8],
         )
         for r in ordered
     ]
@@ -530,8 +674,9 @@ async def _build_enhanced_profile(
             detail=f"No profile found for username '{username}'",
         )
 
-    heatmap, badges, pinned_repos, (activity, total_events) = (
+    heatmap, domain_stats, badges, pinned_repos, (activity, total_events) = (
         await _build_heatmap(session, profile.user_id),
+        await _compute_domain_stats(session, profile.user_id),
         await _compute_badges(session, username, profile.user_id),
         await _build_pinned_repos(session, list(profile.pinned_repo_ids or [])),
         await _build_activity(session, profile.user_id, username, activity_filter, page, per_page),
@@ -548,6 +693,7 @@ async def _build_enhanced_profile(
         is_verified=profile.is_verified,
         cc_license=profile.cc_license,
         heatmap=heatmap,
+        domain_stats=domain_stats,
         badges=badges,
         pinned_repos=pinned_repos,
         activity=activity,
@@ -625,9 +771,13 @@ async def profile_page(
         data = await _build_enhanced_profile(db, username, tab, page, per_page)
         return JSONResponse(content=data.model_dump(by_alias=True, mode="json"))
 
-    # HTML path — lightweight shell, no DB access needed
-    return templates.TemplateResponse(
+    # HTML path — lightweight shell, JS hydrates from ?format=json
+    from musehub.api.routes.musehub.json_alternate import add_json_available_header
+    resp = templates.TemplateResponse(
         request,
-        "musehub/pages/user_profile.html",
+        "musehub/pages/profile.html",
         {"username": username},
+    )
+    return add_json_available_header(
+        resp, request, api_link=f"/api/v1/users/{username}"
     )

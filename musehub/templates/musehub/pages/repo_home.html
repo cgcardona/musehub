@@ -61,19 +61,17 @@
           <p class="repo-hero-desc">{{ repo.description }}</p>
           {% endif %}
 
-          {# Music identity pills #}
+          {# Domain badge + meta pills #}
           <div class="repo-hero-meta">
-            {% if repo.key_signature %}
-            <span class="repo-meta-pill repo-meta-key">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-              {{ repo.key_signature }}
-            </span>
-            {% endif %}
-            {% if repo.tempo_bpm %}
-            <span class="repo-meta-pill repo-meta-tempo">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              {{ repo.tempo_bpm }} BPM
-            </span>
+            {% if domain and domain.scoped_id %}
+            <a class="domain-badge repo-meta-pill" href="/domains/{{ domain.scoped_id }}"
+               title="{{ domain.display_name }} domain">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              {{ domain.scoped_id }}
+            </a>
             {% endif %}
             {% if repo_license %}
             <span class="repo-meta-pill repo-meta-license">
@@ -105,20 +103,33 @@
           {% endif %}
         </div>
 
-        {# Action cluster #}
+        {# Action cluster — adapts to domain #}
         <div class="repo-hero-actions">
-          <button class="btn btn-star btn-sm" id="nav-star-btn"
-                  style="display:none">
+          <button class="btn btn-star btn-sm" id="nav-star-btn" style="display:none">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             <span id="nav-star-count">0</span>
           </button>
-          <a href="{{ base_url }}/listen/HEAD" class="btn btn-listen btn-sm">
+          {# Primary action — domain-specific viewer #}
+          {% if domain and domain.viewer_type == 'piano_roll' %}
+          <a href="{{ base_url }}/view/HEAD" class="btn btn-listen btn-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Listen
+            Play
           </a>
-          <a href="{{ base_url }}/arrange/HEAD" class="btn btn-secondary btn-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="18" y="5" width="4" height="16"/></svg>
-            Arrange
+          {% elif domain and domain.viewer_type == 'symbol_graph' %}
+          <a href="{{ base_url }}/view/HEAD" class="btn btn-primary btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Graph
+          </a>
+          {% else %}
+          <a href="{{ base_url }}/view/HEAD" class="btn btn-primary btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            View
+          </a>
+          {% endif %}
+          {# Secondary: commits, insights #}
+          <a href="{{ base_url }}/commits" class="btn btn-secondary btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+            History
           </a>
         </div>
       </div>
@@ -220,36 +231,16 @@
   {# ──────────────────────────────────────────────────────── Right sidebar #}
   <aside>
 
-    {# ── Musical Identity ───────────────────────────────────────────── #}
+    {# ── Domain Properties ──────────────────────────────────────────── #}
     <div class="card musical-identity-card">
       <div class="sidebar-card-header">
-        <h3 class="sidebar-card-title">Musical Identity</h3>
+        <h3 class="sidebar-card-title">Properties</h3>
+        {% if domain and domain.scoped_id %}
+        <span class="domain-badge" style="font-size:10px;padding:2px 6px">{{ domain.display_name }}</span>
+        {% endif %}
       </div>
 
-      {% if repo.key_signature %}
-      <div class="musical-identity-row">
-        <span class="musical-identity-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        </span>
-        <div>
-          <div class="musical-identity-label">Key</div>
-          <div class="musical-identity-value">{{ repo.key_signature }}</div>
-        </div>
-      </div>
-      {% endif %}
-
-      {% if repo.tempo_bpm %}
-      <div class="musical-identity-row">
-        <span class="musical-identity-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        </span>
-        <div>
-          <div class="musical-identity-label">Tempo</div>
-          <div class="musical-identity-value">{{ repo.tempo_bpm }} BPM</div>
-        </div>
-      </div>
-      {% endif %}
-
+      {# License row (universal) #}
       {% if repo_license %}
       <div class="musical-identity-row">
         <span class="musical-identity-icon">
@@ -262,111 +253,148 @@
       </div>
       {% endif %}
 
-      {# Tag groups #}
-      {% if genre_tags %}
+      {# Domain-specific metadata from domain_meta JSON #}
+      {% for label, value in domain_meta_display %}
+      <div class="musical-identity-row">
+        <span class="musical-identity-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </span>
+        <div>
+          <div class="musical-identity-label">{{ label }}</div>
+          <div class="musical-identity-value">{{ value }}</div>
+        </div>
+      </div>
+      {% endfor %}
+
+      {# Tags — rendered by prefix category for discoverability #}
+      {% set all_tags = repo.tags or [] %}
+      {% set ns = namespace(genre=[], mood=[], stage=[], ref=[], bare=[]) %}
+      {% for t in all_tags %}
+        {% if ':' in t %}
+          {% set prefix = t.split(':')[0] %}
+          {% set val    = t.split(':', 1)[1] %}
+          {% if prefix == 'genre' %}{% set ns.genre = ns.genre + [val] %}
+          {% elif prefix in ('emotion', 'mood') %}{% set ns.mood = ns.mood + [val] %}
+          {% elif prefix == 'stage' %}{% set ns.stage = ns.stage + [val] %}
+          {% elif prefix in ('ref', 'influences') %}{% set ns.ref = ns.ref + [val] %}
+          {% else %}{% set ns.bare = ns.bare + [t] %}{% endif %}
+        {% else %}{% set ns.bare = ns.bare + [t] %}{% endif %}
+      {% endfor %}
+
+      {% if ns.genre %}
       <div class="tag-group">
         <div class="tag-group-label">Genre</div>
         <div class="tag-group-chips">
-          {% for t in genre_tags %}
-          <a href="/topics/genre:{{ t }}" class="tag-chip tag-chip-genre">{{ t }}</a>
-          {% endfor %}
+          {% for t in ns.genre %}<a href="/topics/genre:{{ t }}" class="tag-chip tag-chip-genre">{{ t }}</a>{% endfor %}
         </div>
       </div>
       {% endif %}
-
-      {% if emotion_tags %}
+      {% if ns.mood %}
       <div class="tag-group">
         <div class="tag-group-label">Mood</div>
         <div class="tag-group-chips">
-          {% for t in emotion_tags %}
-          <a href="/topics/emotion:{{ t }}" class="tag-chip tag-chip-emotion">{{ t }}</a>
-          {% endfor %}
+          {% for t in ns.mood %}<a href="/topics/emotion:{{ t }}" class="tag-chip tag-chip-emotion">{{ t }}</a>{% endfor %}
         </div>
       </div>
       {% endif %}
-
-      {% if stage_tags %}
+      {% if ns.stage %}
       <div class="tag-group">
         <div class="tag-group-label">Stage</div>
         <div class="tag-group-chips">
-          {% for t in stage_tags %}
-          <span class="tag-chip tag-chip-stage">{{ t }}</span>
-          {% endfor %}
+          {% for t in ns.stage %}<span class="tag-chip tag-chip-stage">{{ t }}</span>{% endfor %}
         </div>
       </div>
       {% endif %}
-
-      {% if ref_tags %}
+      {% if ns.ref %}
       <div class="tag-group">
-        <div class="tag-group-label">Influences</div>
+        <div class="tag-group-label">References</div>
         <div class="tag-group-chips">
-          {% for t in ref_tags %}
-          <span class="tag-chip tag-chip-ref">{{ t }}</span>
-          {% endfor %}
+          {% for t in ns.ref %}<span class="tag-chip tag-chip-ref">{{ t }}</span>{% endfor %}
         </div>
       </div>
       {% endif %}
-
-      {% if bare_tags %}
+      {% if ns.bare %}
       <div class="tag-group">
         <div class="tag-group-label">Topics</div>
         <div class="tag-group-chips">
-          {% for t in bare_tags %}
-          <a href="/topics/{{ t }}" class="tag-chip tag-chip-neutral">{{ t }}</a>
-          {% endfor %}
+          {% for t in ns.bare %}<a href="/topics/{{ t }}" class="tag-chip tag-chip-neutral">{{ t }}</a>{% endfor %}
         </div>
       </div>
       {% endif %}
 
-      {% if not (repo.key_signature or repo.tempo_bpm or repo_license or genre_tags or emotion_tags or stage_tags or ref_tags or bare_tags) %}
+      {% if not (repo_license or domain_meta_display or all_tags) %}
       <div style="padding:var(--space-4);color:var(--text-muted);font-size:12px;text-align:center">
         No metadata yet.
       </div>
       {% endif %}
     </div>
 
-    {# ── Muse Dimensions ───────────────────────────────────────────── #}
+    {# ── Explore — domain-aware quick links ────────────────────────── #}
     <div class="card" style="margin-bottom:var(--space-3)">
       <div class="sidebar-card-header">
         <h3 class="sidebar-card-title">Explore</h3>
       </div>
       <div class="muse-dimension-grid">
-        <a href="{{ base_url }}/listen/HEAD" class="muse-dimension-item">
+        {# Domain viewer — label and icon adapt to viewer_type #}
+        {% set viewer_type = domain.viewer_type if domain else 'generic' %}
+        {% if viewer_type == 'piano_roll' %}
+        <a href="{{ base_url }}/view/HEAD" class="muse-dimension-item">
           <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--dim-rhythmic)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--color-accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </span>
-          Listen
+          Piano Roll
         </a>
-        <a href="{{ base_url }}/arrange/HEAD" class="muse-dimension-item">
+        {% elif viewer_type == 'symbol_graph' %}
+        <a href="{{ base_url }}/view/HEAD" class="muse-dimension-item">
           <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-harmonic)"><rect x="2" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="18" y="5" width="4" height="16"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent)"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </span>
-          Arrange
+          Symbol Graph
         </a>
-        <a href="{{ base_url }}/analysis/HEAD" class="muse-dimension-item">
+        {% else %}
+        <a href="{{ base_url }}/view/HEAD" class="muse-dimension-item">
           <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-melodic)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent)"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </span>
-          Analysis
+          View
+        </a>
+        {% endif %}
+
+        {# Universal links — always present #}
+        <a href="{{ base_url }}/commits" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-success)"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+          </span>
+          History
+        </a>
+        <a href="{{ base_url }}/graph" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-warning)"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+          </span>
+          DAG Graph
         </a>
         <a href="{{ base_url }}/timeline" class="muse-dimension-item">
           <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-structural)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-info)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </span>
           Timeline
         </a>
-        <a href="{{ base_url }}/groove-check" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--dim-dynamic)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          </span>
-          Groove Check
-        </a>
         <a href="{{ base_url }}/insights" class="muse-dimension-item">
           <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-alt)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           </span>
           Insights
         </a>
+
+        {# MIDI-only extras #}
+        {% if viewer_type == 'piano_roll' %}
+        <a href="{{ base_url }}/analysis/HEAD" class="muse-dimension-item">
+          <span class="muse-dimension-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-secondary)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
+          Analysis
+        </a>
+        {% endif %}
       </div>
     </div>
 

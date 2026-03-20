@@ -9,6 +9,7 @@ Endpoint summary:
   POST /repos/{repo_id}/releases/{tag}/assets/{asset_id}/download — record download event
   DELETE /repos/{repo_id}/releases/{tag}/assets/{asset_id} — remove asset from release
   GET /repos/{repo_id}/releases/{tag}/downloads — per-asset download counts
+  GET /repos/{repo_id}/tags — all tags derived from releases (namespace-grouped)
 
 A release ties a version tag (e.g. "v1.0") to a commit snapshot and carries
 Markdown release notes plus structured download package URLs. Tags are unique
@@ -35,6 +36,8 @@ from musehub.models.musehub import (
     ReleaseDownloadStatsResponse,
     ReleaseListResponse,
     ReleaseResponse,
+    TagListResponse,
+    TagResponse,
 )
 from musehub.services import musehub_releases
 from musehub.services import musehub_repository
@@ -111,6 +114,68 @@ async def list_releases(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return await musehub_releases.get_release_list_response(db, repo_id)
+
+
+@router.get(
+    "/repos/{repo_id}/tags",
+    response_model=TagListResponse,
+    operation_id="listTags",
+    summary="List all tags for a repo (derived from releases)",
+)
+async def list_tags(
+    repo_id: str,
+    namespace: str | None = None,
+    sort: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    claims: TokenClaims | None = Depends(optional_token),
+) -> TagListResponse:
+    """Return all tags for the repo, grouped by namespace.
+
+    Tags are derived from releases. The ``namespace`` field is extracted from
+    the tag name — ``emotion:happy`` → namespace ``emotion``, ``v1.0`` →
+    namespace ``version``.
+
+    Query parameters:
+    - ``namespace``: filter to a single namespace prefix
+    - ``sort``: ``newest`` (default) | ``alpha`` | ``namespace``
+
+    Returns 404 if the repo does not exist.
+    """
+    repo = await musehub_repository.get_repo(db, repo_id)
+    if repo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repo not found")
+    if repo.visibility != "public" and claims is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to access private repos.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    releases = await musehub_releases.list_releases(db, repo_id)
+
+    all_tags: list[TagResponse] = []
+    for release in releases:
+        tag_str = release.tag
+        ns = tag_str.split(":", 1)[0] if ":" in tag_str else "version"
+        all_tags.append(
+            TagResponse(
+                tag=tag_str,
+                namespace=ns,
+                commit_id=release.commit_id,
+                message=release.title,
+                created_at=release.created_at,
+            )
+        )
+
+    active_sort = sort or "newest"
+    if active_sort == "alpha":
+        all_tags.sort(key=lambda t: t.tag)
+    elif active_sort == "namespace":
+        all_tags.sort(key=lambda t: (t.namespace, t.tag))
+
+    filtered = [t for t in all_tags if t.namespace == namespace] if namespace else all_tags
+    namespaces = sorted({t.namespace for t in all_tags})
+    return TagListResponse(tags=filtered, namespaces=namespaces)
 
 
 @router.get(

@@ -14,5 +14,8 @@
     "esbuild": "^0.27.3",
     "sass": "^1.89.2",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "highlight.js": "^11.11.1"
   }
 }

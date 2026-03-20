@@ -3,12 +3,17 @@
  *
  * CSS custom properties that form the foundation of the MuseHub design system.
  * All component classes consume these tokens — do not hardcode hex values in
- * components.css, layout.css, or music.css.  Changing a token here cascades
+ * components.css, layout.css, or _domain.scss.  Changing a token here cascades
  * the change across every page automatically.
  *
  * Dark theme is the default (and currently the only supported theme).
  * Future light-theme support: add a [data-theme="light"] selector block that
  * overrides the --color-* tokens defined here.
+ *
+ * Dimension tokens (--dim-a through --dim-e) are domain-agnostic aliases.
+ * MIDI maps: a=harmonic, b=rhythmic, c=melodic, d=structural, e=dynamic.
+ * Domain-specific overrides can remap them via [data-domain="<slug>"] rules
+ * in _domain.scss.
  */
 
 :root {
@@ -57,20 +62,56 @@
   --color-orange:       #f0883e;
 
   /* -------------------------------------------------------------------------
-   * Musical dimension colors
-   * Used in piano rolls, radar charts, analysis pages, and diff views.
-   * Each dimension has a primary color and a muted/background variant.
+   * Domain-agnostic dimension color tokens (--dim-a … --dim-e)
+   *
+   * Five generic dimension slots usable by any domain plugin.
+   * MIDI mapping: a=harmonic, b=rhythmic, c=melodic, d=structural, e=dynamic.
+   * Code mapping:  a=syntax,   b=semantics, c=types,   d=tests,    e=docs.
+   *
+   * Each slot has a primary and a muted (background/badge) variant.
+   * Domain-specific named aliases are set in _domain.scss under
+   * [data-domain="midi"] / [data-domain="code"] / etc.
+   * Used in viewers, radar charts, insight pages, and diff views.
    * ------------------------------------------------------------------------- */
-  --dim-harmonic:        #388bfd;  /* blue  — chord progressions, intervals */
-  --dim-harmonic-muted:  #1f4a8a;
-  --dim-rhythmic:        #3fb950;  /* green — time, meter, swing */
-  --dim-rhythmic-muted:  #1a5c2a;
-  --dim-melodic:         #bc8cff;  /* purple — pitch contour, motifs */
-  --dim-melodic-muted:   #5a3e8a;
-  --dim-structural:      #f0883e;  /* orange — form, sections, repeats */
-  --dim-structural-muted:#7a3e10;
-  --dim-dynamic:         #f85149;  /* red    — velocity, loudness arcs */
-  --dim-dynamic-muted:   #7a1a18;
+  --dim-a:        #388bfd;  /* blue   — slot A */
+  --dim-a-muted:  #1f4a8a;
+  --dim-b:        #3fb950;  /* green  — slot B */
+  --dim-b-muted:  #1a5c2a;
+  --dim-c:        #bc8cff;  /* purple — slot C */
+  --dim-c-muted:  #5a3e8a;
+  --dim-d:        #f0883e;  /* orange — slot D */
+  --dim-d-muted:  #7a3e10;
+  --dim-e:        #f85149;  /* red    — slot E */
+  --dim-e-muted:  #7a1a18;
+
+  /* Backward-compat aliases for MIDI-specific consumers (deprecated — use --dim-* above) */
+  --dim-harmonic:         var(--dim-a);
+  --dim-harmonic-muted:   var(--dim-a-muted);
+  --dim-rhythmic:         var(--dim-b);
+  --dim-rhythmic-muted:   var(--dim-b-muted);
+  --dim-melodic:          var(--dim-c);
+  --dim-melodic-muted:    var(--dim-c-muted);
+  --dim-structural:       var(--dim-d);
+  --dim-structural-muted: var(--dim-d-muted);
+  --dim-dynamic:          var(--dim-e);
+  --dim-dynamic-muted:    var(--dim-e-muted);
+
+  /* -------------------------------------------------------------------------
+   * Domain badge tokens
+   * Used for the @author/slug pill shown on repo cards, repo headers,
+   * and the domain browser.
+   * ------------------------------------------------------------------------- */
+  --domain-badge-bg:   #1c2a3a;
+  --domain-badge-text: #58a6ff;
+  --domain-badge-border: #2a4a6a;
+
+  /* -------------------------------------------------------------------------
+   * Agent accent token
+   * Used for the "agent" badge in activity feeds and event streams,
+   * and for agent-authored commit indicators.
+   * ------------------------------------------------------------------------- */
+  --agent-accent:    #a78bfa;  /* violet — distinct from human-blue accent */
+  --agent-accent-bg: #2d1f5e;
 
   /* -------------------------------------------------------------------------
    * Track colors — 8 distinct palette for multi-track views

@@ -33,7 +33,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.responses import Response
 
-from musehub.api.routes.musehub.htmx_helpers import is_htmx
+from musehub.api.routes.musehub.htmx_helpers import is_htmx, is_htmx_boosted
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,10 @@ async def negotiate_response(
     Returns:
         ``TemplateResponse`` (fragment or full page), or ``JSONResponse``.
     """
-    if is_htmx(request) and fragment_template is not None:
+    # hx-boost navigations set both HX-Request AND HX-Boosted — they need the
+    # full page so HTMX can extract the <body>.  Only non-boosted HTMX
+    # sub-requests (filter form submit, pagination) should get the bare fragment.
+    if is_htmx(request) and not is_htmx_boosted(request) and fragment_template is not None:
         logger.debug("✅ negotiate_response: HTMX fragment path — %s", fragment_template)
         return templates.TemplateResponse(request, fragment_template, context)
 

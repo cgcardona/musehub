@@ -105,6 +105,7 @@ def _to_repo_response(row: db.MusehubRepo) -> RepoResponse:
         tags=list(row.tags or []),
         key_signature=row.key_signature,
         tempo_bpm=row.tempo_bpm,
+        domain_id=getattr(row, "domain_id", None),
         created_at=row.created_at,
     )
 

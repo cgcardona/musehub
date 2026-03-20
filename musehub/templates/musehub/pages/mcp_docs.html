@@ -1,0 +1,161 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}MCP Reference — MuseHub{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-current">MCP Reference</span>
+{% endblock %}
+
+{% block content %}
+<div class="mcp-docs-page">
+
+  {# ── Header ───────────────────────────────────────────────────────────────── #}
+  <div class="mcp-docs-header">
+    <h1 class="mcp-docs-header__title">Muse Command Protocol</h1>
+    <p class="mcp-docs-header__subtitle">
+      MuseHub speaks <strong>MCP {{ protocol_version }}</strong> — full Streamable HTTP with
+      elicitation, progress streaming, and server-sent events. AI agents and human tools
+      connect identically, as first-class citizens.
+    </p>
+    <div class="mcp-docs-header__actions">
+      <a href="/mcp/docs.json" class="btn btn-secondary btn-sm">docs.json</a>
+      <a href="https://spec.modelcontextprotocol.io/specification/2025-11-25/" class="btn btn-ghost btn-sm" target="_blank" rel="noopener">MCP Spec</a>
+    </div>
+  </div>
+
+  {# ── Connection quick-start ───────────────────────────────────────────────── #}
+  <section class="mcp-docs-section">
+    <h2 class="mcp-docs-section__title">Connecting</h2>
+    <div class="mcp-docs-connect-grid">
+      <div class="mcp-docs-connect-item">
+        <span class="mcp-docs-connect-label">Endpoint</span>
+        <code class="mcp-docs-connect-value">POST /mcp</code>
+      </div>
+      <div class="mcp-docs-connect-item">
+        <span class="mcp-docs-connect-label">SSE stream</span>
+        <code class="mcp-docs-connect-value">GET /mcp</code>
+      </div>
+      <div class="mcp-docs-connect-item">
+        <span class="mcp-docs-connect-label">Protocol</span>
+        <code class="mcp-docs-connect-value">{{ protocol_version }}</code>
+      </div>
+      <div class="mcp-docs-connect-item">
+        <span class="mcp-docs-connect-label">Auth</span>
+        <code class="mcp-docs-connect-value">Authorization: Bearer &lt;jwt&gt;</code>
+      </div>
+      <div class="mcp-docs-connect-item">
+        <span class="mcp-docs-connect-label">Agent JWT</span>
+        <code class="mcp-docs-connect-value">token_type: "agent" claim → higher rate limits + activity badge</code>
+      </div>
+      <div class="mcp-docs-connect-item">
+        <span class="mcp-docs-connect-label">Machine docs</span>
+        <code class="mcp-docs-connect-value">GET /mcp/docs.json</code>
+      </div>
+    </div>
+
+    <div class="mcp-docs-quickstart">
+      <h3 class="mcp-docs-quickstart__title">Agent quick-start</h3>
+      <ol class="mcp-docs-quickstart__steps">
+        <li>Send <code>initialize</code> → receive <code>Mcp-Session-Id</code></li>
+        <li>Call <code>musehub_list_domains</code> to discover available domain plugins</li>
+        <li>Call <code>musehub_get_domain(scoped_id="@author/slug")</code> to read a manifest</li>
+        <li>Call <code>musehub_browse_repo</code> + <code>musehub_get_view</code> to inspect state</li>
+        <li>Use <code>musehub/agent-onboard</code> prompt for a full guided walkthrough</li>
+      </ol>
+    </div>
+  </section>
+
+  {# ── Tools ────────────────────────────────────────────────────────────────── #}
+  <section class="mcp-docs-section">
+    <h2 class="mcp-docs-section__title">Tools <span class="mcp-docs-count">{{ tools | length }}</span></h2>
+    <div class="mcp-docs-tools-list">
+      {% for tool in tools %}
+      <div class="mcp-docs-tool" id="tool-{{ tool.name }}">
+        <div class="mcp-docs-tool__header">
+          <code class="mcp-docs-tool__name">{{ tool.name }}</code>
+          {% if tool.get('server_side') %}
+          <span class="badge badge-sm">server</span>
+          {% endif %}
+          {% if 'elicitation' in tool.description | lower or 'elicit' in tool.description | lower %}
+          <span class="badge badge-sm badge-elicitation">elicitation</span>
+          {% endif %}
+        </div>
+        <p class="mcp-docs-tool__desc">{{ tool.description }}</p>
+        {% if tool.inputSchema and tool.inputSchema.get('properties') %}
+        <details class="mcp-docs-tool__schema">
+          <summary>Parameters</summary>
+          <table class="mcp-docs-params-table">
+            <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+            <tbody>
+              {% set required = tool.inputSchema.get('required', []) %}
+              {% for param_name, param in tool.inputSchema.properties.items() %}
+              <tr>
+                <td><code>{{ param_name }}</code></td>
+                <td><span class="mcp-docs-type">{{ param.get('type', 'any') }}</span></td>
+                <td>{% if param_name in required %}<span class="mcp-docs-required">yes</span>{% else %}—{% endif %}</td>
+                <td>{{ param.get('description', '') }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ── Static resources ─────────────────────────────────────────────────────── #}
+  <section class="mcp-docs-section">
+    <h2 class="mcp-docs-section__title">Resources <span class="mcp-docs-count">{{ static_resources | length }}</span></h2>
+    <div class="mcp-docs-resource-list">
+      {% for res in static_resources %}
+      <div class="mcp-docs-resource">
+        <code class="mcp-docs-resource__uri">{{ res.uri }}</code>
+        <span class="mcp-docs-resource__name">{{ res.name }}</span>
+        <p class="mcp-docs-resource__desc">{{ res.description }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ── Resource templates ───────────────────────────────────────────────────── #}
+  <section class="mcp-docs-section">
+    <h2 class="mcp-docs-section__title">Resource Templates <span class="mcp-docs-count">{{ resource_templates | length }}</span></h2>
+    <div class="mcp-docs-resource-list">
+      {% for tmpl in resource_templates %}
+      <div class="mcp-docs-resource">
+        <code class="mcp-docs-resource__uri">{{ tmpl.uriTemplate }}</code>
+        <span class="mcp-docs-resource__name">{{ tmpl.name }}</span>
+        <p class="mcp-docs-resource__desc">{{ tmpl.description }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ── Prompts ──────────────────────────────────────────────────────────────── #}
+  <section class="mcp-docs-section">
+    <h2 class="mcp-docs-section__title">Prompts <span class="mcp-docs-count">{{ prompts | length }}</span></h2>
+    <div class="mcp-docs-prompt-list">
+      {% for prompt in prompts %}
+      <div class="mcp-docs-prompt" id="prompt-{{ prompt.name | replace('/', '-') }}">
+        <code class="mcp-docs-prompt__name">{{ prompt.name }}</code>
+        <p class="mcp-docs-prompt__desc">{{ prompt.description }}</p>
+        {% if prompt.get('arguments') %}
+        <div class="mcp-docs-prompt__args">
+          {% for arg in prompt.arguments %}
+          <span class="mcp-docs-prompt__arg">
+            <code>{{ arg.name }}</code>
+            {% if arg.get('required') %}<span class="mcp-docs-required">*</span>{% endif %}
+            {% if arg.get('description') %}<span class="mcp-docs-prompt__arg-desc">— {{ arg.description }}</span>{% endif %}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+</div>
+{% endblock %}

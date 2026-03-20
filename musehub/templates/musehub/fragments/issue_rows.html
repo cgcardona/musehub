@@ -11,39 +11,17 @@
 {%- set idx = (name | length) % (colors | length) -%}{{ colors[idx] }}
 {%- endmacro -%}
 
-{# Map first label to a category type for the type badge #}
+{# Map first label to a category type for the type badge — domain-agnostic #}
 {%- macro get_type(labels) -%}
 {%- if labels -%}
   {%- set f = labels[0].lower() -%}
-  {%- if f in ['bug', 'midi', 'error', 'wontfix', 'blocked'] -%}bug
-  {%- elif f in ['arrangement', 'bridge', 'structure', 'form'] -%}arrangement
-  {%- elif f in ['harmony', 'chord', 'theory', 'melody', 'key'] -%}harmony
-  {%- elif f in ['mix', 'mixing', 'vocals', 'eq', 'compression', 'mastering', 'pad'] -%}mix
-  {%- elif f in ['groove', 'bass', 'drums', 'perc', 'timing', 'rhythm', 'tempo'] -%}rhythm
-  {%- elif f in ['strings', 'horns', 'guitar', 'piano', 'keys', 'synth', 'woodwinds'] -%}instrument
-  {%- elif f in ['generative', 'ambient', 'texture', 'enhancement', 'feature'] -%}feature
-  {%- elif f in ['documentation', 'question', 'good first issue', 'help wanted', 'in progress'] -%}meta
+  {%- if f in ['bug', 'error', 'wontfix', 'blocked', 'crash'] -%}bug
+  {%- elif f in ['enhancement', 'feature', 'improvement'] -%}feature
+  {%- elif f in ['documentation', 'docs', 'question', 'good first issue', 'help wanted', 'in progress'] -%}meta
+  {%- elif f in ['performance', 'optimization', 'refactor'] -%}refactor
   {%- else -%}other
   {%- endif -%}
 {%- else -%}other{%- endif -%}
-{%- endmacro -%}
-
-{# Extract musical context refs from body text (track:x, section:x, beats:x, bar:x) #}
-{%- macro musical_refs(body) -%}
-{%- if body -%}
-  {%- for word in body.split()[:60] -%}
-    {%- if ':' in word and '://' not in word -%}
-      {%- set parts = word.split(':') -%}
-      {%- if parts | length == 2 -%}
-        {%- set rt = parts[0].lower().rstrip('.,;!?)') -%}
-        {%- set rv = parts[1].rstrip('.,;!?)') -%}
-        {%- if rt in ['track', 'section', 'beats', 'bar', 'bars', 'instrument'] and rv -%}
-<span class="issue-musical-chip issue-musical-chip-{{ rt }}">{{ rt }}:{{ rv }}</span>
-        {%- endif -%}
-      {%- endif -%}
-    {%- endif -%}
-  {%- endfor -%}
-{%- endif -%}
 {%- endmacro -%}
 
 {# First meaningful non-markdown line from body #}
@@ -105,10 +83,6 @@
         <p class="issue-body-preview">{{ preview }}</p>
         {%- endif -%}
 
-        {# Musical context refs #}
-        {%- if refs_html -%}
-        <div class="issue-musical-refs">{{ refs_html }}</div>
-        {%- endif -%}
 
         {# Labels #}
         {%- if issue.labels -%}

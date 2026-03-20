@@ -525,9 +525,16 @@ function dispatchPageModule(data: Record<string, unknown>): void {
 
 // Run on initial hard load
 document.addEventListener('DOMContentLoaded', initPageGlobals);
-// Re-run after every HTMX navigation — htmx:afterSettle fires after scripts
-// in the swapped content have run, so page modules and DOM data are ready.
-document.addEventListener('htmx:afterSettle', initPageGlobals);
+
+// ── HTMX boost navigation: re-init page globals, no opacity manipulation ──
+// FOUC is only a risk on the very first page load (handled by the inline
+// CSS + <script> in base.html).  HTMX swaps reuse the already-loaded CSS,
+// so removing css-ready here would only cause a white flash (the browser
+// backdrop shines through the opacity:0 html element).
+document.addEventListener('htmx:afterSettle', () => {
+  document.documentElement.classList.add('css-ready');
+  initPageGlobals();
+});
 
 window.getToken = getToken;
 window.setToken = setToken;

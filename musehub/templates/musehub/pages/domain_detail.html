@@ -1,0 +1,296 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}{{ domain.display_name }} · Muse Domain{% endblock %}
+
+{% block breadcrumb %}
+<a href="/domains">Domains</a>
+<span class="breadcrumb-sep">/</span>
+<span class="breadcrumb-current">{{ domain.scoped_id }}</span>
+{% endblock %}
+
+{% block page_json %}{"page": "domain-detail", "domainSlug": {{ domain.slug | tojson }}, "domainId": {{ domain.domain_id | tojson }}}{% endblock %}
+
+{% block content %}
+<div class="dd-page" data-domain-slug="{{ domain.slug }}">
+
+  {# ── Hero banner ────────────────────────────────────────────────────── #}
+  <div class="dd-hero">
+    <div class="dd-hero__bg"></div>
+    <div class="dd-hero__content">
+      <div class="dd-hero__eyebrow">
+        <span class="domain-badge">{{ domain.scoped_id }}</span>
+        {% if domain.is_verified %}
+        <span class="dd-verified-badge">✓ Verified</span>
+        {% endif %}
+        {% if domain.is_deprecated %}
+        <span class="dd-deprecated-badge">⚠ Deprecated</span>
+        {% endif %}
+        <span class="dd-version">v{{ domain.version }}</span>
+      </div>
+      <h1 class="dd-hero__title">
+        <span class="dd-hero__icon">{% if domain.slug == 'midi' %}🎵{% elif domain.slug == 'code' %}⬡{% else %}◎{% endif %}</span>
+        {{ domain.display_name }}
+        <span class="dd-hero__subtitle">Domain</span>
+      </h1>
+      <p class="dd-hero__desc">{{ domain.description }}</p>
+      <div class="dd-hero__actions">
+        <button class="btn btn-primary dd-install-btn" id="dd-install-btn">
+          ↓ Install Domain
+        </button>
+        <a href="#dd-repos" class="btn btn-secondary">Browse Repos</a>
+        <a href="?format=json" class="btn btn-ghost" target="_blank">
+          JSON API ↗
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# ── Stats ribbon ───────────────────────────────────────────────────── #}
+  <div class="dd-stats-ribbon">
+    <div class="dd-stat-pill">
+      <span class="dd-stat-pill__value">{{ domain.dimensions | length }}</span>
+      <span class="dd-stat-pill__label">Dimensions</span>
+    </div>
+    <div class="dd-stat-pill">
+      <span class="dd-stat-pill__value">{{ domain.install_count }}</span>
+      <span class="dd-stat-pill__label">Repositories</span>
+    </div>
+    <div class="dd-stat-pill">
+      <span class="dd-stat-pill__value">{{ domain.viewer_type | replace("_", " ") | title }}</span>
+      <span class="dd-stat-pill__label">Viewer</span>
+    </div>
+    <div class="dd-stat-pill">
+      <span class="dd-stat-pill__value">{{ domain.merge_semantics | upper if domain.merge_semantics else "—" }}</span>
+      <span class="dd-stat-pill__label">Merge</span>
+    </div>
+    {% if domain.artifact_types %}
+    <div class="dd-stat-pill">
+      <span class="dd-stat-pill__value">{{ domain.artifact_types | length }}</span>
+      <span class="dd-stat-pill__label">Artifact Types</span>
+    </div>
+    {% endif %}
+    {% if domain.supported_commands %}
+    <div class="dd-stat-pill">
+      <span class="dd-stat-pill__value">{{ domain.supported_commands | length }}</span>
+      <span class="dd-stat-pill__label">CLI Commands</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Two-column body ────────────────────────────────────────────────── #}
+  <div class="dd-body">
+
+    {# Main content column #}
+    <div class="dd-main">
+
+      {# ── Dimensions ────────────────────────────────────────────────── #}
+      {% if domain.dimensions %}
+      <section class="dd-section">
+        <div class="dd-section__hd">
+          <h2 class="dd-section__title">
+            <span class="dd-section__icon">⊞</span>
+            Dimensions
+            <span class="dd-section__count">{{ domain.dimensions | length }}</span>
+          </h2>
+          <p class="dd-section__desc">
+            Each dimension is independently mergeable — two agents editing different
+            dimensions of the same snapshot never produce a conflict.
+          </p>
+        </div>
+        <div class="dd-dim-grid">
+          {% for dim in domain.dimensions %}
+          <div class="dd-dim-card dd-dim-color-{{ loop.index0 % 8 }}">
+            <div class="dd-dim-card__header">
+              <span class="dd-dim-card__index">#{{ loop.index0 }}</span>
+              <span class="dd-dim-card__name">{{ dim.name }}</span>
+              {% if dim.unit %}<span class="dd-dim-card__unit">{{ dim.unit }}</span>{% endif %}
+            </div>
+            {% if dim.description %}
+            <p class="dd-dim-card__desc">{{ dim.description }}</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {# ── CLI Commands ──────────────────────────────────────────────── #}
+      {% if domain.supported_commands %}
+      <section class="dd-section">
+        <h2 class="dd-section__title"><span class="dd-section__icon">⌘</span> CLI Commands</h2>
+        <div class="dd-terminal">
+          <div class="dd-terminal__chrome">
+            <span class="dd-terminal__dot dd-terminal__dot--red"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--yellow"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--green"></span>
+            <span class="dd-terminal__title">muse</span>
+            <button class="dd-copy-btn" data-copy-id="cli-commands">Copy all</button>
+          </div>
+          <pre class="dd-terminal__body" id="cli-commands">{% for cmd in domain.supported_commands %}$ {{ cmd }}{% if not loop.last %}
+{% endif %}{% endfor %}</pre>
+        </div>
+      </section>
+      {% endif %}
+
+      {# ── MCP / Agent integration ────────────────────────────────────── #}
+      <section class="dd-section">
+        <div class="dd-section__hd">
+          <h2 class="dd-section__title"><span class="dd-section__icon">⚡</span> Agent &amp; MCP Integration</h2>
+          <p class="dd-section__desc">Agents can discover and use this domain through the MuseHub MCP server — no configuration needed.</p>
+        </div>
+        <div class="dd-terminal">
+          <div class="dd-terminal__chrome">
+            <span class="dd-terminal__dot dd-terminal__dot--red"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--yellow"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--green"></span>
+            <span class="dd-terminal__title">MCP</span>
+            <button class="dd-copy-btn" data-copy-id="mcp-snippet">Copy</button>
+          </div>
+          <pre class="dd-terminal__body" id="mcp-snippet">// MCP tool — preferred for AI agents
+musehub_get_domain(scoped_id="{{ domain.scoped_id }}")
+
+// REST API — for programmatic access
+GET /api/v1/domains/{{ domain.scoped_id }}
+GET /api/v1/domains/{{ domain.scoped_id }}/repos
+
+// Human URL (also serves JSON via ?format=json or Accept header)
+GET /domains/{{ domain.scoped_id }}?format=json
+
+// MCP resource URI
+muse://domains/{{ domain.author_slug }}/{{ domain.slug }}
+
+// Create a repo using this domain
+musehub_create_repo(
+  name="my-project",
+  owner="myuser",
+  domain="{{ domain.scoped_id }}"
+)</pre>
+        </div>
+        <div class="dd-mcp-callout">
+          <span class="dd-mcp-callout__icon">🤖</span>
+          <div>
+            <strong>Agents-first design.</strong>
+            Every domain exposes a full MCP resource so AI agents can discover capabilities,
+            read manifests, and create repos without any human configuration.
+          </div>
+        </div>
+      </section>
+
+      {# ── Repos using this domain ────────────────────────────────────── #}
+      <section class="dd-section" id="dd-repos">
+        <div class="dd-section__hd">
+          <h2 class="dd-section__title">
+            <span class="dd-section__icon">📦</span>
+            Public Repositories
+            <span class="dd-section__count">{{ repos_total }}</span>
+          </h2>
+        </div>
+        {% if repos %}
+        <div class="dd-repo-grid">
+          {% for repo in repos %}
+          <a class="dd-repo-card" href="/{{ repo.owner }}/{{ repo.slug }}">
+            <div class="dd-repo-card__header">
+              <span class="dd-repo-card__name">{{ repo.owner }}/{{ repo.slug }}</span>
+              <span class="dd-repo-card__arrow">→</span>
+            </div>
+            {% if repo.description %}
+            <p class="dd-repo-card__desc">{{ repo.description | truncate(100) }}</p>
+            {% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% if repos_total > repos | length %}
+        <div class="dd-see-all">
+          <a class="btn btn-secondary" href="/explore?domain={{ domain.scoped_id }}">
+            See all {{ repos_total }} repositories →
+          </a>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="dd-repos-empty">
+          <div class="dd-repos-empty__icon">📦</div>
+          <p>No public repositories using this domain yet.</p>
+          <a href="/new" class="btn btn-primary">Create the first repository →</a>
+        </div>
+        {% endif %}
+      </section>
+
+    </div>{# /dd-main #}
+
+    {# Sidebar #}
+    <aside class="dd-sidebar">
+
+      {# Install card #}
+      <div class="dd-sidebar-card dd-sidebar-card--install">
+        <h3 class="dd-sidebar-card__title">Install</h3>
+        <p class="dd-sidebar-card__sub">Add this domain plugin to your Muse workspace.</p>
+        <div class="dd-terminal dd-terminal--compact">
+          <div class="dd-terminal__chrome">
+            <span class="dd-terminal__dot dd-terminal__dot--red"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--yellow"></span>
+            <span class="dd-terminal__dot dd-terminal__dot--green"></span>
+            <button class="dd-copy-btn" data-copy-id="install-cmd">Copy</button>
+          </div>
+          <pre class="dd-terminal__body" id="install-cmd">muse domain install {{ domain.scoped_id }}</pre>
+        </div>
+      </div>
+
+      {# Artifact types #}
+      {% if domain.artifact_types %}
+      <div class="dd-sidebar-card">
+        <h3 class="dd-sidebar-card__title">Artifact Types</h3>
+        <div class="dd-artifact-list">
+          {% for mime in domain.artifact_types %}
+          <span class="dd-artifact-badge">{{ mime }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Manifest hash #}
+      {% if domain.manifest_hash %}
+      <div class="dd-sidebar-card">
+        <h3 class="dd-sidebar-card__title">Manifest Hash</h3>
+        <p class="dd-sidebar-card__sub">Pin to this exact capability definition.</p>
+        <div class="dd-hash-block">
+          <code class="dd-hash-code" id="manifest-hash">{{ domain.manifest_hash }}</code>
+          <button class="dd-hash-copy" data-copy-id="manifest-hash" title="Copy hash">⧉</button>
+        </div>
+      </div>
+      {% endif %}
+
+      {# MCP URI #}
+      <div class="dd-sidebar-card">
+        <h3 class="dd-sidebar-card__title">MCP Resource URI</h3>
+        <div class="dd-hash-block">
+          <code class="dd-hash-code" id="mcp-uri">muse://domains/{{ domain.scoped_id }}</code>
+          <button class="dd-hash-copy" data-copy-id="mcp-uri" title="Copy URI">⧉</button>
+        </div>
+      </div>
+
+      {# Metadata #}
+      <div class="dd-sidebar-card">
+        <h3 class="dd-sidebar-card__title">Details</h3>
+        <dl class="dd-meta-list">
+          <dt>Author</dt>
+          <dd>@{{ domain.author_slug }}</dd>
+          <dt>Version</dt>
+          <dd>{{ domain.version }}</dd>
+          <dt>Viewer</dt>
+          <dd>{{ domain.viewer_type | replace("_", " ") | title }}</dd>
+          {% if domain.merge_semantics %}
+          <dt>Merge</dt>
+          <dd>{{ domain.merge_semantics | upper }}</dd>
+          {% endif %}
+          {% if domain.created_at %}
+          <dt>Registered</dt>
+          <dd>{{ domain.created_at[:10] }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+
+    </aside>
+  </div>{# /dd-body #}
+
+</div>{# /dd-page #}
+{% endblock %}

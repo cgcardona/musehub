@@ -1,16 +1,18 @@
 /**
- * graph.ts — Git DAG graph renderer for the commits graph page.
+ * graph.ts — High-performance Canvas2D DAG renderer.
  *
- * Config is read from window.__graphCfg (set by the page_data block).
- * Registered as: window.MusePages['graph']
+ * Architecture:
+ *  - Canvas2D renders graph (edges, nodes, labels) with device-pixel-ratio
+ *    support for crisp retina output.
+ *  - All pan/zoom changes are batched through requestAnimationFrame.
+ *  - Hit-testing is coordinate-based (no per-node DOM elements).
+ *  - A minimap canvas overlay provides always-on navigation context.
+ *  - Search highlights matching commits while dimming the rest.
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface GraphCfg {
-  repoId:  string;
-  baseUrl: string;
-}
+interface GraphCfg { repoId: string; baseUrl: string; }
 
 interface DagNode {
   commitId:     string;
@@ -20,30 +22,13 @@ interface DagNode {
   branch:       string;
   parentIds?:   string[];
   branchLabels?: string[];
+  tagLabels?:   string[];
   isHead?:      boolean;
 }
-
-interface DagEdge {
-  source: string;
-  target: string;
-}
-
-interface DagData {
-  nodes:        DagNode[];
-  edges:        DagEdge[];
-  headCommitId: string;
-}
-
-interface SessionEntry {
-  sessionId: string;
-  intent?:   string;
-  startedAt: string;
-  commits?:  string[];
-}
-
-interface SessionMap {
-  [commitId: string]: { intent: string; sessionId: string };
-}
+interface DagEdge  { source: string; target: string; }
+interface DagData  { nodes: DagNode[]; edges: DagEdge[]; headCommitId: string; }
+interface SessionEntry { sessionId: string; intent?: string; startedAt: string; commits?: string[]; }
+interface SessionMap   { [cid: string]: { intent: string; sessionId: string }; }
 
 declare global {
   interface Window {
@@ -57,143 +42,664 @@ declare global {
 
 // ── Design constants ──────────────────────────────────────────────────────────
 
-const BRANCH_PALETTE = [
+const PALETTE = [
   '#58a6ff','#3fb950','#f0883e','#bc8cff',
   '#ff7b72','#79c0ff','#56d364','#ffa657',
   '#d2a8ff','#ff9492','#2dd4bf','#fbbf24',
 ];
-const AUTHOR_PALETTE = [
-  '#58a6ff','#3fb950','#bc8cff','#fbbf24',
-  '#f0883e','#2dd4bf','#ff9492','#a78bfa',
-];
-const COMMIT_TYPE_COLORS: Record<string, string> = {
-  feat: '#3fb950', fix: '#f85149', refactor: '#bc8cff',
-  init: '#58a6ff', docs: '#8b949e', style:   '#fbbf24',
-  test: '#2dd4bf', chore: '#484f58', perf:   '#f0883e',
+const TYPE_COLORS: Record<string, string> = {
+  feat:'#3fb950', fix:'#f85149', refactor:'#bc8cff',
+  init:'#58a6ff', docs:'#6e96c9', style:'#fbbf24',
+  test:'#2dd4bf', chore:'#6e7681', perf:'#f0883e',
 };
-const SESSION_COLOR = '#2dd4bf';
 const HEAD_COLOR    = '#f0883e';
+const MERGE_COLOR   = '#bc8cff';
+const SESSION_COLOR = '#2dd4bf';
+const DIM_ALPHA     = 0.18;   // dimmed node/edge opacity when search active
 
-const NODE_R     = 11;
-const ROW_H      = 44;
-const COL_W      = 28;
-const PAD_L      = 24;
-const PAD_T      = 20;
-const MSG_OFFSET = 16;
+// Layout constants
+const ROW_H   = 44;
+const LANE_W  = 24;
+const NODE_R  = 9;
+const PAD_L   = 20;
+const PAD_T   = 28;
+const LBL_GAP = 20;   // gap between rightmost lane and first text column
 
-// ── Module state (for zoom/pan controls) ─────────────────────────────────────
-
-let _scale = 1;
-let _tx    = 0;
-let _ty    = 0;
-let _dagG: SVGGElement | null = null;
+// Minimap
+const MM_W  = 148;
+const MM_H  = 100;
+const MM_PAD = 10;
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
-const _branchColors: Record<string, string> = {};
-const _authorColors: Record<string, string> = {};
-
-function colorFor(name: string, palette: string[], cache: Record<string, string>): string {
-  if (cache[name]) return cache[name];
+const _colorCache: Record<string, string> = {};
+function colorFor(name: string): string {
+  if (_colorCache[name]) return _colorCache[name];
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
-  const c = palette[Math.abs(h) % palette.length];
-  cache[name] = c;
-  return c;
+  return (_colorCache[name] = PALETTE[Math.abs(h) % PALETTE.length]);
 }
-function branchColor(b: string): string { return colorFor(b, BRANCH_PALETTE, _branchColors); }
-function authorColor(a: string): string { return colorFor(a, AUTHOR_PALETTE, _authorColors); }
 
 function commitType(msg: string): string | null {
-  const m = msg.match(/^(\w+)[\(!\:]/);
+  const m = msg.match(/^(\w+)[\(!:]/);
   return m ? m[1].toLowerCase() : null;
 }
-function typeColor(type: string): string | null { return COMMIT_TYPE_COLORS[type] || null; }
+
+function timeAgo(ts: string): string {
+  const s = (Date.now() - new Date(ts).getTime()) / 1000;
+  if (s < 60)    return `${Math.floor(s)}s ago`;
+  if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-interface LayoutResult {
-  pos:       Record<string, { col: number; row: number }>;
-  maxCol:    number;
-  branchCol: Record<string, number>;
+interface Layout {
+  rows:     DagNode[];          // display order: index 0 = top = NEWEST
+  pos:      Record<string, { lane: number; row: number }>;
+  laneCount: number;
+  laneColors: Record<string, string>;  // branch → color
+  labelX:   number;
 }
 
-function layoutNodes(nodes: DagNode[]): LayoutResult {
-  const branchCol: Record<string, number> = {};
-  let nextCol = 0;
-  nodes.forEach(n => {
-    if (branchCol[n.branch] === undefined) branchCol[n.branch] = nextCol++;
-  });
-  const pos: Record<string, { col: number; row: number }> = {};
-  nodes.forEach((n, row) => { pos[n.commitId] = { col: branchCol[n.branch], row }; });
-  return { pos, maxCol: nextCol, branchCol };
-}
+function buildLayout(nodes: DagNode[], _edges: DagEdge[]): Layout {
+  // Display newest-first: reverse the array (API returns oldest-first)
+  const rows = [...nodes].reverse();
 
-// ── Transform helper ──────────────────────────────────────────────────────────
+  // Assign lanes by branch name, preserving first-seen order
+  const laneMap: Record<string, number> = {};
+  const laneColors: Record<string, string> = {};
+  let nextLane = 0;
 
-function applyXform(): void {
-  if (_dagG) _dagG.setAttribute('transform', `translate(${_tx},${_ty}) scale(${_scale})`);
-}
-
-// ── SVG renderer ──────────────────────────────────────────────────────────────
-
-function renderGraph(data: DagData, sessionMap: SessionMap, baseUrl: string): void {
-  const { nodes, edges, headCommitId } = data;
-  const loading = document.getElementById('dag-loading');
-  const svgEl   = document.getElementById('dag-svg') as SVGSVGElement | null;
-  if (loading) loading.style.display = 'none';
-
-  if (!nodes.length || !svgEl) {
-    if (svgEl) svgEl.style.display = 'none';
-    const vp = document.getElementById('dag-viewport');
-    if (vp) vp.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">No commits yet.</div>';
-    return;
+  // Give main/master/dev priority lane 0
+  const PRIORITY = ['main', 'master', 'dev', 'develop', 'HEAD'];
+  for (const n of rows) {
+    if (PRIORITY.includes(n.branch) && laneMap[n.branch] === undefined) {
+      laneColors[n.branch] = colorFor(n.branch);
+      laneMap[n.branch] = nextLane++;
+    }
+  }
+  for (const n of rows) {
+    if (laneMap[n.branch] === undefined) {
+      laneColors[n.branch] = colorFor(n.branch);
+      laneMap[n.branch] = nextLane++;
+    }
   }
 
-  const { pos, maxCol, branchCol } = layoutNodes(nodes);
-  const nodeMap: Record<string, DagNode> = {};
-  nodes.forEach(n => { nodeMap[n.commitId] = n; });
+  const pos: Record<string, { lane: number; row: number }> = {};
+  rows.forEach((n, row) => {
+    pos[n.commitId] = { lane: laneMap[n.branch] ?? 0, row };
+  });
 
+  const laneCount = Math.max(1, nextLane);
+  const labelX    = PAD_L + laneCount * LANE_W + LBL_GAP;
+  return { rows, pos, laneCount, laneColors, labelX };
+}
+
+// ── Canvas state ──────────────────────────────────────────────────────────────
+
+let canvas!:   HTMLCanvasElement;
+let mmCanvas!: HTMLCanvasElement;
+let ctx!:      CanvasRenderingContext2D;
+let mmCtx!:    CanvasRenderingContext2D;
+let dpr = 1;
+
+let _layout!:  Layout;
+let _nodeMap:  Record<string, DagNode> = {};
+let _sessMap:  SessionMap = {};
+let _headId = '';
+let _baseUrl = '';
+
+// View state
+let tx = 0, ty = 0, scale = 1;
+let hoverId: string | null = null;
+let searchQuery = '';
+let matchSet: Set<string> | null = null;
+let pinned: string | null = null;   // pinned tooltip on click
+
+let rafId: number | null = null;
+let dirty = false;
+
+function scheduleRedraw(): void {
+  dirty = true;
+  if (rafId !== null) return;
+  rafId = requestAnimationFrame(() => {
+    rafId = null;
+    if (dirty) { dirty = false; draw(); }
+  });
+}
+
+// ── Canvas setup ──────────────────────────────────────────────────────────────
+
+function resizeCanvas(): void {
+  const vp    = canvas.parentElement!;
+  const W     = vp.clientWidth;
+  const H     = vp.clientHeight;
+  dpr         = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const mmEl = document.getElementById('dag-minimap') as HTMLCanvasElement | null;
+  if (mmEl) {
+    mmEl.width  = MM_W * dpr;
+    mmEl.height = MM_H * dpr;
+    mmEl.style.width  = MM_W + 'px';
+    mmEl.style.height = MM_H + 'px';
+    mmCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
+
+// ── Coordinate helpers ────────────────────────────────────────────────────────
+
+function nodeX(lane: number): number { return PAD_L + lane * LANE_W + LANE_W / 2; }
+function nodeY(row: number):  number { return PAD_T + row * ROW_H; }
+function worldToScreen(wx: number, wy: number): [number, number] {
+  return [wx * scale + tx, wy * scale + ty];
+}
+function screenToWorld(sx: number, sy: number): [number, number] {
+  return [(sx - tx) / scale, (sy - ty) / scale];
+}
+
+// ── Hit testing ───────────────────────────────────────────────────────────────
+
+function hitTest(sx: number, sy: number): string | null {
+  const [wx, wy] = screenToWorld(sx, sy);
+  const vpH = canvas.clientHeight;
+  const visibleRows = Math.ceil(vpH / (ROW_H * scale)) + 2;
+  const startRow    = Math.max(0, Math.floor((0 - ty) / (ROW_H * scale)) - 1);
+  const endRow      = Math.min(_layout.rows.length, startRow + visibleRows);
+
+  for (let i = startRow; i < endRow; i++) {
+    const n  = _layout.rows[i];
+    const p  = _layout.pos[n.commitId];
+    if (!p) continue;
+    const cx = nodeX(p.lane);
+    const cy = nodeY(p.row);
+    const dx = wx - cx, dy = wy - cy;
+    // Node circle hit
+    if (dx * dx + dy * dy <= (NODE_R + 6) * (NODE_R + 6)) return n.commitId;
+    // Label row hit (full width, ±ROW_H/2 vertically)
+    if (Math.abs(dy) < ROW_H / 2 && wx >= _layout.labelX - 8) return n.commitId;
+  }
+  return null;
+}
+
+// ── Drawing primitives ────────────────────────────────────────────────────────
+
+function drawEdges(): void {
+  const vpW = canvas.clientWidth;
+  const vpH = canvas.clientHeight;
+  const [wLeft, wTop]    = screenToWorld(0, 0);
+  const [wRight, wBottom] = screenToWorld(vpW, vpH);
+
+  // Build lookup: commitId → row data
+  const rowIdx: Record<string, number> = {};
+  _layout.rows.forEach((n, i) => { rowIdx[n.commitId] = i; });
+
+  // We iterate rows and draw the edge from each row to its parents
+  for (const n of _layout.rows) {
+    const p = _layout.pos[n.commitId];
+    if (!p) continue;
+    const x1 = nodeX(p.lane);
+    const y1 = nodeY(p.row);
+
+    // Quick cull: skip if node is completely off-screen
+    if (y1 * scale + ty + 60 < 0) continue;
+    if (y1 * scale + ty - 60 > vpH) continue;
+
+    const bColor = _layout.laneColors[n.branch] ?? '#8b949e';
+    const isSearchActive = matchSet !== null;
+    const isMatch = !matchSet || matchSet.has(n.commitId);
+
+    for (const pid of (n.parentIds ?? [])) {
+      const pNode = _nodeMap[pid];
+      if (!pNode) continue;
+      const pp  = _layout.pos[pid];
+      if (!pp) continue;
+
+      const x2 = nodeX(pp.lane);
+      const y2 = nodeY(pp.row);
+
+      // Skip if edge is entirely off-screen
+      const minY = Math.min(y1, y2) * scale + ty;
+      const maxY = Math.max(y1, y2) * scale + ty;
+      if (maxY < -10 || minY > vpH + 10) continue;
+
+      const pMatch  = !matchSet || matchSet.has(pid);
+      const alpha   = isSearchActive && !isMatch && !pMatch ? DIM_ALPHA : (isMatch ? 0.72 : 0.72);
+      const edgeCol = isMatch ? bColor : (isSearchActive ? hexToRgba(bColor, DIM_ALPHA) : bColor);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = edgeCol;
+      ctx.lineWidth   = 2 / scale;
+      ctx.beginPath();
+
+      if (x1 === x2) {
+        // Same lane: straight vertical line
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+      } else {
+        // Cross-lane: L-shaped cubic bezier
+        const midY = (y1 + y2) / 2;
+        ctx.moveTo(x1, y1);
+        ctx.bezierCurveTo(x1, midY, x2, midY, x2, y2);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+function drawNode(n: DagNode, isHover: boolean): void {
+  const p = _layout.pos[n.commitId];
+  if (!p) return;
+  const cx  = nodeX(p.lane);
+  const cy  = nodeY(p.row);
+  const bc  = _layout.laneColors[n.branch] ?? '#8b949e';
+  const isHead  = n.commitId === _headId || n.isHead;
+  const isMerge = (n.parentIds ?? []).length > 1;
+  const inSess  = Boolean(_sessMap[n.commitId]);
+  const isSearchActive = matchSet !== null;
+  const isMatch = !matchSet || matchSet.has(n.commitId);
+  const alpha   = isSearchActive && !isMatch ? DIM_ALPHA : 1;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Glow rings
+  if (isHead) {
+    ctx.shadowBlur  = 14 / scale;
+    ctx.shadowColor = HEAD_COLOR;
+    ctx.strokeStyle = HEAD_COLOR;
+    ctx.lineWidth   = 2 / scale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, NODE_R + 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  if (inSess) {
+    ctx.strokeStyle = SESSION_COLOR;
+    ctx.lineWidth   = 1.5 / scale;
+    ctx.setLineDash([3 / scale, 2 / scale]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, NODE_R + 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Hover ring
+  if (isHover) {
+    ctx.strokeStyle = bc;
+    ctx.lineWidth   = 2 / scale;
+    ctx.globalAlpha = alpha * 0.4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, NODE_R + 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = alpha;
+  }
+
+  // Node body
+  if (isMerge) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.PI / 4);
+    const d = NODE_R * 0.9;
+    ctx.fillStyle   = MERGE_COLOR;
+    ctx.strokeStyle = '#0d1117';
+    ctx.lineWidth   = 1.5 / scale;
+    ctx.beginPath();
+    ctx.roundRect(-d, -d, d * 2, d * 2, 2 / scale);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    ctx.fillStyle   = bc;
+    ctx.strokeStyle = '#0d1117';
+    ctx.lineWidth   = 1.5 / scale;
+    ctx.shadowBlur  = isHover ? 10 / scale : 0;
+    ctx.shadowColor = bc;
+    ctx.beginPath();
+    ctx.arc(cx, cy, NODE_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Author initial
+  const initial = (n.author || '?')[0].toUpperCase();
+  ctx.fillStyle  = '#0d1117';
+  ctx.font       = `bold ${Math.max(8, 10 / scale)}px system-ui`;
+  ctx.textAlign  = 'center';
+  ctx.textBaseline = 'middle';
+  // Only draw initial if it's readable (scale > 0.4)
+  if (scale > 0.4) {
+    ctx.font = 'bold 10px system-ui';
+    ctx.fillText(initial, cx, cy + 0.5);
+  }
+
+  ctx.restore();
+}
+
+function drawLabel(n: DagNode, isHover: boolean): void {
+  const p = _layout.pos[n.commitId];
+  if (!p) return;
+  const cy    = nodeY(p.row);
+  const isSearchActive = matchSet !== null;
+  const isMatch = !matchSet || matchSet.has(n.commitId);
+  const alpha   = isSearchActive && !isMatch ? DIM_ALPHA : 1;
+
+  // Skip labels when zoomed too far out
+  if (scale < 0.28) return;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  const sha7    = n.commitId.substring(0, 7);
+  const ctype   = commitType(n.message);
+  const typeCol = ctype ? (TYPE_COLORS[ctype] ?? null) : null;
+  const bodyMsg = ctype ? n.message.replace(/^\w+[^:]*:\s*/, '') : n.message;
+  const isHead  = n.commitId === _headId || n.isHead;
+
+  let x = _layout.labelX;
+
+  // SHA badge
+  ctx.font         = '11px JetBrains Mono, Menlo, monospace';
+  ctx.fillStyle    = isHover ? '#79c0ff' : '#58a6ff';
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(sha7, x, cy);
+  x += ctx.measureText(sha7).width + 10;
+
+  // Commit type pill
+  if (typeCol && ctype) {
+    const pill = ctype;
+    ctx.font = 'bold 10px JetBrains Mono, Menlo, monospace';
+    const pw = ctx.measureText(pill).width + 10;
+    ctx.fillStyle = hexToRgba(typeCol, 0.18);
+    ctx.beginPath();
+    ctx.roundRect(x, cy - 8, pw, 16, 4);
+    ctx.fill();
+    ctx.fillStyle = typeCol;
+    ctx.fillText(pill, x + 5, cy + 0.5);
+    x += pw + 8;
+    ctx.fillStyle = '#6e7681';
+    ctx.font      = '13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(': ', x, cy);
+    x += ctx.measureText(': ').width;
+  }
+
+  // Message
+  const vpW     = canvas.clientWidth;
+  const maxW    = vpW - x * scale - tx - 200;
+  const maxChars = Math.max(10, Math.floor(maxW / (scale * 7.5)));
+  const display  = bodyMsg.length > maxChars ? bodyMsg.substring(0, maxChars - 1) + '…' : bodyMsg;
+  ctx.font      = `${isHover ? 'bold ' : ''}13px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = isHover ? '#ffffff' : '#c9d1d9';
+  ctx.fillText(display, x, cy);
+  x += ctx.measureText(display).width + 14;
+
+  // Branch labels
+  for (const lbl of (n.branchLabels ?? [])) {
+    const lc  = _layout.laneColors[lbl] ?? colorFor(lbl);
+    const lw  = ctx.measureText(lbl).width + 14;
+    ctx.font = 'bold 10px JetBrains Mono, Menlo, monospace';
+    ctx.fillStyle = hexToRgba(lc, 0.2);
+    ctx.beginPath();
+    ctx.roundRect(x, cy - 9, ctx.measureText(lbl).width + 14, 18, 5);
+    ctx.fill();
+    ctx.fillStyle = lc;
+    ctx.fillText(lbl, x + 7, cy + 0.5);
+    x += lw + 5;
+  }
+
+  // HEAD badge
+  if (isHead) {
+    ctx.font = 'bold 10px JetBrains Mono, Menlo, monospace';
+    const hw = ctx.measureText('HEAD').width + 14;
+    ctx.fillStyle = hexToRgba(HEAD_COLOR, 0.25);
+    ctx.beginPath();
+    ctx.roundRect(x, cy - 9, hw, 18, 5);
+    ctx.fill();
+    ctx.fillStyle = HEAD_COLOR;
+    ctx.fillText('HEAD', x + 7, cy + 0.5);
+    x += hw + 5;
+  }
+
+  // Time (right-aligned, dimmer)
+  if (scale > 0.5 && n.timestamp) {
+    const ago = timeAgo(n.timestamp);
+    ctx.font      = '11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#484f58';
+    ctx.textAlign = 'right';
+    ctx.fillText(ago, (vpW - 8) / scale - tx / scale, cy);
+  }
+
+  ctx.restore();
+}
+
+// ── Minimap ───────────────────────────────────────────────────────────────────
+
+function drawMinimap(): void {
+  if (!mmCtx) return;
+  const MW = MM_W, MH = MM_H;
+  mmCtx.clearRect(0, 0, MW, MH);
+
+  // Background
+  mmCtx.fillStyle = 'rgba(22,27,34,0.92)';
+  mmCtx.fillRect(0, 0, MW, MH);
+  mmCtx.strokeStyle = 'rgba(48,54,61,0.8)';
+  mmCtx.lineWidth   = 1;
+  mmCtx.strokeRect(0, 0, MW, MH);
+
+  const totalH  = PAD_T * 2 + _layout.rows.length * ROW_H;
+  const totalW  = _layout.labelX + 400;
+  const scaleX  = (MW - 4) / totalW;
+  const scaleY  = (MH - 4) / totalH;
+
+  // Draw miniature edges (simplified)
+  mmCtx.strokeStyle = 'rgba(88,166,255,0.25)';
+  mmCtx.lineWidth   = 0.5;
+  for (const n of _layout.rows) {
+    const p = _layout.pos[n.commitId];
+    if (!p) continue;
+    const cx = (nodeX(p.lane) * scaleX + 2);
+    const cy = (nodeY(p.row)  * scaleY + 2);
+    for (const pid of (n.parentIds ?? [])) {
+      const pp = _layout.pos[pid];
+      if (!pp) continue;
+      mmCtx.beginPath();
+      mmCtx.moveTo(cx, cy);
+      mmCtx.lineTo(nodeX(pp.lane) * scaleX + 2, nodeY(pp.row) * scaleY + 2);
+      mmCtx.stroke();
+    }
+  }
+
+  // Draw miniature nodes
+  for (const n of _layout.rows) {
+    const p = _layout.pos[n.commitId];
+    if (!p) continue;
+    const cx = nodeX(p.lane) * scaleX + 2;
+    const cy = nodeY(p.row)  * scaleY + 2;
+    const isHead = n.commitId === _headId;
+    mmCtx.fillStyle = isHead ? HEAD_COLOR : (colorFor(n.branch) + '99');
+    mmCtx.beginPath();
+    mmCtx.arc(cx, cy, isHead ? 3 : 1.5, 0, Math.PI * 2);
+    mmCtx.fill();
+  }
+
+  // Viewport rectangle
+  const vpW = canvas.clientWidth;
+  const vpH = canvas.clientHeight;
+  const rx  = (-tx / scale) * scaleX + 2;
+  const ry  = (-ty / scale) * scaleY + 2;
+  const rw  = (vpW / scale) * scaleX;
+  const rh  = (vpH / scale) * scaleY;
+  mmCtx.strokeStyle = 'rgba(88,166,255,0.6)';
+  mmCtx.lineWidth   = 1.5;
+  mmCtx.fillStyle   = 'rgba(88,166,255,0.06)';
+  mmCtx.fillRect(rx, ry, rw, rh);
+  mmCtx.strokeRect(rx, ry, rw, rh);
+}
+
+// ── Main draw ─────────────────────────────────────────────────────────────────
+
+function draw(): void {
+  const vpW = canvas.clientWidth;
+  const vpH = canvas.clientHeight;
+  ctx.clearRect(0, 0, vpW, vpH);
+
+  // Compute visible row range for culling
+  const [, wTop]    = screenToWorld(0, 0);
+  const [, wBottom] = screenToWorld(0, vpH);
+
+  ctx.save();
+  ctx.translate(tx, ty);
+  ctx.scale(scale, scale);
+
+  drawEdges();
+
+  for (let i = 0; i < _layout.rows.length; i++) {
+    const n  = _layout.rows[i];
+    const wy = nodeY(i);
+    if (wy < wTop - ROW_H || wy > wBottom + ROW_H) continue;
+    drawNode(n, n.commitId === hoverId);
+  }
+
+  // Labels after nodes (they overdraw edges)
+  for (let i = 0; i < _layout.rows.length; i++) {
+    const n  = _layout.rows[i];
+    const wy = nodeY(i);
+    if (wy < wTop - ROW_H || wy > wBottom + ROW_H) continue;
+    drawLabel(n, n.commitId === hoverId);
+  }
+
+  ctx.restore();
+  drawMinimap();
+}
+
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+
+function showTooltip(e: MouseEvent, cid: string): void {
+  const tip = document.getElementById('dag-popover');
+  if (!tip) return;
+  const n = _nodeMap[cid];
+  if (!n) return;
+
+  const bc    = _layout.laneColors[n.branch] ?? '#8b949e';
+  const ctype = commitType(n.message);
+  const tc    = ctype ? (TYPE_COLORS[ctype] ?? null) : null;
+  const body  = ctype ? n.message.replace(/^\w+[^:]*:\s*/, '') : n.message;
+
+  const popSha    = document.getElementById('pop-sha');
+  const popBranch = document.getElementById('pop-branch-badge') as HTMLElement | null;
+  const popMsg    = document.getElementById('pop-msg');
+  const popAuthor = document.getElementById('pop-author');
+  const popAvatar = document.getElementById('pop-avatar') as HTMLElement | null;
+  const popTime   = document.getElementById('pop-time');
+  const popSession = document.getElementById('pop-session') as HTMLElement | null;
+  const popType   = document.getElementById('pop-type') as HTMLElement | null;
+
+  if (popSha)    popSha.textContent    = n.commitId.substring(0, 12);
+  if (popBranch) {
+    popBranch.textContent       = n.branch;
+    popBranch.style.background  = bc + '22';
+    popBranch.style.color       = bc;
+    popBranch.style.borderColor = bc + '44';
+  }
+  if (popMsg)    popMsg.textContent    = body.length > 120 ? body.substring(0, 117) + '…' : body;
+  if (popAuthor) popAuthor.textContent = n.author;
+  if (popAvatar) {
+    popAvatar.textContent       = (n.author || '?')[0].toUpperCase();
+    popAvatar.style.background  = colorFor(n.author);
+  }
+  if (popTime)   popTime.textContent   = timeAgo(n.timestamp);
+  if (popType && ctype && tc) {
+    popType.textContent      = ctype;
+    popType.style.display    = 'inline-flex';
+    popType.style.background = tc + '22';
+    popType.style.color      = tc;
+    popType.style.borderColor = tc + '44';
+  } else if (popType) {
+    popType.style.display = 'none';
+  }
+  const sess = _sessMap[cid];
+  if (popSession) {
+    popSession.textContent = sess?.intent ? `◯ ${sess.intent}` : '';
+    popSession.style.display = sess?.intent ? 'block' : 'none';
+  }
+
+  tip.style.display = 'block';
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let px = e.clientX + 20, py = e.clientY - 10;
+  if (px + 380 > vw) px = e.clientX - 390;
+  if (py + 240 > vh) py = e.clientY - 240;
+  tip.style.left = px + 'px';
+  tip.style.top  = py + 'px';
+}
+
+function hideTooltip(): void {
+  if (pinned) return;
+  const tip = document.getElementById('dag-popover');
+  if (tip) tip.style.display = 'none';
+}
+
+// ── Sidebar population ────────────────────────────────────────────────────────
+
+function populateSidebar(nodes: DagNode[]): void {
   const authorCounts: Record<string, number> = {};
   nodes.forEach(n => { authorCounts[n.author] = (authorCounts[n.author] || 0) + 1; });
-  const authors = Object.entries(authorCounts).sort((a, b) => b[1] - a[1]);
-  const mergeCount = nodes.filter(n => (n.parentIds || []).length > 1).length;
+  const authors   = Object.entries(authorCounts).sort((a, b) => b[1] - a[1]);
+  const maxC      = authors[0]?.[1] ?? 1;
+  const mergeCount = nodes.filter(n => (n.parentIds ?? []).length > 1).length;
 
   const statAuthors = document.getElementById('stat-authors');
   const statMerges  = document.getElementById('stat-merges');
   if (statAuthors) statAuthors.textContent = String(authors.length);
   if (statMerges)  statMerges.textContent  = String(mergeCount);
 
-  const branches      = Object.keys(branchCol).sort((a, b) => branchCol[a] - branchCol[b]);
+  const branches = Object.keys(_layout.laneColors);
+  const branchCounts: Record<string, number> = {};
+  nodes.forEach(n => { branchCounts[n.branch] = (branchCounts[n.branch] || 0) + 1; });
+
   const legendBranches = document.getElementById('legend-branches');
   if (legendBranches) {
     legendBranches.innerHTML = branches.map(b =>
       `<span class="graph-legend-branch">
-        <span class="graph-legend-dot" style="background:${branchColor(b)}"></span>
+        <span class="graph-legend-dot" style="background:${_layout.laneColors[b]}"></span>
         ${window.escHtml(b)}
       </span>`
     ).join('');
   }
 
-  const branchCommitCounts: Record<string, number> = {};
-  nodes.forEach(n => { branchCommitCounts[n.branch] = (branchCommitCounts[n.branch] || 0) + 1; });
   const sidebarBranches = document.getElementById('sidebar-branch-list');
   if (sidebarBranches) {
     sidebarBranches.innerHTML = branches.map(b =>
       `<div class="branch-legend-item">
-        <span class="branch-legend-pill" style="background:${branchColor(b)}"></span>
-        <span style="font-size:12px;color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${window.escHtml(b)}</span>
-        <span class="branch-legend-count">${branchCommitCounts[b] || 0}</span>
+        <span class="branch-legend-pill" style="background:${_layout.laneColors[b]}"></span>
+        <span class="branch-legend-name">${window.escHtml(b)}</span>
+        <span class="branch-legend-count">${branchCounts[b] ?? 0}</span>
       </div>`
     ).join('');
   }
 
-  const maxCommits    = authors[0] ? authors[0][1] : 1;
   const sidebarContribs = document.getElementById('sidebar-contributor-list');
   if (sidebarContribs) {
     sidebarContribs.innerHTML = authors.map(([author, count]) => {
-      const pct    = Math.round((count / maxCommits) * 100);
-      const acolor = authorColor(author);
+      const pct   = Math.round((count / maxC) * 100);
+      const acolor = colorFor(author);
       return `<div class="contributor-item">
         <span class="contributor-avatar-sm" style="background:${acolor}">${window.escHtml(author[0].toUpperCase())}</span>
         <div style="flex:1;min-width:0">
@@ -208,211 +714,213 @@ function renderGraph(data: DagData, sessionMap: SessionMap, baseUrl: string): vo
       </div>`;
     }).join('');
   }
+}
 
-  const svgW = PAD_L + maxCol * COL_W + MSG_OFFSET + 520;
-  const svgH = PAD_T * 2 + nodes.length * ROW_H;
-  svgEl.setAttribute('width',  String(svgW));
-  svgEl.setAttribute('height', String(svgH));
-  svgEl.style.display = 'block';
+// ── Search ────────────────────────────────────────────────────────────────────
 
-  const defs = `<defs>
-    <style>
-      @keyframes spin { to { transform: rotate(360deg); } }
-      .dag-node { cursor: pointer; }
-      .dag-edge  { transition: opacity 0.15s; }
-    </style>
-  </defs>`;
-
-  let edgesHtml = '';
-  edges.forEach(e => {
-    const src = pos[e.source];
-    const tgt = pos[e.target];
-    if (!src || !tgt) return;
-    const x1   = PAD_L + src.col * COL_W;
-    const y1   = PAD_T + src.row * ROW_H;
-    const x2   = PAD_L + tgt.col * COL_W;
-    const y2   = PAD_T + tgt.row * ROW_H;
-    const node = nodeMap[e.source];
-    const col  = node ? branchColor(node.branch) : '#8b949e';
-    const midY = (y1 + y2) / 2;
-    edgesHtml += `<path d="M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}"
-      stroke="${col}" stroke-width="2" fill="none" opacity="0.55" class="dag-edge"/>`;
-  });
-
-  let nodesHtml  = '';
-  let labelsHtml = '';
-  const labelX   = PAD_L + maxCol * COL_W + MSG_OFFSET;
-
-  nodes.forEach(n => {
-    const p      = pos[n.commitId];
-    const cx     = PAD_L + p.col * COL_W;
-    const cy     = PAD_T + p.row * ROW_H;
-    const bc     = branchColor(n.branch);
-    const ac     = authorColor(n.author);
-    const isHead  = n.commitId === headCommitId || n.isHead;
-    const isMerge = (n.parentIds || []).length > 1;
-    const inSess  = Boolean(sessionMap[n.commitId]);
-    const initial = (n.author || '?')[0].toUpperCase();
-
-    if (inSess) {
-      nodesHtml += `<circle cx="${cx}" cy="${cy}" r="${NODE_R + 5}"
-        fill="none" stroke="${SESSION_COLOR}" stroke-width="2" opacity="0.8"/>`;
+function applySearch(q: string): void {
+  searchQuery = q.trim().toLowerCase();
+  if (!searchQuery) {
+    matchSet = null;
+  } else {
+    matchSet = new Set<string>();
+    for (const n of _layout.rows) {
+      if (
+        n.message.toLowerCase().includes(searchQuery) ||
+        n.author.toLowerCase().includes(searchQuery) ||
+        n.commitId.toLowerCase().startsWith(searchQuery) ||
+        n.branch.toLowerCase().includes(searchQuery)
+      ) {
+        matchSet.add(n.commitId);
+      }
     }
-    if (isHead) {
-      nodesHtml += `<circle cx="${cx}" cy="${cy}" r="${NODE_R + (inSess ? 9 : 4)}"
-        fill="none" stroke="${HEAD_COLOR}" stroke-width="2" opacity="0.9"/>`;
-    }
+    // Update match count badge
+    const badge = document.getElementById('search-match-count');
+    if (badge) badge.textContent = matchSet.size > 0 ? `${matchSet.size} match${matchSet.size > 1 ? 'es' : ''}` : 'no match';
+  }
+  const badge = document.getElementById('search-match-count');
+  if (badge) badge.textContent = matchSet ? (matchSet.size > 0 ? `${matchSet.size} match${matchSet.size !== 1 ? 'es' : ''}` : 'no match') : '';
+  scheduleRedraw();
+}
 
-    if (isMerge) {
-      const d = NODE_R * 0.9;
-      nodesHtml += `<rect x="${cx - d}" y="${cy - d}" width="${d * 2}" height="${d * 2}"
-        rx="3" fill="${bc}" stroke="${ac}" stroke-width="1.5"
-        transform="rotate(45 ${cx} ${cy})"
-        class="dag-node" data-id="${n.commitId}"/>`;
-    } else {
-      nodesHtml += `<circle cx="${cx}" cy="${cy}" r="${NODE_R}"
-        fill="${bc}" stroke="${ac}" stroke-width="2"
-        class="dag-node" data-id="${n.commitId}"/>`;
-    }
+// ── Pan / Zoom ────────────────────────────────────────────────────────────────
 
-    nodesHtml += `<text x="${cx}" y="${cy + 4}" text-anchor="middle"
-      font-size="10" font-weight="700" fill="#0d1117"
-      style="pointer-events:none;user-select:none">${window.escHtml(initial)}</text>`;
+function clampView(): void {
+  const vpH     = canvas.clientHeight;
+  const totalH  = PAD_T * 2 + _layout.rows.length * ROW_H;
+  const minTy   = Math.min(0, vpH - totalH * scale - PAD_T * scale);
+  ty = Math.max(minTy, Math.min(PAD_T, ty));
+}
 
-    const ctype     = commitType(n.message);
-    const ctypeStr  = ctype && COMMIT_TYPE_COLORS[ctype]
-      ? `<tspan fill="${COMMIT_TYPE_COLORS[ctype]}" font-weight="600">${window.escHtml(ctype)}</tspan><tspan fill="#8b949e">: </tspan>`
-      : '';
-    const fullMsg   = n.message || '';
-    const bodyMsg   = ctype ? fullMsg.replace(/^\w+[^\:]*:\s*/, '') : fullMsg;
-    const displayMsg = bodyMsg.length > 56 ? bodyMsg.substring(0, 53) + '…' : bodyMsg;
+function zoomAround(cx: number, cy: number, factor: number): void {
+  const ns = Math.max(0.12, Math.min(5, scale * factor));
+  tx = cx - (cx - tx) * (ns / scale);
+  ty = cy - (cy - ty) * (ns / scale);
+  scale = ns;
+  clampView();
+  scheduleRedraw();
+  updateZoomLabel();
+}
 
-    let branchBadges = '';
-    let badgeX = labelX;
-    (n.branchLabels || []).forEach(lbl => {
-      const bw     = lbl.length * 6.5 + 14;
-      const bcolor = branchColor(lbl);
-      branchBadges += `<rect x="${badgeX}" y="${cy - 20}" width="${bw}" height="13"
-        rx="6" fill="${bcolor}" opacity="0.2"/>
-      <text x="${badgeX + 7}" y="${cy - 10}" font-size="10" fill="${bcolor}"
-        font-weight="600">${window.escHtml(lbl)}</text>`;
-      badgeX += bw + 5;
-    });
-    if (isHead) {
-      branchBadges += `<rect x="${badgeX}" y="${cy - 20}" width="34" height="13"
-        rx="6" fill="${HEAD_COLOR}" opacity="0.25"/>
-      <text x="${badgeX + 7}" y="${cy - 10}" font-size="10" fill="${HEAD_COLOR}"
-        font-weight="700">HEAD</text>`;
-    }
+function updateZoomLabel(): void {
+  const lbl = document.getElementById('zoom-level');
+  if (lbl) lbl.textContent = Math.round(scale * 100) + '%';
+}
 
-    const sha7 = n.commitId.substring(0, 7);
-    labelsHtml += `
-      ${branchBadges}
-      <text x="${labelX}" y="${cy + 4}" class="dag-node" data-id="${n.commitId}"
-        style="pointer-events:all">
-        <tspan font-family="monospace" font-size="11" fill="#58a6ff">${sha7}</tspan>
-        <tspan dx="8" font-size="13" fill="#c9d1d9">${ctypeStr}${window.escHtml(displayMsg)}</tspan>
-      </text>`;
-  });
+function scrollToHead(): void {
+  // HEAD is index 0 (newest-first display)
+  const headRow = _layout.rows.findIndex(n => n.commitId === _headId);
+  if (headRow < 0) return;
+  const vpH  = canvas.clientHeight;
+  const headY = nodeY(headRow);
+  ty = vpH / 2 - headY * scale;
+  clampView();
+  scheduleRedraw();
+}
 
-  svgEl.innerHTML = defs + `<g id="dag-g">${edgesHtml}${nodesHtml}${labelsHtml}</g>`;
-  _dagG = document.getElementById('dag-g') as SVGGElement | null;
+// ── Event wiring ──────────────────────────────────────────────────────────────
 
-  // ── Pan/zoom interaction ──────────────────────────────────────────────────
-  const viewport = document.getElementById('dag-viewport')!;
-  _scale = 1; _tx = 0; _ty = 0;
+function wireCanvas(vp: HTMLElement): void {
   let dragging = false;
-  let dragSX   = 0;
-  let dragSY   = 0;
+  let dragSX = 0, dragSY = 0;
+  let hasMoved = false;
 
-  viewport.addEventListener('wheel', e => {
+  canvas.addEventListener('wheel', e => {
     e.preventDefault();
-    const rect   = viewport.getBoundingClientRect();
-    const mx     = e.clientX - rect.left;
-    const my     = e.clientY - rect.top;
-    const factor = e.deltaY > 0 ? 0.85 : 1.18;
-    const ns     = Math.max(0.15, Math.min(4, _scale * factor));
-    _tx = mx - (mx - _tx) * (ns / _scale);
-    _ty = my - (my - _ty) * (ns / _scale);
-    _scale = ns;
-    applyXform();
+    const rect = canvas.getBoundingClientRect();
+    // Pinch-to-zoom on macOS trackpads sends ctrlKey=true with wheel events.
+    // Plain two-finger scroll should pan the graph, not zoom.
+    if (e.ctrlKey || e.metaKey) {
+      // Zoom: pinch gesture or Ctrl/Cmd + scroll
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      zoomAround(e.clientX - rect.left, e.clientY - rect.top, factor);
+    } else {
+      // Pan: two-finger scroll — translate vertically (and horizontally for trackpads)
+      tx -= e.deltaX;
+      ty -= e.deltaY;
+      clampView();
+      scheduleRedraw();
+    }
   }, { passive: false });
 
-  viewport.addEventListener('mousedown', e => {
-    dragging = true; dragSX = e.clientX; dragSY = e.clientY;
-  });
-  window.addEventListener('mouseup',   () => { dragging = false; });
-  window.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    _tx += e.clientX - dragSX; _ty += e.clientY - dragSY;
+  canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    dragging = true; hasMoved = false;
     dragSX = e.clientX; dragSY = e.clientY;
-    applyXform();
+    pinned = null;
+    const tip = document.getElementById('dag-popover');
+    if (tip) tip.style.display = 'none';
   });
 
-  // ── Popover ───────────────────────────────────────────────────────────────
-  const popover   = document.getElementById('dag-popover')!;
-  const popSha    = document.getElementById('pop-sha')!;
-  const popBranch = document.getElementById('pop-branch-badge') as HTMLElement;
-  const popMsg    = document.getElementById('pop-msg')!;
-  const popAuthor = document.getElementById('pop-author')!;
-  const popAvatar = document.getElementById('pop-avatar') as HTMLElement;
-  const popTime   = document.getElementById('pop-time')!;
-  const popSession = document.getElementById('pop-session') as HTMLElement;
-
-  svgEl.addEventListener('mousemove', e => {
-    const t = (e.target as Element).closest<Element>('[data-id]');
-    if (!t) { popover.style.display = 'none'; return; }
-    const cid  = t.getAttribute('data-id')!;
-    const node = nodeMap[cid];
-    if (!node) { popover.style.display = 'none'; return; }
-
-    popSha.textContent = node.commitId.substring(0, 12);
-
-    const bc = branchColor(node.branch);
-    popBranch.textContent        = node.branch;
-    popBranch.style.background   = bc + '22';
-    popBranch.style.color        = bc;
-    popBranch.style.border       = `1px solid ${bc}44`;
-
-    const ctype   = commitType(node.message);
-    const bodyMsg = ctype ? node.message.replace(/^\w+[^\:]*:\s*/, '') : node.message;
-    const tc      = ctype ? typeColor(ctype) : null;
-    popMsg.innerHTML = tc
-      ? `<span class="dag-pop-type dag-pop-type-${ctype}" style="background:${tc}22;color:${tc};border:1px solid ${tc}44">${window.escHtml(ctype!)}</span>${window.escHtml(bodyMsg)}`
-      : window.escHtml(node.message);
-
-    const ac = authorColor(node.author);
-    popAvatar.textContent      = (node.author || '?')[0].toUpperCase();
-    popAvatar.style.background = ac;
-    popAuthor.textContent      = node.author;
-    popTime.textContent        = window.fmtDate(node.timestamp);
-
-    const sess = sessionMap[cid];
-    if (sess && sess.intent) {
-      popSession.textContent    = '◯ Session: ' + sess.intent;
-      popSession.style.display  = 'block';
-    } else {
-      popSession.style.display  = 'none';
+  window.addEventListener('mouseup', e => {
+    if (!dragging) return;
+    if (!hasMoved) {
+      // It was a click, not a drag
+      const rect = canvas.getBoundingClientRect();
+      const cid  = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+      if (cid) window.location.href = _baseUrl + '/commits/' + cid;
     }
-
-    popover.style.display = 'block';
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let px = e.clientX + 18;
-    let py = e.clientY + 14;
-    if (px + 460 > vw) px = e.clientX - 460;
-    if (py + 220 > vh) py = e.clientY - 220;
-    popover.style.left = px + 'px';
-    popover.style.top  = py + 'px';
+    dragging = false;
   });
 
-  svgEl.addEventListener('mouseleave', () => { popover.style.display = 'none'; });
+  window.addEventListener('mousemove', e => {
+    if (dragging) {
+      const dx = e.clientX - dragSX;
+      const dy = e.clientY - dragSY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) hasMoved = true;
+      tx += dx; ty += dy;
+      dragSX = e.clientX; dragSY = e.clientY;
+      clampView();
+      scheduleRedraw();
+      return;
+    }
+    // Hover hit test
+    const rect   = canvas.getBoundingClientRect();
+    const cid    = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+    if (cid !== hoverId) {
+      hoverId = cid;
+      canvas.style.cursor = cid ? 'pointer' : 'grab';
+      scheduleRedraw();
+    }
+    if (cid) showTooltip(e, cid);
+    else hideTooltip();
+  });
 
-  svgEl.addEventListener('click', e => {
-    const t = (e.target as Element).closest<Element>('[data-id]');
+  canvas.addEventListener('mouseleave', () => {
+    hoverId = null;
+    hideTooltip();
+    scheduleRedraw();
+  });
+
+  // Touch support
+  let touchStartY = 0, touchLastY = 0, touchStartScale = 1;
+  let touch2Dist = 0;
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      touch2Dist  = Math.sqrt(dx * dx + dy * dy);
+      touchStartScale = scale;
+    } else {
+      touchStartY = touchLastY = e.touches[0].clientY;
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      const dx   = e.touches[0].clientX - e.touches[1].clientX;
+      const dy   = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const rect = canvas.getBoundingClientRect();
+      zoomAround(midX - rect.left, midY - rect.top, dist / touch2Dist);
+      touch2Dist = dist;
+    } else {
+      const curY = e.touches[0].clientY;
+      ty += curY - touchLastY;
+      touchLastY = curY;
+      clampView();
+      scheduleRedraw();
+    }
+  }, { passive: false });
+
+  // Zoom controls
+  document.addEventListener('click', e => {
+    const t = (e.target as Element).closest<HTMLElement>('[data-action]');
     if (!t) return;
-    const cid = t.getAttribute('data-id');
-    if (cid) window.location.href = baseUrl + '/commits/' + cid;
+    const vpRect = canvas.getBoundingClientRect();
+    const cx     = vpRect.width / 2;
+    const cy     = vpRect.height / 2;
+    switch (t.dataset.action) {
+      case 'zoom-in':    zoomAround(cx, cy, 1.3); break;
+      case 'zoom-out':   zoomAround(cx, cy, 0.77); break;
+      case 'zoom-reset': scale = 1; tx = 0; scrollToHead(); updateZoomLabel(); break;
+    }
+  });
+
+  // Minimap click to navigate
+  const mmEl = document.getElementById('dag-minimap');
+  if (mmEl) {
+    mmEl.addEventListener('click', e => {
+      const rect   = mmEl.getBoundingClientRect();
+      const mx     = e.clientX - rect.left;
+      const my     = e.clientY - rect.top;
+      const totalH = PAD_T * 2 + _layout.rows.length * ROW_H;
+      const totalW = _layout.labelX + 400;
+      const scaleY = (MM_H - 4) / totalH;
+      const wy     = (my - 2) / scaleY;
+      const vpH    = canvas.clientHeight;
+      ty = vpH / 2 - wy * scale;
+      clampView();
+      scheduleRedraw();
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+    scheduleRedraw();
   });
 }
 
@@ -424,44 +932,70 @@ function buildSessionMap(sessions: SessionEntry[]): SessionMap {
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
   );
   sorted.forEach(s => {
-    (s.commits || []).forEach(cid => {
-      if (!map[cid]) map[cid] = { intent: s.intent || '', sessionId: s.sessionId };
+    (s.commits ?? []).forEach(cid => {
+      if (!map[cid]) map[cid] = { intent: s.intent ?? '', sessionId: s.sessionId };
     });
   });
   return map;
-}
-
-// ── Zoom/pan control handlers ─────────────────────────────────────────────────
-
-function setupControls(): void {
-  document.addEventListener('click', e => {
-    const target = (e.target as Element).closest<HTMLElement>('[data-action]');
-    if (!target) return;
-    switch (target.dataset.action) {
-      case 'zoom-in':    _scale = Math.max(0.15, Math.min(4, _scale * 1.25)); applyXform(); break;
-      case 'zoom-out':   _scale = Math.max(0.15, Math.min(4, _scale * 0.8));  applyXform(); break;
-      case 'zoom-reset': _scale = 1; _tx = 0; _ty = 0; applyXform(); break;
-    }
-  });
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 async function load(cfg: GraphCfg): Promise<void> {
   if (typeof window.initRepoNav === 'function') window.initRepoNav(cfg.repoId);
+
+  const loadingEl = document.getElementById('dag-loading');
+
   try {
-    const [dagData, sessionsData] = await Promise.all([
+    const [dagData, sessData] = await Promise.all([
       window.apiFetch('/repos/' + cfg.repoId + '/dag'),
       window.apiFetch('/repos/' + cfg.repoId + '/sessions?limit=200').catch(() => ({ sessions: [] })),
     ]) as [DagData, { sessions?: SessionEntry[] }];
-    const sessionMap = buildSessionMap(sessionsData.sessions || []);
-    renderGraph(dagData, sessionMap, cfg.baseUrl);
-  } catch(e) {
-    const err = e as Error;
-    if (err.message !== 'auth') {
-      const loading = document.getElementById('dag-loading');
-      if (loading) loading.innerHTML =
-        `<span style="color:var(--color-danger)">✕ ${window.escHtml(err.message)}</span>`;
+
+    if (loadingEl) loadingEl.style.display = 'none';
+
+    if (!dagData.nodes.length) {
+      const vp = document.getElementById('dag-viewport');
+      if (vp) vp.innerHTML = '<div class="graph-empty">No commits yet.</div>';
+      return;
+    }
+
+    _headId  = dagData.headCommitId;
+    _baseUrl = cfg.baseUrl;
+    _sessMap = buildSessionMap(sessData.sessions ?? []);
+    _layout  = buildLayout(dagData.nodes, dagData.edges);
+
+    dagData.nodes.forEach(n => { _nodeMap[n.commitId] = n; });
+
+    // Wire up canvas
+    canvas  = document.getElementById('dag-canvas') as HTMLCanvasElement;
+    mmCanvas = document.getElementById('dag-minimap') as HTMLCanvasElement;
+    ctx     = canvas.getContext('2d')!;
+    mmCtx   = mmCanvas?.getContext('2d')!;
+    const vp = canvas.parentElement!;
+
+    resizeCanvas();
+    wireCanvas(vp);
+
+    // Wire search
+    const searchInput = document.getElementById('dag-search') as HTMLInputElement | null;
+    if (searchInput) {
+      searchInput.addEventListener('input', () => applySearch(searchInput.value));
+      searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchInput.value = ''; applySearch(''); } });
+    }
+
+    // Initial view: show HEAD at top-ish
+    scale = 1;
+    tx    = 0;
+    scrollToHead();
+    updateZoomLabel();
+    populateSidebar(dagData.nodes);
+    draw();
+
+  } catch (err) {
+    const e = err as Error;
+    if (e.message !== 'auth' && loadingEl) {
+      loadingEl.innerHTML = `<span style="color:var(--color-danger)">✕ ${window.escHtml(e.message)}</span>`;
     }
   }
 }
@@ -471,6 +1005,5 @@ async function load(cfg: GraphCfg): Promise<void> {
 export function initGraph(): void {
   const cfg = window.__graphCfg;
   if (!cfg) return;
-  setupControls();
   void load(cfg);
 }

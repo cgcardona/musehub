@@ -42,14 +42,20 @@ def json_or_html(
     template_fn: Callable[[], Response],
     json_data: dict[str, Any],
 ) -> Response:
-    """Return JSON or HTML based on the caller's Accept header.
+    """Return JSON or HTML based on the caller's Accept header or ?format param.
 
-    Inspects ``Accept: application/json`` and dispatches accordingly:
+    Inspects ``Accept: application/json`` or ``?format=json`` and dispatches:
     - JSON callers receive ``{"data": <json_data>, "meta": {"url": <url>}}``.
     - All other callers receive the HTML shell from ``template_fn()``.
 
+    Both ``Accept: application/json`` and ``?format=json`` are honoured so that
+    agents without header control (e.g. browser-initiated ``<a>`` links, plain
+    ``curl``) can still access structured data — consistent with
+    ``negotiate_response()`` in ``negotiate.py``.
+
     The ``meta.url`` field lets agents reconstruct canonical URLs from
-    relative links without additional parsing.
+    relative links without additional parsing. The ``meta.api`` field links to
+    the canonical REST endpoint when the URL differs from the UI route.
 
     Args:
         request: The incoming FastAPI request.
@@ -60,32 +66,67 @@ def json_or_html(
     Returns:
         ``JSONResponse`` for JSON callers; ``template_fn()`` result otherwise.
     """
-    if request.headers.get("accept", "").startswith("application/json"):
+    wants_json = (
+        request.query_params.get("format") == "json"
+        or "application/json" in request.headers.get("accept", "")
+    )
+    if wants_json:
         logger.debug("✅ json_or_html: JSON path — %s", str(request.url))
+        # Build canonical REST API URL: replace /api/v1 prefix if already an API
+        # URL, or expose the api_link header hint if set by the handler.
+        api_link = request.headers.get("X-MuseHub-API-Link", str(request.url))
         return JSONResponse(
             content={
                 "data": json_data,
-                "meta": {"url": str(request.url)},
+                "meta": {"url": str(request.url), "api": api_link},
             }
         )
     logger.debug("✅ json_or_html: HTML path — %s", str(request.url))
     return add_json_available_header(template_fn(), request)
 
 
-def add_json_available_header(response: Response, request: Request) -> Response:
-    """Attach ``X-MuseHub-JSON-Available: true`` to bot responses.
+def add_json_available_header(
+    response: Response,
+    request: Request,
+    *,
+    api_link: str | None = None,
+) -> Response:
+    """Attach agent-discovery headers to HTML responses.
 
-    Agents that do not yet set ``Accept: application/json`` can detect support
-    from this header and switch on their next request. The header is only
-    added for known bot User-Agents to avoid polluting browser network traces.
+    Two headers are emitted for known bot/agent User-Agents:
+
+    ``X-MuseHub-JSON-Available: true``
+        Signals that content negotiation is supported — the agent can
+        re-request with ``Accept: application/json`` or ``?format=json``
+        to get structured JSON from this same URL.
+
+    ``X-MuseHub-API: <url>``
+        When ``api_link`` is supplied, points directly to the canonical
+        REST endpoint for this resource (e.g. ``/api/v1/domains/@a/b``).
+        Agents that need raw JSON without an HTML wrapper should use
+        this URL, or the ``muse://`` MCP resources.
+
+    ``Link: <url>; rel="alternate"; type="application/json"``
+        Standard RFC 5988 link relation that browsers and well-behaved
+        crawlers understand. Always added when ``api_link`` is provided.
 
     Args:
         response: The response to annotate (mutated in-place).
         request: The originating request used for User-Agent inspection.
+        api_link: Optional canonical REST API URL for this resource.
 
     Returns:
         The same response object (mutated).
     """
+    if api_link:
+        # Always add the standard Link header — readable by any HTTP client.
+        existing = response.headers.get("Link", "")
+        new_link = f'<{api_link}>; rel="alternate"; type="application/json"'
+        response.headers["Link"] = f"{existing}, {new_link}".lstrip(", ")
+
     if is_bot_user_agent(request):
         response.headers["X-MuseHub-JSON-Available"] = "true"
+        if api_link:
+            response.headers["X-MuseHub-API"] = api_link
+
     return response

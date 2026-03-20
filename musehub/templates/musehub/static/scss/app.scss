@@ -10,5 +10,5 @@
 @use "components";
 @use "layout";
 @use "icons";
-@use "music";
+@use "domain";   // supersedes "music" — domain-agnostic styles + [data-domain] scoping
 @use "pages";

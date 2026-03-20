@@ -7,6 +7,42 @@
 
 {% block page_json %}{"page": "explore"}{% endblock %}
 
+{% block content %}
+<div class="explore-hero">
+  <div class="explore-hero__inner">
+    <p class="explore-hero__kicker">Muse · Domain-Agnostic Version Control</p>
+    <h1 class="explore-hero__headline">
+      Version control for<br>
+      <span class="gradient-text">multidimensional state.</span>
+    </h1>
+    <p class="explore-hero__sub">
+      Not just Git. Any state space — MIDI (21 dimensions), code, genomics,
+      climate simulations, 3D design. Any agent, any domain, any scale.
+      This is a paradigm shift.
+    </p>
+    <div class="explore-hero__actions">
+      <a href="/new" class="btn btn-primary">Create repository</a>
+      <a href="/domains" class="btn btn-secondary">Browse domains</a>
+      <a href="/mcp/docs" class="btn btn-ghost">MCP for agents</a>
+    </div>
+    <div class="explore-hero__stats">
+      <div class="explore-hero-stat">
+        <span class="explore-hero-stat__value">21</span>
+        <span class="explore-hero-stat__label">MIDI dimensions</span>
+      </div>
+      <div class="explore-hero-stat">
+        <span class="explore-hero-stat__value">∞</span>
+        <span class="explore-hero-stat__label">domains possible</span>
+      </div>
+      <div class="explore-hero-stat">
+        <span class="explore-hero-stat__value">37</span>
+        <span class="explore-hero-stat__label">MCP tools</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block token_form %}
   <button class="btn btn-secondary btn-sm mobile-filter-toggle"
           data-action="toggle-sidebar">
@@ -36,9 +72,9 @@
           {% endfor %}
         </div>
 
-        <!-- Language / instrument chips from muse_tags -->
+        <!-- Tags from repos -->
         <div class="sidebar-section">
-          <p class="sidebar-section-title">Language / Instrument</p>
+          <p class="sidebar-section-title">Language / Domain Tags</p>
           {% if muse_tag_chips %}
             <div id="lang-chips">
               {% for tag in muse_tag_chips %}
@@ -90,7 +126,7 @@
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
         <div>
-          <p class="eyebrow" style="margin-bottom:4px">Music</p>
+          <p class="eyebrow" style="margin-bottom:4px">Multidimensional State</p>
           <h2 style="margin:0">Explore Repositories</h2>
         </div>
         <span id="repo-count" style="color:#8b949e">{{ total }} repositories</span>

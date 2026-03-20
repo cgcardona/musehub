@@ -55,11 +55,18 @@ class ToolCallContext:
         session: Active :class:`~musehub.mcp.session.MCPSession`, or ``None``
             for clients that did not send an ``Mcp-Session-Id`` header. When
             ``None``, elicitation is unavailable and progress events are silent.
+        is_agent: ``True`` when the JWT carries ``token_type: "agent"``. Agent
+            callers receive higher rate limits and appear with an "agent" badge
+            in the activity feed.
+        agent_name: Optional display identifier from the ``agent_name`` JWT
+            claim (e.g. ``"my-bot/1.0"``). ``None`` for human callers.
         _elicitation_counter: Monotonic counter for unique elicitation IDs.
     """
 
     user_id: str | None
     session: MCPSession | None
+    is_agent: bool = False
+    agent_name: str | None = None
     _elicitation_counter: int = field(default=0, init=False)
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -239,3 +246,10 @@ class ToolCallContext:
     def has_elicitation(self) -> bool:
         """True if the client supports at least form-mode elicitation."""
         return self.session is not None and self.session.supports_elicitation_form()
+
+    @property
+    def actor_label(self) -> str:
+        """Human-readable label for the caller — used in event metadata."""
+        if self.is_agent:
+            return self.agent_name or "agent"
+        return self.user_id or "anonymous"

@@ -19,6 +19,47 @@ from musehub.db import musehub_models as musehub_db
 from musehub.services import musehub_repository
 
 
+async def build_repo_nav_ctx(
+    db: AsyncSession,
+    repo: Any,
+    owner: str,
+    repo_slug: str,
+) -> dict[str, Any]:
+    """Build the nav_ctx dict from an already-resolved repo ORM object.
+
+    Callers that have already fetched the repo (to avoid a second DB round-trip)
+    should use this instead of ``resolve_repo_with_nav``.
+    """
+    repo_id = str(repo.repo_id)
+
+    pr_count = await db.scalar(
+        sa_select(func.count())
+        .select_from(musehub_db.MusehubPullRequest)
+        .where(
+            musehub_db.MusehubPullRequest.repo_id == repo_id,
+            musehub_db.MusehubPullRequest.state == "open",
+        )
+    ) or 0
+
+    issue_count = await db.scalar(
+        sa_select(func.count())
+        .select_from(musehub_db.MusehubIssue)
+        .where(
+            musehub_db.MusehubIssue.repo_id == repo_id,
+            musehub_db.MusehubIssue.state == "open",
+        )
+    ) or 0
+
+    return {
+        "repo_key": getattr(repo, "key_signature", None) or "",
+        "repo_bpm": getattr(repo, "tempo_bpm", None),
+        "repo_tags": getattr(repo, "tags", None) or [],
+        "repo_visibility": getattr(repo, "visibility", None) or "private",
+        "nav_open_pr_count": pr_count,
+        "nav_open_issue_count": issue_count,
+    }
+
+
 async def resolve_repo_with_nav(
     owner: str,
     repo_slug: str,

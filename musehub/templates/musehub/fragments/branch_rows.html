@@ -66,41 +66,24 @@
   {% endif %}
 {% endmacro %}
 
-{# ── Musical divergence score bars ────────────────────────────────────────── #}
-{% macro musical_scores(branch) %}
-  {% set scores = [
-    ("Melodic",    branch.divergence.melodic,    "#58a6ff"),
-    ("Harmonic",   branch.divergence.harmonic,   "#3fb950"),
-    ("Rhythmic",   branch.divergence.rhythmic,   "#a371f7"),
-    ("Structural", branch.divergence.structural, "#fb8500"),
-    ("Dynamic",    branch.divergence.dynamic,    "#2dd4bf"),
-  ] %}
-  {% set has_scores = scores | selectattr(1) | list %}
+{# ── Domain divergence score bars — dimension labels come from the server #}
+{% macro domain_scores(branch) %}
+  {% set dim_scores = branch.divergence.dimensions if branch.divergence and branch.divergence.dimensions else [] %}
   <div class="branch-musical-scores">
-    {% if has_scores %}
-      {% for label, val, color in scores %}
+    {% if dim_scores %}
+      {% for dim in dim_scores %}
       <div class="branch-score-item">
-        <div class="branch-score-label">{{ label[:4] }}</div>
+        <div class="branch-score-label">{{ dim.name[:4] }}</div>
         <div class="branch-score-bar-track">
-          <div class="branch-score-bar-fill" style="width:{{ (val * 100) | round | int }}%;background:{{ color }}"></div>
+          <div class="branch-score-bar-fill" style="width:{{ (dim.score * 100) | round | int }}%;background:var(--color-accent)"></div>
         </div>
       </div>
       {% endfor %}
     {% else %}
       <span style="font-size:10px;color:var(--text-muted);font-style:italic">
         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Musical divergence analysis pending
+        Divergence analysis pending
       </span>
-      <div style="display:flex;gap:var(--space-2)">
-        {% for label, _, color in scores %}
-        <div class="branch-score-item">
-          <div class="branch-score-label">{{ label[:4] }}</div>
-          <div class="branch-score-bar-track" style="opacity:0.3">
-            <div class="branch-score-bar-fill" style="width:0%;background:{{ color }}"></div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
     {% endif %}
   </div>
 {% endmacro %}
@@ -181,9 +164,9 @@
           </div>
         {% endif %}
 
-        {# Musical divergence scores #}
+        {# Domain divergence scores #}
         {% if not branch.is_default %}
-          {{ musical_scores(branch) }}
+          {{ domain_scores(branch) }}
         {% endif %}
       </div>
 
@@ -207,5 +190,5 @@
     </div>
   {% endfor %}
 {% else %}
-  {{ empty_state("🌿", "No branches yet", "Create a branch to start developing a new musical idea or experiment.") }}
+  {{ empty_state("🌿", "No branches yet", "Create a branch to start developing a new idea or experiment.") }}
 {% endif %}

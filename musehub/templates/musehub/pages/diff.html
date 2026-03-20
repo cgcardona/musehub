@@ -14,4 +14,34 @@
 
 {% block page_json %}{"page": "diff"}{% endblock %}
 
-{% block page_data %}window.__diffCfg = { repoId: {{ repo_id | tojson }}, commitId: {{ commit_id | tojson }}, base: {{ base_url | tojson }} };{% endblock %}
+{% block page_data %}
+window.__diffCfg = {
+  repoId:     {{ repo_id | tojson }},
+  commitId:   {{ commit_id | tojson }},
+  base:       {{ base_url | tojson }},
+  viewerType: {{ (domain.viewer_type if domain else 'generic') | tojson }},
+  domainName: {{ (domain.display_name if domain else 'Generic') | tojson }},
+  commit:     {{ (commit | tojson) if commit else 'null' }},
+};
+{% endblock %}
+
+{% block content %}
+<div class="content-wide diff-page">
+
+  {# ── Commit header — filled by JS ──────────────────────────────────────── #}
+  <div class="diff-commit-header-card card" id="diff-commit-header">
+    <div class="diff-loading">
+      <span class="diff-commit-sha">{{ commit_id[:8] }}</span>
+      {% if commit %}
+      <span class="diff-commit-msg">{{ commit.message | truncate(120) }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Main diff area — filled by JS ─────────────────────────────────────── #}
+  <div id="diff-content" class="diff-content">
+    <div class="diff-loading"><span class="spinner"></span> Loading diff…</div>
+  </div>
+
+</div>
+{% endblock %}

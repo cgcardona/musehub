@@ -75,6 +75,8 @@ async def handle_request(
     *,
     user_id: str | None = None,
     session: "MCPSession | None" = None,
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> JSONObject | None:
     """Dispatch a single JSON-RPC 2.0 request and return the response dict.
 
@@ -83,6 +85,8 @@ async def handle_request(
         user_id: Authenticated user ID from JWT (``None`` for anonymous).
         session: Active MCP session for elicitation and progress features,
             or ``None`` for stateless (non-elicitation) clients.
+        is_agent: ``True`` when the caller presents an agent JWT token.
+        agent_name: Optional display name of the agent (from ``agent_name`` claim).
 
     Returns:
         JSON-serialisable response dict, or ``None`` for notifications
@@ -101,7 +105,10 @@ async def handle_request(
     params: JSONObject = raw_params if isinstance(raw_params, dict) else {}
 
     try:
-        result = await _dispatch(method, params, user_id=user_id, session=session)
+        result = await _dispatch(
+            method, params, user_id=user_id, session=session,
+            is_agent=is_agent, agent_name=agent_name,
+        )
         if is_notification:
             return None
         return _success(req_id, result)
@@ -121,6 +128,8 @@ async def handle_batch(
     *,
     user_id: str | None = None,
     session: "MCPSession | None" = None,
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> list[JSONObject]:
     """Dispatch a JSON-RPC 2.0 batch and return all non-notification responses.
 
@@ -128,13 +137,18 @@ async def handle_batch(
         requests: List of parsed JSON-RPC 2.0 request dicts.
         user_id: Authenticated user ID (``None`` for anonymous).
         session: Active MCP session, or ``None`` for stateless clients.
+        is_agent: ``True`` when the caller presents an agent JWT token.
+        agent_name: Optional display name of the agent.
 
     Returns:
         List of response dicts (excluding None responses for notifications).
     """
     results: list[JSONObject] = []
     for req in requests:
-        resp = await handle_request(req, user_id=user_id, session=session)
+        resp = await handle_request(
+            req, user_id=user_id, session=session,
+            is_agent=is_agent, agent_name=agent_name,
+        )
         if resp is not None:
             results.append(resp)
     return results
@@ -157,6 +171,8 @@ async def _dispatch(
     *,
     user_id: str | None,
     session: "MCPSession | None",
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> JSONObject:
     """Route a method name to its handler and return the result dict."""
 
@@ -167,7 +183,10 @@ async def _dispatch(
         return _handle_tools_list()
 
     if method == "tools/call":
-        return await _handle_tools_call(params, user_id=user_id, session=session)
+        return await _handle_tools_call(
+            params, user_id=user_id, session=session,
+            is_agent=is_agent, agent_name=agent_name,
+        )
 
     if method == "resources/list":
         return _handle_resources_list()
@@ -232,12 +251,17 @@ def _handle_initialize(params: JSONObject) -> JSONObject:
             "logging": {},
         },
         "instructions": (
-            "MuseHub is a Git-for-music platform. "
-            "Use musehub_browse_repo to explore repositories, "
-            "musehub_compose_with_preferences to interactively compose, "
-            "and musehub_connect_streaming_platform to publish releases. "
-            "Elicitation is supported: call interactive tools to collect "
-            "user preferences for musical composition and platform connections."
+            "MuseHub is the collaboration hub for Muse — the world's first "
+            "domain-agnostic, multi-dimensional version control system. "
+            "Muse tracks multidimensional state across any domain: MIDI (21 dimensions), "
+            "Code (10 languages), Genomics, Circuit Design, and any custom domain plugin. "
+            "Start with musehub_list_domains to discover domains, "
+            "musehub_browse_repo to explore repositories, "
+            "musehub_get_domain to read a domain manifest, "
+            "and musehub_get_view to inspect full multidimensional state. "
+            "Elicitation (MCP 2025-11-25) is fully supported for interactive workflows. "
+            "AI agents are first-class citizens: use an agent JWT for higher rate limits "
+            "and activity feed visibility."
         ),
     }
 
@@ -255,6 +279,8 @@ async def _handle_tools_call(
     *,
     user_id: str | None,
     session: "MCPSession | None",
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> JSONObject:
     """Route a ``tools/call`` request to the appropriate executor."""
     name = params.get("name")
@@ -278,7 +304,12 @@ async def _handle_tools_call(
         if isinstance(pt, str):
             progress_token = pt
 
-    ctx = ToolCallContext(user_id=user_id, session=session)
+    ctx = ToolCallContext(
+        user_id=user_id,
+        session=session,
+        is_agent=is_agent,
+        agent_name=agent_name,
+    )
 
     try:
         return await _call_tool(name, arguments, ctx=ctx)

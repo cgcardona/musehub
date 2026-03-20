@@ -195,6 +195,7 @@ class RepoResponse(CamelModel):
     tags: list[str] = Field(default_factory=list, description="Free-form tags (genre, key, instrumentation)", examples=[["jazz", "F# minor", "bass"]])
     key_signature: str | None = Field(None, description="Musical key (e.g. 'C major', 'F# minor')", examples=["F# minor"])
     tempo_bpm: int | None = Field(None, description="Tempo in BPM", examples=[120])
+    domain_id: str | None = Field(None, description="ID of the registered Muse domain plugin for this repo")
     created_at: datetime = Field(..., description="Repo creation timestamp (ISO-8601 UTC)")
 
 

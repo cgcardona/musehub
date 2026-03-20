@@ -29,8 +29,8 @@
 }">
 
   <div class="wizard-header">
-    <h1 class="wizard-title">🗂️ Create a new repository</h1>
-    <p class="wizard-subtitle">A repository contains all your project's files, commit history, and collaboration records.</p>
+    <h1 class="wizard-title">Create a new repository</h1>
+    <p class="wizard-subtitle">A repository versions a multidimensional state space — MIDI compositions, source code, genomic sequences, or any domain you choose. It contains all snapshots, commits, branches, and collaboration records.</p>
   </div>
 
   <form id="wizard-form">
@@ -65,7 +65,33 @@
       <label class="form-label" for="f-description">Description</label>
       <div class="form-description">A short summary shown on the explore page and your profile.</div>
       <textarea class="form-input" id="f-description" name="description" rows="2" maxlength="350"
-                placeholder="A jazz trio arrangement in D minor…" style="resize:vertical"></textarea>
+                placeholder="Describe what state this repository versions…" style="resize:vertical"></textarea>
+    </div>
+
+    <hr class="wizard-divider"/>
+
+    {# Domain plugin selection #}
+    <div class="form-group">
+      <label class="form-label" for="f-domain">Domain plugin</label>
+      <div class="form-description">
+        Choose the Muse domain plugin that defines the state space for this repository.
+        Each domain declares its own dimensions, viewer, and insight capabilities.
+        <a href="/domains" class="form-link" target="_blank">Browse all domains →</a>
+      </div>
+      <select class="form-input domain-select" id="f-domain" name="domain" style="max-width:420px">
+        <option value="">Generic (no domain)</option>
+        {% for d in available_domains %}
+        <option value="{{ d.domain_id }}"
+          data-viewer="{{ d.viewer_type }}"
+          data-dims="{{ d.dimension_count }}">
+          {{ d.display_name }} ({{ d.scoped_id }}) — {{ d.dimension_count }} dimension{% if d.dimension_count != 1 %}s{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <div class="domain-select-hint" id="domain-hint" hidden>
+        <span id="domain-hint-viewer"></span>
+        <a href="#" id="domain-hint-link" class="form-link" target="_blank">View domain →</a>
+      </div>
     </div>
 
     <hr class="wizard-divider"/>
@@ -98,7 +124,7 @@
     {# License — server-rendered dropdown #}
     <div class="form-group">
       <label class="form-label" for="f-license">License</label>
-      <div class="form-description">Tell others what they can and cannot do with your music.</div>
+      <div class="form-description">Tell others what they can and cannot do with your work.</div>
       <select class="form-input" id="f-license" name="license" style="max-width:380px">
         {% for value, label in licenses %}
           <option value="{{ value }}">{{ label }}</option>
@@ -109,7 +135,7 @@
     {# Topics — Alpine.js tag chip input #}
     <div class="form-group">
       <label class="form-label">Topics</label>
-      <div class="form-description">Tag your repo with genres, moods, or instruments. Press <kbd>Enter</kbd> or <kbd>,</kbd> to add.</div>
+      <div class="form-description">Tag your repo for discovery. Press <kbd>Enter</kbd> or <kbd>,</kbd> to add.</div>
       <div class="tag-input-container" @click="$refs.topicInput.focus()">
         <template x-for="(t, i) in topics" :key="i">
           <span class="tag-pill">
@@ -118,7 +144,7 @@
           </span>
         </template>
         <input class="tag-text-input" x-ref="topicInput" x-model="topicInput"
-               placeholder="jazz, piano, D minor…"
+               placeholder="genomics, CRISPR, neural…"
                @keydown="onTopicKey($event)"
                @input="topicInput.endsWith(',') && addTopic(topicInput)"/>
       </div>
