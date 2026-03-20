@@ -59,8 +59,8 @@ class MuseMCPServer:
     ) -> MusehubToolResult:
         repo_id = str(params.get("repo_id", ""))
         match name:
-            case "musehub_browse_repo":
-                return await executor.execute_browse_repo(repo_id)
+            case "musehub_get_context":
+                return await executor.execute_get_context(repo_id)
             case "musehub_list_branches":
                 return await executor.execute_list_branches(repo_id)
             case "musehub_list_commits":
@@ -72,15 +72,10 @@ class MuseMCPServer:
             case "musehub_read_file":
                 object_id = str(params.get("object_id", ""))
                 return await executor.execute_read_file(repo_id, object_id)
-            case "musehub_get_analysis":
-                dimension = str(params.get("dimension", "overview"))
-                return await executor.execute_get_analysis(repo_id, dimension=dimension)
             case "musehub_search":
                 query = str(params.get("query", ""))
                 mode = str(params.get("mode", "path"))
                 return await executor.execute_search(repo_id, query=query, mode=mode)
-            case "musehub_get_context":
-                return await executor.execute_get_context(repo_id)
             case _:
                 return MusehubToolResult(
                     ok=False,

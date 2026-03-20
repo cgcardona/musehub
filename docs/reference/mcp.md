@@ -15,14 +15,14 @@ MCP 2025-11-25 adds the full **Streamable HTTP transport** (`GET /mcp` SSE push 
 3. [Authentication](#authentication)
 4. [Session Management](#session-management)
 5. [Elicitation](#elicitation)
-6. [Tools — 32 total](#tools)
-   - [Read Tools (15)](#read-tools-15)
-   - [Write Tools (12)](#write-tools-12)
+6. [Tools — 40 total](#tools)
+   - [Read Tools (20)](#read-tools-20)
+   - [Write Tools (15)](#write-tools-15)
    - [Elicitation-Powered Tools (5)](#elicitation-powered-tools-5)
-7. [Resources — 20 total](#resources)
-   - [Static Resources (5)](#static-resources-5)
-   - [Templated Resources (15)](#templated-resources-15)
-8. [Prompts — 8 total](#prompts)
+7. [Resources — 29 total](#resources)
+   - [Static Resources (12)](#static-resources-12)
+   - [Templated Resources (17)](#templated-resources-17)
+8. [Prompts — 10 total](#prompts)
 9. [Error Handling](#error-handling)
 10. [Usage Patterns](#usage-patterns)
 11. [Architecture Diagrams](#architecture-diagrams)
@@ -189,7 +189,7 @@ The server sends an `elicitation/create` request with a restricted JSON Schema o
 Agent                    MuseHub MCP
   │                           │
   │  POST tools/call          │
-  │  (musehub_compose_with_preferences)
+  │  (musehub_create_with_preferences)
   │──────────────────────────►│
   │                           │ opens SSE stream
   │◄──────────────────────────│
@@ -246,7 +246,17 @@ MuseHub provides five musical form schemas:
 
 ## Tools
 
-All 32 tools use `server_side: true`. The JSON-RPC envelope is always a success response — errors are represented inside the content block via `isError: true`.
+All 40 tools use `server_side: true`. The JSON-RPC envelope is always a success response — errors are represented inside the content block via `isError: true`.
+
+### Repo identification: `repo_id` or `owner` + `slug`
+
+All repo-scoped tools accept either form. The dispatcher resolves `owner` + `slug` to a `repo_id` transparently — agents can use human-readable names without a prior lookup step:
+
+```json
+{ "repo_id": "abc-123-uuid" }
+// or equivalently:
+{ "owner": "cgcardona", "slug": "jazz-standards" }
+```
 
 ### Calling a tool
 
@@ -256,8 +266,8 @@ All 32 tools use `server_side: true`. The JSON-RPC envelope is always a success 
   "id": 1,
   "method": "tools/call",
   "params": {
-    "name": "musehub_browse_repo",
-    "arguments": { "repo_id": "abc123" }
+    "name": "musehub_get_context",
+    "arguments": { "owner": "cgcardona", "slug": "jazz-standards" }
   }
 }
 ```
@@ -277,15 +287,17 @@ Response:
 
 ---
 
-### Read Tools (15)
+### Read Tools (20)
 
-#### `musehub_browse_repo`
+#### `musehub_get_context`
 
-Orientation snapshot for a repo: metadata, default branch, recent commits, top-level file list.
+**Start here.** Full AI context document for a repo — domain plugin (scoped_id, dimensions, capabilities), branches, recent commits, and artifact inventory in a single call. Always call this before creating or modifying state. For computed analytics, follow up with `musehub_get_domain_insights`. For the full viewer payload, follow up with `musehub_get_view`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 
 ---
 
@@ -295,7 +307,9 @@ All branches with their head commit IDs and timestamps.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 
 ---
 
@@ -305,7 +319,9 @@ Paginated commit history, newest first.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `branch` | string | no | Branch name filter |
 | `limit` | integer | no | Max commits (default 20) |
 
@@ -317,21 +333,11 @@ Metadata for a single artifact (MIDI, MP3, WebP, etc.) at a given commit.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `path` | string | yes | File path within the repo |
 | `commit_id` | string | no | Commit SHA (defaults to HEAD) |
-
----
-
-#### `musehub_get_analysis`
-
-13-dimension musical analysis for a repo at a given ref.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
-| `ref` | string | no | Branch, tag, or commit SHA |
-| `mode` | string | no | `"overview"` (default), `"commits"`, or `"objects"` |
 
 ---
 
@@ -341,18 +347,11 @@ Keyword/path search over commits and file paths within a repo.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `query` | string | yes | Search terms |
-
----
-
-#### `musehub_get_context`
-
-Full AI context document for a repo — combines metadata, analysis, recent activity, and usage hints into a single structured payload.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `mode` | string | no | `"path"` (default) or `"commit"` |
 
 ---
 
@@ -362,7 +361,9 @@ Single commit detail with the full snapshot manifest (all file paths and content
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `commit_id` | string | yes | Commit SHA |
 
 ---
@@ -373,7 +374,9 @@ Musical diff between two refs — returns per-dimension change scores (harmony, 
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `base_ref` | string | yes | Base branch, tag, or commit SHA |
 | `head_ref` | string | yes | Head branch, tag, or commit SHA |
 
@@ -385,7 +388,9 @@ Issues with optional state, label, and assignee filters.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `state` | string | no | `"open"` (default) or `"closed"` |
 | `label` | string | no | Label name filter |
 | `assignee` | string | no | Assignee username filter |
@@ -398,7 +403,9 @@ Single issue with its full comment thread.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `issue_number` | integer | yes | Issue number |
 
 ---
@@ -409,7 +416,9 @@ Pull requests with optional state and base branch filters.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `state` | string | no | `"open"` (default), `"closed"`, or `"merged"` |
 | `base` | string | no | Target branch filter |
 
@@ -421,7 +430,9 @@ Single PR with all inline comments and reviews.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `pr_number` | integer | yes | Pull request number |
 
 ---
@@ -432,7 +443,9 @@ All releases for a repo with asset counts and timestamps.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 
 ---
 
@@ -451,7 +464,85 @@ Discover public repos by text query or musical attributes.
 
 ---
 
-### Write Tools (12)
+#### `musehub_list_domains`
+
+List all available domain plugins registered in MuseHub (e.g. MIDI, Genomics, Code).
+
+_No parameters required._
+
+---
+
+#### `musehub_get_domain`
+
+Full definition for a single domain plugin — scoped_id, version, dimension manifest, capabilities, and schema.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `domain_id` | string | yes | Domain plugin identifier (e.g. `"midi-v1"`) |
+
+---
+
+#### `musehub_get_domain_insights`
+
+Computed analytics for a repo using its domain plugin — per-dimension scores, distribution stats, and trend data.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
+| `ref` | string | no | Branch, tag, or commit SHA (defaults to HEAD) |
+
+---
+
+#### `musehub_get_view`
+
+Full viewer payload — dimension slices, navigation strip, and the current state for each registered dimension. Use after `musehub_get_context` for the visual-layer detail.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
+| `ref` | string | no | Branch, tag, or commit SHA (defaults to HEAD) |
+
+---
+
+#### `musehub_whoami`
+
+Return the authenticated user's profile. Useful for confirming token identity before write operations.
+
+_No parameters required._
+
+---
+
+#### `muse_pull`
+
+Pull latest commits from MuseHub into a local Muse working tree — equivalent of `muse pull` on the command line.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
+| `branch` | string | no | Branch to pull (defaults to current) |
+
+---
+
+#### `muse_remote`
+
+Inspect remote tracking configuration and get the clone URL for a repo — equivalent of `muse remote` on the command line. Returns `clone_url`, `clone_command`, and `visibility`. Pass `ref` to pin to a specific branch or tag.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
+| `ref` | string | no | Branch or tag to reference in the clone command |
+
+---
+
+### Write Tools (15)
 
 > All write tools require `Authorization: Bearer <jwt>` on the HTTP transport.
 
@@ -613,10 +704,51 @@ Create a label scoped to a repository.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | yes | Repository UUID |
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 | `name` | string | yes | Label name |
 | `color` | string | yes | Hex color (e.g. `"#0075ca"`) |
 | `description` | string | no | Label description |
+
+---
+
+#### `musehub_create_agent_token`
+
+Mint a long-lived agent JWT with higher rate limits and an activity badge in the public feed.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `agent_name` | string | yes | Display name for the agent (shown in feed) |
+| `scopes` | array of strings | no | Permission scopes (defaults to all) |
+
+---
+
+#### `muse_push`
+
+Push a Muse commit to MuseHub — equivalent of `muse push` on the command line.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
+| `branch` | string | yes | Target branch name |
+| `commit_data` | object | yes | Commit payload (message, snapshot, author) |
+
+---
+
+#### `muse_config`
+
+Read or write per-repo Muse configuration values — equivalent of `muse config` on the command line.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repo_id` | string | no | Repository UUID (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
+| `key` | string | yes | Config key to read or write |
+| `value` | string | no | Value to set (omit to read the current value) |
 
 ---
 
@@ -624,17 +756,19 @@ Create a label scoped to a repository.
 
 > All elicitation tools require `Authorization: Bearer <jwt>`, an active session (`Mcp-Session-Id`), and a client that declared elicitation capability during `initialize`. They degrade gracefully for stateless clients, returning an `elicitation_unavailable` error that includes instructions for the non-interactive equivalent.
 
-#### `musehub_compose_with_preferences` _(form elicitation)_
+#### `musehub_create_with_preferences` _(form elicitation)_
 
-Interview the user about a composition, then return a complete musical plan.
+Interview the user about a creation, then return a complete domain-specific plan.
 
-**Elicits:** key, tempo (BPM), time signature, mood, genre, reference artist, duration (bars), key modulation preference.
+**Elicits (MIDI/music domain):** key, tempo (BPM), time signature, mood, genre, reference artist, duration (bars), key modulation preference.
 
 **Returns:** chord progressions per section, structural form (intro/verse/chorus/bridge/outro), harmonic tension profile, texture guidance, and a step-by-step Muse project workflow.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | no | Optional target repo to scaffold the plan into |
+| `repo_id` | string | no | Optional target repo to scaffold the plan into (or use `owner` + `slug`) |
+| `owner` | string | no | Owner username (use with `slug`) |
+| `slug` | string | no | Repository slug (use with `owner`) |
 
 ---
 
@@ -737,7 +871,7 @@ Response:
 
 ---
 
-### Static Resources (5)
+### Static Resources (12)
 
 #### `musehub://trending`
 
@@ -779,7 +913,7 @@ Activity feed for repos the authenticated user watches. Requires JWT.
 
 ---
 
-### Templated Resources (15)
+### Templated Resources (17)
 
 All templated resources follow RFC 6570 Level 1. `{owner}` and `{slug}` are resolved to a `repo_id` by the dispatcher — agents use human-readable names, not UUIDs.
 
@@ -912,9 +1046,9 @@ With arguments:
 
 ### `musehub/orientation`
 
-**Arguments:** none
+**Arguments:** `caller_type` (optional: `"human"` or `"agent"`)
 
-The essential first read for any new agent. Explains MuseHub's model (repos, commits, branches, musical analysis), the `musehub://` URI scheme, which tools to use for reads vs. writes, and how to authenticate.
+The essential first read for any new agent or human. Explains MuseHub's model (repos, commits, branches, domain plugins, multidimensional state), the `musehub://` URI scheme, which tools to use for reads vs. writes, and how to authenticate. When `caller_type: "agent"` is passed, the response includes extended agent onboarding guidance — tool call sequencing, addressing scheme, and auth setup.
 
 ---
 
@@ -922,29 +1056,30 @@ The essential first read for any new agent. Explains MuseHub's model (repos, com
 
 **Arguments:** `repo_id`, `owner`, `slug`
 
-End-to-end contribution workflow:
+End-to-end contribution workflow, including auth and push setup:
 
+0. Confirm authentication and set up `muse remote` tracking
 1. `musehub_get_context` — understand the repo
 2. `musehub://repos/{owner}/{slug}/issues` — find open issues
 3. `musehub_create_issue` — or create a new one
-4. Make changes, push a commit
+4. Make changes, push a commit via `muse_push`
 5. `musehub_create_pr` — open a PR
 6. `musehub_submit_pr_review` — request review
 7. `musehub_merge_pr` — merge when approved
 
 ---
 
-### `musehub/compose`
+### `musehub/create`
 
 **Arguments:** `repo_id`
 
-Musical composition workflow:
+Domain-agnostic creation workflow:
 
-1. `musehub_get_context` — understand existing tracks and structure
-2. `musehub://repos/{owner}/{slug}/analysis/{ref}` — study the musical analysis
-3. Compose new MIDI matching key/tempo/style
-4. Push the commit
-5. Verify the new analysis with `musehub_get_analysis`
+1. `musehub_get_context` — understand existing content and structure
+2. `musehub://repos/{owner}/{slug}/analysis/{ref}` — study the domain-specific analysis
+3. Create domain artifacts matching the repo's dimensional constraints
+4. Push the commit via `muse_push`
+5. Verify with `musehub_get_domain_insights`
 
 ---
 
@@ -983,7 +1118,7 @@ Prepare a release:
 
 1. `musehub_list_prs` — find merged PRs since the last release
 2. `musehub_list_releases` — check the latest release tag
-3. `musehub_get_analysis` — summarise musical changes
+3. `musehub_get_domain_insights` — summarise domain-specific changes
 4. Draft release notes (Markdown)
 5. `musehub_create_release` — publish
 
@@ -996,7 +1131,7 @@ Prepare a release:
 Interactive artist onboarding using elicitation. Requires a client with session + elicitation capability:
 
 1. `musehub_create_repo` — scaffold the first project repo
-2. `musehub_compose_with_preferences` — elicits key, tempo, mood, genre; returns composition plan
+2. `musehub_create_with_preferences` — elicits key, tempo, mood, genre; returns composition plan
 3. `musehub_connect_daw_cloud` — URL elicitation: OAuth-connect LANDR/Splice/Soundtrap
 4. Guides through first commit, collaboration invite, and activity feed
 
@@ -1012,6 +1147,30 @@ Full elicitation-powered release and distribution pipeline:
 2. `musehub_connect_streaming_platform` — URL elicitation for each target platform
 3. `musehub_connect_daw_cloud` — optional cloud mastering via LANDR
 4. Post announcement issue and notify followers
+
+---
+
+### `musehub/domain-discovery`
+
+**Arguments:** none
+
+Discover and evaluate available domain plugins:
+
+1. `musehub_list_domains` — enumerate all registered domain plugins
+2. `musehub_get_domain` — inspect a specific plugin's dimension manifest and capabilities
+3. `musehub_search_repos` — find repos using that domain
+
+---
+
+### `musehub/domain-authoring`
+
+**Arguments:** `domain_id` (optional)
+
+Author a new domain plugin from scratch or extend an existing one:
+
+1. `musehub_list_domains` — understand the existing domain landscape
+2. Walk through dimension schema design, capability declaration, and scoped_id naming
+3. Validate by creating a test repo and calling `musehub_get_domain_insights`
 
 ---
 
@@ -1057,12 +1216,12 @@ Tool execution errors are not JSON-RPC errors. The envelope is always a success 
 ### Pattern 2: Fix a bug, open a PR
 
 ```
-1. tools/call   musehub_list_issues { repo_id, state: "open" }
-2. tools/call   musehub_get_issue { repo_id, issue_number }
-3. tools/call   musehub_browse_repo { repo_id }
-4. tools/call   musehub_read_file { repo_id, path }
-5. -- compose fix, push commit --
-6. tools/call   musehub_create_pr { repo_id, title, from_branch, to_branch }
+1. tools/call   musehub_list_issues { owner, slug, state: "open" }
+2. tools/call   musehub_get_issue { owner, slug, issue_number }
+3. tools/call   musehub_get_context { owner, slug }
+4. tools/call   musehub_read_file { owner, slug, path }
+5. -- compose fix, push commit via muse_push --
+6. tools/call   musehub_create_pr { owner, slug, title, from_branch, to_branch }
 ```
 
 ### Pattern 3: Full musical PR review (elicitation-powered)
@@ -1082,12 +1241,12 @@ Or stateless:
 4. tools/call   musehub_submit_pr_review { repo_id, pr_id, event: "APPROVE" }
 ```
 
-### Pattern 4: Compose with preferences (elicitation-powered)
+### Pattern 4: Create with preferences (elicitation-powered)
 
 ```
 1. POST initialize  → Mcp-Session-Id: <id>
 2. GET /mcp (SSE)   → open push channel
-3. tools/call       musehub_compose_with_preferences { repo_id }
+3. tools/call       musehub_create_with_preferences { owner, slug }
    → SSE: elicitation/create { mode: "form", schema: compose_preferences }
    → [user selects key: "D minor", tempo: 95, mood: "melancholic", genre: "neo-soul"]
    → POST elicitation result { action: "accept", content: { key: "D minor", ... } }
@@ -1106,11 +1265,11 @@ Or stateless:
 Or stateless:
 
 ```
-1. tools/call   musehub_list_releases { repo_id }
-2. tools/call   musehub_list_prs { repo_id, state: "closed" }
-3. tools/call   musehub_get_analysis { repo_id, dimension: "overview" }
+1. tools/call   musehub_list_releases { owner, slug }
+2. tools/call   musehub_list_prs { owner, slug, state: "closed" }
+3. tools/call   musehub_get_domain_insights { owner, slug }
 4. tools/call   musehub_create_release {
-     repo_id, tag: "v1.2.0", title: "Spring Drop",
+     owner, slug, tag: "v1.2.0", title: "Spring Drop",
      body: "## What changed\n..."
    }
 ```
@@ -1195,14 +1354,12 @@ flowchart TD
 ```mermaid
 classDiagram
     class MUSEHUB_READ_TOOLS {
-        <<list of MCPToolDef — 15 tools>>
-        musehub_browse_repo
+        <<list of MCPToolDef — 20 tools>>
+        musehub_get_context
         musehub_list_branches
         musehub_list_commits
         musehub_read_file
-        musehub_get_analysis
         musehub_search
-        musehub_get_context
         musehub_get_commit
         musehub_compare
         musehub_list_issues
@@ -1211,9 +1368,16 @@ classDiagram
         musehub_get_pr
         musehub_list_releases
         musehub_search_repos
+        musehub_list_domains
+        musehub_get_domain
+        musehub_get_domain_insights
+        musehub_get_view
+        musehub_whoami
+        muse_pull
+        muse_remote
     }
     class MUSEHUB_WRITE_TOOLS {
-        <<list of MCPToolDef — 12 tools>>
+        <<list of MCPToolDef — 15 tools>>
         musehub_create_repo
         musehub_fork_repo
         musehub_create_issue
@@ -1226,10 +1390,13 @@ classDiagram
         musehub_create_release
         musehub_star_repo
         musehub_create_label
+        musehub_create_agent_token
+        muse_push
+        muse_config
     }
     class MUSEHUB_ELICITATION_TOOLS {
         <<list of MCPToolDef — 5 tools — MCP 2025-11-25>>
-        musehub_compose_with_preferences
+        musehub_create_with_preferences
         musehub_review_pr_interactive
         musehub_connect_streaming_platform
         musehub_connect_daw_cloud
@@ -1289,7 +1456,7 @@ sequenceDiagram
     Agent->>MCP: GET /mcp (Accept: text/event-stream, Mcp-Session-Id: abc123)
     MCP-->>Agent: 200 text/event-stream (SSE channel open)
 
-    Agent->>MCP: POST tools/call musehub_compose_with_preferences
+    Agent->>MCP: POST tools/call musehub_create_with_preferences
     Note over MCP: tool needs elicitation → SSE response
     MCP->>Session: create_pending_elicitation("elicit-1")
     MCP-->>Agent: 200 text/event-stream (POST SSE open)

@@ -1,14 +1,17 @@
-"""Tests for MuseHub MCP tools — .
+"""Tests for MuseHub MCP tools.
 
 Covers all acceptance criteria:
-  - musehub_browse_repo returns repo stats, branches, recent commits
+  - musehub_list_branches returns all branches with head commit IDs
   - musehub_read_file returns file metadata with MIME type
   - musehub_list_commits returns paginated commit list
-  - musehub_get_analysis returns analysis for overview/commits/objects dimensions
   - musehub_search supports path and commit modes
   - musehub_get_context returns full AI context document
   - All tools registered in MCP server with proper schemas
   - Tools handle errors gracefully (not_found, invalid dimension/mode)
+
+Note: execute_browse_repo and execute_get_analysis remain as internal executor
+functions, but musehub_browse_repo and musehub_get_analysis are no longer
+registered as MCP tools (their capabilities are served by musehub_get_context).
 
 Tests use conftest db_session (in-memory SQLite) and mock the executor's
 AsyncSessionLocal to use the test session so no live DB is required.
@@ -147,13 +150,12 @@ class TestMusehubToolsRegistered:
             )
 
     def test_all_tools_defined(self) -> None:
-        """All 43 MuseHub tools (23 read + 15 write + 5 elicitation) are defined."""
+        """All 40 MuseHub tools (20 read + 15 write + 5 elicitation) are defined."""
         expected_read = {
-            "musehub_browse_repo",
+            # Core repo reads
             "musehub_list_branches",
             "musehub_list_commits",
             "musehub_read_file",
-            "musehub_get_analysis",
             "musehub_search",
             "musehub_get_context",
             "musehub_get_commit",
@@ -171,7 +173,6 @@ class TestMusehubToolsRegistered:
             "musehub_list_domains",
             # Muse CLI + identity
             "musehub_whoami",
-            "muse_clone",
             "muse_pull",
             "muse_remote",
         }
@@ -194,7 +195,7 @@ class TestMusehubToolsRegistered:
             "muse_config",
         }
         expected_elicitation = {
-            "musehub_compose_with_preferences",
+            "musehub_create_with_preferences",
             "musehub_review_pr_interactive",
             "musehub_connect_streaming_platform",
             "musehub_connect_daw_cloud",
@@ -228,10 +229,10 @@ class TestMusehubExecutors:
             database._async_session_factory = original
 
     @pytest.mark.anyio
-    async def test_mcp_browse_repo_returns_repo_data(
+    async def test_execute_browse_repo_returns_repo_data(
         self, db_session: AsyncSession
     ) -> None:
-        """musehub_browse_repo returns repo, branches, and recent commits."""
+        """execute_browse_repo (internal executor) returns repo, branches, and commits."""
         await _seed_repo(db_session)
 
         with patch(
@@ -249,8 +250,8 @@ class TestMusehubExecutors:
         assert result.data["total_commits"] == 1
 
     @pytest.mark.anyio
-    async def test_mcp_browse_repo_not_found(self, db_session: AsyncSession) -> None:
-        """musehub_browse_repo returns error for unknown repo."""
+    async def test_execute_browse_repo_not_found(self, db_session: AsyncSession) -> None:
+        """execute_browse_repo (internal executor) returns error for unknown repo."""
         with patch(
             "musehub.services.musehub_mcp_executor.AsyncSessionLocal",
             return_value=db_session,
@@ -356,7 +357,7 @@ class TestMusehubExecutors:
 
     @pytest.mark.anyio
     async def test_mcp_get_analysis_overview(self, db_session: AsyncSession) -> None:
-        """musehub_get_analysis overview dimension returns repo stats."""
+        """execute_get_analysis (internal executor) overview dimension returns repo stats."""
         await _seed_repo(db_session)
 
         with patch(
@@ -376,7 +377,7 @@ class TestMusehubExecutors:
 
     @pytest.mark.anyio
     async def test_mcp_get_analysis_commits(self, db_session: AsyncSession) -> None:
-        """musehub_get_analysis commits dimension returns commit activity summary."""
+        """execute_get_analysis commits dimension returns commit activity summary."""
         await _seed_repo(db_session)
 
         with patch(
@@ -396,7 +397,7 @@ class TestMusehubExecutors:
 
     @pytest.mark.anyio
     async def test_mcp_get_analysis_objects(self, db_session: AsyncSession) -> None:
-        """musehub_get_analysis objects dimension returns artifact inventory."""
+        """execute_get_analysis objects dimension returns artifact inventory."""
         await _seed_repo(db_session)
 
         with patch(
@@ -416,7 +417,7 @@ class TestMusehubExecutors:
     async def test_mcp_get_analysis_invalid_dimension(
         self, db_session: AsyncSession
     ) -> None:
-        """musehub_get_analysis returns error for unknown dimension."""
+        """execute_get_analysis returns error for unknown dimension."""
         await _seed_repo(db_session)
 
         with patch(
@@ -571,21 +572,21 @@ class TestMusehubMcpServerRouting:
             return MuseMCPServer()
 
     @pytest.mark.anyio
-    async def test_musehub_browse_repo_routed_to_executor(
+    async def test_musehub_list_branches_routed_to_executor(
         self, server: MuseMCPServer
     ) -> None:
-        """call_tool routes musehub_browse_repo to the MuseHub executor."""
+        """call_tool routes musehub_list_branches to the MuseHub executor."""
         mock_result = MusehubToolResult(
             ok=True,
-            data={"repo": {"name": "test", "owner": "testuser"}, "branches": [], "recent_commits": [], "total_commits": 0, "branch_count": 0},
+            data={"repo_id": "repo-001", "branches": []},
         )
         with patch(
-            "musehub.services.musehub_mcp_executor.execute_browse_repo",
+            "musehub.services.musehub_mcp_executor.execute_list_branches",
             new_callable=AsyncMock,
             return_value=mock_result,
         ):
             result = await server.call_tool(
-                "musehub_browse_repo", {"repo_id": "repo-001"}
+                "musehub_list_branches", {"repo_id": "repo-001"}
             )
 
         assert result.success is True
@@ -595,47 +596,47 @@ class TestMusehubMcpServerRouting:
     async def test_musehub_tool_not_found_returns_error(
         self, server: MuseMCPServer
     ) -> None:
-        """musehub_browse_repo propagates not_found as an error response."""
+        """musehub_list_branches propagates not_found as an error response."""
         mock_result = MusehubToolResult(
             ok=False,
             error_code="not_found",
             error_message="Repository 'bad-id' not found.",
         )
         with patch(
-            "musehub.services.musehub_mcp_executor.execute_browse_repo",
+            "musehub.services.musehub_mcp_executor.execute_list_branches",
             new_callable=AsyncMock,
             return_value=mock_result,
         ):
             result = await server.call_tool(
-                "musehub_browse_repo", {"repo_id": "bad-id"}
+                "musehub_list_branches", {"repo_id": "bad-id"}
             )
 
         assert result.success is False
         assert result.is_error is True
 
     @pytest.mark.anyio
-    async def test_musehub_invalid_dimension_is_bad_request(
+    async def test_musehub_invalid_mode_is_bad_request(
         self, server: MuseMCPServer
     ) -> None:
-        """invalid_dimension error is surfaced as bad_request=True."""
+        """invalid_mode error is surfaced as bad_request=True."""
         mock_result = MusehubToolResult(
             ok=False,
-            error_code="invalid_dimension",
-            error_message="Unknown dimension 'xyz'.",
+            error_code="invalid_mode",
+            error_message="Unknown mode 'fuzzy'.",
         )
         with patch(
-            "musehub.services.musehub_mcp_executor.execute_get_analysis",
+            "musehub.services.musehub_mcp_executor.execute_search",
             new_callable=AsyncMock,
             return_value=mock_result,
         ):
             result = await server.call_tool(
-                "musehub_get_analysis", {"repo_id": "r", "dimension": "xyz"}
+                "musehub_search", {"repo_id": "r", "query": "bass", "mode": "fuzzy"}
             )
 
         assert result.bad_request is True
 
     @pytest.mark.anyio
-    async def test_musehub_browse_repo_db_unavailable_returns_error(
+    async def test_musehub_list_branches_db_unavailable_returns_error(
         self, server: MuseMCPServer
     ) -> None:
         """musehub tools return db_unavailable when session factory is not initialised."""
@@ -645,12 +646,12 @@ class TestMusehubMcpServerRouting:
             error_message="Database session factory is not initialised.",
         )
         with patch(
-            "musehub.services.musehub_mcp_executor.execute_browse_repo",
+            "musehub.services.musehub_mcp_executor.execute_list_branches",
             new_callable=AsyncMock,
             return_value=mock_result,
         ):
             result = await server.call_tool(
-                "musehub_browse_repo", {"repo_id": "any-id"}
+                "musehub_list_branches", {"repo_id": "any-id"}
             )
 
         assert result.success is False

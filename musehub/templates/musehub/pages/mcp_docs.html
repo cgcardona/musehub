@@ -193,7 +193,7 @@
           <div class="mcp-qs-step">4</div>
           <div>
             <p class="mcp-qs-title">Orient</p>
-            <p class="mcp-qs-body">Call <code>musehub_browse_repo</code> + <code>musehub_get_view</code> to inspect multidimensional state before modifying anything</p>
+            <p class="mcp-qs-body">Call <code>musehub_get_context</code> for a single-call orientation snapshot — branches, commits, domain plugin, and artifact inventory in one go</p>
           </div>
         </div>
         <div class="mcp-qs-card">
@@ -207,7 +207,7 @@
           <div class="mcp-qs-step mcp-qs-step--prompt">→</div>
           <div>
             <p class="mcp-qs-title">Full walkthrough</p>
-            <p class="mcp-qs-body">Use the <code>musehub/agent-onboard</code> prompt for a guided end-to-end session tailored to your agent and domain</p>
+            <p class="mcp-qs-body">Use the <code>musehub/orientation</code> prompt (pass <code>caller_type: "agent"</code>) for a guided end-to-end session tailored to your agent and domain</p>
           </div>
         </div>
       </div>
@@ -265,17 +265,17 @@
 
     {# ── Read tools ───────────────────────────────────────────────────────────── #}
     {% set read_names = [
-      'musehub_browse_repo','musehub_list_branches','musehub_list_commits',
-      'musehub_read_file','musehub_get_analysis','musehub_search',
+      'musehub_list_branches','musehub_list_commits',
+      'musehub_read_file','musehub_search',
       'musehub_get_context','musehub_get_commit','musehub_compare',
       'musehub_list_issues','musehub_get_issue','musehub_list_prs',
       'musehub_get_pr','musehub_list_releases','musehub_search_repos',
       'musehub_list_domains','musehub_get_domain','musehub_get_domain_insights',
       'musehub_get_view','musehub_whoami'
     ] %}
-    {% set cli_names = ['muse_clone','muse_pull','muse_remote','muse_push','muse_config'] %}
+    {% set cli_names = ['muse_pull','muse_remote','muse_push','muse_config'] %}
     {% set elicit_names = [
-      'musehub_compose_with_preferences','musehub_review_pr_interactive',
+      'musehub_create_with_preferences','musehub_review_pr_interactive',
       'musehub_connect_streaming_platform','musehub_connect_daw_cloud',
       'musehub_create_release_interactive'
     ] %}
@@ -313,7 +313,7 @@
         <h2 class="mcp-section-title">Muse CLI Tools</h2>
         <span class="mcp-badge mcp-badge--cli">{{ cli_names | length }}</span>
       </div>
-      <p class="mcp-section-desc">Equivalents of <code>muse clone</code>, <code>muse push</code>, <code>muse pull</code>, <code>muse remote</code>, and <code>muse config</code> — operate Muse VCS directly over MCP.</p>
+      <p class="mcp-section-desc">Equivalents of <code>muse push</code>, <code>muse pull</code>, <code>muse remote</code>, and <code>muse config</code> — operate Muse VCS directly over MCP. Clone URLs are surfaced via <code>muse_remote</code>.</p>
       <div class="mcp-tool-list">
         {% for tool in tools if tool.name in cli_names %}
         {{ _render_tool(tool, 'cli') }}
