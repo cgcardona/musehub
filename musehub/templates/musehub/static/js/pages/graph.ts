@@ -24,6 +24,13 @@ interface DagNode {
   branchLabels?: string[];
   tagLabels?:   string[];
   isHead?:      boolean;
+  // Muse semantic enrichment — absent in Git
+  commitType?:  string;   // feat, fix, refactor, chore, perf, …
+  semVerBump?:  string;   // major, minor, patch, none
+  isBreaking?:  boolean;
+  isAgent?:     boolean;
+  symAdded?:    number;
+  symRemoved?:  number;
 }
 interface DagEdge  { source: string; target: string; }
 interface DagData  { nodes: DagNode[]; edges: DagEdge[]; headCommitId: string; }
@@ -47,23 +54,44 @@ const PALETTE = [
   '#ff7b72','#79c0ff','#56d364','#ffa657',
   '#d2a8ff','#ff9492','#2dd4bf','#fbbf24',
 ];
+
+// Commit type → node fill color (semantic primary encoding)
 const TYPE_COLORS: Record<string, string> = {
-  feat:'#3fb950', fix:'#f85149', refactor:'#bc8cff',
-  init:'#58a6ff', docs:'#6e96c9', style:'#fbbf24',
-  test:'#2dd4bf', chore:'#6e7681', perf:'#f0883e',
+  feat:     '#3fb950',  // green   — new capability
+  fix:      '#f85149',  // red     — bug fix
+  refactor: '#bc8cff',  // purple  — structural change
+  init:     '#58a6ff',  // blue    — initialisation
+  docs:     '#6e96c9',  // muted blue
+  style:    '#fbbf24',  // yellow  — formatting
+  test:     '#2dd4bf',  // teal    — tests
+  chore:    '#6e7681',  // gray    — housekeeping
+  perf:     '#f0883e',  // orange  — performance
+  build:    '#a78bfa',  // violet  — build system
+  ci:       '#60a5fa',  // sky     — CI/CD
+  revert:   '#fb923c',  // amber   — revert
 };
-const HEAD_COLOR    = '#f0883e';
-const MERGE_COLOR   = '#bc8cff';
-const SESSION_COLOR = '#2dd4bf';
-const DIM_ALPHA     = 0.18;   // dimmed node/edge opacity when search active
+
+// Semver pip colors (top-right corner badge on the node)
+const SEMVER_COLORS: Record<string, string> = {
+  major: '#ef4444',   // red   — breaking version bump
+  minor: '#3b82f6',   // blue  — feature version bump
+  patch: '#22c55e',   // green — patch/fix bump
+};
+
+const HEAD_COLOR     = '#f0883e';
+const MERGE_COLOR    = '#bc8cff';
+const SESSION_COLOR  = '#2dd4bf';
+const BREAKING_COLOR = '#ef4444';
+const AGENT_COLOR    = '#a78bfa';   // violet for agent-authored nodes
+const DIM_ALPHA      = 0.18;
 
 // Layout constants
-const ROW_H   = 44;
-const LANE_W  = 24;
+const ROW_H   = 48;   // slightly more breathing room
+const LANE_W  = 26;
 const NODE_R  = 9;
 const PAD_L   = 20;
-const PAD_T   = 28;
-const LBL_GAP = 20;   // gap between rightmost lane and first text column
+const PAD_T   = 32;
+const LBL_GAP = 22;
 
 // Minimap
 const MM_W  = 148;
@@ -80,9 +108,17 @@ function colorFor(name: string): string {
   return (_colorCache[name] = PALETTE[Math.abs(h) % PALETTE.length]);
 }
 
-function commitType(msg: string): string | null {
-  const m = msg.match(/^(\w+)[\(!:]/);
+function commitType(n: DagNode): string | null {
+  if (n.commitType) return n.commitType;
+  const m = (n.message || '').match(/^(\w+)[\(!:]/);
   return m ? m[1].toLowerCase() : null;
+}
+
+function nodeSemanticColor(n: DagNode, branchColor: string): string {
+  const ct = commitType(n);
+  if (ct && TYPE_COLORS[ct]) return TYPE_COLORS[ct];
+  if (n.isAgent) return AGENT_COLOR;
+  return branchColor;
 }
 
 function timeAgo(ts: string): string {
@@ -309,6 +345,7 @@ function drawNode(n: DagNode, isHover: boolean): void {
   const cx  = nodeX(p.lane);
   const cy  = nodeY(p.row);
   const bc  = _layout.laneColors[n.branch] ?? '#8b949e';
+  const nc  = nodeSemanticColor(n, bc);   // commit-type fill (the Muse differentiator)
   const isHead  = n.commitId === _headId || n.isHead;
   const isMerge = (n.parentIds ?? []).length > 1;
   const inSess  = Boolean(_sessMap[n.commitId]);
@@ -319,39 +356,59 @@ function drawNode(n: DagNode, isHover: boolean): void {
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  // Glow rings
+  // ── Outermost rings (session, breaking, HEAD glow) ──────────────────────
+  if (n.isBreaking) {
+    // Red pulsing ring for breaking changes — impossible to miss
+    ctx.shadowBlur  = isHover ? 18 / scale : 10 / scale;
+    ctx.shadowColor = BREAKING_COLOR;
+    ctx.strokeStyle = BREAKING_COLOR;
+    ctx.lineWidth   = 2 / scale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, NODE_R + 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
   if (isHead) {
     ctx.shadowBlur  = 14 / scale;
     ctx.shadowColor = HEAD_COLOR;
     ctx.strokeStyle = HEAD_COLOR;
     ctx.lineWidth   = 2 / scale;
     ctx.beginPath();
-    ctx.arc(cx, cy, NODE_R + 5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, NODE_R + (n.isBreaking ? 12 : 5), 0, Math.PI * 2);
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
+
   if (inSess) {
     ctx.strokeStyle = SESSION_COLOR;
     ctx.lineWidth   = 1.5 / scale;
     ctx.setLineDash([3 / scale, 2 / scale]);
     ctx.beginPath();
-    ctx.arc(cx, cy, NODE_R + 8, 0, Math.PI * 2);
+    ctx.arc(cx, cy, NODE_R + (isHead ? 10 : 8), 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
   }
 
-  // Hover ring
+  // ── Hover ring ───────────────────────────────────────────────────────────
   if (isHover) {
-    ctx.strokeStyle = bc;
-    ctx.lineWidth   = 2 / scale;
-    ctx.globalAlpha = alpha * 0.4;
+    ctx.strokeStyle = nc;
+    ctx.lineWidth   = 1.5 / scale;
+    ctx.globalAlpha = alpha * 0.3;
     ctx.beginPath();
-    ctx.arc(cx, cy, NODE_R + 10, 0, Math.PI * 2);
+    ctx.arc(cx, cy, NODE_R + 12, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = alpha;
   }
 
-  // Node body
+  // ── Branch color ring (thin outer ring preserves lane identity) ──────────
+  ctx.strokeStyle = bc;
+  ctx.lineWidth   = 1.5 / scale;
+  ctx.beginPath();
+  ctx.arc(cx, cy, NODE_R + 2.5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // ── Node body — filled with commit-type color ────────────────────────────
   if (isMerge) {
     ctx.save();
     ctx.translate(cx, cy);
@@ -360,17 +417,20 @@ function drawNode(n: DagNode, isHover: boolean): void {
     ctx.fillStyle   = MERGE_COLOR;
     ctx.strokeStyle = '#0d1117';
     ctx.lineWidth   = 1.5 / scale;
+    ctx.shadowBlur  = isHover ? 10 / scale : 0;
+    ctx.shadowColor = MERGE_COLOR;
     ctx.beginPath();
     ctx.roundRect(-d, -d, d * 2, d * 2, 2 / scale);
     ctx.fill();
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.restore();
   } else {
-    ctx.fillStyle   = bc;
+    ctx.fillStyle   = nc;
     ctx.strokeStyle = '#0d1117';
-    ctx.lineWidth   = 1.5 / scale;
-    ctx.shadowBlur  = isHover ? 10 / scale : 0;
-    ctx.shadowColor = bc;
+    ctx.lineWidth   = 1 / scale;
+    ctx.shadowBlur  = isHover ? 12 / scale : 4 / scale;
+    ctx.shadowColor = nc;
     ctx.beginPath();
     ctx.arc(cx, cy, NODE_R, 0, Math.PI * 2);
     ctx.fill();
@@ -378,19 +438,57 @@ function drawNode(n: DagNode, isHover: boolean): void {
     ctx.shadowBlur = 0;
   }
 
-  // Author initial
-  const initial = (n.author || '?')[0].toUpperCase();
-  ctx.fillStyle  = '#0d1117';
-  ctx.font       = `bold ${Math.max(8, 10 / scale)}px system-ui`;
-  ctx.textAlign  = 'center';
-  ctx.textBaseline = 'middle';
-  // Only draw initial if it's readable (scale > 0.4)
+  // ── Inner label (agent "AI" vs author initial) ───────────────────────────
   if (scale > 0.4) {
-    ctx.font = 'bold 10px system-ui';
-    ctx.fillText(initial, cx, cy + 0.5);
+    ctx.fillStyle    = '#0d1117';
+    ctx.font         = 'bold 9px system-ui';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    const label = n.isAgent ? 'AI' : (n.author || '?')[0].toUpperCase();
+    ctx.fillText(label, cx, cy + 0.5);
+  }
+
+  // ── Semver pip (top-right corner) ────────────────────────────────────────
+  const bump = n.semVerBump ?? 'none';
+  const pipColor = SEMVER_COLORS[bump];
+  if (pipColor && scale > 0.25) {
+    const pipR = bump === 'major' ? 3.5 / scale : 2.5 / scale;
+    const pipX = cx + NODE_R * 0.72;
+    const pipY = cy - NODE_R * 0.72;
+    ctx.fillStyle   = pipColor;
+    ctx.strokeStyle = '#0d1117';
+    ctx.lineWidth   = 0.8 / scale;
+    ctx.shadowBlur  = bump === 'major' ? 6 / scale : 0;
+    ctx.shadowColor = pipColor;
+    ctx.beginPath();
+    ctx.arc(pipX, pipY, pipR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 
   ctx.restore();
+}
+
+function drawPill(
+  text: string,
+  x: number,
+  cy: number,
+  fillColor: string,
+  textColor: string,
+  h = 16,
+  padX = 7,
+): number {
+  ctx.font = 'bold 10px JetBrains Mono, Menlo, monospace';
+  const tw = ctx.measureText(text).width;
+  const pw = tw + padX * 2;
+  ctx.fillStyle = fillColor;
+  ctx.beginPath();
+  ctx.roundRect(x, cy - h / 2, pw, h, 4);
+  ctx.fill();
+  ctx.fillStyle = textColor;
+  ctx.fillText(text, x + padX, cy + 0.5);
+  return pw + 6;
 }
 
 function drawLabel(n: DagNode, isHover: boolean): void {
@@ -401,16 +499,15 @@ function drawLabel(n: DagNode, isHover: boolean): void {
   const isMatch = !matchSet || matchSet.has(n.commitId);
   const alpha   = isSearchActive && !isMatch ? DIM_ALPHA : 1;
 
-  // Skip labels when zoomed too far out
   if (scale < 0.28) return;
 
   ctx.save();
   ctx.globalAlpha = alpha;
 
   const sha7    = n.commitId.substring(0, 7);
-  const ctype   = commitType(n.message);
+  const ctype   = commitType(n);
   const typeCol = ctype ? (TYPE_COLORS[ctype] ?? null) : null;
-  const bodyMsg = ctype ? n.message.replace(/^\w+[^:]*:\s*/, '') : n.message;
+  const bodyMsg = ctype ? n.message.replace(/^\w+(\([^)]*\))?!?\s*:\s*/, '') : n.message;
   const isHead  = n.commitId === _headId || n.isHead;
 
   let x = _layout.labelX;
@@ -425,25 +522,21 @@ function drawLabel(n: DagNode, isHover: boolean): void {
 
   // Commit type pill
   if (typeCol && ctype) {
-    const pill = ctype;
-    ctx.font = 'bold 10px JetBrains Mono, Menlo, monospace';
-    const pw = ctx.measureText(pill).width + 10;
-    ctx.fillStyle = hexToRgba(typeCol, 0.18);
-    ctx.beginPath();
-    ctx.roundRect(x, cy - 8, pw, 16, 4);
-    ctx.fill();
-    ctx.fillStyle = typeCol;
-    ctx.fillText(pill, x + 5, cy + 0.5);
-    x += pw + 8;
+    x += drawPill(ctype, x, cy, hexToRgba(typeCol, 0.18), typeCol);
     ctx.fillStyle = '#6e7681';
     ctx.font      = '13px system-ui, -apple-system, sans-serif';
     ctx.fillText(': ', x, cy);
     x += ctx.measureText(': ').width;
   }
 
+  // Breaking badge
+  if (n.isBreaking) {
+    x += drawPill('BREAKING', x, cy, hexToRgba(BREAKING_COLOR, 0.2), BREAKING_COLOR, 16, 6);
+  }
+
   // Message
-  const vpW     = canvas.clientWidth;
-  const maxW    = vpW - x * scale - tx - 200;
+  const vpW      = canvas.clientWidth;
+  const maxW     = vpW - x * scale - tx - 220;
   const maxChars = Math.max(10, Math.floor(maxW / (scale * 7.5)));
   const display  = bodyMsg.length > maxChars ? bodyMsg.substring(0, maxChars - 1) + '…' : bodyMsg;
   ctx.font      = `${isHover ? 'bold ' : ''}13px system-ui, -apple-system, sans-serif`;
@@ -453,29 +546,27 @@ function drawLabel(n: DagNode, isHover: boolean): void {
 
   // Branch labels
   for (const lbl of (n.branchLabels ?? [])) {
-    const lc  = _layout.laneColors[lbl] ?? colorFor(lbl);
-    const lw  = ctx.measureText(lbl).width + 14;
+    const lc = _layout.laneColors[lbl] ?? colorFor(lbl);
     ctx.font = 'bold 10px JetBrains Mono, Menlo, monospace';
-    ctx.fillStyle = hexToRgba(lc, 0.2);
-    ctx.beginPath();
-    ctx.roundRect(x, cy - 9, ctx.measureText(lbl).width + 14, 18, 5);
-    ctx.fill();
-    ctx.fillStyle = lc;
-    ctx.fillText(lbl, x + 7, cy + 0.5);
-    x += lw + 5;
+    x += drawPill(lbl, x, cy, hexToRgba(lc, 0.2), lc, 18, 7);
   }
 
   // HEAD badge
   if (isHead) {
     ctx.font = 'bold 10px JetBrains Mono, Menlo, monospace';
-    const hw = ctx.measureText('HEAD').width + 14;
-    ctx.fillStyle = hexToRgba(HEAD_COLOR, 0.25);
-    ctx.beginPath();
-    ctx.roundRect(x, cy - 9, hw, 18, 5);
-    ctx.fill();
-    ctx.fillStyle = HEAD_COLOR;
-    ctx.fillText('HEAD', x + 7, cy + 0.5);
-    x += hw + 5;
+    x += drawPill('HEAD', x, cy, hexToRgba(HEAD_COLOR, 0.25), HEAD_COLOR, 18, 7);
+  }
+
+  // Agent badge (only when zoomed in enough)
+  if (n.isAgent && scale > 0.6) {
+    x += drawPill('agent', x, cy, hexToRgba(AGENT_COLOR, 0.18), AGENT_COLOR);
+  }
+
+  // Semver bump badge
+  const bump = n.semVerBump ?? 'none';
+  const bumpCol = SEMVER_COLORS[bump];
+  if (bumpCol && scale > 0.6) {
+    drawPill(bump, x, cy, hexToRgba(bumpCol, 0.18), bumpCol);
   }
 
   // Time (right-aligned, dimmer)
@@ -527,14 +618,16 @@ function drawMinimap(): void {
     }
   }
 
-  // Draw miniature nodes
+  // Draw miniature nodes — colored by commit type (semantic encoding)
   for (const n of _layout.rows) {
     const p = _layout.pos[n.commitId];
     if (!p) continue;
     const cx = nodeX(p.lane) * scaleX + 2;
     const cy = nodeY(p.row)  * scaleY + 2;
     const isHead = n.commitId === _headId;
-    mmCtx.fillStyle = isHead ? HEAD_COLOR : (colorFor(n.branch) + '99');
+    const bc = _layout.laneColors[n.branch] ?? '#8b949e';
+    const nc = nodeSemanticColor(n, bc);
+    mmCtx.fillStyle = isHead ? HEAD_COLOR : (nc + 'cc');
     mmCtx.beginPath();
     mmCtx.arc(cx, cy, isHead ? 3 : 1.5, 0, Math.PI * 2);
     mmCtx.fill();
@@ -599,18 +692,19 @@ function showTooltip(e: MouseEvent, cid: string): void {
   if (!n) return;
 
   const bc    = _layout.laneColors[n.branch] ?? '#8b949e';
-  const ctype = commitType(n.message);
+  const ctype = commitType(n);
   const tc    = ctype ? (TYPE_COLORS[ctype] ?? null) : null;
-  const body  = ctype ? n.message.replace(/^\w+[^:]*:\s*/, '') : n.message;
+  const body  = ctype ? n.message.replace(/^\w+(\([^)]*\))?!?\s*:\s*/, '') : n.message;
 
-  const popSha    = document.getElementById('pop-sha');
-  const popBranch = document.getElementById('pop-branch-badge') as HTMLElement | null;
-  const popMsg    = document.getElementById('pop-msg');
-  const popAuthor = document.getElementById('pop-author');
-  const popAvatar = document.getElementById('pop-avatar') as HTMLElement | null;
-  const popTime   = document.getElementById('pop-time');
+  const popSha     = document.getElementById('pop-sha');
+  const popBranch  = document.getElementById('pop-branch-badge') as HTMLElement | null;
+  const popMsg     = document.getElementById('pop-msg');
+  const popAuthor  = document.getElementById('pop-author');
+  const popAvatar  = document.getElementById('pop-avatar') as HTMLElement | null;
+  const popTime    = document.getElementById('pop-time');
   const popSession = document.getElementById('pop-session') as HTMLElement | null;
-  const popType   = document.getElementById('pop-type') as HTMLElement | null;
+  const popType    = document.getElementById('pop-type') as HTMLElement | null;
+  const popMuse    = document.getElementById('pop-muse') as HTMLElement | null;
 
   if (popSha)    popSha.textContent    = n.commitId.substring(0, 12);
   if (popBranch) {
@@ -622,15 +716,15 @@ function showTooltip(e: MouseEvent, cid: string): void {
   if (popMsg)    popMsg.textContent    = body.length > 120 ? body.substring(0, 117) + '…' : body;
   if (popAuthor) popAuthor.textContent = n.author;
   if (popAvatar) {
-    popAvatar.textContent       = (n.author || '?')[0].toUpperCase();
-    popAvatar.style.background  = colorFor(n.author);
+    popAvatar.textContent      = n.isAgent ? '✦' : (n.author || '?')[0].toUpperCase();
+    popAvatar.style.background = n.isAgent ? AGENT_COLOR : colorFor(n.author);
   }
   if (popTime)   popTime.textContent   = timeAgo(n.timestamp);
   if (popType && ctype && tc) {
-    popType.textContent      = ctype;
-    popType.style.display    = 'inline-flex';
-    popType.style.background = tc + '22';
-    popType.style.color      = tc;
+    popType.textContent       = ctype;
+    popType.style.display     = 'inline-flex';
+    popType.style.background  = tc + '22';
+    popType.style.color       = tc;
     popType.style.borderColor = tc + '44';
   } else if (popType) {
     popType.style.display = 'none';
@@ -641,11 +735,30 @@ function showTooltip(e: MouseEvent, cid: string): void {
     popSession.style.display = sess?.intent ? 'block' : 'none';
   }
 
+  // Muse-specific enrichment row
+  if (popMuse) {
+    const parts: string[] = [];
+    if (n.isAgent)    parts.push(`<span class="pop-muse-badge pop-muse-agent">✦ agent</span>`);
+    if (n.isBreaking) parts.push(`<span class="pop-muse-badge pop-muse-breaking">⚡ breaking</span>`);
+    const bump = n.semVerBump ?? 'none';
+    if (bump && bump !== 'none') {
+      const bumpHex = SEMVER_COLORS[bump] ?? '#8b949e';
+      parts.push(`<span class="pop-muse-badge" style="background:${bumpHex}22;color:${bumpHex};border-color:${bumpHex}44">${bump}</span>`);
+    }
+    if ((n.symAdded ?? 0) > 0 || (n.symRemoved ?? 0) > 0) {
+      const addStr = (n.symAdded ?? 0) > 0 ? `<span class="pop-sym-add">+${n.symAdded} sym</span>` : '';
+      const delStr = (n.symRemoved ?? 0) > 0 ? `<span class="pop-sym-del">−${n.symRemoved} sym</span>` : '';
+      parts.push(`<span class="pop-sym-stats">${addStr}${addStr && delStr ? ' ' : ''}${delStr}</span>`);
+    }
+    popMuse.innerHTML = parts.join('');
+    popMuse.style.display = parts.length ? 'flex' : 'none';
+  }
+
   tip.style.display = 'block';
   const vw = window.innerWidth, vh = window.innerHeight;
   let px = e.clientX + 20, py = e.clientY - 10;
   if (px + 380 > vw) px = e.clientX - 390;
-  if (py + 240 > vh) py = e.clientY - 240;
+  if (py + 280 > vh) py = e.clientY - 280;
   tip.style.left = px + 'px';
   tip.style.top  = py + 'px';
 }
@@ -660,15 +773,26 @@ function hideTooltip(): void {
 
 function populateSidebar(nodes: DagNode[]): void {
   const authorCounts: Record<string, number> = {};
-  nodes.forEach(n => { authorCounts[n.author] = (authorCounts[n.author] || 0) + 1; });
-  const authors   = Object.entries(authorCounts).sort((a, b) => b[1] - a[1]);
-  const maxC      = authors[0]?.[1] ?? 1;
+  const typeCounts:   Record<string, number> = {};
+  nodes.forEach(n => {
+    authorCounts[n.author] = (authorCounts[n.author] || 0) + 1;
+    const ct = commitType(n) ?? 'other';
+    typeCounts[ct] = (typeCounts[ct] || 0) + 1;
+  });
+  const authors    = Object.entries(authorCounts).sort((a, b) => b[1] - a[1]);
+  const maxC       = authors[0]?.[1] ?? 1;
   const mergeCount = nodes.filter(n => (n.parentIds ?? []).length > 1).length;
+  const agentCount = nodes.filter(n => n.isAgent).length;
+  const breakCount = nodes.filter(n => n.isBreaking).length;
 
-  const statAuthors = document.getElementById('stat-authors');
-  const statMerges  = document.getElementById('stat-merges');
-  if (statAuthors) statAuthors.textContent = String(authors.length);
-  if (statMerges)  statMerges.textContent  = String(mergeCount);
+  const statAuthors  = document.getElementById('stat-authors');
+  const statMerges   = document.getElementById('stat-merges');
+  const statAgents   = document.getElementById('stat-agents');
+  const statBreaking = document.getElementById('stat-breaking');
+  if (statAuthors)  statAuthors.textContent  = String(authors.length);
+  if (statMerges)   statMerges.textContent   = String(mergeCount);
+  if (statAgents)   statAgents.textContent   = String(agentCount);
+  if (statBreaking) statBreaking.textContent = String(breakCount);
 
   const branches = Object.keys(_layout.laneColors);
   const branchCounts: Record<string, number> = {};
@@ -684,6 +808,24 @@ function populateSidebar(nodes: DagNode[]): void {
     ).join('');
   }
 
+  // Commit-type legend (what makes Muse unique)
+  const legendTypes = document.getElementById('legend-types');
+  if (legendTypes) {
+    const typeOrder = ['feat','fix','refactor','perf','chore','docs','test','style','build','ci','revert','init'];
+    const present   = typeOrder.filter(t => typeCounts[t]);
+    if (present.length) {
+      legendTypes.innerHTML = present.map(t =>
+        `<span class="graph-legend-type">
+          <span class="graph-legend-dot" style="background:${TYPE_COLORS[t] ?? '#8b949e'}"></span>
+          ${window.escHtml(t)} <span class="graph-legend-type-count">${typeCounts[t]}</span>
+        </span>`
+      ).join('');
+      legendTypes.style.display = 'flex';
+    } else {
+      legendTypes.style.display = 'none';
+    }
+  }
+
   const sidebarBranches = document.getElementById('sidebar-branch-list');
   if (sidebarBranches) {
     sidebarBranches.innerHTML = branches.map(b =>
@@ -695,10 +837,33 @@ function populateSidebar(nodes: DagNode[]): void {
     ).join('');
   }
 
+  // Commit type breakdown card
+  const sidebarTypes = document.getElementById('sidebar-type-list');
+  if (sidebarTypes) {
+    const sorted = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]);
+    const maxT   = sorted[0]?.[1] ?? 1;
+    sidebarTypes.innerHTML = sorted.map(([t, cnt]) => {
+      const col = TYPE_COLORS[t] ?? '#6e7681';
+      const pct = Math.round((cnt / maxT) * 100);
+      return `<div class="contributor-item">
+        <span class="contributor-avatar-sm" style="background:${col};color:#0d1117;font-size:9px;font-weight:700">${window.escHtml(t[0].toUpperCase())}</span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="contributor-name" style="color:${col}">${window.escHtml(t)}</span>
+            <span class="contributor-count">${cnt}</span>
+          </div>
+          <div class="contributor-bar">
+            <div class="contributor-bar-fill" style="width:${pct}%;background:${col}"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
   const sidebarContribs = document.getElementById('sidebar-contributor-list');
   if (sidebarContribs) {
     sidebarContribs.innerHTML = authors.map(([author, count]) => {
-      const pct   = Math.round((count / maxC) * 100);
+      const pct    = Math.round((count / maxC) * 100);
       const acolor = colorFor(author);
       return `<div class="contributor-item">
         <span class="contributor-avatar-sm" style="background:${acolor}">${window.escHtml(author[0].toUpperCase())}</span>

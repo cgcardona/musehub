@@ -1073,9 +1073,38 @@ async def list_commits_dag(
         sorted_remaining = sorted(remaining, key=lambda c: row_map[c].timestamp)
         topo_order.extend(sorted_remaining)
 
+    _conv_re = re.compile(r'^(\w+)(\([^)]*\))?(!)?\s*:')
+
     nodes: list[DagNode] = []
     for cid in topo_order:
         row = row_map[cid]
+        raw_meta: dict = dict(row.commit_meta or {}) if row.commit_meta else {}
+
+        # Extract conventional-commit prefix from the message
+        m = _conv_re.match((row.message or "").strip())
+        commit_type = m.group(1).lower() if m else ""
+
+        # Semantic version bump from commit_meta
+        sem_ver_bump = str(raw_meta.get("sem_ver_bump") or "none").lower()
+
+        # Breaking change: bang suffix OR commit_meta flag
+        is_breaking = bool((m and m.group(3)) or raw_meta.get("breaking_changes"))
+
+        # Agent authorship: presence of agent_id in commit_meta
+        is_agent = bool(raw_meta.get("agent_id"))
+
+        # Symbol operation counts from structured_delta
+        structured_delta: dict = raw_meta.get("structured_delta") or {}
+        sym_added = 0
+        sym_removed = 0
+        for file_op in structured_delta.get("ops", []):
+            for child_op in (file_op.get("child_ops") or []):
+                op = child_op.get("op", "")
+                if op == "insert":
+                    sym_added += 1
+                elif op == "delete":
+                    sym_removed += 1
+
         nodes.append(
             DagNode(
                 commit_id=row.commit_id,
@@ -1087,6 +1116,12 @@ async def list_commits_dag(
                 is_head=(row.commit_id == head_commit_id),
                 branch_labels=branch_label_map.get(row.commit_id, []),
                 tag_labels=[],
+                commit_type=commit_type,
+                sem_ver_bump=sem_ver_bump,
+                is_breaking=is_breaking,
+                is_agent=is_agent,
+                sym_added=sym_added,
+                sym_removed=sym_removed,
             )
         )
 
@@ -1428,6 +1463,94 @@ async def resolve_ref_for_tree(
     return commit_row is not None
 
 
+async def _get_head_snapshot_manifest(
+    session: AsyncSession,
+    repo_id: str,
+    ref: str,
+) -> dict[str, str]:
+    """Return the ``{path: object_id}`` manifest for the HEAD commit on *ref*.
+
+    Falls back to an empty dict when no snapshot exists (e.g. new empty repo).
+    """
+    # Resolve branch head → commit_id
+    branch_row = (
+        await session.execute(
+            select(db.MusehubBranch).where(
+                db.MusehubBranch.repo_id == repo_id,
+                db.MusehubBranch.name == ref,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if branch_row is None or not branch_row.head_commit_id:
+        return {}
+
+    head_commit = (
+        await session.execute(
+            select(db.MusehubCommit).where(
+                db.MusehubCommit.commit_id == branch_row.head_commit_id
+            )
+        )
+    ).scalar_one_or_none()
+
+    if head_commit is None or head_commit.snapshot_id is None:
+        return {}
+
+    snapshot = await session.get(db.MusehubSnapshot, head_commit.snapshot_id)
+    if snapshot is None:
+        return {}
+    return dict(snapshot.manifest or {})
+
+
+def _manifest_to_tree(
+    manifest: dict[str, str],
+    dir_path: str,
+) -> tuple[list[TreeEntryResponse], list[TreeEntryResponse]]:
+    """Build sorted (dirs, files) tree entries from a snapshot manifest.
+
+    ``dir_path`` is the directory prefix to list (empty = repo root).
+    Returns (dirs, files) each sorted alphabetically.
+    """
+    prefix = (dir_path.strip("/") + "/") if dir_path.strip("/") else ""
+    seen_dirs: set[str] = set()
+    dirs: list[TreeEntryResponse] = []
+    files: list[TreeEntryResponse] = []
+
+    for path in manifest:
+        norm = path.lstrip("/")
+        if not norm.startswith(prefix):
+            continue
+        remainder = norm[len(prefix):]
+        if not remainder:
+            continue
+        slash_pos = remainder.find("/")
+        if slash_pos == -1:
+            files.append(
+                TreeEntryResponse(
+                    type="file",
+                    name=remainder,
+                    path=norm,
+                    size_bytes=None,
+                )
+            )
+        else:
+            dir_name = remainder[:slash_pos]
+            if dir_name not in seen_dirs:
+                seen_dirs.add(dir_name)
+                dirs.append(
+                    TreeEntryResponse(
+                        type="dir",
+                        name=dir_name,
+                        path=prefix + dir_name,
+                        size_bytes=None,
+                    )
+                )
+
+    dirs.sort(key=lambda e: e.name)
+    files.sort(key=lambda e: e.name)
+    return dirs, files
+
+
 async def list_tree(
     session: AsyncSession,
     repo_id: str,
@@ -1438,32 +1561,30 @@ async def list_tree(
 ) -> TreeListResponse:
     """Build a directory listing for the tree browser.
 
-    Reconstructs the repo's directory structure from all objects stored under
-    ``repo_id``. The ``dir_path`` parameter acts as a path prefix filter:
-    - Empty string → list the root directory.
-    - "tracks" → list all entries directly under the "tracks/" prefix.
+    Primary strategy: read the snapshot manifest for the HEAD commit on *ref*
+    (``musehub_snapshots.manifest``).  This reflects the exact file tree at
+    that commit without relying on per-object path metadata (which is empty
+    for wire-protocol pushes).
 
-    Entries are grouped: directories first (alphabetically), then files
-    (alphabetically). Directory size_bytes is None because computing the
-    recursive sum is deferred to client-side rendering.
-
-    Args:
-        session: Active async DB session.
-        repo_id: UUID of the target repo.
-        owner: Repo owner username (for response breadcrumbs).
-        repo_slug: Repo slug (for response breadcrumbs).
-        ref: Branch name or commit SHA (for response breadcrumbs).
-        dir_path: Current directory prefix; empty string for repo root.
-
-    Returns:
-        TreeListResponse with entries sorted dirs-first, then files.
+    Fallback: scan ``musehub_objects`` by path (legacy MIDI-upload repos).
     """
-    all_objects = await list_objects(session, repo_id)
+    manifest = await _get_head_snapshot_manifest(session, repo_id, ref)
+    if manifest:
+        dirs, files = _manifest_to_tree(manifest, dir_path)
+        return TreeListResponse(
+            owner=owner,
+            repo_slug=repo_slug,
+            ref=ref,
+            dir_path=dir_path.strip("/"),
+            entries=dirs + files,
+        )
 
+    # ── Legacy fallback: objects with explicit paths ──────────────────────
+    all_objects = await list_objects(session, repo_id)
     prefix = (dir_path.strip("/") + "/") if dir_path.strip("/") else ""
     seen_dirs: set[str] = set()
-    dirs: list[TreeEntryResponse] = []
-    files: list[TreeEntryResponse] = []
+    dirs_legacy: list[TreeEntryResponse] = []
+    files_legacy: list[TreeEntryResponse] = []
 
     for obj in all_objects:
         path = obj.path.lstrip("/")
@@ -1474,8 +1595,7 @@ async def list_tree(
             continue
         slash_pos = remainder.find("/")
         if slash_pos == -1:
-            # Direct file entry under this prefix
-            files.append(
+            files_legacy.append(
                 TreeEntryResponse(
                     type="file",
                     name=remainder,
@@ -1484,12 +1604,11 @@ async def list_tree(
                 )
             )
         else:
-            # Directory entry — take only the next path segment
             dir_name = remainder[:slash_pos]
             dir_full_path = prefix + dir_name
             if dir_name not in seen_dirs:
                 seen_dirs.add(dir_name)
-                dirs.append(
+                dirs_legacy.append(
                     TreeEntryResponse(
                         type="dir",
                         name=dir_name,
@@ -1498,16 +1617,280 @@ async def list_tree(
                     )
                 )
 
-    dirs.sort(key=lambda e: e.name)
-    files.sort(key=lambda e: e.name)
+    dirs_legacy.sort(key=lambda e: e.name)
+    files_legacy.sort(key=lambda e: e.name)
 
     return TreeListResponse(
         owner=owner,
         repo_slug=repo_slug,
         ref=ref,
         dir_path=dir_path.strip("/"),
-        entries=dirs + files,
+        entries=dirs_legacy + files_legacy,
     )
+
+
+async def _resolve_ref_to_commit(
+    session: AsyncSession, repo_id: str, ref: str
+) -> db.MusehubCommit | None:
+    """Resolve a branch name or commit SHA to a commit row.
+
+    Tries branch lookup first, then falls back to direct commit_id lookup
+    so both ``main`` and full/partial SHAs work.
+    """
+    # 1. Try branch
+    branch_row = (
+        await session.execute(
+            select(db.MusehubBranch).where(
+                db.MusehubBranch.repo_id == repo_id,
+                db.MusehubBranch.name == ref,
+            )
+        )
+    ).scalar_one_or_none()
+    if branch_row and branch_row.head_commit_id:
+        return await session.get(db.MusehubCommit, branch_row.head_commit_id)
+
+    # 2. Try exact commit_id match
+    row = (
+        await session.execute(
+            select(db.MusehubCommit).where(
+                db.MusehubCommit.repo_id == repo_id,
+                db.MusehubCommit.commit_id == ref,
+            )
+        )
+    ).scalar_one_or_none()
+    if row:
+        return row
+
+    # 3. Prefix match (short SHA)
+    if len(ref) >= 7:
+        row = (
+            await session.execute(
+                select(db.MusehubCommit).where(
+                    db.MusehubCommit.repo_id == repo_id,
+                    db.MusehubCommit.commit_id.like(f"{ref}%"),
+                ).limit(1)
+            )
+        ).scalar_one_or_none()
+        if row:
+            return row
+
+    return None
+
+
+async def get_file_at_ref(
+    session: AsyncSession,
+    repo_id: str,
+    ref: str,
+    file_path: str,
+) -> dict[str, object] | None:
+    """Resolve a file path at a given ref via the snapshot manifest.
+
+    Looks up: ref → commit → snapshot → manifest[file_path] → object_id,
+    then returns metadata. Content bytes are intentionally NOT returned here
+    (callers fetch via the storage backend directly to avoid loading into memory
+    unless needed).
+
+    Returns a dict with:
+    - ``object_id``: content-addressed SHA
+    - ``snapshot_id``: the snapshot this file belongs to
+    - ``commit_id``: resolved commit SHA
+    - ``path``: normalised file path
+
+    Returns None when the ref or file is not found.
+    """
+    commit = await _resolve_ref_to_commit(session, repo_id, ref)
+    if commit is None or commit.snapshot_id is None:
+        return None
+
+    snapshot = await session.get(db.MusehubSnapshot, commit.snapshot_id)
+    if snapshot is None:
+        return None
+
+    manifest: dict[str, str] = dict(snapshot.manifest or {})
+    norm_path = file_path.lstrip("/")
+    object_id = manifest.get(norm_path)
+    if object_id is None:
+        return None
+
+    return {
+        "object_id": object_id,
+        "snapshot_id": commit.snapshot_id,
+        "commit_id": commit.commit_id,
+        "path": norm_path,
+        "manifest_size": len(manifest),
+    }
+
+
+async def get_last_commit_for_file(
+    session: AsyncSession,
+    repo_id: str,
+    file_path: str,
+    current_commit_id: str,
+) -> db.MusehubCommit | None:
+    """Return the most recent commit that changed ``file_path``.
+
+    Scans commits in reverse chronological order, comparing snapshot manifests
+    to find where the object_id for this path last changed.  Stops at
+    ``current_commit_id`` (inclusive).  Returns None if the file has no history.
+    """
+    norm = file_path.lstrip("/")
+
+    # Get the current object_id for this file
+    current_commit = await session.get(db.MusehubCommit, current_commit_id)
+    if current_commit is None or current_commit.snapshot_id is None:
+        return current_commit
+
+    snap = await session.get(db.MusehubSnapshot, current_commit.snapshot_id)
+    if snap is None:
+        return current_commit
+
+    current_oid = (snap.manifest or {}).get(norm)
+    if current_oid is None:
+        return None
+
+    # Walk back at most 200 commits to find where it changed
+    stmt = (
+        select(db.MusehubCommit)
+        .where(
+            db.MusehubCommit.repo_id == repo_id,
+            db.MusehubCommit.branch == (current_commit.branch or "main"),
+            db.MusehubCommit.timestamp <= current_commit.timestamp,
+        )
+        .order_by(desc(db.MusehubCommit.timestamp))
+        .limit(200)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+
+    prev_commit: db.MusehubCommit | None = current_commit
+    for row in rows:
+        if row.snapshot_id is None:
+            continue
+        snap_r = await session.get(db.MusehubSnapshot, row.snapshot_id)
+        if snap_r is None:
+            continue
+        oid = (snap_r.manifest or {}).get(norm)
+        if oid != current_oid:
+            break
+        prev_commit = row
+
+    return prev_commit
+
+
+async def get_snapshot_diff(
+    session: AsyncSession,
+    repo_id: str,
+    commit_snapshot_id: str | None,
+    parent_snapshot_id: str | None,
+) -> dict[str, list[str]]:
+    """Diff two snapshot manifests, returning file-level change lists.
+
+    Returns a dict with:
+    - ``added``:    files present in the new snapshot but not the parent
+    - ``removed``:  files present in the parent but not the new snapshot
+    - ``modified``: files present in both but with different object IDs
+    - ``unchanged``: count only (not listed, to keep payload small)
+    """
+    new_manifest: dict[str, str] = {}
+    old_manifest: dict[str, str] = {}
+
+    if commit_snapshot_id:
+        snap = await session.get(db.MusehubSnapshot, commit_snapshot_id)
+        if snap:
+            new_manifest = dict(snap.manifest or {})
+
+    if parent_snapshot_id:
+        snap = await session.get(db.MusehubSnapshot, parent_snapshot_id)
+        if snap:
+            old_manifest = dict(snap.manifest or {})
+
+    added: list[str] = sorted(p for p in new_manifest if p not in old_manifest)
+    removed: list[str] = sorted(p for p in old_manifest if p not in new_manifest)
+    modified: list[str] = sorted(
+        p for p in new_manifest
+        if p in old_manifest and new_manifest[p] != old_manifest[p]
+    )
+
+    return {
+        "added": added,
+        "removed": removed,
+        "modified": modified,
+        "total_files": len(new_manifest),
+    }
+
+
+async def get_repo_home_stats(
+    session: AsyncSession,
+    repo_id: str,
+    ref: str,
+) -> dict[str, object]:
+    """Return aggregate stats for the repo home page.
+
+    Returns a dict with:
+    - ``total_commits``: int — total commit count across all branches
+    - ``total_objects``: int — number of stored objects
+    - ``total_size_bytes``: int — sum of all object sizes
+    - ``file_type_counts``: dict[str, int] — extension → file count from HEAD snapshot
+    - ``commit_activity``: list[int] — daily commit counts for the last 14 days (oldest first)
+    """
+    from datetime import timedelta
+    from collections import Counter
+
+    total_commits: int = (
+        await session.execute(
+            select(func.count()).where(db.MusehubCommit.repo_id == repo_id)
+        )
+    ).scalar_one() or 0
+
+    obj_agg = (
+        await session.execute(
+            select(
+                func.count().label("cnt"),
+                func.coalesce(func.sum(db.MusehubObject.size_bytes), 0).label("sz"),
+            ).where(db.MusehubObject.repo_id == repo_id)
+        )
+    ).one()
+    total_objects = int(obj_agg.cnt or 0)
+    total_size_bytes = int(obj_agg.sz or 0)
+
+    # File type breakdown from HEAD snapshot manifest
+    manifest = await _get_head_snapshot_manifest(session, repo_id, ref)
+    ext_counter: Counter[str] = Counter()
+    for path in manifest:
+        ext = path.rsplit(".", 1)[-1].lower() if "." in path.split("/")[-1] else ""
+        ext_counter[ext] += 1
+    file_type_counts: dict[str, int] = dict(ext_counter.most_common(10))
+
+    # Daily commit activity for last 14 days
+    now = datetime.now(tz=timezone.utc)
+    fourteen_days_ago = now - timedelta(days=14)
+    recent_rows = (
+        await session.execute(
+            select(db.MusehubCommit.timestamp)
+            .where(
+                db.MusehubCommit.repo_id == repo_id,
+                db.MusehubCommit.timestamp >= fourteen_days_ago,
+                db.MusehubCommit.commit_id.not_like("init-%"),
+            )
+            .order_by(db.MusehubCommit.timestamp)
+        )
+    ).scalars().all()
+
+    # Bucket into 14 daily bins
+    daily: list[int] = [0] * 14
+    for ts in recent_rows:
+        t = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+        day_idx = (now - t).days
+        if 0 <= day_idx < 14:
+            daily[13 - day_idx] += 1
+
+    return {
+        "total_commits": total_commits,
+        "total_objects": total_objects,
+        "total_size_bytes": total_size_bytes,
+        "file_type_counts": file_type_counts,
+        "commit_activity": daily,
+        "total_files": len(manifest),
+    }
 
 
 async def get_user_forks(db_session: AsyncSession, username: str) -> UserForksResponse:

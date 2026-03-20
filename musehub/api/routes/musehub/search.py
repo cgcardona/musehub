@@ -16,17 +16,19 @@ Authentication: JWT Bearer token required (inherited from musehub router).
 
 """
 
+import json
 import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.auth.dependencies import TokenClaims, optional_token
 from musehub.db import get_db
 from musehub.models.musehub import GlobalSearchResult, SearchResponse
 
-from musehub.services import musehub_repository, musehub_search
+from musehub.services import musehub_repository, musehub_search, musehub_discover
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,51 @@ _VALID_MODES = frozenset({"property", "ask", "keyword", "pattern"})
 
 _GLOBAL_VALID_MODES = frozenset({"keyword", "pattern"})
 _REPO_VALID_MODES = frozenset({"property", "ask", "keyword", "pattern"})
+
+
+@router.get(
+    "/search/repos",
+    summary="Discover repos by meaning or name",
+    operation_id="searchRepos",
+)
+async def search_repos(
+    q: str = Query(..., min_length=1, max_length=500, description="Natural-language or keyword query"),
+    limit: int = Query(20, ge=1, le=50, description="Max results"),
+    domain: str | None = Query(None, description="Filter by Muse domain"),
+    db: AsyncSession = Depends(get_db),
+    _: TokenClaims | None = Depends(optional_token),
+) -> Response:
+    """Discover public repos by semantic meaning (Qdrant) or text (fallback).
+
+    When Qdrant + OpenAI are configured the query is embedded into the vector
+    space and the nearest repos are returned — finding repos by *what they
+    contain*, not just their names. Falls back to ILIKE search on name,
+    slug, description and tags when vectors are unavailable.
+
+    Returns ``{ query, semantic, repos: ExploreRepoResult[] }``.
+    """
+    from musehub.services import musehub_qdrant as qdrant_svc
+
+    qdrant = qdrant_svc.get_qdrant()
+    semantic = False
+    repos = []
+
+    if qdrant is not None:
+        sem_hits = await qdrant_svc.semantic_search_repos(qdrant, q, limit=limit, domain=domain)
+        repo_ids = [h.get("repo_id") for h in sem_hits if h.get("repo_id")]
+        if repo_ids:
+            repos = [r.model_dump(mode="json") for r in await musehub_discover.get_repos_by_ids(db, repo_ids)]
+            semantic = bool(repos)
+
+    if not repos:
+        text_results = await musehub_discover.search_repos_by_text(db, q, limit=limit)
+        repos = [r.model_dump(mode="json") for r in text_results]
+
+    logger.info("🔍 search/repos q=%r semantic=%s → %d results", q, semantic, len(repos))
+    return Response(
+        content=json.dumps({"query": q, "semantic": semantic, "repos": repos}),
+        media_type="application/json",
+    )
 
 
 @router.get(

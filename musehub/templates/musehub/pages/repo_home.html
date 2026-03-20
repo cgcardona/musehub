@@ -5,423 +5,354 @@
 {% block title %}{{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}<a href="/{{ owner }}">{{ owner }}</a> / <a href="{{ base_url }}">{{ repo_slug }}</a>{% endblock %}
 
-{% block repo_nav %}
-{% include "musehub/partials/repo_nav.html" %}
-{% endblock %}
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block page_json %}{"page": "repo", "repo_id": {{ repo_id | tojson }}, "clone_musehub": {{ clone_url_musehub | tojson }}, "clone_https": {{ clone_url_https | tojson }}, "clone_ssh": {{ clone_url_ssh | tojson }}}{% endblock %}
 
-{#
-  Parse repo.tags into display groups.
-  Tags may be prefixed (genre:baroque, emotion:melancholic, stage:rough-mix, ref:beethoven, key:c)
-  or bare (jazz, piano, polyrhythm).
-#}
-{% set genre_tags   = [] %}
-{% set emotion_tags = [] %}
-{% set stage_tags   = [] %}
-{% set ref_tags     = [] %}
-{% set bare_tags    = [] %}
-{% for tag in repo.tags %}
-  {% if tag.startswith('genre:') %}
-    {% set _ = genre_tags.append(tag[6:]) %}
-  {% elif tag.startswith('emotion:') %}
-    {% set _ = emotion_tags.append(tag[8:]) %}
-  {% elif tag.startswith('stage:') %}
-    {% set _ = stage_tags.append(tag[6:]) %}
-  {% elif tag.startswith('ref:') %}
-    {% set _ = ref_tags.append(tag[4:]) %}
-  {% elif not tag.startswith('key:') %}
-    {% set _ = bare_tags.append(tag) %}
-  {% endif %}
-{% endfor %}
+{# ── Commit type badge ────────────────────────────────────────────────────── #}
+{% macro commit_type_badge(t) %}
+{% if t == 'feat' %}<span class="rh-commit-type rh-ct-feat">feat</span>
+{% elif t == 'fix' %}<span class="rh-commit-type rh-ct-fix">fix</span>
+{% elif t == 'docs' %}<span class="rh-commit-type rh-ct-docs">docs</span>
+{% elif t == 'test' %}<span class="rh-commit-type rh-ct-test">test</span>
+{% elif t == 'refactor' %}<span class="rh-commit-type rh-ct-refactor">refactor</span>
+{% elif t == 'perf' %}<span class="rh-commit-type rh-ct-perf">perf</span>
+{% elif t == 'chore' or t == 'build' or t == 'ci' %}<span class="rh-commit-type rh-ct-chore">{{ t }}</span>
+{% endif %}
+{% endmacro %}
 
-{# repo_license is injected by the route handler from orm_repo.settings #}
+{% macro semver_badge(bump, breaking) %}
+{% if breaking %}<span class="rh-semver-badge rh-sv-breaking">BREAKING</span>
+{% elif bump == 'major' %}<span class="rh-semver-badge rh-sv-major">major</span>
+{% elif bump == 'minor' %}<span class="rh-semver-badge rh-sv-minor">minor</span>
+{% elif bump == 'patch' %}<span class="rh-semver-badge rh-sv-patch">patch</span>
+{% endif %}
+{% endmacro %}
+
+{% macro author_avatar(author) %}
+{% if author %}{% set initial = author[0] | upper %}{% set color_idx = author | length % 6 %}
+<span class="rh-avatar rh-avatar-{{ color_idx }}">{{ initial }}</span>
+{% else %}
+<span class="rh-avatar rh-avatar-bot">
+  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+</span>
+{% endif %}
+{% endmacro %}
+
+{% macro activity_sparkline(activity) %}
+{% set max_val = activity | max if activity | max > 0 else 1 %}
+<svg class="rh-sparkline" viewBox="0 0 140 28" xmlns="http://www.w3.org/2000/svg">
+  {% for count in activity %}
+  {% set bar_h = [((count / max_val) * 24) | int, 2] | max %}
+  <rect x="{{ loop.index0 * 10 + 1 }}" y="{{ 28 - bar_h }}" width="8" height="{{ bar_h }}"
+        class="rh-spark-bar {% if count == activity | max %}rh-spark-peak{% endif %}" rx="1.5"/>
+  {% endfor %}
+</svg>
+{% endmacro %}
+
+{% macro lang_dots(file_type_counts) %}
+{% set total = namespace(n=0) %}
+{% for ext, cnt in file_type_counts.items() %}{% set total.n = total.n + cnt %}{% endfor %}
+{% if total.n > 0 %}
+<div class="rh-lang-bar">
+  {% for ext, cnt in file_type_counts.items() %}
+  <span class="rh-lang-seg rh-lang-{{ ext | lower }}" style="width:{{ ((cnt / total.n) * 100) | round(1) }}%"></span>
+  {% endfor %}
+</div>
+<div class="rh-lang-legend">
+  {% for ext, cnt in file_type_counts.items() %}
+  <span class="rh-lang-item">
+    <span class="rh-lang-dot rh-lang-{{ ext | lower }}"></span>
+    <span class="rh-lang-ext">{{ ext or 'other' }}</span>
+    <span class="rh-lang-pct">{{ (((cnt / total.n) * 100) | round(0)) | int }}%</span>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
 
 {% block content %}
-<div style="display:grid;grid-template-columns:1fr 300px;gap:var(--space-4);align-items:start">
+<div class="rh-layout">
 
-  {# ──────────────────────────────────────────────────────── Main column #}
-  <main>
+  {# ── Main column ──────────────────────────────────────────────────────────── #}
+  <main class="rh-main">
 
-    {# ── Hero card ──────────────────────────────────────────────────── #}
-    <div class="repo-hero">
-      <div class="repo-hero-top">
-        <div style="flex:1;min-width:0">
-          <h1 class="repo-hero-title">
-            <a href="/{{ owner }}" class="repo-hero-owner">{{ owner }}</a>
-            <span class="repo-hero-sep">/</span>
-            <a href="{{ base_url }}" class="repo-hero-slug">{{ repo_slug }}</a>
+    {# Hero #}
+    <div class="rh-hero">
+      <div class="rh-hero-top">
+        <div class="rh-hero-identity">
+          <h1 class="rh-hero-title">
+            <a href="/{{ owner }}" class="rh-hero-owner">{{ owner }}</a>
+            <span class="rh-hero-sep">/</span>
+            <a href="{{ base_url }}" class="rh-hero-slug">{{ repo_slug }}</a>
             {% if repo.visibility == 'public' %}
-              <span class="badge badge-active" style="font-size:10px;vertical-align:middle">public</span>
+              <span class="badge badge-active rh-vis-badge">public</span>
             {% else %}
-              <span class="badge badge-inactive" style="font-size:10px;vertical-align:middle">private</span>
+              <span class="badge badge-inactive rh-vis-badge">private</span>
             {% endif %}
           </h1>
-          {% if repo.description %}
-          <p class="repo-hero-desc">{{ repo.description }}</p>
-          {% endif %}
-
-          {# Domain badge + meta pills #}
-          <div class="repo-hero-meta">
+          {% if repo.description %}<p class="rh-hero-desc">{{ repo.description }}</p>{% endif %}
+          <div class="rh-hero-pills">
             {% if domain and domain.scoped_id %}
-            <a class="domain-badge repo-meta-pill" href="/domains/{{ domain.scoped_id }}"
-               title="{{ domain.display_name }} domain">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
-                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
+            <a class="rh-pill rh-pill-domain" href="/domains/{{ domain.scoped_id }}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
               {{ domain.scoped_id }}
             </a>
             {% endif %}
-            {% if repo_license %}
-            <span class="repo-meta-pill repo-meta-license">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              {{ repo_license }}
-            </span>
-            {% endif %}
+            {% if repo_license %}<span class="rh-pill rh-pill-license">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              {{ repo_license }}</span>{% endif %}
+            {% if branches | length > 0 %}<span class="rh-pill rh-pill-branch">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+              {{ branches | length }} branch{{ 'es' if branches | length != 1 else '' }}</span>{% endif %}
           </div>
-
-          {# Categorized tag chips #}
-          {% if genre_tags or emotion_tags or stage_tags or ref_tags or bare_tags %}
-          <div class="repo-tags-row">
-            {% for t in genre_tags %}
-            <a href="/topics/genre:{{ t }}" class="tag-chip tag-chip-genre">{{ t }}</a>
-            {% endfor %}
-            {% for t in emotion_tags %}
-            <a href="/topics/emotion:{{ t }}" class="tag-chip tag-chip-emotion">{{ t }}</a>
-            {% endfor %}
-            {% for t in stage_tags %}
-            <span class="tag-chip tag-chip-stage">{{ t }}</span>
-            {% endfor %}
-            {% for t in ref_tags %}
-            <span class="tag-chip tag-chip-ref">{{ t }}</span>
-            {% endfor %}
-            {% for t in bare_tags %}
-            <a href="/topics/{{ t }}" class="tag-chip tag-chip-neutral">{{ t }}</a>
-            {% endfor %}
-          </div>
-          {% endif %}
         </div>
-
-        {# Action cluster — adapts to domain #}
-        <div class="repo-hero-actions">
+        <div class="rh-hero-actions">
           <button class="btn btn-star btn-sm" id="nav-star-btn" style="display:none">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             <span id="nav-star-count">0</span>
           </button>
-          {# Primary action — domain-specific viewer #}
-          {% if domain and domain.viewer_type == 'piano_roll' %}
-          <a href="{{ base_url }}/view/HEAD" class="btn btn-listen btn-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Play
-          </a>
-          {% elif domain and domain.viewer_type == 'symbol_graph' %}
+          {% set viewer_type = domain.viewer_type if domain else 'generic' %}
+          {% if viewer_type == 'piano_roll' %}
           <a href="{{ base_url }}/view/HEAD" class="btn btn-primary btn-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            Graph
-          </a>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg> Play</a>
+          {% elif viewer_type == 'symbol_graph' %}
+          <a href="{{ base_url }}/view/HEAD" class="btn btn-primary btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Graph</a>
           {% else %}
           <a href="{{ base_url }}/view/HEAD" class="btn btn-primary btn-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            View
-          </a>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View</a>
           {% endif %}
-          {# Secondary: commits, insights #}
           <a href="{{ base_url }}/commits" class="btn btn-secondary btn-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
-            History
-          </a>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg> History</a>
         </div>
       </div>
     </div>
 
-    {# ── Stats bar ──────────────────────────────────────────────────── #}
-    <div class="stat-bar">
-      <a href="{{ base_url }}/commits" class="stat-card">
-        <span class="stat-card-value">{{ commits | length }}</span>
-        <span class="stat-card-label">Commits</span>
+    {# Stats strip — flat, like domain/MCP pages #}
+    <div class="ph-stats-strip">
+      <a href="{{ base_url }}/commits" class="ph-stat">
+        <span class="ph-stat-value">{{ repo_stats.total_commits }}</span>
+        <span class="ph-stat-label">Commits</span>
       </a>
-      <a href="{{ base_url }}/branches" class="stat-card">
-        <span class="stat-card-value">{{ branches | length }}</span>
-        <span class="stat-card-label">Branches</span>
+      <a href="{{ base_url }}/branches" class="ph-stat">
+        <span class="ph-stat-value">{{ branches | length }}</span>
+        <span class="ph-stat-label">Branches</span>
       </a>
-      <a href="{{ base_url }}/releases" class="stat-card">
-        <span class="stat-card-value">{{ tags_count }}</span>
-        <span class="stat-card-label">Releases</span>
+      <a href="{{ base_url }}/releases" class="ph-stat">
+        <span class="ph-stat-value">{{ tags_count }}</span>
+        <span class="ph-stat-label">Releases</span>
       </a>
-      <a href="#" class="stat-card" id="stat-stars">
-        <span class="stat-card-value" id="stat-star-count" style="color:var(--color-warning)">—</span>
-        <span class="stat-card-label">Stars</span>
-      </a>
+      <span class="ph-stat">
+        <span class="ph-stat-value">{{ repo_stats.total_files }}</span>
+        <span class="ph-stat-label">Files</span>
+      </span>
+      <span class="ph-stat">
+        <span class="ph-stat-value">{{ repo_stats.total_objects }}</span>
+        <span class="ph-stat-label">Objects</span>
+      </span>
+      <span class="ph-stat" id="stat-stars">
+        <span class="ph-stat-value" id="stat-star-count" style="color:var(--color-warning)">—</span>
+        <span class="ph-stat-label">Stars</span>
+      </span>
     </div>
 
-    {# ── Branch picker + file tree ──────────────────────────────────── #}
-    <div class="branch-bar">
-      <form method="get"
-            hx-get="{{ base_url }}"
-            hx-target="#file-tree"
-            hx-push-url="true"
-            style="display:inline">
-        <select name="ref" class="filter-select">
+    {# Activity + composition — two clean stacked rows #}
+    {% if repo_stats.commit_activity | sum > 0 or repo_stats.file_type_counts %}
+    <div class="rh-pulse-card">
+      {% if repo_stats.commit_activity | sum > 0 %}
+      <div class="rh-pulse-row">
+        <span class="rh-pulse-label">Activity</span>
+        <div class="rh-pulse-content">
+          {{ activity_sparkline(repo_stats.commit_activity) }}
+          <span class="rh-pulse-sub">last 14 days</span>
+        </div>
+      </div>
+      {% endif %}
+      {% if repo_stats.file_type_counts %}
+      <div class="rh-pulse-row">
+        <span class="rh-pulse-label">Composition</span>
+        <div class="rh-pulse-content rh-pulse-langs">
+          {{ lang_dots(repo_stats.file_type_counts) }}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# Branch bar + file tree — flat, no card box #}
+    <div class="rh-branch-bar">
+      <form method="get" hx-get="{{ base_url }}" hx-target="#file-tree" hx-push-url="true" class="rh-branch-form">
+        <svg class="rh-branch-form-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        <select name="ref" class="filter-select rh-ref-select">
           {% for branch in branches %}
-          <option value="{{ branch.name }}" {% if branch.name == ref %}selected{% endif %}>
-            &#127807; {{ branch.name }}
-          </option>
+          <option value="{{ branch.name }}" {% if branch.name == ref %}selected{% endif %}>{{ branch.name }}</option>
           {% endfor %}
-          {% if not branches %}
-          <option value="HEAD" selected>HEAD</option>
-          {% endif %}
+          {% if not branches %}<option value="HEAD" selected>HEAD</option>{% endif %}
         </select>
       </form>
-      <div class="branch-bar-stats">
-        <a href="{{ base_url }}/commits" class="branch-bar-stat">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
-          {{ commits | length }} commit{{ 's' if commits | length != 1 else '' }}
+      <div class="rh-branch-meta">
+        <a href="{{ base_url }}/commits" class="rh-branch-stat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+          {{ repo_stats.total_commits }} commit{{ 's' if repo_stats.total_commits != 1 else '' }}
         </a>
-        <span class="branch-bar-stat" style="cursor:default">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        <span class="rh-branch-stat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
           {{ branches | length }} branch{{ 'es' if branches | length != 1 else '' }}
         </span>
-        <a href="{{ base_url }}/releases" class="branch-bar-stat">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          {{ tags_count }} release{{ 's' if tags_count != 1 else '' }}
-        </a>
+        {% if repo_stats.total_size_bytes > 0 %}
+        <span class="rh-branch-stat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          {{ repo_stats.total_size_bytes | filesizeformat }}
+        </span>
+        {% endif %}
       </div>
     </div>
 
-    <div class="card file-tree-card">
-      <div id="file-tree">
-        {% include "musehub/fragments/file_tree.html" %}
-      </div>
+    <div class="rh-file-tree-card">
+      <div id="file-tree">{% include "musehub/fragments/file_tree.html" %}</div>
     </div>
 
-    {# ── Recent commits ─────────────────────────────────────────────── #}
-    <div class="card commit-list-card">
-      <div class="commit-list-header">
-        <h3 class="commit-list-title">Recent Commits</h3>
-        <a href="{{ base_url }}/commits" style="font-size:11px;color:var(--color-accent)">View all →</a>
+    {# Recent commits — flat, divider-based #}
+    <div class="rh-commits-section">
+      <div class="rh-commits-header">
+        <span class="ph-sidebar-heading" style="font-size:12px">Recent Commits</span>
+        <a href="{{ base_url }}/commits" class="rh-commits-viewall">View all {{ repo_stats.total_commits }} →</a>
       </div>
-      {% if commits %}
-        {% for commit in commits %}
-        <div class="commit-card-row">
-          <div class="commit-author-avatar">{{ commit.author[0] if commit.author else '?' }}</div>
-          <div class="commit-card-body">
-            <a href="{{ base_url }}/commits/{{ commit.commitId }}" class="commit-card-msg">
-              {{ commit.message | truncate(80, True, '…') }}
-            </a>
-            <div class="commit-card-meta">
-              <span class="commit-card-author">{{ commit.author }}</span>
-              <span class="commit-card-time">{{ commit.timestamp | fmtrelative }}</span>
+      {% set real_commits = commits | selectattr('commitId', 'ne', 'init-' ~ repo_id[:8]) | list %}
+      {% if real_commits %}
+        {% for commit in real_commits %}
+        {% set is_breaking = commit.isBreaking %}
+        <div class="rh-commit-row {% if is_breaking %}rh-commit-breaking{% endif %}">
+          {{ author_avatar(commit.author) }}
+          <div class="rh-commit-body">
+            <div class="rh-commit-top">
+              <div class="rh-commit-badges">
+                {{ commit_type_badge(commit.commitType) }}
+                {{ semver_badge(commit.semVerBump, is_breaking) }}
+                {% if commit.agentId %}
+                <span class="rh-commit-type rh-ct-agent" title="Agent: {{ commit.agentId }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+                  agent
+                </span>
+                {% endif %}
+              </div>
+              <a href="{{ base_url }}/commits/{{ commit.commitId }}" class="rh-commit-msg">
+                {{ (commit.message.split('\n')[0] if '\n' in commit.message else commit.message) | truncate(90, True, '…') }}
+              </a>
+            </div>
+            <div class="rh-commit-meta">
+              {% if commit.author %}<span class="rh-commit-author">{{ commit.author | truncate(24, True, '…') }}</span>{% endif %}
+              <span class="rh-commit-time">{{ commit.timestamp | fmtrelative }}</span>
             </div>
           </div>
-          <a href="{{ base_url }}/commits/{{ commit.commitId }}" class="commit-card-sha">
-            {{ commit.commitId | shortsha }}
-          </a>
+          <a href="{{ base_url }}/commits/{{ commit.commitId }}" class="rh-commit-sha">{{ commit.commitId | shortsha }}</a>
         </div>
         {% endfor %}
       {% else %}
-        <div style="padding:var(--space-5);text-align:center;color:var(--text-muted);font-size:13px">
-          No commits yet — push your first commit.
+        <div class="rh-empty-commits">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+          <p>No commits yet — push your first commit.</p>
         </div>
       {% endif %}
     </div>
 
   </main>
 
-  {# ──────────────────────────────────────────────────────── Right sidebar #}
-  <aside>
+  {# ── Right sidebar — divider-based, no card boxes ─────────────────────────── #}
+  <aside class="rh-sidebar">
 
-    {# ── Domain Properties ──────────────────────────────────────────── #}
-    <div class="card musical-identity-card">
-      <div class="sidebar-card-header">
-        <h3 class="sidebar-card-title">Properties</h3>
+    {# Properties #}
+    <div class="rh-sidebar-section">
+      <div class="rh-sidebar-hd">
+        <span class="ph-sidebar-heading">Properties</span>
         {% if domain and domain.scoped_id %}
-        <span class="domain-badge" style="font-size:10px;padding:2px 6px">{{ domain.display_name }}</span>
+        <span class="rh-domain-badge">
+          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          {{ domain.display_name or domain.scoped_id }}
+        </span>
         {% endif %}
       </div>
 
-      {# License row (universal) #}
-      {% if repo_license %}
-      <div class="musical-identity-row">
-        <span class="musical-identity-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </span>
-        <div>
-          <div class="musical-identity-label">License</div>
-          <div class="musical-identity-value">{{ repo_license }}</div>
+      {# Stats mini row #}
+      <div class="rh-dim-row">
+        <div class="rh-dim-item">
+          <div class="rh-dim-val">{{ repo_stats.total_commits }}</div>
+          <div class="rh-dim-lbl">Commits</div>
+        </div>
+        <div class="rh-dim-item">
+          <div class="rh-dim-val">{{ repo_stats.total_files }}</div>
+          <div class="rh-dim-lbl">Files</div>
+        </div>
+        <div class="rh-dim-item">
+          <div class="rh-dim-val">{{ repo_stats.total_objects }}</div>
+          <div class="rh-dim-lbl">Objects</div>
+        </div>
+        <div class="rh-dim-item">
+          <div class="rh-dim-val">{{ repo_stats.total_size_bytes | filesizeformat }}</div>
+          <div class="rh-dim-lbl">Size</div>
         </div>
       </div>
-      {% endif %}
 
-      {# Domain-specific metadata from domain_meta JSON #}
-      {% for label, value in domain_meta_display %}
-      <div class="musical-identity-row">
-        <span class="musical-identity-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </span>
-        <div>
-          <div class="musical-identity-label">{{ label }}</div>
-          <div class="musical-identity-value">{{ value }}</div>
-        </div>
-      </div>
-      {% endfor %}
-
-      {# Tags — rendered by prefix category for discoverability #}
-      {% set all_tags = repo.tags or [] %}
-      {% set ns = namespace(genre=[], mood=[], stage=[], ref=[], bare=[]) %}
-      {% for t in all_tags %}
-        {% if ':' in t %}
-          {% set prefix = t.split(':')[0] %}
-          {% set val    = t.split(':', 1)[1] %}
-          {% if prefix == 'genre' %}{% set ns.genre = ns.genre + [val] %}
-          {% elif prefix in ('emotion', 'mood') %}{% set ns.mood = ns.mood + [val] %}
-          {% elif prefix == 'stage' %}{% set ns.stage = ns.stage + [val] %}
-          {% elif prefix in ('ref', 'influences') %}{% set ns.ref = ns.ref + [val] %}
-          {% else %}{% set ns.bare = ns.bare + [t] %}{% endif %}
-        {% else %}{% set ns.bare = ns.bare + [t] %}{% endif %}
-      {% endfor %}
-
-      {% if ns.genre %}
-      <div class="tag-group">
-        <div class="tag-group-label">Genre</div>
-        <div class="tag-group-chips">
-          {% for t in ns.genre %}<a href="/topics/genre:{{ t }}" class="tag-chip tag-chip-genre">{{ t }}</a>{% endfor %}
-        </div>
-      </div>
-      {% endif %}
-      {% if ns.mood %}
-      <div class="tag-group">
-        <div class="tag-group-label">Mood</div>
-        <div class="tag-group-chips">
-          {% for t in ns.mood %}<a href="/topics/emotion:{{ t }}" class="tag-chip tag-chip-emotion">{{ t }}</a>{% endfor %}
-        </div>
-      </div>
-      {% endif %}
-      {% if ns.stage %}
-      <div class="tag-group">
-        <div class="tag-group-label">Stage</div>
-        <div class="tag-group-chips">
-          {% for t in ns.stage %}<span class="tag-chip tag-chip-stage">{{ t }}</span>{% endfor %}
-        </div>
-      </div>
-      {% endif %}
-      {% if ns.ref %}
-      <div class="tag-group">
-        <div class="tag-group-label">References</div>
-        <div class="tag-group-chips">
-          {% for t in ns.ref %}<span class="tag-chip tag-chip-ref">{{ t }}</span>{% endfor %}
-        </div>
-      </div>
-      {% endif %}
-      {% if ns.bare %}
-      <div class="tag-group">
-        <div class="tag-group-label">Topics</div>
-        <div class="tag-group-chips">
-          {% for t in ns.bare %}<a href="/topics/{{ t }}" class="tag-chip tag-chip-neutral">{{ t }}</a>{% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {% if not (repo_license or domain_meta_display or all_tags) %}
-      <div style="padding:var(--space-4);color:var(--text-muted);font-size:12px;text-align:center">
-        No metadata yet.
-      </div>
+      {% if not (repo_license or domain_meta_display or (repo.tags or [])) %}
+      <p class="rh-props-empty">No metadata yet.</p>
       {% endif %}
     </div>
 
-    {# ── Explore — domain-aware quick links ────────────────────────── #}
-    <div class="card" style="margin-bottom:var(--space-3)">
-      <div class="sidebar-card-header">
-        <h3 class="sidebar-card-title">Explore</h3>
-      </div>
-      <div class="muse-dimension-grid">
-        {# Domain viewer — label and icon adapt to viewer_type #}
-        {% set viewer_type = domain.viewer_type if domain else 'generic' %}
-        {% if viewer_type == 'piano_roll' %}
-        <a href="{{ base_url }}/view/HEAD" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--color-accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </span>
-          Piano Roll
-        </a>
-        {% elif viewer_type == 'symbol_graph' %}
-        <a href="{{ base_url }}/view/HEAD" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent)"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          </span>
-          Symbol Graph
-        </a>
-        {% else %}
-        <a href="{{ base_url }}/view/HEAD" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent)"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </span>
-          View
-        </a>
-        {% endif %}
-
-        {# Universal links — always present #}
-        <a href="{{ base_url }}/commits" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-success)"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
-          </span>
-          History
-        </a>
-        <a href="{{ base_url }}/graph" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-warning)"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-          </span>
-          DAG Graph
-        </a>
-        <a href="{{ base_url }}/timeline" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-info)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </span>
-          Timeline
-        </a>
-        <a href="{{ base_url }}/insights" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-alt)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          </span>
-          Insights
-        </a>
-
-        {# MIDI-only extras #}
-        {% if viewer_type == 'piano_roll' %}
-        <a href="{{ base_url }}/analysis/HEAD" class="muse-dimension-item">
-          <span class="muse-dimension-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-secondary)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          </span>
-          Analysis
-        </a>
-        {% endif %}
-      </div>
+    {# Explore #}
+    <div class="rh-sidebar-section">
+      <div class="ph-sidebar-heading">Explore</div>
+      {% set viewer_type = domain.viewer_type if domain else 'generic' %}
+      {% if viewer_type == 'piano_roll' %}
+      <a href="{{ base_url }}/view/HEAD" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--color-accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Piano Roll
+      </a>
+      {% elif viewer_type == 'symbol_graph' %}
+      <a href="{{ base_url }}/view/HEAD" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-accent)"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Symbol Graph
+      </a>
+      {% else %}
+      <a href="{{ base_url }}/view/HEAD" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-accent)"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        View
+      </a>
+      {% endif %}
+      <a href="{{ base_url }}/commits" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-success)"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+        History
+      </a>
+      <a href="{{ base_url }}/graph" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-warning)"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        DAG
+      </a>
+      <a href="{{ base_url }}/timeline" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Timeline
+      </a>
+      <a href="{{ base_url }}/insights" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-purple)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Insights
+      </a>
     </div>
 
-    {# ── Clone widget ───────────────────────────────────────────────── #}
-    <div class="card clone-widget">
-      <div class="sidebar-card-header">
-        <h3 class="sidebar-card-title">Clone</h3>
+    {# Clone #}
+    <div class="rh-sidebar-section">
+      <div class="ph-sidebar-heading">Clone</div>
+      <div class="clone-tabs">
+        <button class="clone-tab-btn active" data-clone-tab="musehub">MuseHub</button>
+        <button class="clone-tab-btn" data-clone-tab="https">HTTPS</button>
+        <button class="clone-tab-btn" data-clone-tab="ssh">SSH</button>
       </div>
-      <div style="padding:0 var(--space-4) var(--space-3)">
-        <div class="clone-tabs">
-          <button class="clone-tab-btn active" data-clone-tab="musehub">MuseHub</button>
-          <button class="clone-tab-btn" data-clone-tab="https">HTTPS</button>
-          <button class="clone-tab-btn" data-clone-tab="ssh">SSH</button>
-        </div>
-        <div class="clone-input-wrap">
-          <input type="text" class="clone-input" id="clone-input" readonly
-                 value="{{ clone_url_musehub }}">
-          <button class="btn btn-secondary btn-sm clone-copy-btn"
-                  id="clone-copy-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy
-          </button>
-        </div>
+      <div class="clone-input-wrap">
+        <input type="text" class="clone-input" id="clone-input" readonly value="{{ clone_url_musehub }}">
+        <button class="btn btn-secondary btn-sm clone-copy-btn" id="clone-copy-btn" title="Copy">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
       </div>
     </div>
 
   </aside>
 </div>
 {% endblock %}
-

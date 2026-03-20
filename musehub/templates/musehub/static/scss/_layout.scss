@@ -33,17 +33,15 @@
   position: sticky;
   top: 0;
   z-index: var(--z-raised);
-  height: 50px;
+  height: 42px;
 }
 
 .navbar-inner {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: 0 var(--space-6);
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
   height: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
   width: 100%;
 }
 
@@ -228,7 +226,7 @@
 .breadcrumb-bar {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  padding: var(--space-2) var(--space-6);
+  padding: 4px var(--space-4);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -256,7 +254,7 @@
 
 .breadcrumb-bar .breadcrumb a:hover,
 .breadcrumb-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .breadcrumb-sep {
@@ -330,16 +328,16 @@ header .header-actions {
 .repo-header {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
-  padding: var(--space-4) var(--space-6);
+  padding: 10px 0;
 }
 
 .repo-header-inner {
-  max-width: 1280px;
-  margin: 0 auto;
+  padding: 0 var(--space-4);
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .repo-header-identity {
@@ -428,23 +426,29 @@ header .header-actions {
  * Repo tab strip  (sticky below global header)
  * ------------------------------------------------------------------------- */
 :root {
-  --header-height: 50px;  /* global header height — matches .musehub-navbar height */
+  --header-height: 42px;  /* global header height — matches .musehub-navbar height */
 }
 
 .repo-tabs {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
-  padding: 0 var(--space-6);
-  display: flex;
-  align-items: stretch;
+  padding: 0;
   overflow-x: auto;
-  scrollbar-width: none;      /* Firefox */
+  scrollbar-width: none;
   position: sticky;
   top: var(--header-height);
   z-index: calc(var(--z-raised) - 1);
-  /* Fade edges on overflow */
-  -webkit-mask-image: linear-gradient(to right, transparent 0px, black 24px, black calc(100% - 24px), transparent 100%);
-          mask-image: linear-gradient(to right, transparent 0px, black 24px, black calc(100% - 24px), transparent 100%);
+  /* Right-only fade for overflow scroll indicator; left is flush with content */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
+          mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
+}
+
+/* Inner wrapper aligns tabs with the page container */
+.repo-tabs-inner {
+  display: flex;
+  align-items: stretch;
+  padding: 0 var(--space-4);
+  width: 100%;
 }
 
 .repo-tabs::-webkit-scrollbar { display: none; }
@@ -453,7 +457,7 @@ header .header-actions {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-size-sm);
   color: var(--text-muted);
   border-bottom: 2px solid transparent;
@@ -600,15 +604,216 @@ body.player-open .container-wide {
 }
 
 .container-wide {
-  max-width: 1280px;
-  margin: var(--space-6) auto;
-  padding: 0 var(--space-6);
+  margin: var(--space-3) 0;
+  padding: 0 var(--space-4);
 }
 
 .container-narrow {
   max-width: 720px;
   margin: var(--space-6) auto;
   padding: 0 var(--space-6);
+}
+
+/* -------------------------------------------------------------------------
+ * Shared full-bleed page layout  (.ph-* = page hero/layout primitives)
+ *
+ * Used by MCP docs, Domain detail, and any future full-page layout.
+ * Pages using this system add:
+ *   {% block container_extra_class %} page-container{% endblock %}
+ * to strip the default container padding, then manage their own padding
+ * internally so hero backgrounds can be truly full-bleed.
+ * ------------------------------------------------------------------------- */
+
+/* Strips container padding so child sections can be full-bleed.
+   .container-wide.page-container wins over .container-wide by specificity. */
+.container-wide.page-container,
+.page-container {
+  padding: 0;
+  margin-top: 0;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.ph-hero {
+  position: relative;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow: hidden;
+  padding: 0 var(--space-4);
+}
+
+.ph-hero-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-6) 0 var(--space-4);
+
+  @media (max-width: 768px) { flex-direction: column; }
+}
+
+.ph-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ph-hero-title {
+  font-size: clamp(24px, 3.5vw, 40px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-2);
+  color: var(--text-primary);
+}
+
+.ph-hero-sub {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 520px;
+  margin-bottom: var(--space-3);
+}
+
+.ph-hero-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── Stats strip — flat separator bar ────────────────────────────────────── */
+.ph-stats-strip {
+  display: flex;
+  background: transparent;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.ph-stat {
+  flex: 1;
+  min-width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  gap: 2px;
+  text-align: center;
+  border-right: 1px solid var(--border-subtle);
+  &:last-child { border-right: none; }
+}
+
+.ph-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+
+.ph-stat-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* ── Page body: sidebar + main content ───────────────────────────────────── */
+.ph-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;  // narrow content left | wide sidebar right
+  align-items: start;
+  gap: 0;
+
+  @media (max-width: 900px) { grid-template-columns: 1fr; }
+}
+
+/* ── Sidebar (right column) ───────────────────────────────────────────────── */
+.ph-sidebar {
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-3);
+  border-left: 1px solid var(--border-subtle);
+  min-width: 0;
+
+  @media (max-width: 900px) { display: none; }
+}
+
+.ph-sidebar-section {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  &:last-child { border-bottom: none; }
+}
+
+.ph-sidebar-heading {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.ph-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--space-2);
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.1s, background 0.1s;
+
+  &:hover { color: var(--text-primary); background: var(--bg-hover); text-decoration: none; }
+  &.is-active { color: var(--color-accent); }
+}
+
+/* ── Main content area ────────────────────────────────────────────────────── */
+.ph-content {
+  padding: 0 var(--space-4);
+  min-width: 0;
+}
+
+/* ── Section: divider-based, no card box ─────────────────────────────────── */
+.ph-section {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-subtle);
+
+  &:last-child { border-bottom: none; }
+}
+
+.ph-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ph-section-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+  line-height: 1.55;
+}
+
+/* ── Count badge (section title inline pill) ─────────────────────────────── */
+.ph-count {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--bg-overlay);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
 }
 
 /* -------------------------------------------------------------------------
@@ -1019,9 +1224,7 @@ body.player-open .container-wide {
 
 /* xl — desktops 1280px+ */
 @media (min-width: 1280px) {
-  .container-wide {
-    max-width: 1440px;
-  }
+  /* No overrides needed — content is full-width at all viewport sizes */
 }
 
 /* -------------------------------------------------------------------------
@@ -1030,7 +1233,7 @@ body.player-open .container-wide {
 @media print {
   header { display: none; }
   .btn   { display: none; }
-  .token-form { display: none !important; }
+  .token-form { display: none; }
   pre { white-space: pre-wrap; border: 1px solid #ccc; }
 }
 

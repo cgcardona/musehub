@@ -526,6 +526,19 @@ function dispatchPageModule(data: Record<string, unknown>): void {
 // Run on initial hard load
 document.addEventListener('DOMContentLoaded', initPageGlobals);
 
+// ── Guard: never let HTMX boost intercept /raw/ URLs ──────────────────────────
+// Raw endpoints return text/plain — if HTMX boosts them it dumps plain text
+// into the DOM and breaks the history stack.  We cancel the request and let
+// the browser navigate normally (opens in same tab like a plain <a> click).
+document.addEventListener('htmx:beforeRequest', (evt: Event) => {
+  const detail = (evt as CustomEvent).detail as { pathInfo?: { requestPath?: string }; xhr?: XMLHttpRequest };
+  const path: string = detail?.pathInfo?.requestPath ?? '';
+  if (path.includes('/raw/')) {
+    evt.preventDefault();
+    window.location.href = path;
+  }
+});
+
 // ── HTMX boost navigation: re-init page globals, no opacity manipulation ──
 // FOUC is only a risk on the very first page load (handled by the inline
 // CSS + <script> in base.html).  HTMX swaps reuse the already-loaded CSS,

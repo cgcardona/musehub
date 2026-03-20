@@ -5,7 +5,7 @@
   Optional: repo_domain (dict with viewer_type key)
 #}
 <nav class="repo-tabs" id="repo-tabs" hx-boost="true" aria-label="Repository navigation">
-
+<div class="repo-tabs-inner">
   <a href="{{ base_url }}"
      class="repo-tab{% if current_page == 'commits' %} active{% endif %}"
      {% if current_page == 'commits' %}aria-current="page"{% endif %}>
@@ -110,4 +110,5 @@
     Activity
   </a>
 
+</div>
 </nav>

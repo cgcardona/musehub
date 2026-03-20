@@ -38,11 +38,6 @@
 
   {% include "musehub/partials/navbar.html" %}
 
-  <div class="breadcrumb-bar">
-    <span class="breadcrumb">{% block breadcrumb %}{% endblock %}</span>
-    {% include "musehub/partials/breadcrumbs.html" %}
-  </div>
-
   {% block repo_nav %}{% endblock %}
 
   <div class="container-wide{% block container_extra_class %}{% endblock %}" hx-boost="true" hx-ext="response-targets"{% block container_attrs %}{% endblock %}>
@@ -81,7 +76,6 @@
     </button>
   </div>
 
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="/static/app.js"></script>
   {# page_json: JSON data bridge for new TypeScript page modules (read by musehub.ts dispatchPageModule) #}
   <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>

@@ -10,27 +10,32 @@
 
 {% block content %}
 
-{# Stats bar ─── SSR, visible immediately #}
-<div class="graph-stats-bar">
-  <div class="graph-stat">
-    <span class="graph-stat-value">{{ commit_count }}</span>
-    <span class="graph-stat-label">Commits</span>
-  </div>
-  <div class="graph-stat-divider"></div>
-  <div class="graph-stat">
-    <span class="graph-stat-value">{{ branch_count }}</span>
-    <span class="graph-stat-label">Branches</span>
-  </div>
-  <div class="graph-stat-divider"></div>
-  <div class="graph-stat">
-    <span class="graph-stat-value" id="stat-authors">—</span>
-    <span class="graph-stat-label">Contributors</span>
-  </div>
-  <div class="graph-stat-divider"></div>
-  <div class="graph-stat">
-    <span class="graph-stat-value" id="stat-merges">—</span>
-    <span class="graph-stat-label">Merges</span>
-  </div>
+{# Stats strip — shared ph-stats-strip; JS fills id-based values #}
+<div class="ph-stats-strip">
+  <a href="{{ base_url }}/commits" class="ph-stat">
+    <span class="ph-stat-value">{{ commit_count }}</span>
+    <span class="ph-stat-label">Commits</span>
+  </a>
+  <span class="ph-stat">
+    <span class="ph-stat-value">{{ branch_count }}</span>
+    <span class="ph-stat-label">Branches</span>
+  </span>
+  <span class="ph-stat">
+    <span class="ph-stat-value" id="stat-authors">—</span>
+    <span class="ph-stat-label">Contributors</span>
+  </span>
+  <span class="ph-stat">
+    <span class="ph-stat-value" id="stat-merges">—</span>
+    <span class="ph-stat-label">Merges</span>
+  </span>
+  <span class="ph-stat">
+    <span class="ph-stat-value" id="stat-agents">—</span>
+    <span class="ph-stat-label">Agent commits</span>
+  </span>
+  <span class="ph-stat">
+    <span class="ph-stat-value" id="stat-breaking">—</span>
+    <span class="ph-stat-label">Breaking</span>
+  </span>
   <a href="{{ base_url }}/commits" class="btn btn-secondary btn-sm" style="margin-left:auto">
     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
     All commits
@@ -40,10 +45,10 @@
 <div class="graph-layout">
 
   {# ── Main graph area ──────────────────────────────────────────────────────── #}
-  <div>
+  <div class="graph-main">
     <div class="graph-viewport-card">
 
-      {# Legend bar #}
+      {# Legend bar — branches row + commit-type row #}
       <div class="graph-legend-bar" id="graph-legend-bar">
         <span class="graph-legend-label">Branches</span>
         <span id="legend-branches" class="graph-legend-items"></span>
@@ -51,6 +56,16 @@
           <span>◆ = merge</span>
           <span style="color:#f0883e">○ = HEAD</span>
           <span style="color:#2dd4bf">○ = session</span>
+          <span style="color:#ef4444">○ = breaking</span>
+        </span>
+      </div>
+      <div class="graph-legend-bar graph-legend-bar--types" id="graph-legend-types-bar">
+        <span class="graph-legend-label">Commit types</span>
+        <span id="legend-types" class="graph-legend-items graph-legend-types" style="display:none"></span>
+        <span class="graph-legend-sep graph-legend-sep--right">
+          <span style="color:#3b82f6">● = minor bump</span>
+          <span style="color:#ef4444">● = major bump</span>
+          <span style="color:#a78bfa">✦ = agent</span>
         </span>
       </div>
 
@@ -80,7 +95,7 @@
 
         <div class="graph-search-wrap">
           <svg class="graph-search-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="dag-search" class="graph-search-input" type="text" placeholder="Search commits, authors…" autocomplete="off" spellcheck="false">
+          <input id="dag-search" class="graph-search-input" type="text" placeholder="Search commits, authors, types…" autocomplete="off" spellcheck="false">
           <span id="search-match-count" class="graph-search-count"></span>
         </div>
 
@@ -104,57 +119,58 @@
         </span>
         <span id="pop-time" class="dag-pop-time"></span>
       </div>
+      {# Muse-specific enrichment row: agent, breaking, semver, sym counts #}
+      <div class="dag-pop-muse" id="pop-muse" style="display:none"></div>
       <div class="dag-pop-session" id="pop-session" style="display:none"></div>
       <div class="dag-pop-nav">Click to open commit →</div>
     </div>
   </div>
 
-  {# ── Right sidebar ─────────────────────────────────────────────────────────── #}
+  {# ── Right sidebar — divider-based, no card boxes ────────────────────────── #}
   <aside class="graph-sidebar">
 
-    <div class="card graph-sidebar-card" id="sidebar-branches-card">
-      <h3 class="graph-sidebar-title">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+    <div class="graph-sidebar-section" id="sidebar-branches-card">
+      <div class="ph-sidebar-heading">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
         Branches
-      </h3>
+      </div>
       <div id="sidebar-branch-list" class="sidebar-branch-list"></div>
     </div>
 
-    <div class="card graph-sidebar-card" id="sidebar-contributors-card">
-      <h3 class="graph-sidebar-title">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <div class="graph-sidebar-section" id="sidebar-types-card">
+      <div class="ph-sidebar-heading">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Commit Types
+      </div>
+      <div id="sidebar-type-list" class="sidebar-branch-list"></div>
+    </div>
+
+    <div class="graph-sidebar-section" id="sidebar-contributors-card">
+      <div class="ph-sidebar-heading">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Contributors
-      </h3>
+      </div>
       <div id="sidebar-contributor-list" class="sidebar-contributor-list"></div>
     </div>
 
-    <div class="card graph-sidebar-card">
-      <h3 class="graph-sidebar-title">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Navigate
-      </h3>
-      <div class="graph-nav-links">
-        <a href="{{ base_url }}" class="graph-nav-link">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          Repository
-        </a>
-        <a href="{{ base_url }}/commits" class="graph-nav-link">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
-          All Commits
-        </a>
-        <a href="{{ base_url }}/branches" class="graph-nav-link">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-          Branches
-        </a>
-        <a href="{{ base_url }}/timeline" class="graph-nav-link">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Timeline
-        </a>
-        <a href="{{ base_url }}/insights/HEAD" class="graph-nav-link">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          Insights
-        </a>
-      </div>
+    <div class="graph-sidebar-section">
+      <div class="ph-sidebar-heading">Navigate</div>
+      <a href="{{ base_url }}" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        Repository
+      </a>
+      <a href="{{ base_url }}/commits" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+        All Commits
+      </a>
+      <a href="{{ base_url }}/branches" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        Branches
+      </a>
+      <a href="{{ base_url }}/insights/HEAD" class="ph-sidebar-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Insights
+      </a>
     </div>
 
   </aside>

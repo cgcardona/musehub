@@ -1,161 +1,413 @@
 {% extends "musehub/base.html" %}
 
-{% block title %}MCP Reference — MuseHub{% endblock %}
+{% block title %}MCP — MuseHub{% endblock %}
+{% block page_json %}{"page":"mcp-docs"}{% endblock %}
 
-{% block breadcrumb %}
-<span class="breadcrumb-current">MCP Reference</span>
-{% endblock %}
+{# Full-bleed layout — we control our own padding internally #}
+{% block container_extra_class %} page-container{% endblock %}
 
 {% block content %}
-<div class="mcp-docs-page">
-
-  {# ── Header ───────────────────────────────────────────────────────────────── #}
-  <div class="mcp-docs-header">
-    <h1 class="mcp-docs-header__title">Muse Command Protocol</h1>
-    <p class="mcp-docs-header__subtitle">
-      MuseHub speaks <strong>MCP {{ protocol_version }}</strong> — full Streamable HTTP with
-      elicitation, progress streaming, and server-sent events. AI agents and human tools
-      connect identically, as first-class citizens.
-    </p>
-    <div class="mcp-docs-header__actions">
-      <a href="/mcp/docs.json" class="btn btn-secondary btn-sm">docs.json</a>
-      <a href="https://spec.modelcontextprotocol.io/specification/2025-11-25/" class="btn btn-ghost btn-sm" target="_blank" rel="noopener">MCP Spec</a>
+{# ── Macro: render a single tool card — defined at top of block ─────────────── #}
+{% macro _render_tool(tool, kind) %}
+<div class="mcp-tool-card mcp-tool-card--{{ kind }}" id="tool-{{ tool.name }}" data-tool-name="{{ tool.name }}" data-tool-desc="{{ tool.description | lower }}">
+  <div class="mcp-tool-header">
+    <div class="mcp-tool-title-row">
+      <code class="mcp-tool-name">{{ tool.name }}</code>
+      <div class="mcp-tool-badges">
+        {% if kind == 'read' %}<span class="mcp-badge mcp-badge--read">read</span>
+        {% elif kind == 'write' %}<span class="mcp-badge mcp-badge--write">write</span>
+        {% elif kind == 'cli' %}<span class="mcp-badge mcp-badge--cli">cli</span>
+        {% elif kind == 'elicit' %}<span class="mcp-badge mcp-badge--elicit">elicitation</span>{% endif %}
+        {% if tool.get('server_side') %}<span class="mcp-badge mcp-badge--server">server</span>{% endif %}
+        {% if 'deprecated' in tool.description | lower %}<span class="mcp-badge mcp-badge--deprecated">deprecated</span>{% endif %}
+      </div>
+    </div>
+    <p class="mcp-tool-desc">{{ tool.description | auto_code | safe }}</p>
+  </div>
+  {% if tool.inputSchema and tool.inputSchema.get('properties') %}
+  <details class="mcp-tool-params">
+    <summary class="mcp-tool-params-summary">
+      <svg class="mcp-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      Parameters
+      <span class="mcp-param-count">{{ tool.inputSchema.properties | length }}</span>
+    </summary>
+    <table class="mcp-params-table">
+      <thead>
+        <tr><th>Name</th><th>Type</th><th>Req</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        {% set required = tool.inputSchema.get('required', []) %}
+        {% for param_name, param in tool.inputSchema.properties.items() %}
+        <tr{% if param_name in required %} class="mcp-param-required"{% endif %}>
+          <td><code class="mcp-param-name">{{ param_name }}</code></td>
+          <td><span class="mcp-type mcp-type--{{ param.get('type', 'any') }}">{{ param.get('type', 'any') }}</span></td>
+          <td>{% if param_name in required %}<span class="mcp-req-star">*</span>{% else %}<span class="mcp-opt">—</span>{% endif %}</td>
+          <td class="mcp-param-desc">{{ param.get('description', '') | auto_code | safe }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% else %}
+  <p class="mcp-no-params">No parameters required.</p>
+  {% endif %}
+</div>
+{% endmacro %}
+{# ── Hero ──────────────────────────────────────────────────────────────────── #}
+<div class="mcp-hero">
+  <div class="mcp-hero-glow"></div>
+  <div class="mcp-hero-inner">
+    <div class="mcp-hero-left">
+      <h1 class="mcp-hero-title">Model Context<br><span class="gradient-text">Protocol</span></h1>
+      <p class="mcp-hero-sub">
+        MuseHub is a full MCP {{ protocol_version }} server — Streamable HTTP,
+        elicitation, SSE, sessions, and progress streaming.
+        Agents and humans connect identically, as first-class citizens.
+      </p>
+      <div class="mcp-hero-actions">
+        <a href="/mcp/docs.json" class="mcp-hero-btn mcp-hero-btn--primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          docs.json
+        </a>
+        <a href="https://modelcontextprotocol.io/specification/2025-11-25" class="mcp-hero-btn mcp-hero-btn--secondary" target="_blank" rel="noopener">
+          MCP Spec
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="mcp-hero-stats">
+      <div class="mcp-stat-pill">
+        <span class="mcp-stat-num">{{ tools | length }}</span>
+        <span class="mcp-stat-label">Tools</span>
+      </div>
+      <div class="mcp-stat-pill">
+        <span class="mcp-stat-num">{{ static_resources | length }}</span>
+        <span class="mcp-stat-label">Resources</span>
+      </div>
+      <div class="mcp-stat-pill">
+        <span class="mcp-stat-num">{{ resource_templates | length }}</span>
+        <span class="mcp-stat-label">Templates</span>
+      </div>
+      <div class="mcp-stat-pill">
+        <span class="mcp-stat-num">{{ prompts | length }}</span>
+        <span class="mcp-stat-label">Prompts</span>
+      </div>
     </div>
   </div>
 
-  {# ── Connection quick-start ───────────────────────────────────────────────── #}
-  <section class="mcp-docs-section">
-    <h2 class="mcp-docs-section__title">Connecting</h2>
-    <div class="mcp-docs-connect-grid">
-      <div class="mcp-docs-connect-item">
-        <span class="mcp-docs-connect-label">Endpoint</span>
-        <code class="mcp-docs-connect-value">POST /mcp</code>
+  {# Connection strip #}
+  <div class="mcp-connect-strip">
+    <div class="mcp-connect-item">
+      <span class="mcp-connect-label">POST</span>
+      <code class="mcp-connect-val">/mcp</code>
+    </div>
+    <div class="mcp-connect-sep">·</div>
+    <div class="mcp-connect-item">
+      <span class="mcp-connect-label">SSE</span>
+      <code class="mcp-connect-val">GET /mcp</code>
+    </div>
+    <div class="mcp-connect-sep">·</div>
+    <div class="mcp-connect-item">
+      <span class="mcp-connect-label">Auth</span>
+      <code class="mcp-connect-val">Authorization: Bearer &lt;jwt&gt;</code>
+    </div>
+    <div class="mcp-connect-sep">·</div>
+    <div class="mcp-connect-item">
+      <span class="mcp-connect-label">Machine docs</span>
+      <code class="mcp-connect-val">GET /mcp/docs.json</code>
+    </div>
+    <div class="mcp-connect-sep">·</div>
+    <div class="mcp-connect-item">
+      <span class="mcp-connect-label">Sessions</span>
+      <code class="mcp-connect-val">Mcp-Session-Id header</code>
+    </div>
+  </div>
+</div>
+
+{# ── Body: sidebar + content ───────────────────────────────────────────────── #}
+<div class="mcp-body">
+
+  {# Sticky sidebar #}
+  <nav class="mcp-sidebar" aria-label="MCP reference navigation">
+    <div class="mcp-sidebar-section">
+      <p class="mcp-sidebar-heading">Getting Started</p>
+      <a class="mcp-sidebar-link" href="#quickstart">Quick-start</a>
+      <a class="mcp-sidebar-link" href="#connect">Connection</a>
+    </div>
+    <div class="mcp-sidebar-section">
+      <p class="mcp-sidebar-heading">Tools <span class="mcp-sidebar-count">{{ tools | length }}</span></p>
+      <a class="mcp-sidebar-link mcp-sidebar-link--read" href="#tools-read">Read</a>
+      <a class="mcp-sidebar-link mcp-sidebar-link--write" href="#tools-write">Write</a>
+      <a class="mcp-sidebar-link mcp-sidebar-link--cli" href="#tools-cli">Muse CLI</a>
+      <a class="mcp-sidebar-link mcp-sidebar-link--elicit" href="#tools-elicit">Elicitation</a>
+    </div>
+    <div class="mcp-sidebar-section">
+      <p class="mcp-sidebar-heading">Resources <span class="mcp-sidebar-count">{{ static_resources | length }}</span></p>
+      <a class="mcp-sidebar-link" href="#resources">Static</a>
+      <a class="mcp-sidebar-link" href="#resource-templates">Templates <span class="mcp-sidebar-count">{{ resource_templates | length }}</span></a>
+    </div>
+    <div class="mcp-sidebar-section">
+      <p class="mcp-sidebar-heading">Prompts <span class="mcp-sidebar-count">{{ prompts | length }}</span></p>
+      <a class="mcp-sidebar-link" href="#prompts">All Prompts</a>
+    </div>
+    <div class="mcp-sidebar-section">
+      <a class="mcp-sidebar-link mcp-sidebar-link--meta" href="/mcp/docs.json" target="_blank">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        docs.json ↗
+      </a>
+    </div>
+  </nav>
+
+  {# Main content #}
+  <main class="mcp-content">
+
+    {# ── Quick-start ──────────────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="quickstart">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Agent Quick-start</h2>
+        <span class="mcp-badge mcp-badge--agent">agent-first</span>
       </div>
-      <div class="mcp-docs-connect-item">
-        <span class="mcp-docs-connect-label">SSE stream</span>
-        <code class="mcp-docs-connect-value">GET /mcp</code>
+      <div class="mcp-quickstart-grid">
+        <div class="mcp-qs-card">
+          <div class="mcp-qs-step">1</div>
+          <div>
+            <p class="mcp-qs-title">Initialize</p>
+            <p class="mcp-qs-body">Send <code>initialize</code> with your capabilities → receive <code>Mcp-Session-Id</code> for session-bound calls</p>
+          </div>
+        </div>
+        <div class="mcp-qs-card">
+          <div class="mcp-qs-step">2</div>
+          <div>
+            <p class="mcp-qs-title">Authenticate</p>
+            <p class="mcp-qs-body">Mint an agent JWT via <code>musehub_create_agent_token</code> — higher rate limits + activity badge in feed</p>
+          </div>
+        </div>
+        <div class="mcp-qs-card">
+          <div class="mcp-qs-step">3</div>
+          <div>
+            <p class="mcp-qs-title">Discover</p>
+            <p class="mcp-qs-body">Call <code>musehub_list_domains</code> to find available domain plugins, then <code>musehub_search_repos</code> to find state repositories</p>
+          </div>
+        </div>
+        <div class="mcp-qs-card">
+          <div class="mcp-qs-step">4</div>
+          <div>
+            <p class="mcp-qs-title">Orient</p>
+            <p class="mcp-qs-body">Call <code>musehub_browse_repo</code> + <code>musehub_get_view</code> to inspect multidimensional state before modifying anything</p>
+          </div>
+        </div>
+        <div class="mcp-qs-card">
+          <div class="mcp-qs-step">5</div>
+          <div>
+            <p class="mcp-qs-title">Act</p>
+            <p class="mcp-qs-body">Push commits, open issues, create PRs, publish releases. All write operations use the same JWT — no separate auth</p>
+          </div>
+        </div>
+        <div class="mcp-qs-card mcp-qs-card--prompt">
+          <div class="mcp-qs-step mcp-qs-step--prompt">→</div>
+          <div>
+            <p class="mcp-qs-title">Full walkthrough</p>
+            <p class="mcp-qs-body">Use the <code>musehub/agent-onboard</code> prompt for a guided end-to-end session tailored to your agent and domain</p>
+          </div>
+        </div>
       </div>
-      <div class="mcp-docs-connect-item">
-        <span class="mcp-docs-connect-label">Protocol</span>
-        <code class="mcp-docs-connect-value">{{ protocol_version }}</code>
+    </section>
+
+    {# ── Connection details ───────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="connect">
+      <h2 class="mcp-section-title">Connection Details</h2>
+      <div class="mcp-connect-table">
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Endpoint</span>
+          <code class="mcp-ct-val">POST https://musehub.ai/mcp</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">SSE stream</span>
+          <code class="mcp-ct-val">GET https://musehub.ai/mcp</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Protocol</span>
+          <code class="mcp-ct-val">{{ protocol_version }}</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Auth</span>
+          <code class="mcp-ct-val">Authorization: Bearer &lt;jwt&gt;</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Agent JWT claim</span>
+          <code class="mcp-ct-val">token_type: "agent"  →  higher rate limits + activity badge</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Session header</span>
+          <code class="mcp-ct-val">Mcp-Session-Id  (returned by initialize, required for elicitation)</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Machine docs</span>
+          <code class="mcp-ct-val">GET https://musehub.ai/mcp/docs.json</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Streaming</span>
+          <code class="mcp-ct-val">Content-Type: text/event-stream  (SSE, Streamable HTTP)</code>
+        </div>
+        <div class="mcp-ct-row">
+          <span class="mcp-ct-key">Elicitation</span>
+          <code class="mcp-ct-val">Requires active Mcp-Session-Id + client capability declared in initialize</code>
+        </div>
       </div>
-      <div class="mcp-docs-connect-item">
-        <span class="mcp-docs-connect-label">Auth</span>
-        <code class="mcp-docs-connect-value">Authorization: Bearer &lt;jwt&gt;</code>
-      </div>
-      <div class="mcp-docs-connect-item">
-        <span class="mcp-docs-connect-label">Agent JWT</span>
-        <code class="mcp-docs-connect-value">token_type: "agent" claim → higher rate limits + activity badge</code>
-      </div>
-      <div class="mcp-docs-connect-item">
-        <span class="mcp-docs-connect-label">Machine docs</span>
-        <code class="mcp-docs-connect-value">GET /mcp/docs.json</code>
-      </div>
+    </section>
+
+    {# ── Tool search ──────────────────────────────────────────────────────────── #}
+    <div class="mcp-tool-search-bar">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="mcp-tool-filter" type="text" placeholder="Filter tools by name or keyword…" autocomplete="off">
+      <span id="mcp-tool-count" class="mcp-tool-count">{{ tools | length }} tools</span>
     </div>
 
-    <div class="mcp-docs-quickstart">
-      <h3 class="mcp-docs-quickstart__title">Agent quick-start</h3>
-      <ol class="mcp-docs-quickstart__steps">
-        <li>Send <code>initialize</code> → receive <code>Mcp-Session-Id</code></li>
-        <li>Call <code>musehub_list_domains</code> to discover available domain plugins</li>
-        <li>Call <code>musehub_get_domain(scoped_id="@author/slug")</code> to read a manifest</li>
-        <li>Call <code>musehub_browse_repo</code> + <code>musehub_get_view</code> to inspect state</li>
-        <li>Use <code>musehub/agent-onboard</code> prompt for a full guided walkthrough</li>
-      </ol>
-    </div>
-  </section>
+    {# ── Read tools ───────────────────────────────────────────────────────────── #}
+    {% set read_names = [
+      'musehub_browse_repo','musehub_list_branches','musehub_list_commits',
+      'musehub_read_file','musehub_get_analysis','musehub_search',
+      'musehub_get_context','musehub_get_commit','musehub_compare',
+      'musehub_list_issues','musehub_get_issue','musehub_list_prs',
+      'musehub_get_pr','musehub_list_releases','musehub_search_repos',
+      'musehub_list_domains','musehub_get_domain','musehub_get_domain_insights',
+      'musehub_get_view','musehub_whoami'
+    ] %}
+    {% set cli_names = ['muse_clone','muse_pull','muse_remote','muse_push','muse_config'] %}
+    {% set elicit_names = [
+      'musehub_compose_with_preferences','musehub_review_pr_interactive',
+      'musehub_connect_streaming_platform','musehub_connect_daw_cloud',
+      'musehub_create_release_interactive'
+    ] %}
 
-  {# ── Tools ────────────────────────────────────────────────────────────────── #}
-  <section class="mcp-docs-section">
-    <h2 class="mcp-docs-section__title">Tools <span class="mcp-docs-count">{{ tools | length }}</span></h2>
-    <div class="mcp-docs-tools-list">
-      {% for tool in tools %}
-      <div class="mcp-docs-tool" id="tool-{{ tool.name }}">
-        <div class="mcp-docs-tool__header">
-          <code class="mcp-docs-tool__name">{{ tool.name }}</code>
-          {% if tool.get('server_side') %}
-          <span class="badge badge-sm">server</span>
-          {% endif %}
-          {% if 'elicitation' in tool.description | lower or 'elicit' in tool.description | lower %}
-          <span class="badge badge-sm badge-elicitation">elicitation</span>
+    <section class="mcp-section" id="tools-read">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Read Tools</h2>
+        <span class="mcp-badge mcp-badge--read">{% for t in tools if t.name in read_names %}{% if loop.last %}{{ loop.index }}{% endif %}{% endfor %}</span>
+      </div>
+      <p class="mcp-section-desc">Browse repos, inspect commits, read files, and discover the MuseHub catalogue — no write permissions required.</p>
+      <div class="mcp-tool-list">
+        {% for tool in tools if tool.name in read_names %}
+        {{ _render_tool(tool, 'read') }}
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ── Write tools ──────────────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="tools-write">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Write Tools</h2>
+        <span class="mcp-badge mcp-badge--write">{% for t in tools if t.name not in read_names and t.name not in cli_names and t.name not in elicit_names %}{% if loop.last %}{{ loop.index }}{% endif %}{% endfor %}</span>
+      </div>
+      <p class="mcp-section-desc">Create repos, open issues, push commits, merge PRs, publish releases, star, fork — full contribution capability.</p>
+      <div class="mcp-tool-list">
+        {% for tool in tools if tool.name not in read_names and tool.name not in cli_names and tool.name not in elicit_names %}
+        {{ _render_tool(tool, 'write') }}
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ── Muse CLI tools ───────────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="tools-cli">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Muse CLI Tools</h2>
+        <span class="mcp-badge mcp-badge--cli">{{ cli_names | length }}</span>
+      </div>
+      <p class="mcp-section-desc">Equivalents of <code>muse clone</code>, <code>muse push</code>, <code>muse pull</code>, <code>muse remote</code>, and <code>muse config</code> — operate Muse VCS directly over MCP.</p>
+      <div class="mcp-tool-list">
+        {% for tool in tools if tool.name in cli_names %}
+        {{ _render_tool(tool, 'cli') }}
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ── Elicitation tools ────────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="tools-elicit">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Elicitation Tools</h2>
+        <span class="mcp-badge mcp-badge--elicit">{{ elicit_names | length }}</span>
+      </div>
+      <p class="mcp-section-desc">Interactive tools that collect user input mid-call via MCP 2025-11-25 elicitation. Requires an active <code>Mcp-Session-Id</code> and client elicitation capability.</p>
+      <div class="mcp-tool-list">
+        {% for tool in tools if tool.name in elicit_names %}
+        {{ _render_tool(tool, 'elicit') }}
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ── Static resources ─────────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="resources">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Resources</h2>
+        <span class="mcp-badge mcp-badge--resource">{{ static_resources | length }}</span>
+      </div>
+      <p class="mcp-section-desc">Static MCP resources — fixed URIs that return structured data. No parameters required.</p>
+      <div class="mcp-resource-grid">
+        {% for res in static_resources %}
+        <div class="mcp-resource-card">
+          <div class="mcp-resource-card-top">
+            <code class="mcp-resource-uri">{{ res.uri }}</code>
+            {% if res.get('mimeType') %}<span class="mcp-mime">{{ res.mimeType }}</span>{% endif %}
+          </div>
+          <p class="mcp-resource-name">{{ res.name }}</p>
+          <p class="mcp-resource-desc">{{ res.description | auto_code | safe }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ── Resource templates ───────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="resource-templates">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Resource Templates</h2>
+        <span class="mcp-badge mcp-badge--resource">{{ resource_templates | length }}</span>
+      </div>
+      <p class="mcp-section-desc">Parameterised resource URIs — interpolate owner, slug, ref, and other values to fetch repo-scoped data.</p>
+      <div class="mcp-resource-grid">
+        {% for tmpl in resource_templates %}
+        <div class="mcp-resource-card">
+          <div class="mcp-resource-card-top">
+            <code class="mcp-resource-uri">{{ tmpl.uriTemplate }}</code>
+          </div>
+          <p class="mcp-resource-name">{{ tmpl.name }}</p>
+          <p class="mcp-resource-desc">{{ tmpl.description | auto_code | safe }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ── Prompts ──────────────────────────────────────────────────────────────── #}
+    <section class="mcp-section" id="prompts">
+      <div class="mcp-section-header">
+        <h2 class="mcp-section-title">Prompts</h2>
+        <span class="mcp-badge mcp-badge--prompt">{{ prompts | length }}</span>
+      </div>
+      <p class="mcp-section-desc">Reusable MCP prompts — inject these into your agent context to give it structured, domain-aware workflows.</p>
+      <div class="mcp-prompt-grid">
+        {% for prompt in prompts %}
+        <div class="mcp-prompt-card" id="prompt-{{ prompt.name | replace('/', '-') }}">
+          <div class="mcp-prompt-header">
+            <code class="mcp-prompt-name">{{ prompt.name }}</code>
+            {% if prompt.get('arguments') %}
+            <span class="mcp-prompt-arg-count">{{ prompt.arguments | length }} arg{{ 's' if prompt.arguments | length != 1 }}</span>
+            {% endif %}
+          </div>
+          <p class="mcp-prompt-desc">{{ prompt.description | auto_code | safe }}</p>
+          {% if prompt.get('arguments') %}
+          <div class="mcp-prompt-args">
+            {% for arg in prompt.arguments %}
+            <span class="mcp-prompt-arg-chip">
+              <code>{{ arg.name }}</code>{% if arg.get('required') %}<span class="mcp-req-star">*</span>{% endif %}
+              {% if arg.get('description') %}<span class="mcp-prompt-arg-hint">{{ arg.description | auto_code | safe }}</span>{% endif %}
+            </span>
+            {% endfor %}
+          </div>
           {% endif %}
         </div>
-        <p class="mcp-docs-tool__desc">{{ tool.description }}</p>
-        {% if tool.inputSchema and tool.inputSchema.get('properties') %}
-        <details class="mcp-docs-tool__schema">
-          <summary>Parameters</summary>
-          <table class="mcp-docs-params-table">
-            <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-            <tbody>
-              {% set required = tool.inputSchema.get('required', []) %}
-              {% for param_name, param in tool.inputSchema.properties.items() %}
-              <tr>
-                <td><code>{{ param_name }}</code></td>
-                <td><span class="mcp-docs-type">{{ param.get('type', 'any') }}</span></td>
-                <td>{% if param_name in required %}<span class="mcp-docs-required">yes</span>{% else %}—{% endif %}</td>
-                <td>{{ param.get('description', '') }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </details>
-        {% endif %}
+        {% endfor %}
       </div>
-      {% endfor %}
-    </div>
-  </section>
+    </section>
 
-  {# ── Static resources ─────────────────────────────────────────────────────── #}
-  <section class="mcp-docs-section">
-    <h2 class="mcp-docs-section__title">Resources <span class="mcp-docs-count">{{ static_resources | length }}</span></h2>
-    <div class="mcp-docs-resource-list">
-      {% for res in static_resources %}
-      <div class="mcp-docs-resource">
-        <code class="mcp-docs-resource__uri">{{ res.uri }}</code>
-        <span class="mcp-docs-resource__name">{{ res.name }}</span>
-        <p class="mcp-docs-resource__desc">{{ res.description }}</p>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  {# ── Resource templates ───────────────────────────────────────────────────── #}
-  <section class="mcp-docs-section">
-    <h2 class="mcp-docs-section__title">Resource Templates <span class="mcp-docs-count">{{ resource_templates | length }}</span></h2>
-    <div class="mcp-docs-resource-list">
-      {% for tmpl in resource_templates %}
-      <div class="mcp-docs-resource">
-        <code class="mcp-docs-resource__uri">{{ tmpl.uriTemplate }}</code>
-        <span class="mcp-docs-resource__name">{{ tmpl.name }}</span>
-        <p class="mcp-docs-resource__desc">{{ tmpl.description }}</p>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  {# ── Prompts ──────────────────────────────────────────────────────────────── #}
-  <section class="mcp-docs-section">
-    <h2 class="mcp-docs-section__title">Prompts <span class="mcp-docs-count">{{ prompts | length }}</span></h2>
-    <div class="mcp-docs-prompt-list">
-      {% for prompt in prompts %}
-      <div class="mcp-docs-prompt" id="prompt-{{ prompt.name | replace('/', '-') }}">
-        <code class="mcp-docs-prompt__name">{{ prompt.name }}</code>
-        <p class="mcp-docs-prompt__desc">{{ prompt.description }}</p>
-        {% if prompt.get('arguments') %}
-        <div class="mcp-docs-prompt__args">
-          {% for arg in prompt.arguments %}
-          <span class="mcp-docs-prompt__arg">
-            <code>{{ arg.name }}</code>
-            {% if arg.get('required') %}<span class="mcp-docs-required">*</span>{% endif %}
-            {% if arg.get('description') %}<span class="mcp-docs-prompt__arg-desc">— {{ arg.description }}</span>{% endif %}
-          </span>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
+  </main>
 </div>
 {% endblock %}

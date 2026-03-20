@@ -67,6 +67,7 @@ The embed route sets ``X-Frame-Options: ALLOWALL`` for cross-origin iframe use.
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -94,10 +95,12 @@ from musehub.models.musehub import (
     TagResponse,
 )
 from musehub.db import musehub_models as musehub_db
+from musehub.db import musehub_domain_models as domain_db
 from musehub.muse_cli.models import MuseCliTag
 from musehub.db import musehub_label_models as label_db
 from musehub.services import musehub_analysis, musehub_credits, musehub_divergence, musehub_events, musehub_issues, musehub_listen, musehub_pull_requests, musehub_releases
 from musehub.services import musehub_discover, musehub_repository, musehub_search
+from musehub.storage.backends import get_backend as _get_storage_backend
 from musehub.api.routes.musehub._templates import templates
 
 logger = logging.getLogger(__name__)
@@ -400,6 +403,45 @@ async def explore_page(
         for name, _ in sorted(topic_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:40]
     ]
 
+    # Hero stats: total commits and distinct domain count across public repos.
+    _commit_count_row = await db.execute(
+        sa_select(func.count()).select_from(musehub_db.MusehubCommit).join(
+            musehub_db.MusehubRepo,
+            musehub_db.MusehubCommit.repo_id == musehub_db.MusehubRepo.repo_id,
+        ).where(musehub_db.MusehubRepo.visibility == "public")
+    )
+    total_commits_count: int = _commit_count_row.scalar_one_or_none() or 0
+
+    _domain_tag_rows = await db.execute(
+        sa_select(musehub_db.MusehubRepo.tags).where(
+            musehub_db.MusehubRepo.visibility == "public"
+        )
+    )
+    _domain_set: set[str] = set()
+    for (tags,) in _domain_tag_rows:
+        for t in tags or []:
+            raw = str(t)
+            # Use only prefix-based domain tags (e.g. "domain:audio", "genre:baroque")
+            # or bare single-word tags that represent a domain category.
+            value = raw.split(":", 1)[-1].lower() if ":" in raw else raw.lower()
+            if len(value) >= 3 and not value.replace(".", "").isdigit():
+                _domain_set.add(value)
+    domain_count: int = len(_domain_set)
+
+    # Fetch registered public domains for the sidebar quick-filter.
+    _domain_rows = await db.execute(
+        sa_select(
+            domain_db.MusehubDomain.domain_id,
+            domain_db.MusehubDomain.display_name,
+            domain_db.MusehubDomain.slug,
+            domain_db.MusehubDomain.author_slug,
+        ).order_by(domain_db.MusehubDomain.install_count.desc())
+    )
+    explore_domains: list[dict[str, str]] = [
+        {"domain_id": r.domain_id, "name": r.display_name, "slug": r.slug, "owner": r.author_slug}
+        for r in _domain_rows
+    ]
+
     # Map UI sort labels to discover service sort fields.
     _sort_map: dict[str, musehub_discover.SortField] = {
         "stars": "stars",
@@ -442,6 +484,9 @@ async def explore_page(
             ("trending", "Trending"),
         ],
         "base_explore_url": "/explore",
+        "total_commits_count": total_commits_count,
+        "domain_count": domain_count,
+        "explore_domains": explore_domains,
     }
     return await htmx_fragment_or_full(
         request,
@@ -543,9 +588,10 @@ async def repo_page(
         releases,
         pr_count_result,
         issue_count_result,
+        repo_stats,
     ) = await asyncio.gather(
         musehub_repository.list_tree(db, repo_id, owner, repo_slug, ref, ""),
-        musehub_repository.list_commits(db, repo_id, limit=5),
+        musehub_repository.list_commits(db, repo_id, limit=8),
         musehub_repository.list_branches(db, repo_id),
         musehub_releases.list_releases(db, repo_id),
         db.execute(
@@ -560,6 +606,7 @@ async def repo_page(
                 musehub_db.MusehubIssue.state == "open",
             )
         ),
+        musehub_repository.get_repo_home_stats(db, repo_id, ref),
     )
     tags_count = len(releases)
     nav_ctx: dict[str, Any] = {
@@ -596,6 +643,29 @@ async def repo_page(
         if k not in _META_SKIP and v
     ]
 
+    # Enrich commits with commit_meta (sem_ver_bump, agent_id, etc.) from ORM rows.
+    _CONV_COMMIT_RE = re.compile(
+        r"^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)"
+        r"(\([^)]+\))?(!)?:"
+    )
+    commits_enriched: list[dict[str, Any]] = []
+    for c in commits:
+        row = await db.get(musehub_db.MusehubCommit, c.commit_id)
+        meta: dict[str, Any] = dict(row.commit_meta or {}) if row else {}
+        d = c.model_dump(by_alias=True)
+        # Conventional commit type extraction
+        m = _CONV_COMMIT_RE.match(c.message.strip())
+        d["commitType"] = m.group(1) if m else ""
+        d["isBreaking"] = bool(m and m.group(3)) or bool(meta.get("breaking_changes"))
+        d["semVerBump"] = meta.get("sem_ver_bump", "none") or "none"
+        d["agentId"] = meta.get("agent_id", "") or ""
+        d["modelId"] = meta.get("model_id", "") or ""
+        d["toolchainId"] = meta.get("toolchain_id", "") or ""
+        d["testRuns"] = int(meta.get("test_runs") or 0)
+        d["formatVersion"] = int(meta.get("format_version") or 0)
+        d["reviewedBy"] = list(meta.get("reviewed_by") or [])
+        commits_enriched.append(d)
+
     page_url = str(request.url)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -607,10 +677,10 @@ async def repo_page(
         "repo_license": repo_license,
         "ref": ref,
         "tree": tree_response.entries,
-        # commit_row macro expects camelCase keys (commitId, etc.)
-        "commits": [c.model_dump(by_alias=True) for c in commits],
+        "commits": commits_enriched,
         "branches": branches,
         "tags_count": tags_count,
+        "repo_stats": repo_stats,
         "jsonld_script": render_jsonld_script(jsonld_repo(repo, page_url)),
         "og_meta": _og_tags(
             title=f"{owner}/{repo_slug} — MuseHub",
@@ -899,53 +969,110 @@ async def commit_page(
 
     comments, branch_commits = await asyncio.gather(_q_comments(), _q_branch_commits())
 
-    # ── Find prev (older) / next (newer) siblings on branch ──────────────
-    # list_commits returns newest-first; pos+1 = older, pos-1 = newer
+    # ── Prev / next siblings on branch ───────────────────────────────────
     cur_pos = next((i for i, c in enumerate(branch_commits) if c.commit_id == commit_id), None)
     older_commit: Any = branch_commits[cur_pos + 1] if (cur_pos is not None and cur_pos + 1 < len(branch_commits)) else None
     newer_commit: Any = branch_commits[cur_pos - 1] if (cur_pos is not None and cur_pos > 0) else None
 
-    # ── Compute musical dimension change scores from commit message ───────
-    _DIM_KWS: list[tuple[str, frozenset[str]]] = [
-        ("melodic",    frozenset(["melody", "melodic", "lead", "motif", "phrase", "contour", "scale", "mode"])),
-        ("harmonic",   frozenset(["key", "chord", "harmony", "harmonic", "tonal", "modulation", "progression", "pitch"])),
-        ("rhythmic",   frozenset(["bpm", "tempo", "beat", "rhythm", "rhythmic", "groove", "swing", "meter", "time"])),
-        ("structural", frozenset(["section", "structural", "intro", "verse", "chorus", "bridge", "outro", "form", "arrangement", "structure"])),
-        ("dynamic",    frozenset(["dynamic", "volume", "velocity", "loud", "soft", "crescendo", "decrescendo", "fade", "mute", "swell"])),
-    ]
+    # ── Commit metadata from ORM ──────────────────────────────────────────
+    orm_row = await db.get(musehub_db.MusehubCommit, commit_id)
+    raw_meta: dict[str, Any] = dict(orm_row.commit_meta or {}) if orm_row else {}
 
-    def _dim_score(msg: str, kws: frozenset[str], is_root: bool) -> dict[str, Any]:
-        score = 1.0 if is_root else (0.0 if not any(kw in msg for kw in kws) else min(0.35 + (sum(1 for kw in kws if kw in msg) - 1) * 0.15, 0.95))
-        label = "none" if score < 0.15 else ("low" if score < 0.40 else ("medium" if score < 0.70 else "high"))
-        return {"dimension": name, "score": round(score, 3), "label": label}
+    # Parse conventional commit type from message
+    _CONV_RE = re.compile(r"^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([^)]+\))?(!)?:")
+    _cm = _CONV_RE.match(commit.message.strip())
+    commit_type = _cm.group(1) if _cm else ""
+    commit_scope = (_cm.group(2) or "").strip("()") if _cm else ""
+    is_breaking = bool((_cm and _cm.group(3)) or raw_meta.get("breaking_changes"))
 
-    is_root = not commit.parent_ids
-    msg_lower = commit.message.lower()
-    dimensions: list[dict[str, Any]] = []
-    for name, kws in _DIM_KWS:
-        score = 1.0 if is_root else (0.0 if not any(kw in msg_lower for kw in kws) else min(0.35 + (sum(1 for kw in kws if kw in msg_lower) - 1) * 0.15, 0.95))
-        label = "none" if score < 0.15 else ("low" if score < 0.40 else ("medium" if score < 0.70 else "high"))
-        dimensions.append({"dimension": name, "score": round(score, 3), "label": label})
+    # Structured delta from commit_meta (Muse semantic diff)
+    structured_delta: dict[str, Any] = raw_meta.get("structured_delta") or {}
 
-    overall_change = round(sum(d["score"] for d in dimensions) / len(dimensions), 3) if dimensions else 0.0
+    # Snapshot diff: compare this snapshot vs parent snapshot
+    parent_snapshot_id: str | None = None
+    if commit.parent_ids:
+        parent_orm = await db.get(musehub_db.MusehubCommit, commit.parent_ids[0])
+        parent_snapshot_id = parent_orm.snapshot_id if parent_orm else None
+
+    snapshot_diff = await musehub_repository.get_snapshot_diff(
+        db, repo_id, commit.snapshot_id, parent_snapshot_id
+    )
 
     # ── Domain context ────────────────────────────────────────────────────
     from musehub.api.routes.musehub.ui_view import _get_domain_for_repo as _gdfr
     orm_repo_cd = await db.get(musehub_db.MusehubRepo, repo_id)
     domain_ctx_cd = await _gdfr(db, repo_id, getattr(orm_repo_cd, "domain_id", None))
 
-    # ── Audio / render status — only meaningful for MIDI domain ──────────
+    # ── Audio — MIDI domain only ──────────────────────────────────────────
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
         if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "piano_roll"
         else None
     )
-    render_status = "ready" if audio_url else "none"
 
-    # ── Dimension scores — MIDI-only; skip for other domains ─────────────
-    if domain_ctx_cd["viewer_type"] != "piano_roll":
-        dimensions = []
-        overall_change = 0.0
+    # ── Provenance dict (sidebar) ─────────────────────────────────────────
+    provenance = {
+        "sem_ver_bump": raw_meta.get("sem_ver_bump") or "none",
+        "agent_id": raw_meta.get("agent_id") or "",
+        "model_id": raw_meta.get("model_id") or "",
+        "toolchain_id": raw_meta.get("toolchain_id") or "",
+        "prompt_hash": raw_meta.get("prompt_hash") or "",
+        "signature": raw_meta.get("signature") or "",
+        "signer_key_id": raw_meta.get("signer_key_id") or "",
+        "format_version": int(raw_meta.get("format_version") or 0),
+        "reviewed_by": list(raw_meta.get("reviewed_by") or []),
+        "test_runs": int(raw_meta.get("test_runs") or 0),
+        "breaking_changes": list(raw_meta.get("breaking_changes") or []),
+        "is_agent": bool(raw_meta.get("agent_id")),
+    }
+
+    # Split commit message into subject + body
+    msg_parts = commit.message.split("\n", 1)
+    commit_subject = msg_parts[0].strip()
+    commit_body = msg_parts[1].strip() if len(msg_parts) > 1 else ""
+
+    # ── Dimension strip: aggregate counts from structured_delta + snapshot ──
+    def _count_sym_ops(delta: dict[str, Any], op_filter: str | None = None) -> int:
+        total = 0
+        for fop in delta.get("ops", []):
+            for cop in (fop.get("child_ops") or []):
+                if op_filter is None or cop.get("op") == op_filter:
+                    total += 1
+        return total
+
+    sym_added    = _count_sym_ops(structured_delta, "insert")
+    sym_removed  = _count_sym_ops(structured_delta, "delete")
+    sym_modified = _count_sym_ops(structured_delta, "replace") + _count_sym_ops(structured_delta, "patch")
+    sym_total    = _count_sym_ops(structured_delta)
+    files_added_n    = len(snapshot_diff.get("added", []))
+    files_modified_n = len(snapshot_diff.get("modified", []))
+    files_removed_n  = len(snapshot_diff.get("removed", []))
+    files_changed_n  = files_added_n + files_modified_n + files_removed_n
+
+    # Dead code: child ops with op=delete and "0 callers" in summary, or flagged
+    dead_code_removed = sum(
+        1 for fop in structured_delta.get("ops", [])
+        for cop in (fop.get("child_ops") or [])
+        if cop.get("op") == "delete" and (
+            "0 callers" in (cop.get("content_summary") or "")
+            or "dead" in (cop.get("content_summary") or "").lower()
+        )
+    )
+
+    dims = {
+        "sym_added": sym_added,
+        "sym_removed": sym_removed,
+        "sym_modified": sym_modified,
+        "sym_total": sym_total,
+        "files_added": files_added_n,
+        "files_modified": files_modified_n,
+        "files_removed": files_removed_n,
+        "files_changed": files_changed_n,
+        "dead_code_removed": dead_code_removed,
+        "test_runs": provenance["test_runs"],
+        "total_files": snapshot_diff.get("total_files", 0),
+        "domain": structured_delta.get("domain") or "code",
+    }
 
     ctx: dict[str, Any] = {
         "owner": owner,
@@ -957,11 +1084,18 @@ async def commit_page(
         "current_page": "commits",
         "domain": domain_ctx_cd,
         "commit": commit.model_dump(mode="json"),
+        "commit_subject": commit_subject,
+        "commit_body": commit_body,
+        "commit_type": commit_type,
+        "commit_scope": commit_scope,
+        "is_breaking": is_breaking,
         "comments": comments,
         "audio_url": audio_url,
-        "render_status": render_status,
-        "dimensions": dimensions,
-        "overall_change": overall_change,
+        "render_status": "ready" if audio_url else "none",
+        "provenance": provenance,
+        "structured_delta": structured_delta,
+        "snapshot_diff": snapshot_diff,
+        "dims": dims,
         "older_commit": older_commit.model_dump(mode="json") if older_commit else None,
         "newer_commit": newer_commit.model_dump(mode="json") if newer_commit else None,
         "branch_commit_count": len(branch_commits),
@@ -974,7 +1108,7 @@ async def commit_page(
         ),
         "og_meta": _og_tags(
             title=f"Commit {short_id} · {owner}/{repo_slug} — MuseHub",
-            description=commit.message,
+            description=commit_subject,
             og_type="article",
         ),
     }
@@ -1013,15 +1147,38 @@ async def diff_page(
     commit = await musehub_repository.get_commit(db, repo_id, commit_id)
     commit_data = commit.model_dump(by_alias=True, mode="json") if commit else None
 
+    raw_meta_d: dict[str, Any] = {}
+    structured_delta_d: dict[str, Any] = {}
+    snapshot_diff_d: dict[str, Any] = {"added": [], "modified": [], "removed": [], "total_files": 0}
+    parent_id_d: str | None = None
+    short_id_d = commit_id[:8]
+
+    if commit:
+        orm_row_d = await db.get(musehub_db.MusehubCommit, commit_id)
+        raw_meta_d = dict(orm_row_d.commit_meta or {}) if orm_row_d else {}
+        structured_delta_d = raw_meta_d.get("structured_delta") or {}
+        parent_id_d = commit.parent_ids[0] if commit.parent_ids else None
+        parent_snapshot_id_d: str | None = None
+        if parent_id_d:
+            parent_orm_d = await db.get(musehub_db.MusehubCommit, parent_id_d)
+            parent_snapshot_id_d = parent_orm_d.snapshot_id if parent_orm_d else None
+        snapshot_diff_d = await musehub_repository.get_snapshot_diff(
+            db, repo_id, commit.snapshot_id, parent_snapshot_id_d
+        )
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "commit_id": commit_id,
+        "short_id": short_id_d,
         "base_url": base_url,
         "current_page": "commits",
         "domain": domain_ctx_d,
         "commit": commit_data,
+        "structured_delta": structured_delta_d,
+        "snapshot_diff": snapshot_diff_d,
+        "parent_id": parent_id_d,
     }
     ctx.update(nav_ctx)
     return json_or_html(
@@ -4220,6 +4377,83 @@ async def piano_roll_track_page(
 
 
 @router.get(
+    "/{owner}/{repo_slug}/raw/{ref}/{path:path}",
+    summary="MuseHub semantic raw file download",
+)
+async def raw_file_semantic(
+    owner: str,
+    repo_slug: str,
+    ref: str,
+    path: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Serve raw file bytes resolved via the snapshot manifest.
+
+    Works for both wire-protocol repos (content-addressed objects) and legacy
+    MIDI-upload repos.  Returns the file with a correct Content-Type header and
+    a Content-Disposition: attachment so browsers offer a Save dialog.
+    """
+    import mimetypes
+    from fastapi.responses import StreamingResponse
+
+    # Binary extensions → force download; everything else → inline (browser renders)
+    _BINARY_EXTS = {".mid", ".midi", ".mp3", ".wav", ".flac", ".ogg",
+                    ".webp", ".png", ".jpg", ".jpeg", ".gif", ".pdf",
+                    ".zip", ".tar", ".gz", ".bz2", ".wasm"}
+
+    # Text-ish extensions → always serve as text/plain so browsers display inline
+    _TEXT_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".rs", ".go",
+                  ".swift", ".kt", ".java", ".rb", ".cpp", ".c", ".h", ".cs",
+                  ".hs", ".scala", ".php", ".lua", ".sh", ".bash", ".zsh",
+                  ".json", ".jsonc", ".yaml", ".yml", ".toml", ".ini", ".cfg",
+                  ".md", ".mdx", ".rst", ".txt", ".csv", ".xml", ".html",
+                  ".htm", ".css", ".scss", ".sass", ".sql", ".graphql", ".proto",
+                  ".dockerfile", ".makefile", ""}
+
+    repo_id, _, _ = await _resolve_repo(owner, repo_slug, db)
+    norm_path = path.lstrip("/")
+    ext = Path(norm_path).suffix.lower()
+    filename = norm_path.split("/")[-1]
+    is_binary = ext in _BINARY_EXTS
+
+    if is_binary:
+        # Use correct MIME and prompt download
+        _MIME_BINARY: dict[str, str] = {
+            ".mid": "audio/midi", ".midi": "audio/midi",
+            ".mp3": "audio/mpeg", ".wav": "audio/wav", ".flac": "audio/flac",
+            ".ogg": "audio/ogg", ".webp": "image/webp",
+            ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        }
+        media_type = _MIME_BINARY.get(ext) or (mimetypes.guess_type(norm_path)[0] or "application/octet-stream")
+        disposition = f'attachment; filename="{filename}"'
+    else:
+        # Serve all text/code as plain text — browser displays inline, no HTML injection
+        media_type = "text/plain; charset=utf-8"
+        disposition = f'inline; filename="{filename}"'
+
+    # Strategy 1: snapshot manifest → storage backend
+    file_meta = await musehub_repository.get_file_at_ref(db, repo_id, ref, norm_path)
+    if file_meta:
+        storage = _get_storage_backend()
+        data = await storage.get(repo_id, str(file_meta["object_id"]))
+        if data:
+            return Response(content=data, media_type=media_type,
+                            headers={"Content-Disposition": disposition})
+
+    # Strategy 2: legacy path-indexed object
+    obj = await musehub_repository.get_object_by_path(db, repo_id, norm_path)
+    if obj and hasattr(obj, "disk_path") and obj.disk_path:
+        disk = Path(obj.disk_path)
+        if disk.exists():
+            data_legacy = await asyncio.to_thread(disk.read_bytes)
+            return Response(content=data_legacy, media_type=media_type,
+                            headers={"Content-Disposition": disposition})
+
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail=f"File '{norm_path}' not found at ref '{ref}'")
+
+
+@router.get(
     "/{owner}/{repo_slug}/blob/{ref}/{path:path}",
     summary="MuseHub file blob viewer — music-aware file rendering",
 )
@@ -4231,67 +4465,114 @@ async def blob_page(
     path: str,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the music-aware blob viewer with SSR scaffolding.
+    """Render the Muse-native file blob viewer.
 
-    Fetches the file object from the database server-side and populates the
-    template with enough context to render the page header, file metadata,
-    and (for text files) the full line-numbered content without JavaScript.
+    Resolution strategy (handles both wire-protocol and legacy MIDI uploads):
+    1. Snapshot manifest lookup: ref → commit → snapshot → manifest[path] → object_id
+    2. Content from storage backend (LocalBackend / S3Backend)
+    3. Legacy fallback: musehub_objects.path for old MIDI upload repos
 
-    Rendering modes by extension:
-    - .mid/.midi → MIDI player shell with data-midi-url attribute
-    - .mp3/.wav/.flac → client-side audio player (JS required for <audio>)
-    - Text/code files → server-rendered line-numbered table; JS enhances with
-      syntax highlighting progressively
-    - Binary / oversized (>1 MB) → download link only
+    Rendering modes:
+    - .mid/.midi     → MIDI player shell
+    - .mp3/.wav/...  → audio player
+    - Text/code      → SSR line-numbered table + JS syntax highlighting
+    - Binary / >1 MB → download link only
 
-    If no object exists at ``path`` in the repo a 404 is raised immediately,
-    avoiding the JS "File not found" flash that the previous implementation
-    produced.
-
-    Auth: no JWT required for public repos.  Private-repo auth is
-    handled client-side via localStorage JWT (consistent with other
-    MuseHub UI pages).
+    Returns 404 when path is not found at the given ref.
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    filename = path.split("/")[-1] if path else ""
-
-    obj = await musehub_repository.get_object_by_path(db, repo_id, path)
-
-    lang = _detect_language(path)
-    ext = Path(path).suffix.lower()
+    norm_path = path.lstrip("/")
+    filename = norm_path.split("/")[-1] if norm_path else ""
+    lang = _detect_language(norm_path)
+    ext = Path(norm_path).suffix.lower()
     is_binary = ext in _BLOB_BINARY_TYPES
     is_midi = ext in (".mid", ".midi")
-    size_bytes: int = obj.size_bytes if obj is not None else 0
 
-    # Treat files over 1 MB as binary regardless of extension.
+    # ── Strategy 1: snapshot manifest → storage backend ──────────────────
+    file_meta = await musehub_repository.get_file_at_ref(db, repo_id, ref, norm_path)
+    content_bytes: bytes | None = None
+    object_id: str = ""
+    snapshot_id: str = ""
+    blob_found = False
+
+    if file_meta:
+        object_id = str(file_meta["object_id"])
+        snapshot_id = str(file_meta["snapshot_id"])
+        blob_found = True
+        if not is_binary:
+            storage = _get_storage_backend()
+            raw = await storage.get(repo_id, object_id)
+            if raw:
+                content_bytes = raw
+    else:
+        # ── Strategy 2: legacy path-indexed object (old MIDI uploads) ────
+        obj = await musehub_repository.get_object_by_path(db, repo_id, norm_path)
+        if obj:
+            blob_found = True
+            object_id = obj.object_id or ""
+            snapshot_id = ""
+            if not is_binary and hasattr(obj, "disk_path") and obj.disk_path:
+                _disk_path: str = obj.disk_path
+                def _read_legacy() -> bytes | None:
+                    p = Path(_disk_path)
+                    return p.read_bytes() if p.exists() else None
+                try:
+                    content_bytes = await asyncio.to_thread(_read_legacy)
+                except OSError:
+                    logger.warning("⚠️ blob_page: could not read %s", _disk_path)
+
+    if not blob_found:
+        ctx_404: dict[str, object] = {
+            "owner": owner, "repo_slug": repo_slug, "repo_id": repo_id,
+            "ref": ref, "file_path": norm_path, "filename": filename,
+            "base_url": base_url, "current_page": "tree",
+            "blob_found": False, "lang": lang, "is_binary": False,
+            "is_midi": False, "size_bytes": 0, "lines": [],
+            "line_count": 0, "object_id": "", "snapshot_id": "",
+        }
+        ctx_404.update(nav_ctx)
+        return json_or_html(
+            request,
+            lambda: templates.TemplateResponse(request, "musehub/pages/blob.html", ctx_404),
+            ctx_404,
+        )
+
+    # Decode text content
+    content: str | None = None
+    if content_bytes is not None and not is_binary:
+        if len(content_bytes) > 1_000_000:
+            is_binary = True
+        else:
+            content = content_bytes.decode("utf-8", errors="replace")
+
+    size_bytes: int = len(content_bytes) if content_bytes else 0
     if size_bytes > 1_000_000:
         is_binary = True
+        content = None
 
-    # Read text content for small non-binary files so we can SSR line numbers.
-    # Use asyncio.to_thread so the blocking file read does not stall the event loop.
-    content: str | None = None
-    if obj is not None and not is_binary and Path(obj.disk_path).exists():
-        _disk_path = obj.disk_path
-
-        def _read_file() -> str:
-            with open(_disk_path, encoding="utf-8", errors="replace") as fh:
-                return fh.read()
-
-        try:
-            content = await asyncio.to_thread(_read_file)
-        except OSError:
-            logger.warning("⚠️ blob_page: could not read %s", obj.disk_path)
-
-    lines: list[str] = content.splitlines() if content is not None else []
+    lines: list[str] = content.splitlines() if content else []
     line_count = len(lines)
+
+    # Last-modified commit for this file
+    last_commit = await musehub_repository.get_last_commit_for_file(
+        db, repo_id, norm_path, str(file_meta["commit_id"]) if file_meta else ref
+    ) if file_meta else None
+
+    # Breadcrumb path segments
+    path_segments: list[tuple[str, str]] = []
+    accumulated = ""
+    for seg in norm_path.split("/")[:-1]:
+        accumulated = f"{accumulated}/{seg}" if accumulated else seg
+        path_segments.append((seg, f"{base_url}/tree/{ref}/{accumulated}"))
 
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "ref": ref,
-        "file_path": path,
+        "file_path": norm_path,
         "filename": filename,
+        "path_segments": path_segments,
         "base_url": base_url,
         "current_page": "tree",
         "lang": lang,
@@ -4300,7 +4581,15 @@ async def blob_page(
         "size_bytes": size_bytes,
         "lines": lines,
         "line_count": line_count,
-        "blob_found": obj is not None,
+        "blob_found": blob_found,
+        "object_id": object_id,
+        "object_id_short": object_id[:16] if object_id else "",
+        "snapshot_id": snapshot_id,
+        "last_commit": last_commit.commit_id[:8] if last_commit else "",
+        "last_commit_full": last_commit.commit_id if last_commit else "",
+        "last_commit_msg": (last_commit.message.split("\n")[0] if last_commit else ""),
+        "last_commit_time": last_commit.timestamp if last_commit else None,
+        "last_commit_author": last_commit.author if last_commit else "",
     }
     ctx.update(nav_ctx)
     return json_or_html(

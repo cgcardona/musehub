@@ -24,7 +24,7 @@ differ between engines and are not needed at this scale.
 import logging
 from typing import Any, Literal
 
-from sqlalchemy import Integer, Text, desc, func, or_, outerjoin, select
+from sqlalchemy import Integer, Text, desc, func, or_, outerjoin, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.db import musehub_models as db
@@ -217,6 +217,129 @@ async def list_public_repos(
 
     logger.debug("✅ Explore query: %d/%d repos (page %d, sort=%s)", len(results), total, page, sort)
     return ExploreResponse(repos=results, total=total, page=page, page_size=page_size)
+
+
+async def search_repos_by_text(
+    session: AsyncSession,
+    q: str,
+    *,
+    limit: int = 20,
+) -> list[ExploreRepoResult]:
+    """Full-text fallback: search public repos across name, slug, description, and tags.
+
+    Returns up to ``limit`` results ordered by star count then commit count.
+    Used when Qdrant vector search is not configured.
+    """
+    pattern       = f"%{q.lower()}%"
+    pattern_hyph  = f"%{q.lower().replace(' ', '-')}%"
+    star_count_col   = func.count(db.MusehubStar.star_id).label("star_count")
+    commit_count_col = func.count(db.MusehubCommit.commit_id).label("commit_count")
+
+    stmt = (
+        select(db.MusehubRepo, star_count_col, commit_count_col)
+        .select_from(
+            outerjoin(
+                outerjoin(
+                    db.MusehubRepo,
+                    db.MusehubStar,
+                    db.MusehubRepo.repo_id == db.MusehubStar.repo_id,
+                ),
+                db.MusehubCommit,
+                db.MusehubRepo.repo_id == db.MusehubCommit.repo_id,
+            )
+        )
+        .where(
+            db.MusehubRepo.visibility == "public",
+            or_(
+                func.lower(db.MusehubRepo.name).ilike(pattern),
+                func.lower(db.MusehubRepo.name).ilike(pattern_hyph),
+                func.lower(db.MusehubRepo.slug).ilike(pattern),
+                func.lower(db.MusehubRepo.description).ilike(pattern),
+                func.lower(db.MusehubRepo.description).ilike(pattern_hyph),
+                func.cast(db.MusehubRepo.tags, Text).ilike(pattern),
+            ),
+        )
+        .group_by(db.MusehubRepo.repo_id)
+        .order_by(desc(star_count_col), desc(commit_count_col))
+        .limit(limit)
+    )
+
+    rows = (await session.execute(stmt)).all()
+    results: list[ExploreRepoResult] = []
+    for row in rows:
+        dmeta: dict[str, Any] = row.MusehubRepo.domain_meta or {}
+        results.append(
+            ExploreRepoResult(
+                repo_id=row.MusehubRepo.repo_id,
+                name=row.MusehubRepo.name,
+                owner=row.MusehubRepo.owner,
+                slug=row.MusehubRepo.slug,
+                owner_user_id=row.MusehubRepo.owner_user_id,
+                description=row.MusehubRepo.description,
+                tags=list(row.MusehubRepo.tags or []),
+                key_signature=dmeta.get("key_signature"),
+                tempo_bpm=dmeta.get("tempo_bpm"),
+                star_count=row.star_count or 0,
+                commit_count=row.commit_count or 0,
+                created_at=row.MusehubRepo.created_at,
+            )
+        )
+    logger.debug("🔍 text search '%s' → %d repos", q, len(results))
+    return results
+
+
+async def get_repos_by_ids(
+    session: AsyncSession,
+    repo_ids: list[str],
+) -> list[ExploreRepoResult]:
+    """Fetch full ExploreRepoResult data for a specific set of repo IDs.
+
+    Used to hydrate sparse Qdrant payloads (which only contain repo_id/owner/slug)
+    back into full card data. Preserves the input ID ordering.
+    """
+    if not repo_ids:
+        return []
+
+    star_count_col   = func.count(db.MusehubStar.star_id).label("star_count")
+    commit_count_col = func.count(db.MusehubCommit.commit_id).label("commit_count")
+
+    stmt = (
+        select(db.MusehubRepo, star_count_col, commit_count_col)
+        .select_from(
+            outerjoin(
+                outerjoin(
+                    db.MusehubRepo,
+                    db.MusehubStar,
+                    db.MusehubRepo.repo_id == db.MusehubStar.repo_id,
+                ),
+                db.MusehubCommit,
+                db.MusehubRepo.repo_id == db.MusehubCommit.repo_id,
+            )
+        )
+        .where(db.MusehubRepo.repo_id.in_(repo_ids))
+        .group_by(db.MusehubRepo.repo_id)
+    )
+
+    rows = (await session.execute(stmt)).all()
+    by_id: dict[str, ExploreRepoResult] = {}
+    for row in rows:
+        dmeta: dict[str, Any] = row.MusehubRepo.domain_meta or {}
+        by_id[row.MusehubRepo.repo_id] = ExploreRepoResult(
+            repo_id=row.MusehubRepo.repo_id,
+            name=row.MusehubRepo.name,
+            owner=row.MusehubRepo.owner,
+            slug=row.MusehubRepo.slug,
+            owner_user_id=row.MusehubRepo.owner_user_id,
+            description=row.MusehubRepo.description,
+            tags=list(row.MusehubRepo.tags or []),
+            key_signature=dmeta.get("key_signature"),
+            tempo_bpm=dmeta.get("tempo_bpm"),
+            star_count=row.star_count or 0,
+            commit_count=row.commit_count or 0,
+            created_at=row.MusehubRepo.created_at,
+        )
+    # Preserve Qdrant ranking order; drop any IDs not found in DB
+    return [by_id[rid] for rid in repo_ids if rid in by_id]
 
 
 async def star_repo(session: AsyncSession, repo_id: str, user_id: str) -> StarResponse:

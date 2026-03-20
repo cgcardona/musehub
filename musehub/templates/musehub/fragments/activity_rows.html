@@ -14,19 +14,46 @@
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
 
-{# ── Event type metadata (icon + human label) ──────────────────────────── #}
+{# ── SVG icon macro — one clean place for all activity icons ───────────── #}
+{% macro ev_icon(type) %}
+{%- if type == 'commit_pushed' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+{%- elif type == 'pr_opened' or type == 'pr_merged' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v2a3 3 0 0 0 3 3h7"/><polyline points="15 11 18 14 15 17"/></svg>
+{%- elif type == 'pr_closed' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+{%- elif type == 'issue_opened' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+{%- elif type == 'issue_closed' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+{%- elif type == 'branch_created' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+{%- elif type == 'branch_deleted' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+{%- elif type == 'tag_pushed' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+{%- elif type == 'session_started' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+{%- elif type == 'session_ended' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+{%- else -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/></svg>
+{%- endif -%}
+{% endmacro %}
+
+{# ── Event type label map ────────────────────────────────────────────────── #}
 {%- set ev_cfg = {
-  "commit_pushed":   {"icon": "📝", "label": "Commit"},
-  "pr_opened":       {"icon": "🔀", "label": "PR Opened"},
-  "pr_merged":       {"icon": "🟣", "label": "PR Merged"},
-  "pr_closed":       {"icon": "✕",  "label": "PR Closed"},
-  "issue_opened":    {"icon": "🐛", "label": "Issue Opened"},
-  "issue_closed":    {"icon": "✓",  "label": "Issue Closed"},
-  "branch_created":  {"icon": "⑂",  "label": "Branch Created"},
-  "branch_deleted":  {"icon": "🗑",  "label": "Branch Deleted"},
-  "tag_pushed":      {"icon": "🏷",  "label": "Tag Pushed"},
-  "session_started": {"icon": "🎙",  "label": "Session Started"},
-  "session_ended":   {"icon": "⏹",  "label": "Session Ended"},
+  "commit_pushed":   {"label": "Commit"},
+  "pr_opened":       {"label": "PR Opened"},
+  "pr_merged":       {"label": "PR Merged"},
+  "pr_closed":       {"label": "PR Closed"},
+  "issue_opened":    {"label": "Issue Opened"},
+  "issue_closed":    {"label": "Issue Closed"},
+  "branch_created":  {"label": "Branch Created"},
+  "branch_deleted":  {"label": "Branch Deleted"},
+  "tag_pushed":      {"label": "Tag Pushed"},
+  "session_started": {"label": "Session Started"},
+  "session_ended":   {"label": "Session Ended"},
 } %}
 
 {# ── Filter pills ──────────────────────────────────────────────────────── #}
@@ -47,14 +74,14 @@
   {# Per-type pills — sorted by count descending #}
   {%- for pill in type_pills %}
   {%- if pill.count > 0 %}
-  {%- set cfg = ev_cfg.get(pill.type, {"icon": "•", "label": pill.type | replace("_"," ") | title}) %}
+  {%- set cfg = ev_cfg.get(pill.type, {"label": pill.type | replace("_"," ") | title}) %}
   <a class="av-pill {% if event_type == pill.type %}av-pill--active{% endif %}"
      href="{{ pill_base }}?event_type={{ pill.type }}"
      hx-get="{{ pill_base }}?event_type={{ pill.type }}"
      hx-target="#av-feed"
      hx-push-url="true"
      title="{{ cfg.label }}">
-    {{ cfg.icon }} {{ cfg.label }}
+    {{ ev_icon(pill.type) }} {{ cfg.label }}
     <span class="av-pill-count">{{ pill.count }}</span>
   </a>
   {%- endif %}
@@ -81,7 +108,7 @@
 
 {# Event rows in this date group #}
 {%- for event in group.events %}
-{%- set cfg = ev_cfg.get(event.event_type, {"icon": "•", "label": event.event_type | replace("_"," ") | title}) %}
+{%- set cfg = ev_cfg.get(event.event_type, {"label": event.event_type | replace("_"," ") | title}) %}
 {%- set meta = event.metadata | default({}) %}
 {%- set is_last_in_group = loop.last %}
 
@@ -89,7 +116,7 @@
 
   {# Icon column with connector line #}
   <div class="av-row-icon-col">
-    <div class="av-icon-badge av-type-{{ event.event_type }}">{{ cfg.icon }}</div>
+    <div class="av-icon-badge av-type-{{ event.event_type }}">{{ ev_icon(event.event_type) }}</div>
     {%- if not is_last_in_group or not loop.last %}
     <div class="av-row-connector"></div>
     {%- endif %}
@@ -119,7 +146,7 @@
       {%- endif %}
 
       {%- if meta.get("branch") %}
-      <span class="av-chip av-chip-branch">⑂ {{ meta.branch }}</span>
+      <span class="av-chip av-chip-branch"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> {{ meta.branch }}</span>
       {%- endif %}
 
       {%- if meta.get("pr_number") %}
@@ -133,11 +160,11 @@
       {%- endif %}
 
       {%- if meta.get("tag") %}
-      <span class="av-chip av-chip-tag">🏷 {{ meta.tag }}</span>
+      <span class="av-chip av-chip-tag"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> {{ meta.tag }}</span>
       {%- endif %}
 
       {%- if meta.get("session_id") %}
-      <span class="av-chip av-chip-session">🎙 session</span>
+      <span class="av-chip av-chip-session"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> session</span>
       {%- endif %}
 
       {%- if meta.get("participants") %}

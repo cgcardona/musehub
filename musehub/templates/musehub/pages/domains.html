@@ -1,99 +1,175 @@
 {% extends "musehub/base.html" %}
 
+{% block container_extra_class %} page-container{% endblock %}
 {% block title %}Domains{% endblock %}
+{% block page_json %}{"page":"domains"}{% endblock %}
 
 {% block content %}
-<div class="domains-page">
-  <div class="domains-hero">
-    <h1 class="domains-hero__title">Domain Plugins</h1>
-    <p class="domains-hero__sub">
-      A Muse domain plugin defines a unique state space — MIDI, code, genomics,
-      climate simulation, 3D design — and the six interfaces Muse uses to version it.
-      Any agent or developer can register a domain.
-    </p>
-    <form class="domains-search-form" method="get" action="/domains">
-      <input
-        type="search"
-        name="q"
-        class="domains-search-input"
-        placeholder="Search domains…"
-        value="{{ search_query }}"
-        autocomplete="off"
-      >
-      <label class="domains-search-verified">
-        <input type="checkbox" name="verified" value="true" {% if verified_only %}checked{% endif %}>
-        Verified only
+
+{# ── Hero ─────────────────────────────────────────────────────────────────── #}
+<div class="dm-hero">
+  <div class="dm-hero-glow"></div>
+  <div class="dm-hero-inner">
+
+    <div class="dm-hero-left">
+      <h1 class="dm-hero-title">
+        Domain <span class="gradient-text">Plugins</span>
+      </h1>
+      <p class="dm-hero-sub">
+        A Muse domain defines a unique state space — MIDI, code, genomics,
+        climate simulation — and the six interfaces Muse uses to version it.
+        Any agent or developer can register one.
+      </p>
+
+      {# Live search — debounced, no submit button #}
+      <div class="dm-search-field" id="dm-search-field">
+        <svg class="dm-search-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="dm-search-input"
+               class="dm-search-input"
+               type="text"
+               name="q"
+               placeholder="Search domains…"
+               value="{{ search_query }}"
+               autocomplete="off"
+               hx-get="/domains"
+               hx-target="#dm-list-region"
+               hx-trigger="input changed delay:280ms"
+               hx-select="#dm-list-region"
+               hx-push-url="true">
+      </div>
+
+      <label class="dm-verified-toggle">
+        <input type="checkbox" name="verified" value="true"
+               {% if verified_only %}checked{% endif %}
+               hx-get="/domains"
+               hx-target="#dm-list-region"
+               hx-select="#dm-list-region"
+               hx-trigger="change"
+               hx-include="#dm-search-input"
+               hx-push-url="true">
+        <span class="dm-verified-chip">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Verified only
+        </span>
       </label>
-      <button type="submit" class="btn btn-primary">Search</button>
-    </form>
+    </div>
+
+    <div class="dm-hero-right">
+      <div class="dm-stat-pill">
+        <span class="dm-stat-value">{{ total }}</span>
+        <span class="dm-stat-label">domain{% if total != 1 %}s{% endif %}</span>
+      </div>
+      {% set total_dims = domains | sum(attribute='dimension_count') %}
+      <div class="dm-stat-pill">
+        <span class="dm-stat-value">{{ total_dims }}</span>
+        <span class="dm-stat-label">dimensions</span>
+      </div>
+      {% set verified_count = domains | selectattr('is_verified') | list | length %}
+      <div class="dm-stat-pill">
+        <span class="dm-stat-value">{{ verified_count }}</span>
+        <span class="dm-stat-label">verified</span>
+      </div>
+    </div>
+
   </div>
+</div>
+
+{# ── Domain list (HTMX swap target) ──────────────────────────────────────── #}
+<div id="dm-list-region" class="dm-body">
 
   {% if domains %}
-  <div class="domains-stats">
-    <span class="domains-count">{{ total }} domain{% if total != 1 %}s{% endif %} registered</span>
-  </div>
-
   <div class="domain-grid">
     {% for domain in domains %}
     <a class="domain-card" href="/domains/@{{ domain.author_slug }}/{{ domain.slug }}">
+
       <div class="domain-card__header">
         <span class="domain-card__name">{{ domain.display_name }}</span>
         {% if domain.is_verified %}
-        <span class="badge badge-verified" title="MuseHub verified domain">verified</span>
+        <span class="badge-verified">verified</span>
         {% endif %}
-        <span class="domain-badge">@{{ domain.author_slug }}/{{ domain.slug }}</span>
+        <span class="domain-badge dm-scoped-id">@{{ domain.author_slug }}/{{ domain.slug }}</span>
       </div>
+
       <p class="domain-card__description">{{ domain.description | truncate(140) }}</p>
+
       <div class="domain-card__meta">
         <span class="domain-card__stat">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          {# Dimensions icon — stacked squares #}
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
           </svg>
-          {{ domain.dimension_count }} dimension{% if domain.dimension_count != 1 %}s{% endif %}
+          {{ domain.dimension_count }} dim{% if domain.dimension_count != 1 %}s{% endif %}
         </span>
         <span class="domain-card__stat">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          {# Repos icon — box #}
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
           </svg>
           {{ domain.install_count }} repo{% if domain.install_count != 1 %}s{% endif %}
         </span>
         <span class="domain-card__viewer">{{ domain.viewer_type | replace("_", " ") }}</span>
         {% if domain.merge_semantics %}
-        <span class="domain-card__merge">{{ domain.merge_semantics }} merge</span>
+        <span class="domain-card__merge">{{ domain.merge_semantics }}</span>
         {% endif %}
       </div>
+
     </a>
     {% endfor %}
   </div>
+
   {% else %}
-  <div class="empty-state">
-    <p class="empty-state__text">
-      {% if search_query %}
-        No domains matching <strong>{{ search_query }}</strong>.
-      {% else %}
-        No domain plugins registered yet. Be the first to register one.
-      {% endif %}
-    </p>
-    <a href="/api/v1/domains" class="btn btn-secondary">View API</a>
+  <div class="dm-empty">
+    {% if search_query %}
+      No domains matching <strong>{{ search_query }}</strong>.
+    {% else %}
+      No domain plugins registered yet. Be the first to register one.
+    {% endif %}
   </div>
   {% endif %}
 
-  <div class="domains-cta">
-    <h2 class="domains-cta__title">Build your own domain</h2>
-    <p class="domains-cta__body">
-      Implement the <code>MuseDomainPlugin</code> protocol — six interfaces —
-      and any state space becomes versionable: genomics, climate simulation,
-      3D spatial design, spacetime, or anything else you can imagine.
-    </p>
+</div>
+
+{# ── CTA ───────────────────────────────────────────────────────────────────── #}
+<div class="domains-cta">
+  <div class="domains-cta__inner">
+    <div class="domains-cta__text">
+      <h2 class="domains-cta__title">Build your own domain</h2>
+      <p class="domains-cta__body">
+        Implement the <code>MuseDomainPlugin</code> protocol — six interfaces —
+        and any state space becomes versionable: genomics, climate simulation,
+        3D spatial design, spacetime, or anything else you can imagine.
+      </p>
+    </div>
     <div class="domains-cta__actions">
-      <a href="https://github.com/cgcardona/muse#plugin-architecture" class="btn btn-primary" target="_blank">
+      <a href="https://github.com/cgcardona/muse#plugin-architecture"
+         class="dm-cta-btn dm-cta-btn--primary" target="_blank" rel="noopener">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
         Protocol docs
       </a>
-      <a href="/mcp/docs" class="btn btn-secondary">MCP tools</a>
+      <a href="/mcp/docs" class="dm-cta-btn dm-cta-btn--secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+        </svg>
+        MCP tools
+      </a>
     </div>
   </div>
 </div>
+
 {% endblock %}

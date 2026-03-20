@@ -1,16 +1,16 @@
 /**
- * diff.ts — Domain-aware diff page.
+ * diff.ts — Muse semantic diff page.
  *
- * Code repos  → syntax-highlighted file browser + unified diff view.
- * MIDI repos  → musical property deltas + artifact comparison.
+ * Unlike Git, Muse knows *what semantically changed* (structured_delta) and
+ * *which files truly changed* (snapshot_diff). We use both to render:
  *
- * Config from window.__diffCfg (set by the page_data block).
- * Registered as: window.MusePages['diff']
+ *   1. A stats bar — symbol counts, file counts (things Git cannot show)
+ *   2. Per-file cards — semantic symbol changes above the line diff
+ *   3. Real line diff — comparing parent vs current content, not just dumping
+ *      the whole file green
  */
 
 import hljs from 'highlight.js/lib/core';
-
-// Register only the languages we support — keeps bundle small.
 import python     from 'highlight.js/lib/languages/python';
 import typescript from 'highlight.js/lib/languages/typescript';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -21,12 +21,11 @@ import kotlin     from 'highlight.js/lib/languages/kotlin';
 import java       from 'highlight.js/lib/languages/java';
 import ruby       from 'highlight.js/lib/languages/ruby';
 import cpp        from 'highlight.js/lib/languages/cpp';
-import haskell    from 'highlight.js/lib/languages/haskell';
 import json       from 'highlight.js/lib/languages/json';
 import yaml       from 'highlight.js/lib/languages/yaml';
-import toml       from 'highlight.js/lib/languages/ini';  // TOML ≈ INI
+import toml       from 'highlight.js/lib/languages/ini';
 import bash       from 'highlight.js/lib/languages/bash';
-import xml        from 'highlight.js/lib/languages/xml';  // HTML/XML
+import xml        from 'highlight.js/lib/languages/xml';
 import css        from 'highlight.js/lib/languages/css';
 import sql        from 'highlight.js/lib/languages/sql';
 import markdown   from 'highlight.js/lib/languages/markdown';
@@ -42,7 +41,6 @@ hljs.registerLanguage('kotlin',     kotlin);
 hljs.registerLanguage('java',       java);
 hljs.registerLanguage('ruby',       ruby);
 hljs.registerLanguage('cpp',        cpp);
-hljs.registerLanguage('haskell',    haskell);
 hljs.registerLanguage('json',       json);
 hljs.registerLanguage('yaml',       yaml);
 hljs.registerLanguage('toml',       toml);
@@ -55,406 +53,423 @@ hljs.registerLanguage('plaintext',  plaintext);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface DiffCfg {
-  repoId:     string;
-  commitId:   string;
-  base:       string;
-  viewerType: string;   // 'piano_roll' | 'symbol_graph' | 'generic'
-  domainName: string;
-  commit:     CommitData | null;
+interface ChildOp {
+  address:         string;
+  op:              string;
+  content_summary: string;
+}
+
+interface FileOp {
+  address:       string;
+  op:            string;
+  child_summary: string;
+  child_ops:     ChildOp[];
+}
+
+interface StructuredDelta {
+  domain: string;
+  ops:    FileOp[];
+}
+
+interface SnapshotDiff {
+  added:       string[];
+  modified:    string[];
+  removed:     string[];
+  total_files: number;
 }
 
 interface CommitData {
-  commitId:   string;
-  message:    string;
-  author:     string;
-  timestamp:  string;
-  branch:     string;
-  parentIds?: string[];
+  commitId:  string;
+  message:   string;
+  author:    string;
+  timestamp: string;
+  branch:    string;
+  parentIds: string[];
 }
 
-interface TreeEntry {
-  name:    string;
-  path:    string;
-  type:    string;   // 'file' | 'dir'
-  size?:   number;
+interface PageData {
+  page:             string;
+  repoId:           string;
+  commitId:         string;
+  shortId:          string;
+  owner:            string;
+  repoSlug:         string;
+  baseUrl:          string;
+  parentId:         string | null;
+  structuredDelta:  StructuredDelta | null;
+  snapshotDiff:     SnapshotDiff;
+  commit:           CommitData | null;
+  viewerType:       string;
+  domainName:       string;
 }
-
-declare global {
-  interface Window {
-    __diffCfg?:          DiffCfg;
-    escHtml:             (s: string) => string;
-    apiFetch:            (path: string, init?: RequestInit) => Promise<unknown>;
-    parseCommitMessage:  (msg: string) => { type: string; scope: string; subject: string };
-    parseCommitMeta:     (msg: string) => Record<string, string>;
-    initRepoNav?:        (repoId: string) => void;
-    queueAudio?:         (url: string, name: string, repo: string) => void;
-    shortSha?:           (sha: string) => string;
-    MusePages:           Record<string, () => void>;
-  }
-}
-
-// ── Global state ──────────────────────────────────────────────────────────────
-
-let _cfg: DiffCfg;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function esc(s: string): string { return window.escHtml(s); }
-function apiFetch(path: string): Promise<unknown> { return window.apiFetch(path); }
-
-function shortSha(sha: string): string {
-  return typeof window.shortSha === 'function' ? window.shortSha(sha) : sha.slice(0, 8);
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** Map a file extension to a highlight.js language name. */
 function extToLang(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   const map: Record<string, string> = {
     py: 'python', pyw: 'python',
     ts: 'typescript', tsx: 'typescript',
-    js: 'javascript', jsx: 'javascript', mjs: 'javascript',
-    rs: 'rust',
-    go: 'go',
-    swift: 'swift',
-    kt: 'kotlin', kts: 'kotlin',
-    java: 'java',
-    rb: 'ruby',
-    cpp: 'cpp', cc: 'cpp', cxx: 'cpp', c: 'cpp', h: 'cpp', hpp: 'cpp',
-    hs: 'haskell',
-    json: 'json',
-    yaml: 'yaml', yml: 'yaml',
-    toml: 'toml',
-    sh: 'bash', bash: 'bash', zsh: 'bash',
-    html: 'xml', htm: 'xml', xml: 'xml', svg: 'xml',
-    css: 'css', scss: 'css', sass: 'css',
-    sql: 'sql',
-    md: 'markdown', mdx: 'markdown',
+    js: 'javascript', jsx: 'javascript',
+    rs: 'rust', go: 'go', swift: 'swift',
+    kt: 'kotlin', java: 'java', rb: 'ruby',
+    cpp: 'cpp', cc: 'cpp', c: 'cpp', h: 'cpp',
+    json: 'json', yaml: 'yaml', yml: 'yaml',
+    toml: 'toml', sh: 'bash', bash: 'bash',
+    html: 'xml', xml: 'xml', css: 'css', scss: 'css',
+    sql: 'sql', md: 'markdown', mdx: 'markdown',
   };
   return map[ext] ?? 'plaintext';
 }
 
-/** Format bytes as human-readable string. */
-function fmtBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** Highlight source code and return an HTML table of line-numbered rows. */
-function buildHighlightedLines(code: string, lang: string, isNew: boolean): string {
-  let highlighted: string;
+function highlight(code: string, lang: string): string {
   try {
-    highlighted = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+    return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
   } catch {
-    highlighted = esc(code);
+    return esc(code);
   }
-
-  const lines = highlighted.split('\n');
-  // Remove trailing empty line from the split
-  if (lines.length && lines[lines.length - 1] === '') lines.pop();
-
-  const sign    = isNew ? '+' : ' ';
-  const rowCls  = isNew ? 'diff-line-add' : 'diff-line-ctx';
-
-  const rows = lines.map((html, i) =>
-    `<tr class="${rowCls}">` +
-    `<td class="diff-ln-sign">${sign}</td>` +
-    `<td class="diff-ln-num">${i + 1}</td>` +
-    `<td class="diff-ln-code"><span>${html}</span></td>` +
-    `</tr>`
-  ).join('');
-
-  return `<table class="diff-table hljs"><tbody>${rows}</tbody></table>`;
 }
 
-// ── Code diff rendering ───────────────────────────────────────────────────────
+/** Determine op class from operation string. */
+function opClass(op: string): string {
+  if (op === 'insert') return 'df3-op-add';
+  if (op === 'delete') return 'df3-op-del';
+  return 'df3-op-mod';
+}
 
-async function renderCodeDiff(): Promise<void> {
-  const container = document.getElementById('diff-content');
-  if (!container) return;
+function opSign(op: string): string {
+  if (op === 'insert') return '+';
+  if (op === 'delete') return '−';
+  return '~';
+}
 
-  container.innerHTML = `<div class="diff-loading"><span class="spinner"></span> Loading file tree…</div>`;
+/** Detect kind from content_summary string. */
+function kindChip(summary: string): string {
+  const s = summary.toLowerCase();
+  if (s.includes('class'))    return '<span class="df3-kind df3-k-class">class</span>';
+  if (s.includes('method'))   return '<span class="df3-kind df3-k-method">method</span>';
+  if (s.includes('function') || s.includes('func')) return '<span class="df3-kind df3-k-func">func</span>';
+  if (s.includes('import'))   return '<span class="df3-kind df3-k-import">import</span>';
+  if (s.includes('variable') || s.includes('constant')) return '<span class="df3-kind df3-k-var">var</span>';
+  return '';
+}
 
-  // Fetch tree at HEAD
-  let entries: TreeEntry[] = [];
+// ── Myers line diff ───────────────────────────────────────────────────────────
+// Simple O(ND) diff — sufficient for typical commit sizes.
+
+type LineKind = 'add' | 'del' | 'ctx';
+interface DiffLine { kind: LineKind; text: string; oldN: number; newN: number; }
+
+function diffLines(oldLines: string[], newLines: string[]): DiffLine[] {
+  const m = oldLines.length, n = newLines.length;
+  const max = m + n;
+  const v: number[] = new Array(2 * max + 1).fill(0);
+  const trace: number[][] = [];
+
+  outer: for (let d = 0; d <= max; d++) {
+    trace.push([...v]);
+    for (let k = -d; k <= d; k += 2) {
+      const ki = k + max;
+      let x: number;
+      if (k === -d || (k !== d && v[ki - 1] < v[ki + 1])) {
+        x = v[ki + 1];
+      } else {
+        x = v[ki - 1] + 1;
+      }
+      let y = x - k;
+      while (x < m && y < n && oldLines[x] === newLines[y]) { x++; y++; }
+      v[ki] = x;
+      if (x >= m && y >= n) break outer;
+    }
+  }
+
+  // Backtrack
+  const result: DiffLine[] = [];
+  let x = m, y = n;
+  for (let d = trace.length - 1; d >= 0; d--) {
+    const vd = trace[d];
+    const k = x - y;
+    const ki = k + max;
+    const prevK = (k === -d || (k !== d && vd[ki - 1] < vd[ki + 1])) ? k + 1 : k - 1;
+    const prevX = vd[prevK + max];
+    const prevY = prevX - prevK;
+    while (x > prevX && y > prevY) {
+      result.unshift({ kind: 'ctx', text: oldLines[x - 1], oldN: x, newN: y });
+      x--; y--;
+    }
+    if (d > 0) {
+      if (x === prevX) {
+        result.unshift({ kind: 'add', text: newLines[y - 1], oldN: 0, newN: y });
+        y--;
+      } else {
+        result.unshift({ kind: 'del', text: oldLines[x - 1], oldN: x, newN: 0 });
+        x--;
+      }
+    }
+  }
+  return result;
+}
+
+/** Render a diff as an HTML table with syntax-highlighted tokens. */
+function renderDiffTable(lines: DiffLine[], lang: string): string {
+  // Highlight the full old and new texts then split, to preserve multi-line spans.
+  const oldText = lines.filter(l => l.kind !== 'add').map(l => l.text).join('\n');
+  const newText = lines.filter(l => l.kind !== 'del').map(l => l.text).join('\n');
+  const oldHl = highlight(oldText, lang).split('\n');
+  const newHl = highlight(newText, lang).split('\n');
+
+  let oldI = 0, newI = 0;
+  const rows = lines.map(l => {
+    let hlCode: string;
+    let rowCls: string;
+    let sign: string;
+    if (l.kind === 'del') {
+      hlCode = oldHl[oldI++] ?? esc(l.text);
+      rowCls = 'df3-dl-del'; sign = '−';
+    } else if (l.kind === 'add') {
+      hlCode = newHl[newI++] ?? esc(l.text);
+      rowCls = 'df3-dl-add'; sign = '+';
+    } else {
+      hlCode = oldHl[oldI++] ?? esc(l.text); newI++;
+      rowCls = 'df3-dl-ctx'; sign = ' ';
+    }
+    const ln = l.kind === 'del' ? l.oldN : l.kind === 'add' ? l.newN : l.oldN;
+    return `<tr class="${rowCls}"><td class="df3-ln-sign">${sign}</td><td class="df3-ln-num">${ln}</td><td class="df3-ln-code"><span>${hlCode}</span></td></tr>`;
+  });
+  return `<table class="df3-table hljs"><tbody>${rows.join('')}</tbody></table>`;
+}
+
+/** Collapse context lines — show only ±5 lines around changes. */
+function collapseContext(lines: DiffLine[], ctx = 5): DiffLine[] {
+  const changed = new Set<number>();
+  lines.forEach((l, i) => { if (l.kind !== 'ctx') { for (let j = Math.max(0, i - ctx); j <= Math.min(lines.length - 1, i + ctx); j++) changed.add(j); } });
+  const result: DiffLine[] = [];
+  let skipped = 0;
+  lines.forEach((l, i) => {
+    if (changed.has(i)) {
+      if (skipped > 0) {
+        result.push({ kind: 'ctx', text: `⋯ ${skipped} unchanged lines`, oldN: 0, newN: 0 });
+        skipped = 0;
+      }
+      result.push(l);
+    } else {
+      skipped++;
+    }
+  });
+  if (skipped > 0) result.push({ kind: 'ctx', text: `⋯ ${skipped} unchanged lines`, oldN: 0, newN: 0 });
+  return result;
+}
+
+// ── Fetch file content ────────────────────────────────────────────────────────
+
+async function fetchFile(owner: string, repoSlug: string, ref: string, path: string): Promise<string | null> {
   try {
-    const data = await apiFetch(`/repos/${_cfg.repoId}/tree/HEAD`) as { entries?: TreeEntry[] };
-    entries = (data.entries ?? []).filter(e => e.type === 'file');
+    const resp = await fetch(`/${owner}/${repoSlug}/raw/${ref}/${path}`);
+    if (!resp.ok) return null;
+    return await resp.text();
   } catch {
-    container.innerHTML = `<p class="diff-error">⚠ Could not load file tree.</p>`;
-    return;
-  }
-
-  if (entries.length === 0) {
-    container.innerHTML = `<p class="diff-empty">No files in this repository yet.</p>`;
-    return;
-  }
-
-  // Sort: dirs first (by depth proxy: more slashes = deeper), then alpha
-  entries.sort((a, b) => a.path.localeCompare(b.path));
-
-  const commit   = _cfg.commit;
-  const parentId = commit?.parentIds?.[0] ?? null;
-  const isRoot   = !parentId;
-  const parsed   = commit ? window.parseCommitMessage(commit.message) : null;
-
-  // Render the two-panel layout
-  container.innerHTML = `
-    <div class="diff-layout">
-      <aside class="diff-file-tree" id="diff-tree">
-        <div class="diff-tree-header">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          <span>${entries.length} file${entries.length !== 1 ? 's' : ''}</span>
-        </div>
-        <ul class="diff-file-list" id="diff-file-list">
-          ${entries.map((e, idx) => `
-          <li class="diff-file-item${idx === 0 ? ' active' : ''}"
-              data-idx="${idx}" data-path="${esc(e.path)}"
-              title="${esc(e.path)}">
-            <span class="diff-file-sign diff-sign-add">+</span>
-            <span class="diff-file-icon">${fileIcon(e.path)}</span>
-            <span class="diff-file-name">${esc(e.path.split('/').pop() ?? e.path)}</span>
-            ${e.size != null ? `<span class="diff-file-size">${fmtBytes(e.size)}</span>` : ''}
-          </li>`).join('')}
-        </ul>
-      </aside>
-
-      <div class="diff-viewer" id="diff-viewer">
-        <div class="diff-viewer-header" id="diff-viewer-header">
-          <div class="diff-file-path-bar">
-            <span class="diff-file-path-label" id="diff-current-path">${esc(entries[0]?.path ?? '')}</span>
-            <a class="btn btn-ghost btn-xs" id="diff-raw-link"
-               href="/repos/${_cfg.repoId}/raw/HEAD/${esc(entries[0]?.path ?? '')}"
-               target="_blank">Raw ↗</a>
-          </div>
-          ${isRoot
-            ? `<span class="diff-root-badge">✦ Root commit — all files new</span>`
-            : `<span class="diff-parent-badge">vs parent <a href="${_cfg.base}/commits/${parentId}" class="diff-parent-sha">${shortSha(parentId!)}</a></span>`}
-        </div>
-        <div id="diff-code-panel" class="diff-code-panel">
-          <div class="diff-loading"><span class="spinner"></span> Loading…</div>
-        </div>
-      </div>
-    </div>`;
-
-  // Load the first file immediately
-  if (entries[0]) await loadFile(entries[0].path, 0);
-
-  // Click delegation on file list
-  const fileList = document.getElementById('diff-file-list');
-  if (fileList) {
-    fileList.addEventListener('click', async e => {
-      const li = (e.target as Element).closest<HTMLElement>('.diff-file-item');
-      if (!li) return;
-      const path = li.dataset.path ?? '';
-      const idx  = Number(li.dataset.idx ?? 0);
-
-      fileList.querySelectorAll('.diff-file-item').forEach(el => el.classList.remove('active'));
-      li.classList.add('active');
-
-      const pathLabel = document.getElementById('diff-current-path');
-      const rawLink   = document.getElementById('diff-raw-link') as HTMLAnchorElement | null;
-      if (pathLabel) pathLabel.textContent = path;
-      if (rawLink)   rawLink.href = `/repos/${_cfg.repoId}/raw/HEAD/${path}`;
-
-      await loadFile(path, idx);
-    });
+    return null;
   }
 }
 
-function fileIcon(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase() ?? '';
-  const icons: Record<string, string> = {
-    py: '🐍', ts: '📘', js: '📙', rs: '🦀', go: '🐹',
-    swift: '🍎', kt: '🟣', java: '☕', rb: '💎', cpp: '⚙️',
-    c: '⚙️', h: '⚙️', hs: '𝛌', md: '📝', json: '🗂️',
-    yaml: '⚡', yml: '⚡', toml: '🔧', sh: '🔲', bash: '🔲',
-    css: '🎨', scss: '🎨', html: '🌐', xml: '🌐', sql: '🗄️',
-    txt: '📄', lock: '🔒', gitignore: '🚫',
-  };
-  return icons[ext] ?? '📄';
-}
+// ── Symbol changes sidebar ────────────────────────────────────────────────────
 
-async function loadFile(path: string, _idx: number): Promise<void> {
-  const panel = document.getElementById('diff-code-panel');
-  if (!panel) return;
-  panel.innerHTML = `<div class="diff-loading"><span class="spinner"></span> Loading ${esc(path)}…</div>`;
+function renderSymbolChanges(fileOp: FileOp): string {
+  if (!fileOp.child_ops?.length) return '';
 
-  try {
-    // Fetch raw text content
-    const resp = await fetch(`/repos/${_cfg.repoId}/raw/HEAD/${path}`);
-    if (!resp.ok) {
-      panel.innerHTML = `<p class="diff-error">⚠ ${resp.status}: Could not load file.</p>`;
-      return;
-    }
-    const text = await resp.text();
-    const lang  = extToLang(path);
-    const table = buildHighlightedLines(text, lang, true);
-
-    panel.innerHTML = `
-      <div class="diff-hunk-header">
-        <span class="diff-hunk-info">
-          <span class="diff-lang-badge">${esc(lang)}</span>
-          ${text.split('\n').length} lines
-        </span>
-      </div>
-      <div class="diff-code-scroll">${table}</div>`;
-  } catch (err) {
-    panel.innerHTML = `<p class="diff-error">⚠ ${esc((err as Error).message)}</p>`;
-  }
-}
-
-// ── MIDI diff rendering (legacy, cleaned up) ──────────────────────────────────
-
-function metaDiff(a: string | null | undefined, b: string | null | undefined, label: string, icon: string): string {
-  if (!a && !b) return '';
-  if (a === b) return `
-    <div class="meta-item">
-      <span class="meta-label">${icon} ${label}</span>
-      <span class="meta-value text-sm">${esc(a!)}</span>
-    </div>`;
-  return `
-    <div class="meta-item">
-      <span class="meta-label">${icon} ${label}</span>
-      <span class="meta-value text-sm">
-        ${a ? `<span style="text-decoration:line-through;color:var(--color-danger)">${esc(a)}</span> ` : ''}
-        ${b ? `<span style="color:var(--color-success)">${esc(b)}</span>` : ''}
-      </span>
-    </div>`;
-}
-
-function seededWave(seed: number, color: string): string {
-  let x = seed;
-  const bars = Array.from({ length: 64 }, () => {
-    x = (x * 1103515245 + 12345) & 0x7fffffff;
-    const h = 10 + (x % 80);
-    return `<div style="flex:1;background:${color};opacity:0.7;border-radius:1px 1px 0 0;min-height:4px;height:${h}%"></div>`;
-  }).join('');
-  return `<div style="display:flex;align-items:flex-end;gap:2px;height:80px;background:var(--bg-base);border-radius:var(--radius-sm);padding:var(--space-2)">${bars}</div>`;
-}
-
-async function renderMidiDiff(): Promise<void> {
-  const container = document.getElementById('diff-content');
-  if (!container) return;
-
-  try {
-    const commitsData = await apiFetch(`/repos/${_cfg.repoId}/commits?limit=200`) as { commits?: CommitData[] };
-    const commits = commitsData.commits ?? [];
-    const commit  = _cfg.commit ?? commits.find(c => c.commitId === _cfg.commitId);
-    if (!commit) {
-      container.innerHTML = '<p class="diff-error">Commit not found.</p>';
-      return;
-    }
-
-    const parentId = (commit.parentIds ?? [])[0];
-    const parent   = parentId ? commits.find(c => c.commitId === parentId) : null;
-    const parsedChild  = window.parseCommitMessage(commit.message);
-    const parsedParent = parent ? window.parseCommitMessage(parent.message) : null;
-    const metaChild    = window.parseCommitMeta(commit.message);
-    const metaParent   = parent ? window.parseCommitMeta(parent.message) : {} as Record<string, string>;
-
-    const seed1 = parseInt(parentId ? parentId.slice(0, 8) : '0', 16) || 12345;
-    const seed2 = parseInt(_cfg.commitId.slice(0, 8), 16) || 54321;
-
-    container.innerHTML = `
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4)">
-          <a href="${_cfg.base}/commits/${_cfg.commitId}" class="btn btn-ghost btn-sm">← Back to commit</a>
-          <h2 style="margin:0">State Diff</h2>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:var(--space-4);align-items:start;margin-bottom:var(--space-4)">
-          <div>
-            <div class="text-xs text-muted" style="margin-bottom:var(--space-1)">Parent</div>
-            ${parent
-              ? `<a href="${_cfg.base}/commits/${parentId}" class="text-mono text-sm">${shortSha(parentId!)}</a>
-                 <div class="text-sm text-muted" style="margin-top:4px">${esc(parsedParent!.subject || parent.message)}</div>`
-              : '<span class="text-muted text-sm">Root commit — no parent</span>'}
-          </div>
-          <div style="font-size:24px;color:var(--text-muted);align-self:center">→</div>
-          <div>
-            <div class="text-xs text-muted" style="margin-bottom:var(--space-1)">This commit</div>
-            <a href="${_cfg.base}/commits/${_cfg.commitId}" class="text-mono text-sm">${shortSha(_cfg.commitId)}</a>
-            <div class="text-sm text-muted" style="margin-top:4px">${esc(parsedChild.subject || commit.message)}</div>
-          </div>
-        </div>
-
-        <h3 style="margin-bottom:var(--space-3)">State Properties</h3>
-        <div class="meta-row" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:var(--space-4)">
-          ${metaDiff(metaParent['key'],                                metaChild['key'],                                'Key',    '♭')}
-          ${metaDiff(metaParent['tempo'] || metaParent['bpm'],         metaChild['tempo'] || metaChild['bpm'],          'BPM',    '⏱')}
-          ${metaDiff(metaParent['section'],                            metaChild['section'],                            'Section','♪')}
-          ${metaDiff(parent ? parent.branch : null,                    commit.branch,                                   'Branch', '⑂')}
-        </div>
-
-        <h3 style="margin-bottom:var(--space-3)">Audio Waveform Comparison</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">
-          <div>
-            <div class="text-xs text-muted" style="margin-bottom:var(--space-1)">Parent ${parent ? shortSha(parentId!) : '—'}</div>
-            ${seededWave(seed1, 'var(--color-accent)')}
-          </div>
-          <div>
-            <div class="text-xs text-muted" style="margin-bottom:var(--space-1)">This commit ${shortSha(_cfg.commitId)}</div>
-            ${seededWave(seed2, 'var(--color-success)')}
-          </div>
-        </div>
-
-        <h3 style="margin-bottom:var(--space-3)">Commit Messages</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
-          <div>
-            <div class="text-xs text-muted" style="margin-bottom:var(--space-1)">Parent</div>
-            <pre style="font-size:12px">${parent ? esc(parent.message) : 'None'}</pre>
-          </div>
-          <div>
-            <div class="text-xs text-muted" style="margin-bottom:var(--space-1)">This commit</div>
-            <pre style="font-size:12px">${esc(commit.message)}</pre>
-          </div>
-        </div>
+  const rows = fileOp.child_ops.map(sym => {
+    const addr = sym.address.includes('::') ? sym.address.split('::').slice(1).join('::') : sym.address;
+    const isChild = addr.includes('.');
+    const label = isChild ? addr.split('.').pop()! : addr;
+    const indent = isChild ? 'df3-sym-child' : 'df3-sym-top';
+    const desc = sym.content_summary
+      ? sym.content_summary.replace(/^(added |modified |removed )/, '')
+      : '';
+    return `
+      <div class="df3-sym-row ${indent}">
+        ${isChild ? '<span class="df3-sym-indent"><svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1v7h8"/></svg></span>' : ''}
+        <span class="df3-sym-dot ${opClass(sym.op)}">${opSign(sym.op)}</span>
+        <span class="df3-sym-name">${esc(label)}</span>
+        ${kindChip(sym.content_summary || '')}
+        ${desc ? `<span class="df3-sym-desc">${esc(desc)}</span>` : ''}
       </div>`;
-  } catch (e) {
-    container.innerHTML = `<p class="diff-error">⚠ ${esc((e as Error).message)}</p>`;
-  }
+  }).join('');
+
+  const total = fileOp.child_ops.length;
+  return `
+    <div class="df3-sym-panel">
+      <div class="df3-sym-hd">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-accent)"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <span class="df3-sym-title">Symbols</span>
+        <span class="df3-sym-count">${total} change${total !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="df3-sym-body">${rows}</div>
+    </div>`;
 }
 
-// ── Commit header (shared) ─────────────────────────────────────────────────────
+// ── File card ─────────────────────────────────────────────────────────────────
 
-function renderCommitHeader(commit: CommitData | null): void {
-  const header = document.getElementById('diff-commit-header');
-  if (!header || !commit) return;
-  const parsed   = window.parseCommitMessage(commit.message);
-  const parentId = (commit.parentIds ?? [])[0] ?? null;
+async function renderFileCard(
+  path: string,
+  fileType: 'added' | 'modified' | 'removed',
+  pd: PageData,
+  fileOp: FileOp | null,
+): Promise<string> {
+  const lang = extToLang(path);
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  const fname = path.split('/').pop() ?? path;
+  const opLabel = fileType === 'added' ? 'added' : fileType === 'removed' ? 'removed' : 'modified';
+  const opDotCls = fileType === 'added' ? 'df3-op-add' : fileType === 'removed' ? 'df3-op-del' : 'df3-op-mod';
+  const opSign2 = fileType === 'added' ? '+' : fileType === 'removed' ? '−' : '~';
+  const blobUrl = `${pd.baseUrl}/blob/${pd.shortId}/${path}`;
+  const rawUrl = `/${pd.owner}/${pd.repoSlug}/raw/${pd.commitId}/${path}`;
 
-  header.innerHTML = `
-    <div class="diff-commit-meta">
-      <a href="${_cfg.base}/commits/${commit.commitId}" class="btn btn-ghost btn-xs">← Commit</a>
-      <span class="diff-commit-sha">${shortSha(commit.commitId)}</span>
-      <span class="diff-commit-branch">⑂ ${esc(commit.branch ?? '—')}</span>
-      <span class="diff-commit-author">${esc(commit.author ?? '')}</span>
-    </div>
-    <div class="diff-commit-msg">${esc(parsed.subject || commit.message)}</div>
-    ${parentId
-      ? `<div class="diff-commit-parent">
-           <span class="text-muted text-xs">parent</span>
-           <a href="${_cfg.base}/commits/${parentId}" class="text-mono text-xs">${shortSha(parentId)}</a>
-         </div>`
-      : `<span class="diff-root-pill">root commit</span>`}`;
+  // Fetch file content
+  let tableHtml = '';
+  let lineStats = '';
+
+  if (fileType === 'added') {
+    const text = await fetchFile(pd.owner, pd.repoSlug, pd.commitId, path);
+    if (text !== null) {
+      const lines = text.split('\n');
+      const hl = highlight(text, lang).split('\n');
+      const rows = lines.map((_, i) =>
+        `<tr class="df3-dl-add"><td class="df3-ln-sign">+</td><td class="df3-ln-num">${i + 1}</td><td class="df3-ln-code"><span>${hl[i] ?? ''}</span></td></tr>`
+      ).join('');
+      tableHtml = `<table class="df3-table hljs"><tbody>${rows}</tbody></table>`;
+      lineStats = `+${lines.length} lines`;
+    }
+  } else if (fileType === 'removed') {
+    const ref = pd.parentId ?? pd.commitId;
+    const text = await fetchFile(pd.owner, pd.repoSlug, ref, path);
+    if (text !== null) {
+      const lines = text.split('\n');
+      const hl = highlight(text, lang).split('\n');
+      const rows = lines.map((_, i) =>
+        `<tr class="df3-dl-del"><td class="df3-ln-sign">−</td><td class="df3-ln-num">${i + 1}</td><td class="df3-ln-code"><span>${hl[i] ?? ''}</span></td></tr>`
+      ).join('');
+      tableHtml = `<table class="df3-table hljs"><tbody>${rows}</tbody></table>`;
+      lineStats = `−${lines.length} lines`;
+    }
+  } else {
+    // Modified: compute real line diff
+    const [oldText, newText] = await Promise.all([
+      fetchFile(pd.owner, pd.repoSlug, pd.parentId ?? pd.commitId, path),
+      fetchFile(pd.owner, pd.repoSlug, pd.commitId, path),
+    ]);
+    if (oldText !== null && newText !== null) {
+      const oldLines = oldText.split('\n');
+      const newLines = newText.split('\n');
+      const rawDiff = diffLines(oldLines, newLines);
+      const collapsed = collapseContext(rawDiff);
+      const added = rawDiff.filter(l => l.kind === 'add').length;
+      const removed = rawDiff.filter(l => l.kind === 'del').length;
+      lineStats = `<span class="df3-stat-add">+${added}</span> <span class="df3-stat-del">−${removed}</span>`;
+      tableHtml = renderDiffTable(collapsed, lang);
+    }
+  }
+
+  const symHtml = fileOp ? renderSymbolChanges(fileOp) : '';
+
+  return `
+    <div class="df3-file-card df3-file-${fileType}" id="df3-file-${CSS.escape(path)}">
+      <div class="df3-file-hd">
+        <span class="df3-op-dot ${opDotCls}">${opSign2}</span>
+        <a href="${blobUrl}" class="df3-file-path">${esc(path)}</a>
+        ${ext ? `<span class="df3-ext">.${esc(ext)}</span>` : ''}
+        <div class="df3-file-hd-right">
+          ${lineStats ? `<span class="df3-line-stat">${lineStats}</span>` : ''}
+          <a href="${rawUrl}" class="df3-raw-link" target="_blank" rel="noopener">Raw ↗</a>
+        </div>
+      </div>
+      ${symHtml}
+      ${tableHtml ? `<div class="df3-code-wrap">${tableHtml}</div>` : '<p class="df3-no-content">Could not load file content.</p>'}
+    </div>`;
+}
+
+// ── Stats bar ─────────────────────────────────────────────────────────────────
+
+function renderStatsBar(pd: PageData): string {
+  const { snapshotDiff: sd, structuredDelta: delta } = pd;
+
+  let symAdded = 0, symModified = 0, symRemoved = 0;
+  if (delta) {
+    for (const fop of delta.ops ?? []) {
+      for (const cop of fop.child_ops ?? []) {
+        if (cop.op === 'insert') symAdded++;
+        else if (cop.op === 'delete') symRemoved++;
+        else symModified++;
+      }
+    }
+  }
+
+  const filesChanged = sd.added.length + sd.modified.length + sd.removed.length;
+  const isRoot = !pd.parentId;
+
+  const stats: string[] = [];
+  if (symAdded)    stats.push(`<div class="df3-stat df3-stat-add"><div class="df3-stat-n">+${symAdded}</div><div class="df3-stat-l">symbol${symAdded !== 1 ? 's' : ''} added</div></div>`);
+  if (symModified) stats.push(`<div class="df3-stat df3-stat-mod"><div class="df3-stat-n">~${symModified}</div><div class="df3-stat-l">symbol${symModified !== 1 ? 's' : ''} modified</div></div>`);
+  if (symRemoved)  stats.push(`<div class="df3-stat df3-stat-del"><div class="df3-stat-n">−${symRemoved}</div><div class="df3-stat-l">symbol${symRemoved !== 1 ? 's' : ''} removed</div></div>`);
+  if (filesChanged) stats.push(`<div class="df3-stat df3-stat-files"><div class="df3-stat-n">${filesChanged}</div><div class="df3-stat-l">file${filesChanged !== 1 ? 's' : ''} changed</div></div>`);
+  if (sd.total_files) stats.push(`<div class="df3-stat df3-stat-snap"><div class="df3-stat-n">${sd.total_files}</div><div class="df3-stat-l">in snapshot</div></div>`);
+  if (symAdded + symModified + symRemoved > 0) stats.push(`<div class="df3-stat df3-stat-clean"><div class="df3-stat-n">0</div><div class="df3-stat-l">dead code</div></div>`);
+
+  const parentHtml = isRoot
+    ? `<span class="df3-root-pill">root commit</span>`
+    : `<span class="df3-vs">vs parent <a href="${pd.baseUrl}/commits/${pd.parentId}" class="df3-parent-sha">${(pd.parentId ?? '').slice(0, 8)}</a></span>`;
+
+  return `
+    <div class="df3-stats-bar">
+      <div class="df3-stats-row">${stats.join('')}</div>
+      <div class="df3-stats-meta">${parentHtml}</div>
+    </div>`;
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initDiff(): void {
-  const cfg = window.__diffCfg;
-  if (!cfg) return;
-  _cfg = cfg;
+export async function initDiff(): Promise<void> {
+  const el = document.getElementById('page-data');
+  if (!el) return;
+  let pd: PageData;
+  try { pd = JSON.parse(el.textContent ?? '{}') as PageData; } catch { return; }
+  if (pd.page !== 'diff') return;
 
-  if (typeof window.initRepoNav === 'function') window.initRepoNav(_cfg.repoId);
+  const container = document.getElementById('df3-content');
+  if (!container) return;
 
-  renderCommitHeader(_cfg.commit);
+  const { snapshotDiff: sd, structuredDelta: delta } = pd;
+  const allFiles: Array<[string, 'added' | 'modified' | 'removed']> = [
+    ...sd.added.map(p => [p, 'added'] as [string, 'added']),
+    ...sd.modified.map(p => [p, 'modified'] as [string, 'modified']),
+    ...sd.removed.map(p => [p, 'removed'] as [string, 'removed']),
+  ];
 
-  if (_cfg.viewerType === 'piano_roll') {
-    void renderMidiDiff();
-  } else {
-    void renderCodeDiff();
+  if (allFiles.length === 0) {
+    container.innerHTML = `<p class="df3-empty">No file changes in this commit.</p>`;
+    return;
   }
+
+  // Build lookup: file path → FileOp from structured delta
+  const deltaByFile = new Map<string, FileOp>();
+  for (const fop of delta?.ops ?? []) {
+    deltaByFile.set(fop.address, fop);
+  }
+
+  // Render stats bar immediately
+  container.innerHTML = renderStatsBar(pd) +
+    `<div id="df3-files" class="df3-files"><div class="df3-loading"><span class="spinner"></span> Loading file diffs…</div></div>`;
+
+  // Render file cards async (in parallel, then stitch in order)
+  const filesDiv = document.getElementById('df3-files');
+  if (!filesDiv) return;
+
+  const cards = await Promise.all(
+    allFiles.map(([path, ft]) => renderFileCard(path, ft, pd, deltaByFile.get(path) ?? null))
+  );
+
+  filesDiv.innerHTML = cards.join('');
 }

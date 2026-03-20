@@ -1,46 +1,43 @@
 {% extends "musehub/base.html" %}
 
-{% block title %}Diff {{ commit_id[:8] }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+{% block title %}Diff {{ short_id }} · {{ owner }}/{{ repo_slug }}{% endblock %}
+
 {% block breadcrumb %}
   <a href="/{{ owner }}">{{ owner }}</a> /
   <a href="{{ base_url }}">{{ repo_slug }}</a> /
-  <a href="{{ base_url }}/commits/{{ commit_id }}">{{ commit_id[:8] }}</a> /
+  <a href="{{ base_url }}/commits/{{ commit_id }}">{{ short_id }}</a> /
   diff
 {% endblock %}
 
-{% block repo_nav %}
-{% include "musehub/partials/repo_nav.html" %}
-{% endblock %}
+{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "diff"}{% endblock %}
-
-{% block page_data %}
-window.__diffCfg = {
-  repoId:     {{ repo_id | tojson }},
-  commitId:   {{ commit_id | tojson }},
-  base:       {{ base_url | tojson }},
-  viewerType: {{ (domain.viewer_type if domain else 'generic') | tojson }},
-  domainName: {{ (domain.display_name if domain else 'Generic') | tojson }},
-  commit:     {{ (commit | tojson) if commit else 'null' }},
-};
-{% endblock %}
+{% block page_json %}{"page": "diff", "repoId": {{ repo_id | tojson }}, "commitId": {{ commit_id | tojson }}, "shortId": {{ short_id | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "baseUrl": {{ base_url | tojson }}, "parentId": {{ parent_id | tojson }}, "structuredDelta": {{ structured_delta | tojson if structured_delta else 'null' }}, "snapshotDiff": {{ snapshot_diff | tojson }}, "commit": {{ (commit | tojson) if commit else 'null' }}, "viewerType": {{ (domain.viewer_type if domain else 'generic') | tojson }},"domainName": {{ (domain.display_name if domain else 'Generic') | tojson }}
+}{% endblock %}
 
 {% block content %}
-<div class="content-wide diff-page">
+<div class="df3-page">
 
-  {# ── Commit header — filled by JS ──────────────────────────────────────── #}
-  <div class="diff-commit-header-card card" id="diff-commit-header">
-    <div class="diff-loading">
-      <span class="diff-commit-sha">{{ commit_id[:8] }}</span>
-      {% if commit %}
-      <span class="diff-commit-msg">{{ commit.message | truncate(120) }}</span>
-      {% endif %}
-    </div>
+  {# ── Commit header ─────────────────────────────────────────────────────── #}
+  <div class="df3-header">
+    <a href="{{ base_url }}/commits/{{ commit_id }}" class="df3-back">
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Commit
+    </a>
+    {% if commit %}
+    <span class="df3-sha">{{ short_id }}</span>
+    <span class="df3-branch">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      {{ commit.branch or 'main' }}
+    </span>
+    <span class="df3-msg">{{ commit.message.split('\n')[0] | truncate(100) }}</span>
+    {% endif %}
   </div>
 
-  {# ── Main diff area — filled by JS ─────────────────────────────────────── #}
-  <div id="diff-content" class="diff-content">
-    <div class="diff-loading"><span class="spinner"></span> Loading diff…</div>
+  {# ── Filled by diff.ts ─────────────────────────────────────────────────── #}
+  <div id="df3-content" class="df3-content">
+    <div class="df3-loading">
+      <span class="spinner"></span> Loading diff…
+    </div>
   </div>
 
 </div>

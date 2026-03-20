@@ -1692,6 +1692,15 @@ class DagNode(CamelModel):
     Designed for consumption by interactive graph renderers. The ``is_head``
     flag marks the current HEAD commit across all branches. ``branch_labels``
     and ``tag_labels`` list all ref names pointing at this commit.
+
+    Muse-specific semantic fields (absent in Git) allow renderers to encode
+    the *type* and *significance* of each commit visually:
+
+    - ``commit_type``: conventional-commit prefix (feat, fix, refactor, …)
+    - ``sem_ver_bump``: version significance (major, minor, patch, none)
+    - ``is_breaking``: true when the commit contains breaking changes
+    - ``is_agent``: true when committed by an AI agent rather than a human
+    - ``sym_added`` / ``sym_removed``: count of AST symbol operations
     """
 
     commit_id: str
@@ -1703,6 +1712,13 @@ class DagNode(CamelModel):
     is_head: bool = False
     branch_labels: list[str] = Field(default_factory=list)
     tag_labels: list[str] = Field(default_factory=list)
+    # Muse semantic enrichment
+    commit_type: str = ""
+    sem_ver_bump: str = "none"
+    is_breaking: bool = False
+    is_agent: bool = False
+    sym_added: int = 0
+    sym_removed: int = 0
 
 
 class DagEdge(CamelModel):

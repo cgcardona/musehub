@@ -49,6 +49,8 @@ import { initFeed }          from './pages/feed.ts';
 import { initCompare }       from './pages/compare.ts';
 import { initTree }          from './pages/tree.ts';
 import { initContext }       from './pages/context.ts';
+import { initMcpDocs }      from './pages/mcp-docs.ts';
+import { initDomains }      from './pages/domains.ts';
 
 // Register page modules — keyed by the "page" field in the #page-data JSON.
 type PageData = Record<string, unknown>;
@@ -90,6 +92,8 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'compare':         () => initCompare(),
   'tree':            (d) => initTree(d),
   'context':         (d) => initContext(d),
+  'mcp-docs':        () => initMcpDocs(),
+  'domains':         () => initDomains(),
 };
 
 // Attach to window so musehub.ts dispatchPageModule() can reach it.

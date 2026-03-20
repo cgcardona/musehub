@@ -141,8 +141,11 @@ function highlightLines(code: string, lang: string): string[] {
  * anchors (`id="L1"` etc.) while adding colour.
  */
 function applySsrHighlighting(filename: string): void {
+  // Support both old class names (blob-*) and new blob2-* names
   const cells = Array.from(
-    document.querySelectorAll<HTMLTableCellElement>('.blob-line-table td.blob-code'),
+    document.querySelectorAll<HTMLTableCellElement>(
+      '.blob2-line-table td.blob2-code, .blob-line-table td.blob-code',
+    ),
   );
   if (cells.length === 0) return;
 
@@ -162,7 +165,8 @@ function applySsrHighlighting(filename: string): void {
   });
 
   // Mark the table so CSS can apply the hljs theme background
-  document.querySelector('.blob-line-table')?.classList.add('hljs');
+  (document.querySelector('.blob2-line-table') ?? document.querySelector('.blob-line-table'))
+    ?.classList.add('hljs');
 }
 
 // ── Utility helpers ───────────────────────────────────────────────────────────

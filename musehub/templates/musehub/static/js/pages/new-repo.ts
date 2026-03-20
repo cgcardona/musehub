@@ -63,19 +63,11 @@ function initTagInput(containerId: string, hiddenInputId: string): void {
 }
 
 function initVisibilityCards(): void {
-  document.querySelectorAll('.visibility-card').forEach((card) => {
+  document.querySelectorAll('.nr-vis-card').forEach((card) => {
     const el = card as HTMLElement;
-    el.addEventListener('click', () => {
-      document.querySelectorAll('.visibility-card').forEach((c) => {
-        (c as HTMLElement).setAttribute('aria-checked', 'false');
-        (c as HTMLElement).classList.remove('selected');
-      });
-      el.setAttribute('aria-checked', 'true');
-      el.classList.add('selected');
-      const radio = el.querySelector('input[type=radio]') as HTMLInputElement | null;
-      if (radio) radio.checked = true;
+    el.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') el.click();
     });
-    el.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') el.click(); });
   });
 }
 
@@ -96,7 +88,7 @@ async function submitWizard(e: Event): Promise<void> {
   const vis     = visEl ? visEl.value : 'private';
 
   // Collect topics from Alpine.js data
-  const alpineRoot = document.querySelector('.wizard-layout') as (Element & { _x_dataStack?: Array<{ topics: string[] }> }) | null;
+  const alpineRoot = document.querySelector('.nr-page') as (Element & { _x_dataStack?: Array<{ topics: string[] }> }) | null;
   const topics: string[] = (alpineRoot?._x_dataStack?.[0])
     ? [...alpineRoot._x_dataStack[0].topics]
     : [];
@@ -124,9 +116,9 @@ async function submitWizard(e: Event): Promise<void> {
       window.location.href = data.redirect!;
       return;
     }
-    if (errorEl) { errorEl.textContent = '❌ ' + (data.detail || 'Failed to create repository.'); errorEl.style.display = ''; }
+    if (errorEl) { errorEl.textContent = (data.detail || 'Failed to create repository.'); errorEl.style.display = ''; }
   } catch (ex) {
-    if (errorEl) { errorEl.textContent = '❌ ' + (ex instanceof Error ? ex.message : String(ex)); errorEl.style.display = ''; }
+    if (errorEl) { errorEl.textContent = (ex instanceof Error ? ex.message : String(ex)); errorEl.style.display = ''; }
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Create repository'; }
   }

@@ -3,8 +3,8 @@
 // Import order matters: tokens must come first so all partials
 // can reference the CSS custom properties they define.
 //
-// embed.css is intentionally excluded — it is self-contained
-// (hardcoded colours) and served independently for iframe embeds.
+// embed.scss is compiled separately to static/embed.css via build:embed.
+// It is self-contained (hardcoded colours) and served independently for iframe embeds.
 
 @use "tokens";
 @use "components";
