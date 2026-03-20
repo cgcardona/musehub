@@ -27,6 +27,7 @@ import logging
 import math
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -113,7 +114,7 @@ async def _get_domain_for_repo(
     db: AsyncSession,
     repo_id: str,
     domain_id: str | None,
-) -> dict:
+) -> dict[str, object]:
     """Return domain capabilities dict for a repo, falling back to generic."""
     if not domain_id:
         return {
@@ -167,7 +168,7 @@ async def domain_viewer_page(
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
     # Determine page_json for the TypeScript view module
-    page_json: dict = {
+    page_json: dict[str, object] = {
         "repoId": repo.repo_id,
         "owner": owner,
         "slug": repo_slug,
@@ -242,7 +243,7 @@ _DOC_EXTS = frozenset(["md", "rst", "txt"])
 _CODE_EXTS = frozenset(_EXT_TO_LANG.keys()) - _DOC_EXTS - frozenset(["json", "yaml", "yml", "toml", "xml"])
 
 
-async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict:
+async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, Any]:
     """Compute code-domain insight metrics from stored objects + commits."""
     objects_rows = (await db.execute(
         sa_select(musehub_db.MusehubObject.path, musehub_db.MusehubObject.size_bytes)
@@ -262,9 +263,9 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict:
     )).scalar_one_or_none() or 0
 
     # ── File metrics ──
-    lang_stats: dict[str, dict] = defaultdict(lambda: {"count": 0, "bytes": 0, "files": []})
+    lang_stats: dict[str, dict[str, Any]] = defaultdict(lambda: {"count": 0, "bytes": 0, "files": []})
     test_files, doc_files, total_bytes = [], [], 0
-    largest_files: list[dict] = []
+    largest_files: list[dict[str, Any]] = []
 
     for path, size in objects_rows:
         ext = Path(path).suffix.lstrip(".").lower()
@@ -310,10 +311,8 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict:
     for row in commits_rows:
         contributors[row.author] += 1
 
-    top_contributors = sorted(
-        [{"name": n, "commits": c} for n, c in contributors.items()],
-        key=lambda x: x["commits"], reverse=True,
-    )[:8]
+    _contribs: list[dict[str, Any]] = [{"name": n, "commits": c} for n, c in contributors.items()]
+    top_contributors = sorted(_contribs, key=lambda x: x["commits"], reverse=True)[:8]
 
     recent_commits = [
         {
@@ -381,7 +380,7 @@ async def insights_dashboard_page(
     nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
-    metrics: dict = {}
+    metrics: dict[str, Any] = {}
     if domain_ctx["viewer_type"] == "symbol_graph":
         metrics = await _compute_code_insights(db, repo.repo_id)
 
@@ -424,7 +423,7 @@ async def insights_dimension_page(
     nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
-    metrics: dict = {}
+    metrics: dict[str, Any] = {}
     if domain_ctx["viewer_type"] == "symbol_graph":
         metrics = await _compute_code_insights(db, repo.repo_id)
 

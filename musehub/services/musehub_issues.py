@@ -80,7 +80,7 @@ def _to_comment_response(row: db.MusehubIssueComment) -> IssueCommentResponse:
     """Convert a DB comment row to the wire representation."""
     musical_refs = [
         MusicalRef(type=r["type"], value=r["value"], raw=r["raw"])
-        for r in (row.musical_refs or [])
+        for r in (row.state_refs or [])
     ]
     return IssueCommentResponse(
         comment_id=row.comment_id,

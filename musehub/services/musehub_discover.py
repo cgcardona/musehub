@@ -22,7 +22,7 @@ differ between engines and are not needed at this scale.
 """
 
 import logging
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import Text, desc, func, or_, outerjoin, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -192,7 +192,7 @@ async def list_public_repos(
 
     results = []
     for row in rows:
-        dmeta: dict = row.MusehubRepo.domain_meta or {}
+        dmeta: dict[str, Any] = row.MusehubRepo.domain_meta or {}
         results.append(ExploreRepoResult(
             repo_id=row.MusehubRepo.repo_id,
             name=row.MusehubRepo.name,

@@ -81,7 +81,7 @@ class MusehubDomain(Base):
     # SHA-256 of the capabilities JSON — immutable fingerprint for pinning
     manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     # JSON capabilities blob — see class docstring for schema
-    capabilities: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    capabilities: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
     # Primary viewer type: "piano_roll" | "symbol_graph" | "sequence_viewer" | "generic"
     viewer_type: Mapped[str] = mapped_column(String(64), nullable=False, default="generic")
     # Number of repos using this domain (denormalised counter, updated async)

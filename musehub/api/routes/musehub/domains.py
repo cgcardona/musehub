@@ -47,7 +47,7 @@ class RegisterDomainRequest(BaseModel):
     description: str = ""
     """Short description of what state space this domain versions."""
 
-    capabilities: dict
+    capabilities: dict[str, object]
     """Domain capabilities manifest — dimensions, viewer_type, artifact_types, etc."""
 
     viewer_type: str = "generic"

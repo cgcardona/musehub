@@ -235,16 +235,17 @@ async def merge_pr(
 
 
 def _to_comment_response(row: db.MusehubPRComment) -> PRCommentResponse:
+    dim_ref: dict[str, object] = row.dimension_ref or {}
     return PRCommentResponse(
         comment_id=row.comment_id,
         pr_id=row.pr_id,
         author=row.author,
         body=row.body,
-        target_type=row.target_type,
-        target_track=row.target_track,
-        target_beat_start=row.target_beat_start,
-        target_beat_end=row.target_beat_end,
-        target_note_pitch=row.target_note_pitch,
+        target_type=str(dim_ref.get("type", "general")),
+        target_track=str(dim_ref["track"]) if "track" in dim_ref else None,
+        target_beat_start=float(dim_ref["beat_start"]) if "beat_start" in dim_ref else None,  # type: ignore[arg-type]
+        target_beat_end=float(dim_ref["beat_end"]) if "beat_end" in dim_ref else None,  # type: ignore[arg-type]
+        target_note_pitch=int(dim_ref["pitch"]) if "pitch" in dim_ref else None,  # type: ignore[call-overload]
         parent_comment_id=row.parent_comment_id,
         created_at=row.created_at,
     )

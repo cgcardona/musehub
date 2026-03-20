@@ -2485,7 +2485,7 @@ class RenderStatusResponse(CamelModel):
     Returned by ``GET /api/v1/repos/{repo_id}/commits/{sha}/render-status``.
 
     ``status`` lifecycle: ``pending`` → ``rendering`` → ``complete`` | ``failed``.
-    ``mp3_object_ids`` and ``image_object_ids`` are populated only when
+    ``audio_object_ids`` and ``preview_object_ids`` are populated only when
     status is ``complete``; both lists may be empty when no MIDI files were
     pushed with the commit.
 
@@ -2500,17 +2500,17 @@ class RenderStatusResponse(CamelModel):
         ...,
         description="Render job status: pending | rendering | complete | failed | not_found",
     )
-    midi_count: int = Field(
+    artifact_count: int = Field(
         default=0,
-        description="Number of MIDI objects found in the commit",
+        description="Number of domain artifacts found in the commit",
     )
-    mp3_object_ids: list[str] = Field(
+    audio_object_ids: list[str] = Field(
         default_factory=list,
-        description="Object IDs of generated MP3 (or stub) artifacts",
+        description="Object IDs of generated audio artifacts",
     )
-    image_object_ids: list[str] = Field(
+    preview_object_ids: list[str] = Field(
         default_factory=list,
-        description="Object IDs of generated piano-roll PNG artifacts",
+        description="Object IDs of generated preview image artifacts",
     )
     error_message: str | None = Field(
         default=None,

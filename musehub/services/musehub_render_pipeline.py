@@ -320,7 +320,7 @@ async def trigger_render_background(
                 repo_id=repo_id,
                 commit_id=commit_id,
                 status="rendering",
-                midi_count=len(midi_objects),
+                artifact_count=len(midi_objects),
             )
             session.add(job)
             await session.flush() # Obtain PK before proceeding
@@ -339,8 +339,8 @@ async def trigger_render_background(
                     objects=objects,
                 )
                 job.status = result.status
-                job.mp3_object_ids = result.mp3_object_ids
-                job.image_object_ids = result.image_object_ids
+                job.audio_object_ids = result.mp3_object_ids
+                job.preview_object_ids = result.image_object_ids
             except Exception as exc:
                 job.status = "failed"
                 job.error_message = str(exc)
@@ -355,8 +355,8 @@ async def trigger_render_background(
                 "✅ Render complete: commit=%s status=%s mp3=%d images=%d",
                 commit_id[:8],
                 job.status,
-                len(job.mp3_object_ids or []),
-                len(job.image_object_ids or []),
+                len(job.audio_object_ids or []),
+                len(job.preview_object_ids or []),
             )
 
     except Exception as exc:

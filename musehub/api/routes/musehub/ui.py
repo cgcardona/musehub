@@ -2239,9 +2239,9 @@ async def arrange_page(
     rj_result = await db.execute(
         sa_select(
             musehub_db.MusehubRenderJob.status,
-            musehub_db.MusehubRenderJob.midi_count,
-            musehub_db.MusehubRenderJob.mp3_object_ids,
-            musehub_db.MusehubRenderJob.image_object_ids,
+            musehub_db.MusehubRenderJob.artifact_count,
+            musehub_db.MusehubRenderJob.audio_object_ids,
+            musehub_db.MusehubRenderJob.preview_object_ids,
         ).where(
             musehub_db.MusehubRenderJob.repo_id == repo_id,
             musehub_db.MusehubRenderJob.commit_id == actual_commit_id,
@@ -2351,8 +2351,8 @@ async def arrange_page(
         ],
         # Render job
         "render_status": render_job_row.status if render_job_row else None,
-        "midi_count": render_job_row.midi_count if render_job_row else 0,
-        "mp3_count": len(render_job_row.mp3_object_ids or []) if render_job_row else 0,
+        "midi_count": render_job_row.artifact_count if render_job_row else 0,
+        "mp3_count": len(render_job_row.audio_object_ids or []) if render_job_row else 0,
         # Matrix
         "instruments": matrix.instruments,
         "sections": matrix.sections,

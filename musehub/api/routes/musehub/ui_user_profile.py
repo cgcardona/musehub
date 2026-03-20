@@ -313,7 +313,7 @@ async def _compute_domain_stats(session: AsyncSession, user_id: str) -> list[Dom
     stats: list[DomainStat] = []
     # Sort by commit count descending
     for did, repo_count in sorted(domain_repo_count.items(), key=lambda x: domain_commit_count.get(x[0], 0), reverse=True):
-        meta = domain_meta.get(did or "", ("Unknown", None, "generic")) if did else ("Unknown", None, "generic")
+        meta = domain_meta.get(did, ("Unknown", None, "generic")) if did else ("Unknown", None, "generic")
         stats.append(DomainStat(
             domain_id=did,
             domain_name=meta[0],

@@ -101,7 +101,7 @@ class MusehubRepo(Base):
     def tempo_bpm(self) -> int | None:
         """MIDI tempo in BPM. Stored in domain_meta for V2 repos."""
         val = (self.domain_meta or {}).get("tempo_bpm")
-        return int(val) if val is not None else None
+        return int(val) if isinstance(val, (int, float, str)) else None
 
     branches: Mapped[list[MusehubBranch]] = relationship(
         "MusehubBranch", back_populates="repo", cascade="all, delete-orphan"

@@ -525,9 +525,9 @@ async def get_commit_render_status(
     return RenderStatusResponse(
         commit_id=job.commit_id,
         status=job.status,
-        midi_count=job.midi_count,
-        mp3_object_ids=list(job.mp3_object_ids or []),
-        image_object_ids=list(job.image_object_ids or []),
+        artifact_count=job.artifact_count,
+        audio_object_ids=list(job.audio_object_ids or []),
+        preview_object_ids=list(job.preview_object_ids or []),
         error_message=job.error_message,
     )
 
