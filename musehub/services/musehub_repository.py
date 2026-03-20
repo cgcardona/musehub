@@ -1782,7 +1782,7 @@ async def get_snapshot_diff(
     repo_id: str,
     commit_snapshot_id: str | None,
     parent_snapshot_id: str | None,
-) -> dict[str, list[str] | int]:
+) -> dict[str, Any]:
     """Diff two snapshot manifests, returning file-level change lists.
 
     Returns a dict with:
