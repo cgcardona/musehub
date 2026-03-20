@@ -8,9 +8,9 @@ Covers:
   - prompts/get: known prompt assembly and unknown prompt error
   - Batch request handling
   - Notification handling (no id → returns None)
-  - Tool catalogue completeness (32 tools)
-  - Resource catalogue completeness (5 static, 15 templated)
-  - Prompt catalogue completeness (8 prompts)
+  - Tool catalogue completeness (43 tools)
+  - Resource catalogue completeness (12 static, 17 templated)
+  - Prompt catalogue completeness (12 prompts)
   - MCP 2025-11-25: elicitation capability in initialize, new notifications
 """
 from __future__ import annotations
@@ -89,6 +89,23 @@ async def test_unknown_method_returns_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_completions_complete_returns_empty() -> None:
+    """completions/complete stub returns empty values list (MCP 2025-11-25)."""
+    resp = await handle_request(_req("completions/complete", {"ref": {}, "argument": {"name": "x", "value": "y"}}))
+    assert resp is not None
+    assert "result" in resp
+    assert resp["result"]["completion"]["values"] == []
+
+
+@pytest.mark.asyncio
+async def test_logging_set_level_returns_empty() -> None:
+    """logging/setLevel should return an empty result dict (MCP 2025-11-25)."""
+    resp = await handle_request(_req("logging/setLevel", {"level": "info"}))
+    assert resp is not None
+    assert resp["result"] == {}
+
+
+@pytest.mark.asyncio
 async def test_notification_returns_none() -> None:
     """Notifications (no id) should return None from handle_request."""
     result = await handle_request(_notification("ping"))
@@ -99,15 +116,15 @@ async def test_notification_returns_none() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tools_list_returns_32_tools() -> None:
-    """tools/list should return all 27 registered tools."""
+async def test_tools_list_returns_43_tools() -> None:
+    """tools/list should return all 43 registered tools."""
     resp = await handle_request(_req("tools/list"))
     assert resp is not None
     result = resp["result"]
     assert isinstance(result, dict)
     tools = result["tools"]
     assert isinstance(tools, list)
-    assert len(tools) == 32  # 15 read + 12 write + 5 elicitation
+    assert len(tools) == 43  # 23 read + 15 write + 5 elicitation
 
 
 @pytest.mark.asyncio
@@ -121,18 +138,19 @@ async def test_tools_list_no_server_side_field() -> None:
 
 @pytest.mark.asyncio
 async def test_tools_list_all_have_required_fields() -> None:
-    """Every tool in tools/list must have name, description, and inputSchema."""
+    """Every tool in tools/list must have name, description, inputSchema, and annotations."""
     resp = await handle_request(_req("tools/list"))
     assert resp is not None
     for tool in resp["result"]["tools"]:
         assert "name" in tool, f"Missing name: {tool}"
         assert "description" in tool, f"Missing description for {tool.get('name')}"
         assert "inputSchema" in tool, f"Missing inputSchema for {tool.get('name')}"
+        assert "annotations" in tool, f"Missing MCP 2025-11-25 annotations for {tool.get('name')}"
 
 
-def test_tool_catalogue_has_32_tools() -> None:
-    """The MCP_TOOLS list must contain exactly 32 tools (27 original + 5 elicitation)."""
-    assert len(MCP_TOOLS) == 32
+def test_tool_catalogue_has_43_tools() -> None:
+    """The MCP_TOOLS list must contain exactly 43 tools."""
+    assert len(MCP_TOOLS) == 43
 
 
 def test_write_tool_names_all_in_catalogue() -> None:
@@ -226,37 +244,39 @@ async def test_tools_call_read_tool_with_mock_executor() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resources_list_returns_5_static() -> None:
-    """resources/list should return the 5 static resources."""
+async def test_resources_list_returns_12_static() -> None:
+    """resources/list should return all 12 static resources (musehub:// + muse:// docs/domains)."""
     resp = await handle_request(_req("resources/list"))
     assert resp is not None
     resources = resp["result"]["resources"]
-    assert len(resources) == 5
+    assert len(resources) == 12
 
 
 @pytest.mark.asyncio
-async def test_resources_templates_list_returns_15_templates() -> None:
-    """resources/templates/list should return the 15 URI templates."""
+async def test_resources_templates_list_returns_17_templates() -> None:
+    """resources/templates/list should return the 17 URI templates."""
     resp = await handle_request(_req("resources/templates/list"))
     assert resp is not None
     templates = resp["result"]["resourceTemplates"]
-    assert len(templates) == 15
+    assert len(templates) == 17
 
 
 def test_static_resources_have_required_fields() -> None:
     """Each static resource must have uri, name, and mimeType."""
+    _VALID_PREFIXES = ("musehub://", "muse://")
     for r in STATIC_RESOURCES:
         assert "uri" in r
         assert "name" in r
-        assert r["uri"].startswith("musehub://")
+        assert r["uri"].startswith(_VALID_PREFIXES), f"Unexpected URI scheme: {r['uri']}"
 
 
 def test_resource_templates_have_required_fields() -> None:
     """Each resource template must have uriTemplate, name, and mimeType."""
+    _VALID_PREFIXES = ("musehub://", "muse://")
     for t in RESOURCE_TEMPLATES:
         assert "uriTemplate" in t
         assert "name" in t
-        assert t["uriTemplate"].startswith("musehub://")
+        assert t["uriTemplate"].startswith(_VALID_PREFIXES), f"Unexpected URI scheme: {t['uriTemplate']}"
 
 
 @pytest.mark.asyncio
@@ -302,30 +322,34 @@ async def test_resources_read_me_requires_auth() -> None:
 
 
 @pytest.mark.asyncio
-async def test_prompts_list_returns_8_prompts() -> None:
-    """prompts/list should return all 8 workflow prompts (6 + 2 elicitation-aware)."""
+async def test_prompts_list_returns_12_prompts() -> None:
+    """prompts/list should return all 12 workflow prompts."""
     resp = await handle_request(_req("prompts/list"))
     assert resp is not None
     prompts = resp["result"]["prompts"]
-    assert len(prompts) == 8
+    assert len(prompts) == 12
 
 
 def test_prompt_catalogue_completeness() -> None:
-    """PROMPT_CATALOGUE must have exactly 8 entries."""
-    assert len(PROMPT_CATALOGUE) == 8
+    """PROMPT_CATALOGUE must have exactly 12 entries."""
+    assert len(PROMPT_CATALOGUE) == 12
 
 
 def test_prompt_names_are_correct() -> None:
-    """All 8 expected prompt names must be present."""
+    """All 12 expected prompt names must be present."""
     names = {p["name"] for p in PROMPT_CATALOGUE}
     assert "musehub/orientation" in names
     assert "musehub/contribute" in names
-    assert "musehub/compose" in names
+    assert "musehub/create" in names
     assert "musehub/review_pr" in names
     assert "musehub/issue_triage" in names
     assert "musehub/release_prep" in names
     assert "musehub/onboard" in names
     assert "musehub/release_to_world" in names
+    assert "musehub/domain-discovery" in names
+    assert "musehub/domain-authoring" in names
+    assert "musehub/agent-onboard" in names
+    assert "musehub/push-workflow" in names
 
 
 @pytest.mark.asyncio

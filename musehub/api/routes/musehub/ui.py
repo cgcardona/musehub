@@ -577,6 +577,25 @@ async def repo_page(
     if orm_repo and orm_repo.settings and isinstance(orm_repo.settings, dict):
         repo_license = str(orm_repo.settings.get("license", "") or "")
 
+    # Domain context — drives domain-specific UI on the repo home page.
+    from musehub.api.routes.musehub.ui_view import _get_domain_for_repo
+    domain_ctx = await _get_domain_for_repo(
+        db, repo_id, getattr(orm_repo, "domain_id", None)
+    )
+    # domain_meta as ordered pairs for the "Properties" sidebar (non-technical keys only)
+    _META_SKIP = {"source_repo"}
+    _META_LABELS: dict[str, str] = {
+        "tempo_bpm": "BPM",
+        "key_signature": "Key",
+        "time_signature": "Time",
+        "duration_seconds": "Duration",
+    }
+    domain_meta_display: list[tuple[str, str]] = [
+        (_META_LABELS.get(k, k.replace("_", " ").title()), str(v))
+        for k, v in ((orm_repo.domain_meta or {}) if orm_repo else {}).items()
+        if k not in _META_SKIP and v
+    ]
+
     page_url = str(request.url)
     ctx: dict[str, object] = {
         "owner": owner,
@@ -601,6 +620,8 @@ async def repo_page(
         "clone_url_musehub": f"musehub://{owner}/{repo_slug}",
         "clone_url_ssh": f"ssh://git@musehub.app/{owner}/{repo_slug}.git",
         "clone_url_https": f"https://musehub.app/{owner}/{repo_slug}.git",
+        "domain": domain_ctx,
+        "domain_meta_display": domain_meta_display,
     }
     ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
@@ -908,13 +929,23 @@ async def commit_page(
 
     overall_change = round(sum(d["score"] for d in dimensions) / len(dimensions), 3) if dimensions else 0.0
 
-    # ── Audio / render status ─────────────────────────────────────────────
+    # ── Domain context ────────────────────────────────────────────────────
+    from musehub.api.routes.musehub.ui_view import _get_domain_for_repo as _gdfr
+    orm_repo_cd = await db.get(musehub_db.MusehubRepo, repo_id)
+    domain_ctx_cd = await _gdfr(db, repo_id, getattr(orm_repo_cd, "domain_id", None))
+
+    # ── Audio / render status — only meaningful for MIDI domain ──────────
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
-        if commit.snapshot_id is not None
+        if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "piano_roll"
         else None
     )
     render_status = "ready" if audio_url else "none"
+
+    # ── Dimension scores — MIDI-only; skip for other domains ─────────────
+    if domain_ctx_cd["viewer_type"] != "piano_roll":
+        dimensions = []
+        overall_change = 0.0
 
     ctx: dict[str, Any] = {
         "owner": owner,
@@ -923,9 +954,8 @@ async def commit_page(
         "commit_id": commit_id,
         "short_id": short_id,
         "base_url": base_url,
-        "listen_url": f"{base_url}/listen/{commit_id}",
-        "embed_url": f"{base_url}/embed/{commit_id}",
         "current_page": "commits",
+        "domain": domain_ctx_cd,
         "commit": commit.model_dump(mode="json"),
         "comments": comments,
         "audio_url": audio_url,
@@ -945,7 +975,7 @@ async def commit_page(
         "og_meta": _og_tags(
             title=f"Commit {short_id} · {owner}/{repo_slug} — MuseHub",
             description=commit.message,
-            og_type="music.song",
+            og_type="article",
         ),
     }
     ctx.update(nav_ctx)
@@ -960,7 +990,7 @@ async def commit_page(
 
 @router.get(
     "/{owner}/{repo_slug}/commits/{commit_id}/diff",
-    summary="MuseHub musical diff view",
+    summary="MuseHub diff view",
 )
 async def diff_page(
     request: Request,
@@ -969,13 +999,20 @@ async def diff_page(
     commit_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Render the musical diff between a commit and its parent.
+    """Render the diff for a commit.
 
-    Shows key/tempo/time-signature deltas, tracks added/removed/modified,
-    and side-by-side artifact comparison. Fetches commit and parent metadata
-    from the API client-side.
+    For code repos: syntax-highlighted unified diff of all changed files.
+    For MIDI repos: musical property deltas and artifact comparison.
+    Domain is detected server-side and passed to the TypeScript module.
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
+    orm_repo_d = await db.get(musehub_db.MusehubRepo, repo_id)
+    from musehub.api.routes.musehub.ui_view import _get_domain_for_repo as _gdfr_d
+    domain_ctx_d = await _gdfr_d(db, repo_id, getattr(orm_repo_d, "domain_id", None))
+
+    commit = await musehub_repository.get_commit(db, repo_id, commit_id)
+    commit_data = commit.model_dump(by_alias=True, mode="json") if commit else None
+
     ctx: dict[str, object] = {
         "owner": owner,
         "repo_slug": repo_slug,
@@ -983,6 +1020,8 @@ async def diff_page(
         "commit_id": commit_id,
         "base_url": base_url,
         "current_page": "commits",
+        "domain": domain_ctx_d,
+        "commit": commit_data,
     }
     ctx.update(nav_ctx)
     return json_or_html(
@@ -2206,9 +2245,9 @@ async def arrange_page(
     rj_result = await db.execute(
         sa_select(
             musehub_db.MusehubRenderJob.status,
-            musehub_db.MusehubRenderJob.midi_count,
-            musehub_db.MusehubRenderJob.mp3_object_ids,
-            musehub_db.MusehubRenderJob.image_object_ids,
+            musehub_db.MusehubRenderJob.artifact_count,
+            musehub_db.MusehubRenderJob.audio_object_ids,
+            musehub_db.MusehubRenderJob.preview_object_ids,
         ).where(
             musehub_db.MusehubRenderJob.repo_id == repo_id,
             musehub_db.MusehubRenderJob.commit_id == actual_commit_id,
@@ -2318,8 +2357,8 @@ async def arrange_page(
         ],
         # Render job
         "render_status": render_job_row.status if render_job_row else None,
-        "midi_count": render_job_row.midi_count if render_job_row else 0,
-        "mp3_count": len(render_job_row.mp3_object_ids or []) if render_job_row else 0,
+        "midi_count": render_job_row.artifact_count if render_job_row else 0,
+        "mp3_count": len(render_job_row.audio_object_ids or []) if render_job_row else 0,
         # Matrix
         "instruments": matrix.instruments,
         "sections": matrix.sections,

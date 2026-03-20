@@ -24,7 +24,7 @@ import logging
 import mimetypes
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 from musehub.contracts.json_types import JSONValue
 from musehub.db.database import AsyncSessionLocal
@@ -44,6 +44,11 @@ MusehubErrorCode = Literal[
     "elicitation_unavailable",
     "elicitation_declined",
     "not_confirmed",
+    "invalid_scoped_id",
+    "unauthenticated",
+    "push_failed",
+    "non_fast_forward",
+    "pull_failed",
 ]
 """Enumeration of error codes returned by MuseHub MCP executors.
 
@@ -976,21 +981,17 @@ async def execute_list_releases(repo_id: str) -> MusehubToolResult:
 
 async def execute_search_repos(
     query: str | None = None,
-    key_signature: str | None = None,
-    tempo_min: int | None = None,
-    tempo_max: int | None = None,
+    domain: str | None = None,
     tags: list[str] | None = None,
     limit: int = 20,
 ) -> MusehubToolResult:
-    """Discover public repositories by text query or musical attributes.
+    """Discover public repositories by text query, domain, or tags.
 
     All filters are optional and combined with AND logic.
 
     Args:
         query: Free-text query matched against repo names and descriptions.
-        key_signature: Filter by key signature (e.g. ``"C major"``).
-        tempo_min: Minimum tempo (BPM).
-        tempo_max: Maximum tempo (BPM).
+        domain: Filter by domain scoped ID (e.g. ``"@cgcardona/midi"``).
         tags: Filter repos that have all of these tags.
         limit: Maximum results to return (default: 20, max: 100).
 
@@ -1006,9 +1007,6 @@ async def execute_search_repos(
         from musehub.services import musehub_discover
         explore = await musehub_discover.list_public_repos(
             session,
-            key=key_signature,
-            tempo_min=tempo_min,
-            tempo_max=tempo_max,
             page_size=min(capped_limit * 3, 100),
         )
         all_repos = explore.repos
@@ -1017,6 +1015,9 @@ async def execute_search_repos(
         for r in all_repos:
             if query and query.lower() not in (r.name or "").lower() and \
                     query.lower() not in (r.description or "").lower():
+                continue
+            if domain and domain.lower() not in (r.description or "").lower() \
+                    and not any(domain.lower() in t.lower() for t in (r.tags or [])):
                 continue
             if tags:
                 repo_tags: list[str] = list(r.tags) if r.tags else []
@@ -1035,8 +1036,6 @@ async def execute_search_repos(
                     "slug": r.slug,
                     "name": r.name,
                     "description": r.description,
-                    "key_signature": r.key_signature,
-                    "tempo_bpm": r.tempo_bpm,
                     "tags": list(r.tags) if r.tags else [],
                     "star_count": r.star_count,
                 }
@@ -1044,3 +1043,414 @@ async def execute_search_repos(
             ],
         }
         return MusehubToolResult(ok=True, data=data)
+
+
+# ── Domain executor functions ─────────────────────────────────────────────────
+
+
+async def execute_list_domains(
+    query: str | None = None,
+    viewer_type: str | None = None,
+    verified: bool | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> MusehubToolResult:
+    """List registered Muse domain plugins."""
+    if (err := _check_db_available()) is not None:
+        return err
+
+    capped = min(max(1, limit), 100)
+    page = offset // capped + 1
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_domains as _domains_svc
+        response = await _domains_svc.list_domains(
+            session,
+            query=query,
+            verified_only=verified is True,
+            page=page,
+            page_size=capped,
+        )
+
+        domains_out: list[JSONValue] = []
+        for d in response.domains:
+            if viewer_type and d.viewer_type != viewer_type:
+                continue
+            domains_out.append({
+                "domain_id": d.domain_id,
+                "scoped_id": d.scoped_id,
+                "display_name": d.display_name,
+                "description": d.description,
+                "version": d.version,
+                "viewer_type": d.viewer_type,
+                "install_count": d.install_count,
+                "is_verified": d.is_verified,
+            })
+
+        return MusehubToolResult(ok=True, data={"total": response.total, "domains": domains_out})
+
+
+async def execute_get_domain(scoped_id: str) -> MusehubToolResult:
+    """Fetch the full manifest for a Muse domain plugin by its scoped ID."""
+    if (err := _check_db_available()) is not None:
+        return err
+
+    parts = scoped_id.lstrip("@").split("/", 1)
+    if len(parts) != 2:
+        return MusehubToolResult(
+            ok=False,
+            error_code="invalid_scoped_id",
+            error_message=f"Invalid scoped_id format: {scoped_id!r}. Expected '@author/slug'.",
+        )
+    author_slug, slug = parts
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_domains as _domains_svc
+        domain = await _domains_svc.get_domain_by_scoped_id(session, author_slug, slug)
+        if domain is None:
+            return MusehubToolResult(
+                ok=False, error_code="not_found",
+                error_message=f"Domain {scoped_id!r} not found.",
+            )
+
+        return MusehubToolResult(ok=True, data={
+            "domain_id": domain.domain_id,
+            "scoped_id": domain.scoped_id,
+            "display_name": domain.display_name,
+            "description": domain.description,
+            "version": domain.version,
+            "manifest_hash": domain.manifest_hash,
+            "viewer_type": domain.viewer_type,
+            "capabilities": cast(JSONValue, domain.capabilities),
+            "install_count": domain.install_count,
+            "is_verified": domain.is_verified,
+            "is_deprecated": domain.is_deprecated,
+        })
+
+
+async def execute_get_domain_insights(
+    repo_id: str,
+    dimension: str = "overview",
+    ref: str | None = None,
+) -> MusehubToolResult:
+    """Return domain insights for a repo — delegates to the analysis executor."""
+    return await execute_get_analysis(repo_id, dimension=dimension)
+
+
+async def execute_get_view(
+    repo_id: str,
+    ref: str | None = None,
+    dimension: str | None = None,
+) -> MusehubToolResult:
+    """Return the universal viewer payload for a repo at a given ref."""
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_repository as _repo_svc
+        from musehub.db import musehub_models as _db
+        from sqlalchemy import select
+
+        repo = await _repo_svc.get_repo(session, repo_id)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False, error_code="not_found",
+                error_message=f"Repo {repo_id!r} not found.",
+            )
+
+        default_branch = "main"
+        resolved_ref = ref or str(default_branch)
+
+        branch_row = (await session.execute(
+            select(_db.MusehubBranch).where(
+                _db.MusehubBranch.repo_id == repo_id,
+                _db.MusehubBranch.name == resolved_ref,
+            )
+        )).scalar_one_or_none()
+        head_commit_id = branch_row.head_commit_id if branch_row else None
+
+        domain_info: dict[str, JSONValue] = {}
+        if repo.domain_id:
+            from musehub.db.musehub_domain_models import MusehubDomain
+            dom = await session.get(MusehubDomain, repo.domain_id)
+            if dom:
+                domain_info = {
+                    "scoped_id": f"@{dom.author_slug}/{dom.slug}",
+                    "display_name": dom.display_name,
+                    "viewer_type": dom.viewer_type,
+                    "capabilities": cast(JSONValue, dom.capabilities),
+                }
+
+        return MusehubToolResult(ok=True, data={
+            "repo_id": repo_id,
+            "owner": repo.owner,
+            "slug": repo.slug,
+            "ref": resolved_ref,
+            "head_commit_id": head_commit_id,
+            "domain": domain_info,
+            "dimension": dimension,
+        })
+
+
+# ── Muse CLI + auth executor functions ───────────────────────────────────────
+
+
+async def execute_whoami(user_id: str | None) -> MusehubToolResult:
+    """Return identity information for the currently authenticated caller."""
+    if user_id is None:
+        return MusehubToolResult(ok=True, data={"authenticated": False, "user_id": None})
+
+    if (err := _check_db_available()) is not None:
+        return MusehubToolResult(ok=True, data={"authenticated": True, "user_id": user_id})
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_repository as _repo_svc
+        repos_result = await _repo_svc.list_repos_for_user(session, user_id)
+        repo_count = len(repos_result.repos) if repos_result else 0
+        return MusehubToolResult(ok=True, data={
+            "authenticated": True,
+            "user_id": user_id,
+            "repo_count": repo_count,
+            "hub_url": "https://musehub.ai",
+        })
+
+
+async def execute_create_agent_token(
+    user_id: str,
+    agent_name: str,
+    expires_in_days: int = 90,
+) -> MusehubToolResult:
+    """Mint a long-lived agent JWT for programmatic access."""
+    if not user_id:
+        return MusehubToolResult(
+            ok=False, error_code="unauthenticated",
+            error_message="Authentication required to create an agent token.",
+        )
+
+    capped_days = min(max(1, expires_in_days), 365)
+    from musehub.auth.tokens import generate_agent_token
+    token = generate_agent_token(
+        user_id=user_id,
+        agent_name=agent_name or "mcp-agent",
+        duration_days=capped_days,
+    )
+
+    return MusehubToolResult(ok=True, data={
+        "token": token,
+        "agent_name": agent_name,
+        "user_id": user_id,
+        "expires_in_days": capped_days,
+        "usage": (
+            "Add to requests as: Authorization: Bearer <token>  "
+            "or configure with: muse config set musehub.token <token>"
+        ),
+    })
+
+
+async def execute_muse_clone(
+    owner: str,
+    slug: str,
+    ref: str | None = None,
+) -> MusehubToolResult:
+    """Return the clone URL and repo metadata for a MuseHub repository."""
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_repository as _repo_svc
+        repo = await _repo_svc.get_repo_by_owner_slug(session, owner, slug)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False, error_code="not_found",
+                error_message=f"Repo {owner}/{slug} not found.",
+            )
+
+        hub_url = "https://musehub.ai"
+        clone_url = f"{hub_url}/{owner}/{slug}"
+        ref_part = f" --branch {ref}" if ref else ""
+
+        return MusehubToolResult(ok=True, data={
+            "repo_id": repo.repo_id,
+            "owner": repo.owner,
+            "slug": repo.slug,
+            "name": repo.name,
+            "clone_url": clone_url,
+            "command": f"muse clone {clone_url}{ref_part}",
+            "default_branch": str("main"),
+            "visibility": repo.visibility,
+        })
+
+
+async def execute_muse_push(
+    repo_id: str,
+    branch: str,
+    head_commit_id: str,
+    commits: list[object],
+    objects: list[object],
+    force: bool = False,
+    user_id: str = "",
+) -> MusehubToolResult:
+    """Push commits and binary objects to a MuseHub repository."""
+    if not user_id:
+        return MusehubToolResult(
+            ok=False, error_code="unauthenticated",
+            error_message="Authentication required to push. Use musehub_create_agent_token first.",
+        )
+
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_repository as _repo_svc, musehub_sync as _sync_svc
+        from musehub.models.musehub import CommitInput as _CommitInput, ObjectInput as _ObjectInput
+
+        repo = await _repo_svc.get_repo(session, repo_id)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False, error_code="not_found",
+                error_message=f"Repo {repo_id!r} not found.",
+            )
+
+        commit_inputs = [_CommitInput.model_validate(c) for c in commits]
+        object_inputs = [_ObjectInput.model_validate(o) for o in objects]
+
+        try:
+            push_result = await _sync_svc.ingest_push(
+                session,
+                repo_id=repo_id,
+                branch=branch,
+                head_commit_id=head_commit_id,
+                commits=commit_inputs,
+                objects=object_inputs,
+                force=force,
+                author=user_id,
+            )
+            await session.commit()
+
+            return MusehubToolResult(ok=True, data={
+                "repo_id": repo_id,
+                "branch": branch,
+                "remote_head": push_result.remote_head,
+                "commits_pushed": len(commit_inputs),
+                "objects_pushed": len(object_inputs),
+            })
+        except ValueError as exc:
+            code: MusehubErrorCode = "non_fast_forward" if "non_fast_forward" in str(exc) else "push_failed"
+            return MusehubToolResult(ok=False, error_code=code, error_message=str(exc))
+
+
+async def execute_muse_pull(
+    repo_id: str,
+    branch: str | None = None,
+    since_commit_id: str | None = None,
+    object_ids: list[str] | None = None,
+) -> MusehubToolResult:
+    """Fetch missing commits and objects from a MuseHub repository."""
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_repository as _repo_svc, musehub_sync as _sync_svc
+
+        repo = await _repo_svc.get_repo(session, repo_id)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False, error_code="not_found",
+                error_message=f"Repo {repo_id!r} not found.",
+            )
+
+        resolved_branch = branch or "main"
+        # compute_pull_delta uses have_commits/have_objects as exclusion lists.
+        # since_commit_id and object_ids are treated as "have" hints.
+        have_commits: list[str] = [since_commit_id] if since_commit_id else []
+        have_objects: list[str] = list(object_ids) if object_ids else []
+
+        try:
+            pull_result = await _sync_svc.compute_pull_delta(
+                session,
+                repo_id=repo_id,
+                branch=resolved_branch,
+                have_commits=have_commits,
+                have_objects=have_objects,
+            )
+            commits_out: list[JSONValue] = [
+                cast(JSONValue, c.model_dump()) for c in pull_result.commits
+            ]
+            objects_out: list[JSONValue] = [
+                {"object_id": o.object_id, "path": o.path}
+                for o in pull_result.objects
+            ]
+            return MusehubToolResult(ok=True, data={
+                "repo_id": repo_id,
+                "branch": resolved_branch,
+                "remote_head": pull_result.remote_head,
+                "commits": commits_out,
+                "objects": objects_out,
+            })
+        except Exception as exc:
+            return MusehubToolResult(ok=False, error_code="pull_failed", error_message=str(exc))
+
+
+async def execute_muse_remote(
+    owner: str,
+    slug: str,
+) -> MusehubToolResult:
+    """Return the remote URL and push/pull endpoints for a MuseHub repo."""
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_repository as _repo_svc
+        repo = await _repo_svc.get_repo_by_owner_slug(session, owner, slug)
+        if repo is None:
+            return MusehubToolResult(
+                ok=False, error_code="not_found",
+                error_message=f"Repo {owner}/{slug} not found.",
+            )
+
+        hub_url = "https://musehub.ai"
+        remote_url = f"{hub_url}/{owner}/{slug}"
+        api_base = f"{hub_url}/api/v1/repos/{repo.repo_id}"
+
+        return MusehubToolResult(ok=True, data={
+            "repo_id": repo.repo_id,
+            "name": "origin",
+            "remote_url": remote_url,
+            "push_url": f"{api_base}/push",
+            "pull_url": f"{api_base}/pull",
+            "clone_command": f"muse clone {remote_url}",
+            "add_remote_command": f"muse remote add origin {remote_url}",
+        })
+
+
+async def execute_muse_config(
+    key: str | None = None,
+    value: str | None = None,
+) -> MusehubToolResult:
+    """Read or describe Muse configuration keys relevant to MuseHub."""
+    hub_config_keys: dict[str, str] = {
+        "musehub.token": "Bearer token for authentication with MuseHub (JWT).",
+        "musehub.url": "Base URL for the MuseHub instance (default: https://musehub.ai).",
+        "musehub.username": "Your MuseHub username — default owner for new repos.",
+        "core.editor": "Text editor for commit messages (e.g. 'vim', 'nano', 'code --wait').",
+        "user.name": "Your display name used in commit author fields.",
+        "user.email": "Your email address used in commit author fields.",
+    }
+
+    if key is None:
+        return MusehubToolResult(ok=True, data={
+            "config_keys": cast(JSONValue, hub_config_keys),
+            "hint": (
+                "Use 'muse config set <key> <value>' to configure Muse. "
+                "Run 'muse config list' to see all current values."
+            ),
+        })
+
+    description = hub_config_keys.get(key, f"Unknown key: {key!r}")
+    result: dict[str, JSONValue] = {"key": key, "description": description}
+    if value is not None:
+        cli_cmd = f"muse config set {key} {value}"
+        result["command"] = cli_cmd
+        result["hint"] = f"Run this command in your terminal: {cli_cmd}"
+
+    return MusehubToolResult(ok=True, data=result)

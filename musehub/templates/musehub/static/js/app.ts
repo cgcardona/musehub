@@ -12,6 +12,7 @@
 import './musehub.ts';
 import './audio-player.ts';
 import './piano-roll.ts';
+import './midi-player.ts';
 
 import { initRepoPage } from './pages/repo-page.ts';
 import { initIssueList } from './pages/issue-list.ts';
@@ -32,6 +33,7 @@ import { initCommits }      from './pages/commits.ts';
 import { initIssueDetail }   from './pages/issue-detail.ts';
 import { initReleaseDetail } from './pages/release-detail.ts';
 import { initGraph }         from './pages/graph.ts';
+import { initDomainDetail }  from './pages/domain-detail.ts';
 import { initDiff }          from './pages/diff.ts';
 import { initSettings }      from './pages/settings.ts';
 import { initExplore }       from './pages/explore.ts';
@@ -72,6 +74,7 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'issue-detail':    () => initIssueDetail(),
   'release-detail':  () => initReleaseDetail(),
   'graph':           () => initGraph(),
+  'domain-detail':   (d) => initDomainDetail(d),
   'diff':            () => initDiff(),
   'settings':        () => initSettings(),
   'explore':         () => initExplore(),

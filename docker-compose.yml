@@ -3,7 +3,7 @@ services:
     build: .
     container_name: musehub
     ports:
-      - "10003:10003"
+      - "127.0.0.1:10003:10003"
     env_file: .env
     environment:
       DATABASE_URL: "postgresql+asyncpg://musehub:${DB_PASSWORD:-musehub}@postgres:5432/musehub"

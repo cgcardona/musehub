@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# FOUC prevention: keep the document invisible until app.css has been parsed.
+     The inline script immediately after <link app.css> adds the 'css-ready' class
+     which transitions to opacity:1. On HTMX navigation, musehub.ts removes/re-adds
+     the class around the body swap so there is no flash of unstyled content. #}
+  <style>html{opacity:0}html.css-ready{opacity:1;transition:opacity .12s ease}</style>
   <link rel="preconnect" href="https://fonts.bunny.net">
   <link rel="stylesheet" href="https://fonts.bunny.net/css?family=jetbrains-mono:400,500,600,700&display=swap">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -10,11 +15,16 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/app.css">
+  <script>document.documentElement.classList.add('css-ready')</script>
   <title>{% block title %}MuseHub{% endblock %} — MuseHub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
   {% block oembed_link %}<link rel="alternate" type="application/json+oembed"
        href="https://musehub.app/musehub/oembed?url={{ request.url | urlencode }}"
        title="MuseHub oEmbed">{% endblock %}
+  {# Agent-discovery links: let MCP clients navigate HTML and find the resource/tool endpoints #}
+  {% if muse_resource_uri is defined %}<link rel="muse-resource" href="{{ muse_resource_uri }}">{% endif %}
+  <link rel="muse-mcp" href="/mcp">
+  <link rel="muse-docs" href="/mcp/docs">
   {% block extra_css %}{% endblock %}
   {% block jsonld %}{% endblock %}
   <script src="/static/alpinejs.min.js" defer></script>

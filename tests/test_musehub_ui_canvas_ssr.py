@@ -77,7 +77,7 @@ async def test_piano_roll_page_renders_track_name_server_side(
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/bass.mid")
     response = await client.get(
-        "/canvasuser/canvas-test-beats/piano-roll/main/tracks/bass.mid"
+        "/canvasuser/canvas-test-beats/view/main/tracks/bass.mid"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -91,16 +91,16 @@ async def test_piano_roll_page_renders_instrument_sidebar(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Piano roll page renders instrument lane names in the SSR sidebar."""
+    """View page renders successfully for a repo with MIDI objects."""
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/keys.mid")
     response = await client.get(
-        "/canvasuser/canvas-test-beats/piano-roll/main"
+        "/canvasuser/canvas-test-beats/view/main"
     )
     assert response.status_code == 200
     body = response.text
-    # The instrument sidebar shows instrument names derived from path stems
-    assert "instrument-lane" in body or "Keys" in body or "keys" in body.lower()
+    # Domain viewer renders SSR HTML
+    assert "view-container" in body
 
 
 @pytest.mark.anyio
@@ -108,13 +108,13 @@ async def test_piano_roll_page_canvas_has_data_midi_url(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Piano roll canvas element carries a data-midi-url attribute for JS."""
+    """View page embeds the viewerType in its page config JSON."""
     await _make_repo(db_session)
     response = await client.get(
-        "/canvasuser/canvas-test-beats/piano-roll/main"
+        "/canvasuser/canvas-test-beats/view/main"
     )
     assert response.status_code == 200
-    assert "data-midi-url" in response.text
+    assert "viewerType" in response.text
 
 
 @pytest.mark.anyio
@@ -122,13 +122,13 @@ async def test_piano_roll_page_transport_bar_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Piano roll page SSR includes the transport bar (#transport-bar)."""
+    """View page renders the domain viewer container for any ref."""
     await _make_repo(db_session)
     response = await client.get(
-        "/canvasuser/canvas-test-beats/piano-roll/main"
+        "/canvasuser/canvas-test-beats/view/main"
     )
     assert response.status_code == 200
-    assert "transport-bar" in response.text
+    assert "view-container" in response.text
 
 
 @pytest.mark.anyio
@@ -136,15 +136,15 @@ async def test_piano_roll_track_page_canvas_has_data_instruments(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Single-track piano roll page embeds data-instruments JSON on the canvas."""
+    """File view page embeds the file path in the page config JSON."""
     repo_id = await _make_repo(db_session)
     await _seed_midi_object(db_session, repo_id, path="tracks/guitar.mid")
     response = await client.get(
-        "/canvasuser/canvas-test-beats/piano-roll/main/tracks/guitar.mid"
+        "/canvasuser/canvas-test-beats/view/main/tracks/guitar.mid"
     )
     assert response.status_code == 200
     body = response.text
-    assert "data-instruments" in body
+    assert "guitar.mid" in body
 
 
 # ---------------------------------------------------------------------------

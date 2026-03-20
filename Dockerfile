@@ -25,18 +25,19 @@ RUN groupadd -r musehub && useradd -r -g musehub musehub
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/wheels /wheels
 RUN pip install --no-cache-dir /wheels/*
-RUN pip install --no-cache-dir pytest-cov
 
 COPY --chown=musehub:musehub musehub/ ./musehub/
-COPY --chown=musehub:musehub tests/ ./tests/
-COPY --chown=musehub:musehub scripts/ ./scripts/
 COPY --chown=musehub:musehub alembic/ ./alembic/
 COPY --chown=musehub:musehub tourdeforce/ ./tourdeforce/
 COPY --chown=musehub:musehub alembic.ini pyproject.toml ./
+
+COPY --chown=musehub:musehub entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 RUN mkdir -p /data && chown -R musehub:musehub /data && chmod 755 /data
 
@@ -48,4 +49,7 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 10003
 
-CMD ["uvicorn", "musehub.main:app", "--host", "0.0.0.0", "--port", "10003"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:10003/api/v1/openapi.json')" || exit 1
+
+ENTRYPOINT ["./entrypoint.sh"]

@@ -64,6 +64,8 @@ _DIRECT_REGISTERED = {
     "users",           # registered in main.py at /api/v1/musehub (same path as auto-discovery)
     "oembed",          # registered in main.py at root
     "raw",             # registered in main.py at /api/v1
+    "domains",         # registered in main.py at /api/v1 (domain registry API)
+    "ui_domains",      # registered in main.py at root (domain registry UI pages)
 }
 
 # Load every sibling module that exposes a `router` attribute, alphabetically.

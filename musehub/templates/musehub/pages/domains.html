@@ -1,0 +1,99 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}Domains{% endblock %}
+
+{% block content %}
+<div class="domains-page">
+  <div class="domains-hero">
+    <h1 class="domains-hero__title">Domain Plugins</h1>
+    <p class="domains-hero__sub">
+      A Muse domain plugin defines a unique state space — MIDI, code, genomics,
+      climate simulation, 3D design — and the six interfaces Muse uses to version it.
+      Any agent or developer can register a domain.
+    </p>
+    <form class="domains-search-form" method="get" action="/domains">
+      <input
+        type="search"
+        name="q"
+        class="domains-search-input"
+        placeholder="Search domains…"
+        value="{{ search_query }}"
+        autocomplete="off"
+      >
+      <label class="domains-search-verified">
+        <input type="checkbox" name="verified" value="true" {% if verified_only %}checked{% endif %}>
+        Verified only
+      </label>
+      <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+  </div>
+
+  {% if domains %}
+  <div class="domains-stats">
+    <span class="domains-count">{{ total }} domain{% if total != 1 %}s{% endif %} registered</span>
+  </div>
+
+  <div class="domain-grid">
+    {% for domain in domains %}
+    <a class="domain-card" href="/domains/@{{ domain.author_slug }}/{{ domain.slug }}">
+      <div class="domain-card__header">
+        <span class="domain-card__name">{{ domain.display_name }}</span>
+        {% if domain.is_verified %}
+        <span class="badge badge-verified" title="MuseHub verified domain">verified</span>
+        {% endif %}
+        <span class="domain-badge">@{{ domain.author_slug }}/{{ domain.slug }}</span>
+      </div>
+      <p class="domain-card__description">{{ domain.description | truncate(140) }}</p>
+      <div class="domain-card__meta">
+        <span class="domain-card__stat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {{ domain.dimension_count }} dimension{% if domain.dimension_count != 1 %}s{% endif %}
+        </span>
+        <span class="domain-card__stat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          </svg>
+          {{ domain.install_count }} repo{% if domain.install_count != 1 %}s{% endif %}
+        </span>
+        <span class="domain-card__viewer">{{ domain.viewer_type | replace("_", " ") }}</span>
+        {% if domain.merge_semantics %}
+        <span class="domain-card__merge">{{ domain.merge_semantics }} merge</span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p class="empty-state__text">
+      {% if search_query %}
+        No domains matching <strong>{{ search_query }}</strong>.
+      {% else %}
+        No domain plugins registered yet. Be the first to register one.
+      {% endif %}
+    </p>
+    <a href="/api/v1/domains" class="btn btn-secondary">View API</a>
+  </div>
+  {% endif %}
+
+  <div class="domains-cta">
+    <h2 class="domains-cta__title">Build your own domain</h2>
+    <p class="domains-cta__body">
+      Implement the <code>MuseDomainPlugin</code> protocol — six interfaces —
+      and any state space becomes versionable: genomics, climate simulation,
+      3D spatial design, spacetime, or anything else you can imagine.
+    </p>
+    <div class="domains-cta__actions">
+      <a href="https://github.com/cgcardona/muse#plugin-architecture" class="btn btn-primary" target="_blank">
+        Protocol docs
+      </a>
+      <a href="/mcp/docs" class="btn btn-secondary">MCP tools</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

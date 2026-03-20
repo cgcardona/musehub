@@ -40,6 +40,8 @@ from musehub.api.routes.musehub import (
     ui_user_profile as musehub_ui_profile_routes,
     ui_mcp_elicitation as musehub_ui_mcp_elicitation_routes,
     ui_new_repo as musehub_ui_new_repo_routes,
+    ui_domains as musehub_ui_domains_routes,
+    domains as musehub_domains_routes,
     discover as musehub_discover_routes,
     users as musehub_user_routes,
     oembed as musehub_oembed_routes,
@@ -48,6 +50,8 @@ from musehub.api.routes.musehub import (
 )
 from musehub.api.routes import musehub as musehub_router_pkg
 from musehub.api.routes.mcp import router as mcp_router
+from musehub.api.routes.musehub.ui_view import view_router as musehub_ui_view_router
+from musehub.api.routes.musehub.ui_view import redirect_router as musehub_ui_redirect_router
 from musehub.db import init_db, close_db
 
 
@@ -69,6 +73,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "gyroscope=(), magnetometer=(), microphone=(), "
             "payment=(), usb=()"
         )
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
+            "font-src 'self' https://fonts.bunny.net; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'"
+        )
+        if not settings.debug:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=63072000; includeSubDomains; preload"
+            )
+        # Prevent fingerprinting — suppress the default "uvicorn" server banner
+        response.headers["Server"] = "musehub"
         return response
 
 
@@ -95,7 +114,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     if not settings.debug and settings.database_url and "postgres" in settings.database_url:
         pw = (settings.db_password or "").strip()
-        if not pw or pw == "changeme123":
+        weak = {"", "changeme123", "musehub", "password", "postgres", "secret"}
+        if not pw or pw in weak:
             raise RuntimeError(
                 "Production requires DB_PASSWORD set to a strong value. "
                 "Generate with: openssl rand -hex 16"
@@ -110,19 +130,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="MuseHub API",
     version=settings.app_version,
+    # OpenAPI schema served in debug/dev and test environments.
+    # In production (DEBUG=false, MUSE_ENV != "test") it is disabled — agents use /mcp instead.
+    openapi_url="/api/v1/openapi.json" if (settings.debug or settings.muse_env == "test") else None,
     description=(
-        "**MuseHub** — the music composition version control platform powered by Muse VCS.\n\n"
-        "MuseHub gives AI agents and human composers a GitHub-style workflow for music:\n"
-        "push commits, open pull requests, track issues, and browse public repos via a "
-        "machine-readable OpenAPI spec.\n\n"
+        "**MuseHub** — the version control hub for multidimensional state, powered by Muse.\n\n"
+        "Muse is a domain-agnostic version control system. Not just Git — any state space "
+        "where a 'change' is a delta across multiple axes simultaneously. "
+        "MIDI (21 dimensions), code (symbol graph), genomics, climate simulation, 3D design.\n\n"
+        "MuseHub gives AI agents and humans a GitHub-style workflow for any Muse domain: "
+        "push commits, open pull requests, track issues, browse domain insights, and "
+        "discover registered domain plugins — all via a machine-readable OpenAPI + MCP spec.\n\n"
         "## Authentication\n\n"
         "All write endpoints and private-repo reads require a **Bearer JWT** in the "
         "`Authorization` header:\n\n"
         "```\nAuthorization: Bearer <your-jwt>\n```\n\n"
         "Public repo read endpoints accept unauthenticated requests.\n\n"
+        "## MCP (Model Context Protocol)\n\n"
+        "Full MCP 2025-11-25 Streamable HTTP at `POST /GET /DELETE /mcp`. "
+        "37 tools, 27 resource URIs (`muse://...`), and 11 prompts. "
+        "See `/mcp/docs` for the interactive reference.\n\n"
         "## URL Scheme\n\n"
-        "Repos are addressed as `/{owner}/{slug}` (e.g. `/gabriel/neo-soul-experiment`).\n"
-        "Clone URL format: `musehub://{owner}/{slug}`\n"
+        "Repos: `/{owner}/{slug}` · Domain viewer: `/{owner}/{slug}/view/{ref}` · "
+        "Insights: `/{owner}/{slug}/insights/{ref}/{dim}`\n"
+        "Clone URL: `musehub://{owner}/{slug}`\n"
     ),
     contact={
         "name": "Muse VCS",
@@ -134,7 +165,6 @@ app = FastAPI(
         "url": "https://musehub.app/terms",
     },
     lifespan=lifespan,
-    openapi_url="/api/v1/openapi.json",
     # Docs are served via custom routes below that use locally-bundled assets,
     # so we disable the default CDN-dependent auto-generated routes.
     docs_url=None,
@@ -177,11 +207,13 @@ app.mount(
 app.include_router(musehub_user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(musehub_discover_routes.router, prefix="/api/v1", tags=["Discover"])
 app.include_router(musehub_discover_routes.star_router, prefix="/api/v1", tags=["Social"])
+app.include_router(musehub_domains_routes.router, prefix="/api/v1", tags=["Domains"])
 app.include_router(musehub_router_pkg.router, prefix="/api/v1")
 app.include_router(musehub_ui_notifications_routes.router, tags=["musehub-ui-notifications"])
 app.include_router(musehub_ui_topics_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_mcp_elicitation_routes.router, tags=["musehub-ui-mcp"])
 app.include_router(musehub_ui_new_repo_routes.router, tags=["musehub-ui"])
+app.include_router(musehub_ui_domains_routes.router, tags=["musehub-ui-domains"])
 app.include_router(musehub_ui_routes.fixed_router, tags=["musehub-ui"])
 app.include_router(musehub_ui_milestones_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_stash_routes.router, tags=["musehub-ui-stash"])
@@ -199,6 +231,10 @@ app.include_router(mcp_router)
 
 # Wildcard UI routes — /{owner}/{repo_slug} and deeper paths.
 # Must come after all fixed-path routers above.
+# Redirect router must come before view_router so /piano-roll, /listen, /arrange
+# are caught and 301'd before they'd match as owner names.
+app.include_router(musehub_ui_redirect_router, tags=["musehub-ui-redirects"])
+app.include_router(musehub_ui_view_router, tags=["musehub-ui-view"])
 app.include_router(musehub_ui_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_blame_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_settings_routes.router, tags=["musehub-ui-settings"])

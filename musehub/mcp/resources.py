@@ -1,18 +1,25 @@
-"""MuseHub MCP Resource catalogue — ``musehub://`` URI scheme.
+"""MuseHub MCP Resource catalogue — ``musehub://`` and ``muse://`` URI schemes.
 
 Resources are side-effect-free, cacheable reads addressable by URI.
 Every resource returns ``application/json``.
 
 ## URI design
 
-Static resources (5):
-  musehub://trending          — top public repos by star count
-  musehub://me                — authenticated user profile + pinned repos
-  musehub://me/notifications  — unread notification inbox
-  musehub://me/starred        — repos the authenticated user has starred
-  musehub://me/feed           — activity feed for watched repos
+### Static resources (12):
+  musehub://trending                — top public repos by star count
+  musehub://me                      — authenticated user profile + pinned repos
+  musehub://me/notifications        — unread notification inbox
+  musehub://me/starred              — repos the authenticated user has starred
+  musehub://me/feed                 — activity feed for watched repos
+  musehub://me/tokens               — active agent tokens for the authenticated user
+  muse://docs/overview              — Muse paradigm overview (State, Commit, Branch, Merge, Drift)
+  muse://docs/protocol              — MuseDomainPlugin protocol spec (all 6 interfaces)
+  muse://docs/crdt                  — CRDT reference (VectorClock, RGA, ORSet, AWMap)
+  muse://docs/domains               — Domain plugin authoring guide
+  muse://docs/merge                 — Three-way merge semantics and OT
+  muse://domains                    — All domains registered on this MuseHub instance
 
-Templated resources (15, RFC 6570 Level 1):
+### Templated resources (17, RFC 6570 Level 1):
   musehub://repos/{owner}/{slug}
   musehub://repos/{owner}/{slug}/branches
   musehub://repos/{owner}/{slug}/commits
@@ -25,9 +32,11 @@ Templated resources (15, RFC 6570 Level 1):
   musehub://repos/{owner}/{slug}/pulls/{number}
   musehub://repos/{owner}/{slug}/releases
   musehub://repos/{owner}/{slug}/releases/{tag}
-  musehub://repos/{owner}/{slug}/analysis/{ref}
+  musehub://repos/{owner}/{slug}/insights/{ref}
+  musehub://repos/{owner}/{slug}/remote
   musehub://repos/{owner}/{slug}/timeline
   musehub://users/{username}
+  muse://domains/{author}/{slug}
 
 ## Ownership / auth
 
@@ -83,8 +92,8 @@ STATIC_RESOURCES: list[MCPResource] = [
         "uri": "musehub://trending",
         "name": "Trending Repositories",
         "description": (
-            "Top public MuseHub repositories ranked by recent star count. "
-            "Use this to discover popular music projects before browsing or forking."
+            "Top public MuseHub repositories ranked by recent star count across all domains. "
+            "Use this to discover popular state repositories before browsing or forking."
         ),
         "mimeType": "application/json",
     },
@@ -120,6 +129,80 @@ STATIC_RESOURCES: list[MCPResource] = [
         "description": (
             "Recent activity (commits, PRs, issues) across repositories the "
             "authenticated user watches. Requires authentication."
+        ),
+        "mimeType": "application/json",
+    },
+    # ── Muse protocol documentation resources ─────────────────────────────────
+    {
+        "uri": "muse://docs/overview",
+        "name": "Muse Paradigm Overview",
+        "description": (
+            "High-level introduction to the Muse paradigm: State, Commit, Branch, Merge, "
+            "and Drift. Explains how Muse extends version control from text/code to any "
+            "multidimensional state space. Essential first read for any agent new to Muse."
+        ),
+        "mimeType": "application/json",
+    },
+    {
+        "uri": "muse://docs/protocol",
+        "name": "MuseDomainPlugin Protocol Spec",
+        "description": (
+            "Full specification of the MuseDomainPlugin protocol — the six interfaces "
+            "every domain plugin must implement: StateSerializer, DiffEngine, MergeStrategy, "
+            "InsightProvider, ViewRenderer, and ArtifactManager. "
+            "Read this to understand how domains work or to build a new one."
+        ),
+        "mimeType": "application/json",
+    },
+    {
+        "uri": "muse://docs/crdt",
+        "name": "Muse CRDT Reference",
+        "description": (
+            "Reference for the CRDT data structures used in Muse's multi-agent merge engine: "
+            "VectorClock, RGA (Replicated Growable Array), ORSet, and AWMap. "
+            "Required reading for understanding conflict-free concurrent editing."
+        ),
+        "mimeType": "application/json",
+    },
+    {
+        "uri": "muse://docs/domains",
+        "name": "Domain Plugin Authoring Guide",
+        "description": (
+            "Step-by-step guide for authoring and registering a new Muse domain plugin. "
+            "Covers the MuseDomainPlugin scaffold, capability manifest schema, "
+            "viewer registration, and publishing to the MuseHub domain registry."
+        ),
+        "mimeType": "application/json",
+    },
+    {
+        "uri": "muse://docs/merge",
+        "name": "Muse Merge Semantics",
+        "description": (
+            "Three-way merge semantics and Operational Transform (OT) specification. "
+            "Covers per-dimension conflict detection, domain-supplied merge strategies, "
+            "and the Drift protocol for divergent branch reconciliation."
+        ),
+        "mimeType": "application/json",
+    },
+    {
+        "uri": "muse://domains",
+        "name": "Registered Domain Plugins",
+        "description": (
+            "All domain plugins registered on this MuseHub instance, with their "
+            "scoped IDs (@author/slug), dimension counts, viewer types, and install counts. "
+            "Use musehub_list_domains for richer filtering."
+        ),
+        "mimeType": "application/json",
+    },
+    {
+        "uri": "musehub://me/tokens",
+        "name": "My Active Agent Tokens",
+        "description": (
+            "Active agent JWT tokens issued to the authenticated user. "
+            "Returns token metadata (never the raw token itself): agent_name, "
+            "issued_at, expires_at, and last_used. "
+            "Use musehub_create_agent_token to mint new tokens. "
+            "Requires authentication."
         ),
         "mimeType": "application/json",
     },
@@ -201,21 +284,49 @@ RESOURCE_TEMPLATES: list[MCPResourceTemplate] = [
         "mimeType": "application/json",
     },
     {
-        "uriTemplate": "musehub://repos/{owner}/{slug}/analysis/{ref}",
-        "name": "Musical Analysis",
-        "description": "Structured harmonic, rhythmic, and groove analysis at a given ref.",
+        "uriTemplate": "musehub://repos/{owner}/{slug}/insights/{ref}",
+        "name": "Domain Insights",
+        "description": (
+            "Domain-specific insight dimensions at a given ref. The dimensions returned "
+            "are sourced from the repo's domain plugin capabilities — e.g. harmony/rhythm/melody "
+            "for MIDI repos, or symbols/hotspots/coupling for code repos."
+        ),
         "mimeType": "application/json",
     },
     {
         "uriTemplate": "musehub://repos/{owner}/{slug}/timeline",
-        "name": "Musical Timeline",
-        "description": "Chronological evolution of the repository's musical content.",
+        "name": "State Timeline",
+        "description": (
+            "Chronological evolution of the repository's state across all dimensions. "
+            "Shows commits, branch divergences, and structural milestones over time."
+        ),
         "mimeType": "application/json",
     },
     {
         "uriTemplate": "musehub://users/{username}",
         "name": "User Profile",
         "description": "Public profile and list of public repositories for a user.",
+        "mimeType": "application/json",
+    },
+    {
+        "uriTemplate": "muse://domains/{author}/{slug}",
+        "name": "Domain Plugin Manifest",
+        "description": (
+            "Full manifest for a specific registered domain plugin: capabilities, "
+            "dimensions, viewer type, artifact types, merge semantics, and install instructions. "
+            "Use {author}=cgcardona and {slug}=midi to read the built-in MIDI domain."
+        ),
+        "mimeType": "application/json",
+    },
+    {
+        "uriTemplate": "musehub://repos/{owner}/{slug}/remote",
+        "name": "Repository Remote Info",
+        "description": (
+            "Remote URL, push/pull API endpoints, and Muse CLI commands for a repository. "
+            "Returns origin URL, push endpoint, pull endpoint, clone command, "
+            "and the 'muse remote add origin' command. "
+            "Equivalent to 'muse remote -v' for a MuseHub repo."
+        ),
         "mimeType": "application/json",
     },
 ]
@@ -229,10 +340,10 @@ def _err(message: str) -> dict[str, JSONValue]:
 
 
 async def read_resource(uri: str, user_id: str | None = None) -> dict[str, JSONValue]:
-    """Dispatch a ``musehub://`` URI to the appropriate resource handler.
+    """Dispatch a ``musehub://`` or ``muse://`` URI to the appropriate handler.
 
     Args:
-        uri: The ``musehub://`` URI requested by the MCP client.
+        uri: The URI requested by the MCP client (musehub:// or muse://).
         user_id: Authenticated user ID from JWT, or ``None`` for anonymous access.
 
     Returns:
@@ -240,6 +351,10 @@ async def read_resource(uri: str, user_id: str | None = None) -> dict[str, JSONV
         ``{"error": "<message>"}`` — the caller wraps this in an
         ``MCPResourceContent`` text block.
     """
+    # ── muse:// scheme (Muse protocol docs + domain registry) ────────────────
+    if uri.startswith("muse://"):
+        return await _read_muse_resource(uri[len("muse://"):])
+
     if not uri.startswith("musehub://"):
         return _err(f"Unsupported URI scheme: {uri!r}")
 
@@ -257,6 +372,8 @@ async def read_resource(uri: str, user_id: str | None = None) -> dict[str, JSONV
         return await _read_me_starred(user_id)
     if path == "me/feed":
         return await _read_me_feed(user_id)
+    if path == "me/tokens":
+        return await _read_me_tokens(user_id)
 
     # ── Templated resources ──────────────────────────────────────────────────
 
@@ -441,12 +558,20 @@ async def _read_repo_resource(
             if m:
                 return await _repo_release_by_tag(session, repo_id, m.group(1))
 
+            m = re.match(r"^/insights/(.+)$", rest)
+            if m:
+                return await _repo_insights(session, repo_id, m.group(1))
+
+            # Legacy path: redirect analysis to insights
             m = re.match(r"^/analysis/(.+)$", rest)
             if m:
-                return await _repo_analysis(session, repo_id, m.group(1))
+                return await _repo_insights(session, repo_id, m.group(1))
 
             if rest == "/timeline":
                 return await _repo_timeline(session, repo_id)
+
+            if rest == "/remote":
+                return _repo_remote_info(repo, repo_id)
 
             return _err(f"Unknown resource path: musehub://repos/{owner}/{slug}{rest}")
     except Exception as exc:
@@ -455,6 +580,43 @@ async def _read_repo_resource(
 
 
 # ── Sub-resource helpers ──────────────────────────────────────────────────────
+
+
+def _repo_remote_info(repo: object, repo_id: str) -> dict[str, JSONValue]:
+    """Return remote URL and push/pull endpoints for a repository."""
+    from musehub.models.musehub import RepoResponse
+    assert isinstance(repo, RepoResponse)
+
+    hub_url = "https://musehub.ai"
+    remote_url = f"{hub_url}/{repo.owner}/{repo.slug}"
+    api_base = f"{hub_url}/api/v1/repos/{repo_id}"
+
+    return {
+        "repo_id": repo_id,
+        "name": "origin",
+        "remote_url": remote_url,
+        "push_url": f"{api_base}/push",
+        "pull_url": f"{api_base}/pull",
+        "clone_command": f"muse clone {remote_url}",
+        "add_remote_command": f"muse remote add origin {remote_url}",
+    }
+
+
+async def _read_me_tokens(user_id: str | None) -> dict[str, JSONValue]:
+    """Return active agent token metadata for the authenticated user."""
+    if user_id is None:
+        return _err("Authentication required for musehub://me/tokens")
+    # Tokens are stateless JWTs — we can't enumerate them without a DB store.
+    # Return guidance on how to create/manage tokens instead.
+    return {
+        "user_id": user_id,
+        "note": (
+            "Agent tokens are stateless JWTs. Use musehub_create_agent_token "
+            "to mint a new token, and store it with: "
+            "muse config set musehub.token <token>"
+        ),
+        "create_token_tool": "musehub_create_agent_token",
+    }
 
 
 async def _repo_overview(session: object, repo: object, repo_id: str) -> dict[str, JSONValue]:
@@ -476,8 +638,8 @@ async def _repo_overview(session: object, repo: object, repo_id: str) -> dict[st
         "description": repo.description,
         "visibility": repo.visibility,
         "tags": list(repo.tags) if repo.tags else [],
-        "key_signature": repo.key_signature,
-        "tempo_bpm": repo.tempo_bpm,
+        "domain_id": getattr(repo, "domain_id", None),
+        "domain_meta": dict(getattr(repo, "domain_meta", {}) or {}),
         "branch_count": len(branches),
         "total_commits": total,
         "recent_commits": [
@@ -698,10 +860,7 @@ async def _repo_pull(session: object, repo_id: str, pr_id: str) -> dict[str, JSO
                 "comment_id": c.comment_id,
                 "author": c.author,
                 "body": c.body,
-                "target_type": c.target_type,
-                "target_track": c.target_track,
-                "target_beat_start": c.target_beat_start,
-                "target_beat_end": c.target_beat_end,
+                "dimension_ref": getattr(c, "dimension_ref", {}),
             }
             for c in comments_resp.comments
         ],
@@ -759,12 +918,12 @@ async def _repo_release_by_tag(session: object, repo_id: str, tag: str) -> dict[
     }
 
 
-async def _repo_analysis(session: object, repo_id: str, ref: str) -> dict[str, JSONValue]:
+async def _repo_insights(session: object, repo_id: str, ref: str) -> dict[str, JSONValue]:
     from musehub.services import musehub_mcp_executor
     result = await musehub_mcp_executor.execute_get_analysis(repo_id, dimension="overview")
     if not result.ok:
-        return _err(result.error_message or "Analysis failed")
-    return {"repo_id": repo_id, "ref": ref, "analysis": result.data}
+        return _err(result.error_message or "Insights unavailable")
+    return {"repo_id": repo_id, "ref": ref, "insights": result.data}
 
 
 async def _repo_timeline(session: object, repo_id: str) -> dict[str, JSONValue]:
@@ -805,6 +964,173 @@ async def _repo_timeline(session: object, repo_id: str) -> dict[str, JSONValue]:
             for t in timeline.tracks
         ],
     }
+
+
+_MUSE_DOCS: dict[str, dict[str, JSONValue]] = {
+    "overview": {
+        "title": "Muse Paradigm Overview",
+        "content": (
+            "Muse is a domain-agnostic version control system for multidimensional state. "
+            "Unlike Git, which versions text, Muse can version any state space — "
+            "MIDI (21 dimensions), code (symbol graph), genomics, climate simulations.\n\n"
+            "Core concepts:\n"
+            "- State: A complete snapshot of a multidimensional space at a point in time.\n"
+            "- Commit: An immutable, content-addressed delta between two states.\n"
+            "- Branch: A named pointer to a commit, enabling parallel exploration.\n"
+            "- Merge: Three-way merge using domain-supplied strategies (OT or CRDT).\n"
+            "- Drift: The divergence metric between two branches — measures how far apart.\n"
+            "- Domain: A plugin that defines how Muse versions a specific state space.\n\n"
+            "The scoped domain ID (@author/slug, e.g. @cgcardona/midi) uniquely "
+            "identifies which plugin a repository uses."
+        ),
+    },
+    "protocol": {
+        "title": "MuseDomainPlugin Protocol Specification",
+        "content": (
+            "Every Muse domain plugin implements six interfaces:\n\n"
+            "1. StateSerializer — serialise/deserialise a state snapshot to bytes.\n"
+            "2. DiffEngine — compute a structured diff between two snapshots.\n"
+            "3. MergeStrategy — resolve a three-way merge (OT or CRDT-based).\n"
+            "4. InsightProvider — compute named insight dimensions from a snapshot.\n"
+            "5. ViewRenderer — return viewport data for the primary domain viewer.\n"
+            "6. ArtifactManager — enumerate and serve downloadable artifacts.\n\n"
+            "Capabilities manifest schema:\n"
+            "{\n"
+            '  "dimensions": [{"name": str, "description": str}],\n'
+            '  "viewer_type": "piano_roll" | "symbol_graph" | "sequence_viewer" | "generic",\n'
+            '  "artifact_types": [str],  // MIME types\n'
+            '  "merge_semantics": "ot" | "crdt" | "three_way",\n'
+            '  "supported_commands": [str]\n'
+            "}"
+        ),
+    },
+    "crdt": {
+        "title": "Muse CRDT Reference",
+        "content": (
+            "Muse uses four CRDT types for conflict-free concurrent editing:\n\n"
+            "- VectorClock: Tracks causal ordering across N agents for any state.\n"
+            "- RGA (Replicated Growable Array): For ordered sequences (notes, lines).\n"
+            "- ORSet (Observed-Remove Set): For unordered collections of named items.\n"
+            "- AWMap (Add-Wins Map): For key-value stores; add operations win on conflict.\n\n"
+            "Domains choose which CRDT types to apply per dimension. MIDI's harmony "
+            "dimension uses ORSet for chords; its rhythm dimension uses RGA for beats."
+        ),
+    },
+    "domains": {
+        "title": "Domain Plugin Authoring Guide",
+        "content": (
+            "To create a new Muse domain plugin:\n\n"
+            "1. Implement the six MuseDomainPlugin interfaces.\n"
+            "2. Define the capabilities manifest (dimensions, viewer_type, etc.).\n"
+            "3. Register with the MuseHub API: POST /api/v1/domains.\n"
+            "4. The scoped ID @{your_username}/{plugin_slug} is now globally unique.\n\n"
+            "Use the musehub/domain-authoring MCP prompt for a guided walkthrough. "
+            "Reference @cgcardona/midi as the canonical implementation example."
+        ),
+    },
+    "merge": {
+        "title": "Muse Merge Semantics",
+        "content": (
+            "Muse performs per-dimension merge using domain-supplied strategies:\n\n"
+            "Three-way merge: Given ancestor A, branch B, and branch C, compute the diff "
+            "A→B and A→C, then compose them. Conflicts occur when both diffs touch the "
+            "same position in the same dimension.\n\n"
+            "OT (Operational Transform): Each dimension declares an OT function. For MIDI, "
+            "note insertions are transformed against concurrent note deletions.\n\n"
+            "CRDT mode: Dimensions using CRDT types (ORSet, RGA) never conflict. "
+            "Merge is O(1) per dimension regardless of agent count.\n\n"
+            "Drift: Computed as the sum of per-dimension deltas normalised by the "
+            "domain's dimension weights. A drift score of 0.0 means identical state."
+        ),
+    },
+}
+
+
+async def _read_muse_resource(path: str) -> dict[str, JSONValue]:
+    """Handle muse:// URIs: docs, domains, and domain manifests."""
+    # muse://docs/{doc}
+    m = re.match(r"^docs/([a-z_]+)$", path)
+    if m:
+        doc_key = m.group(1)
+        if doc_key in _MUSE_DOCS:
+            return {"uri": f"muse://docs/{doc_key}", **_MUSE_DOCS[doc_key]}
+        return _err(f"Unknown doc: muse://docs/{doc_key}")
+
+    # muse://domains (list all)
+    if path == "domains":
+        from musehub.services.musehub_mcp_executor import _check_db_available
+        from musehub.db.database import AsyncSessionLocal
+        from musehub.services import musehub_domains as _domains_svc
+
+        if _check_db_available() is not None:
+            return _err("Database unavailable")
+
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await _domains_svc.list_domains(session, page_size=100)
+                return {
+                    "domains": [
+                        {
+                            "domain_id": d.domain_id,
+                            "scoped_id": d.scoped_id,
+                            "display_name": d.display_name,
+                            "description": d.description,
+                            "viewer_type": d.viewer_type,
+                            "dimension_count": len(d.capabilities.get("dimensions", [])),
+                            "install_count": d.install_count,
+                            "is_verified": d.is_verified,
+                            "manifest_hash": d.manifest_hash,
+                        }
+                        for d in result.domains
+                    ],
+                    "total": result.total,
+                }
+        except Exception as exc:
+            logger.exception("muse://domains resource failed: %s", exc)
+            return _err(str(exc))
+
+    # muse://domains/{author}/{slug}
+    m2 = re.match(r"^domains/([^/]+)/([^/]+)$", path)
+    if m2:
+        author_slug, slug = m2.group(1), m2.group(2)
+        from musehub.services.musehub_mcp_executor import _check_db_available
+        from musehub.db.database import AsyncSessionLocal
+        from musehub.services import musehub_domains as _domains_svc
+
+        if _check_db_available() is not None:
+            return _err("Database unavailable")
+
+        try:
+            async with AsyncSessionLocal() as session:
+                domain = await _domains_svc.get_domain_by_scoped_id(session, author_slug, slug)
+                if domain is None:
+                    return _err(f"Domain '@{author_slug}/{slug}' not found.")
+                return {
+                    "domain_id": domain.domain_id,
+                    "scoped_id": domain.scoped_id,
+                    "display_name": domain.display_name,
+                    "description": domain.description,
+                    "version": domain.version,
+                    "manifest_hash": domain.manifest_hash,
+                    "capabilities": domain.capabilities,
+                    "viewer_type": domain.viewer_type,
+                    "install_count": domain.install_count,
+                    "is_verified": domain.is_verified,
+                    "install_command": f"muse domain install {domain.scoped_id}",
+                    "create_repo_example": {
+                        "tool": "musehub_create_repo",
+                        "params": {
+                            "name": "my-project",
+                            "owner": "myuser",
+                            "domain": domain.scoped_id,
+                        },
+                    },
+                }
+        except Exception as exc:
+            logger.exception("muse://domains resource failed (%s/%s): %s", author_slug, slug, exc)
+            return _err(str(exc))
+
+    return _err(f"Unknown muse:// resource: muse://{path}")
 
 
 async def _read_user(username: str) -> dict[str, JSONValue]:

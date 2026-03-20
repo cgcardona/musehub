@@ -64,7 +64,7 @@ async def test_dynamics_page_renders_server_side(
     """GET dynamics page must contain an SVG element rendered server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/dynamics"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/dynamics"
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -80,7 +80,7 @@ async def test_dynamics_page_shows_velocity_bars(
     """Dynamics page must render SVG <rect> velocity bars server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/dynamics"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/dynamics"
     )
     assert response.status_code == 200
     body = response.text
@@ -96,7 +96,7 @@ async def test_dynamics_page_shows_arc_badge(
     """Dynamics page must render arc classification badge server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/dynamics"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/dynamics"
     )
     assert response.status_code == 200
     body = response.text
@@ -118,7 +118,7 @@ async def test_emotion_page_renders_svg_scatter(
     """GET emotion page must contain SVG <circle> elements for the scatter plot."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/emotion"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/emotion"
     )
     assert response.status_code == 200
     body = response.text
@@ -134,7 +134,7 @@ async def test_emotion_page_shows_summary_vector(
     """Emotion page must render energy/valence/tension/darkness bars server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/emotion"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/emotion"
     )
     assert response.status_code == 200
     body = response.text
@@ -152,7 +152,7 @@ async def test_emotion_page_shows_narrative(
     """Emotion page must render the narrative text server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/emotion"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/emotion"
     )
     assert response.status_code == 200
     body = response.text
@@ -173,7 +173,7 @@ async def test_chord_map_page_renders_progression(
     """GET chord-map page must contain chord symbols rendered server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/chord-map"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/chord-map"
     )
     assert response.status_code == 200
     body = response.text
@@ -188,7 +188,7 @@ async def test_chord_map_page_shows_chord_table(
     """Chord map page must render a chord table with beat and function columns."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/chord-map"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/chord-map"
     )
     assert response.status_code == 200
     body = response.text
@@ -211,7 +211,7 @@ async def test_contour_page_renders_polyline(
     """GET contour page must contain SVG <polyline> rendered server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/contour"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/contour"
     )
     assert response.status_code == 200
     body = response.text
@@ -227,7 +227,7 @@ async def test_contour_page_shows_shape_label(
     """Contour page must render the shape label and direction server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/contour"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/contour"
     )
     assert response.status_code == 200
     body = response.text
@@ -249,7 +249,7 @@ async def test_motifs_page_renders_patterns(
     """GET motifs page must contain interval pattern elements rendered server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/motifs"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/motifs"
     )
     assert response.status_code == 200
     body = response.text
@@ -264,7 +264,7 @@ async def test_motifs_page_shows_occurrence_grid(
     """Motifs page must render occurrence beat markers server-side."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/motifs"
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/motifs"
     )
     assert response.status_code == 200
     body = response.text
@@ -284,7 +284,7 @@ async def test_complex_analysis_htmx_fragment_path(
     """GET emotion page with HX-Request:true returns bare fragment (no <html> wrapper)."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/emotion",
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/emotion",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -304,7 +304,7 @@ async def test_dynamics_htmx_fragment_path(
     """GET dynamics page with HX-Request:true returns bare fragment."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/dynamics",
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/dynamics",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -321,7 +321,7 @@ async def test_contour_htmx_fragment_path(
     """GET contour page with HX-Request:true returns bare fragment."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/contour",
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/contour",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -338,7 +338,7 @@ async def test_chord_map_htmx_fragment_path(
     """GET chord-map page with HX-Request:true returns bare fragment."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/chord-map",
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/chord-map",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -355,7 +355,7 @@ async def test_motifs_htmx_fragment_path(
     """GET motifs page with HX-Request:true returns bare fragment."""
     await _make_repo(db_session)
     response = await client.get(
-        f"/testuser/test-beats/analysis/{_ANALYSIS_REF}/motifs",
+        f"/testuser/test-beats/insights/{_ANALYSIS_REF}/motifs",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200

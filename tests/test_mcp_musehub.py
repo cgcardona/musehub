@@ -130,12 +130,14 @@ class TestMusehubToolsRegistered:
             )
 
     def test_musehub_tools_have_required_fields(self) -> None:
-        """Every musehub_* tool has name, description, and inputSchema."""
+        """Every tool has name, description, and inputSchema. Names start with musehub_ or muse_."""
         for tool in MUSEHUB_TOOLS:
             assert "name" in tool
             assert "description" in tool
             assert "inputSchema" in tool
-            assert tool["name"].startswith("musehub_")
+            assert tool["name"].startswith("musehub_") or tool["name"].startswith("muse_"), (
+                f"Tool name {tool['name']!r} must start with 'musehub_' or 'muse_'"
+            )
 
     def test_musehub_tools_are_server_side(self) -> None:
         """Every musehub_* tool is marked server_side=True."""
@@ -145,7 +147,7 @@ class TestMusehubToolsRegistered:
             )
 
     def test_all_tools_defined(self) -> None:
-        """All 32 MuseHub tools (15 read + 12 write + 5 elicitation) are defined."""
+        """All 43 MuseHub tools (23 read + 15 write + 5 elicitation) are defined."""
         expected_read = {
             "musehub_browse_repo",
             "musehub_list_branches",
@@ -162,6 +164,16 @@ class TestMusehubToolsRegistered:
             "musehub_get_pr",
             "musehub_list_releases",
             "musehub_search_repos",
+            # Domain tools
+            "musehub_get_domain",
+            "musehub_get_domain_insights",
+            "musehub_get_view",
+            "musehub_list_domains",
+            # Muse CLI + identity
+            "musehub_whoami",
+            "muse_clone",
+            "muse_pull",
+            "muse_remote",
         }
         expected_write = {
             "musehub_create_repo",
@@ -176,6 +188,10 @@ class TestMusehubToolsRegistered:
             "musehub_create_release",
             "musehub_star_repo",
             "musehub_create_label",
+            # Auth + push
+            "musehub_create_agent_token",
+            "muse_push",
+            "muse_config",
         }
         expected_elicitation = {
             "musehub_compose_with_preferences",

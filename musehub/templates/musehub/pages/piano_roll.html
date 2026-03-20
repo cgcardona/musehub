@@ -12,78 +12,381 @@
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block content %}
-<div class="piano-roll-wrapper">
-  {# Server-rendered header with track metadata #}
-  <div class="piano-roll-meta">
-    <h1 style="margin:0;font-size:16px">
-      &#127929;
-      {% if track %}{{ track.name }}{% elif path %}{{ path }}{% else %}Piano Roll{% endif %}
-    </h1>
-    <code class="ref-badge">{{ short_ref }}</code>
+<div class="piano-roll-page">
+  {# ── Header ──────────────────────────────────────────────────────────── #}
+  <div class="piano-roll-header">
+    <div class="piano-roll-title">
+      <span class="piano-roll-icon">♩</span>
+      <h1>
+        {% if track %}{{ track.name }}{% elif path %}{{ path }}{% else %}Piano Roll{% endif %}
+      </h1>
+      <code class="ref-badge">{{ short_ref }}</code>
+    </div>
     {% if track %}
-      <span style="color:#8b949e;font-size:12px">
-        {% if track.sizeBytes %}{{ track.sizeBytes | filesizeformat }}{% endif %}
-        {% if track.durationSec %} &bull; {{ "%.1f"|format(track.durationSec) }}s{% endif %}
-        {% if track.trackCount %} &bull; {{ track.trackCount }} track{{ 's' if track.trackCount != 1 else '' }}{% endif %}
-      </span>
+    <div class="piano-roll-meta-pills">
+      {% if track.sizeBytes %}
+        <span class="meta-pill">{{ track.sizeBytes | filesizeformat }}</span>
+      {% endif %}
+      {% if track.durationSec %}
+        <span class="meta-pill">{{ "%.1f"|format(track.durationSec) }}s</span>
+      {% endif %}
+      {% if track.trackCount %}
+        <span class="meta-pill">{{ track.trackCount }} track{{ 's' if track.trackCount != 1 else '' }}</span>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
 
-  {# Server-rendered transport bar — JS attaches event listeners on load #}
-  <div class="piano-roll-controls" id="transport-bar">
-    <button id="play-btn" class="btn btn-primary" type="button">&#9654; Play</button>
-    <button id="stop-btn" class="btn btn-secondary" type="button">&#9632; Stop</button>
-    <label>
-      Tempo
-      <input id="tempo-slider" type="range" min="50" max="200" value="120" title="Tempo (BPM)"/>
-    </label>
-    <span id="current-time" style="font-size:12px;font-family:monospace">0:00</span>
-    <span style="color:#8b949e;font-size:12px">/</span>
-    <span id="total-time" style="font-size:12px;font-family:monospace">
-      {%- if track and track.durationSec -%}
-        {{ "%d:%02d"|format(track.durationSec|int // 60, track.durationSec|int % 60) }}
-      {%- else -%}
-        --:--
-      {%- endif -%}
-    </span>
+  {# ── Transport bar ────────────────────────────────────────────────────── #}
+  <div class="piano-roll-transport" id="transport-bar">
+    <div class="transport-left">
+      <button id="play-btn" class="btn btn-primary transport-btn" type="button" title="Play (Space)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l10 6-10 6V2z"/></svg>
+        Play
+      </button>
+      <button id="pause-btn" class="btn btn-secondary transport-btn" type="button" title="Pause" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2h3v12H4V2zm5 0h3v12H9V2z"/></svg>
+        Pause
+      </button>
+      <button id="stop-btn" class="btn btn-secondary transport-btn" type="button" title="Stop">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12"/></svg>
+        Stop
+      </button>
+    </div>
+
+    <div class="transport-center">
+      <span id="current-time" class="transport-time">0:00</span>
+      <div class="transport-progress" id="seek-bar" title="Click to seek">
+        <div class="transport-progress-fill" id="seek-fill" style="width:0%"></div>
+      </div>
+      <span id="total-time" class="transport-time">
+        {%- if track and track.durationSec -%}
+          {{ "%d:%02d"|format(track.durationSec|int // 60, track.durationSec|int % 60) }}
+        {%- else -%}
+          --:--
+        {%- endif -%}
+      </span>
+    </div>
+
+    <div class="transport-right">
+      <label class="transport-label" title="Playback tempo">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="opacity:.7"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 3.5v4.25l3.25 1.94-.75 1.26L7.25 8V4.5h1.5z"/></svg>
+        <input id="tempo-slider" class="transport-slider" type="range" min="40" max="220" value="{{ track.tempoBpm | default(120) | int }}" title="Tempo BPM"/>
+        <span id="tempo-display" class="transport-time">{{ track.tempoBpm | default(120) | int }} BPM</span>
+      </label>
+      <label class="transport-label" title="Volume">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="opacity:.7"><path d="M3 6v4h2.586L9 13.414V2.586L5.586 6H3zm8.293-2.293a1 1 0 011.414 1.414A5 5 0 0114 8a5 5 0 01-1.293 3.293 1 1 0 01-1.414-1.414A3 3 0 0012 8a3 3 0 00-.707-2.293z"/></svg>
+        <input id="volume-slider" class="transport-slider" type="range" min="-36" max="0" value="-6" title="Volume (dB)"/>
+      </label>
+    </div>
   </div>
 
-  {# Layout: instrument sidebar (SSR) + canvas (JS) #}
-  <div style="display:flex;gap:0;border:1px solid var(--color-border,#30363d);border-radius:6px;overflow:hidden">
-    {# Server-rendered instrument sidebar #}
+  {# ── Piano roll canvas ─────────────────────────────────────────────────── #}
+  <div class="piano-roll-container">
+    {# Instrument sidebar — server-rendered #}
     {% if instruments %}
     <aside class="instrument-sidebar">
       {% for inst in instruments %}
       <div class="instrument-lane" data-channel="{{ inst.channel }}">
+        <div class="instrument-lane-dot" style="background:var(--track-{{ loop.index0 % 10 }}, #58a6ff)"></div>
         <span class="instrument-lane-name" title="{{ inst.name }}">{{ inst.name }}</span>
       </div>
       {% endfor %}
     </aside>
     {% endif %}
 
-    {# Canvas — piano-roll.js renders MIDI note data here #}
-    <div id="piano-roll-outer" style="{% if not instruments %}width:100%{% endif %}">
+    {# Canvas — piano-roll.ts renders MIDI note data here #}
+    <div id="piano-roll-outer" class="piano-roll-canvas-wrap">
       <canvas id="piano-canvas"
               data-midi-url="{{ piano_roll_data_url }}"
               data-repo-id="{{ repo_id }}"
               data-ref="{{ ref }}"
               data-path="{{ path or '' }}"
               data-instruments="{{ instruments | tojson if instruments else '[]' }}"
-              style="display:block;width:100%;height:{{ [instruments|length * 40, 200]|max if instruments else 200 }}px">
+              data-tempo="{{ track.tempoBpm | default(120) | int if track else 120 }}"
+              style="display:block;width:100%;height:{{ [instruments|length * 40, 220]|max if instruments else 220 }}px">
       </canvas>
-      <div id="tooltip"></div>
+      {# Playhead overlay is drawn on a second canvas by midi-player.ts #}
+      <canvas id="playhead-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
+      <div class="piano-roll-tooltip" id="piano-tooltip"></div>
     </div>
   </div>
 
-  {# Loading state shown until JS replaces #piano-canvas content #}
-  <div id="piano-roll-status" style="display:none;color:#8b949e;font-size:13px">
-    <p class="loading">Loading piano roll&hellip;</p>
+  {# ── Piano roll controls ───────────────────────────────────────────────── #}
+  <div class="piano-roll-zoom-bar" id="piano-roll-zoom">
+    <label class="zoom-label">
+      H-Zoom
+      <input class="transport-slider" type="range" id="zoom-x" min="4" max="200" value="60" style="width:90px">
+    </label>
+    <label class="zoom-label">
+      V-Zoom
+      <input class="transport-slider" type="range" id="zoom-y" min="4" max="40" value="14" style="width:70px">
+    </label>
+    <label class="zoom-label">
+      Track
+      <select id="track-sel" class="zoom-select">
+        <option value="-1">All tracks</option>
+      </select>
+    </label>
+    <span class="zoom-info" id="zoom-info"></span>
+  </div>
+
+  {# ── Tone.js status banner ────────────────────────────────────────────── #}
+  <div id="tone-status" class="tone-status" style="display:none">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="opacity:.6"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 8.5h-1.5V7h1.5v2.5zm0-4h-1.5V4h1.5v1.5z"/></svg>
+    <span id="tone-status-text">Initializing audio engine…</span>
   </div>
 </div>
+
+{# Tooltip element used by piano-roll.ts (positioned globally) #}
+<div class="piano-roll-tooltip" id="piano-roll-tooltip-global" style="display:none;position:fixed;z-index:1000;pointer-events:none"></div>
 {% endblock %}
 
-{% block page_json %}{"page": "piano-roll", "repo_id": {{ repo_id | tojson }}, "ref": {{ ref | tojson }}, "path": {{ (path or '') | tojson }}, "base": {{ base_url | tojson }}}{% endblock %}
+{% block page_json %}{"page": "piano-roll", "repo_id": {{ repo_id | tojson }}, "ref": {{ ref | tojson }}, "path": {{ (path or '') | tojson }}, "base": {{ base_url | tojson }}, "tempo": {{ (track.tempoBpm | default(120)) | int if track else 120 }}}{% endblock %}
 
 {% block body_extra %}
+{# Tone.js v14 — MIT licensed, loaded from CDN. Bundled version is used in
+   production; CDN fallback ensures local dev works without a build step. #}
+<script>
+(function() {
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js';
+  s.crossOrigin = 'anonymous';
+  s.onload = function() {
+    document.dispatchEvent(new CustomEvent('tone-ready'));
+  };
+  s.onerror = function() {
+    var el = document.getElementById('tone-status');
+    var txt = document.getElementById('tone-status-text');
+    if (el && txt) { el.style.display = 'flex'; txt.textContent = 'Audio engine unavailable — playback disabled.'; }
+  };
+  document.head.appendChild(s);
+})();
+</script>
+
 <script src="/static/piano-roll.js"></script>
+<script src="/static/midi-player.js"></script>
+
+<script id="piano-roll-init" type="module">
+/**
+ * Piano roll + MIDI player wiring.
+ *
+ * Flow:
+ *   1. piano-roll.js renders canvas from /parse-midi endpoint.
+ *   2. Tone.js CDN script fires 'tone-ready' event.
+ *   3. We call createPlayerFromCanvas() to build a MidiPlayer.
+ *   4. Transport buttons (play/pause/stop) drive the player.
+ *   5. Player fires onProgress(beat) → drawPlayhead() overlays the canvas.
+ */
+(async function() {
+  const canvas    = document.getElementById('piano-canvas');
+  const phCanvas  = document.getElementById('playhead-canvas');
+  const playBtn   = document.getElementById('play-btn');
+  const pauseBtn  = document.getElementById('pause-btn');
+  const stopBtn   = document.getElementById('stop-btn');
+  const tempoSldr = document.getElementById('tempo-slider');
+  const tempoDisp = document.getElementById('tempo-display');
+  const volSldr   = document.getElementById('volume-slider');
+  const seekBar   = document.getElementById('seek-bar');
+  const seekFill  = document.getElementById('seek-fill');
+  const curTime   = document.getElementById('current-time');
+  const toneStatus = document.getElementById('tone-status');
+  const toneStatusTxt = document.getElementById('tone-status-text');
+
+  if (!canvas) return;
+
+  // ── Piano roll canvas rendering ──────────────────────────────────────────
+  const midiUrl = canvas.dataset.midiUrl;
+  let midiData = null;
+
+  if (midiUrl && window.PianoRoll) {
+    try {
+      const resp = await fetch(midiUrl, { credentials: 'include' });
+      if (resp.ok) {
+        midiData = await resp.json();
+        const outer = document.getElementById('piano-roll-outer');
+        if (outer && window.PianoRoll && window.PianoRoll.render) {
+          window.PianoRoll.render(midiData, outer);
+        }
+      }
+    } catch (e) {
+      console.warn('Piano roll: could not fetch MIDI data', e);
+    }
+  }
+
+  // ── Playhead canvas setup ────────────────────────────────────────────────
+  let phCtx = null;
+  if (phCanvas) {
+    phCtx = phCanvas.getContext('2d');
+    function resizePlayhead() {
+      const pr = document.getElementById('piano-roll-outer');
+      if (!pr) return;
+      const dpr = window.devicePixelRatio || 1;
+      phCanvas.width  = pr.clientWidth  * dpr;
+      phCanvas.height = pr.clientHeight * dpr;
+      phCanvas.style.width  = pr.clientWidth  + 'px';
+      phCanvas.style.height = pr.clientHeight + 'px';
+    }
+    resizePlayhead();
+    window.addEventListener('resize', resizePlayhead);
+  }
+
+  // ── State ────────────────────────────────────────────────────────────────
+  let player = null;
+  let totalBeats = midiData ? (midiData.total_beats || 0) : 0;
+  let currentBpm = parseInt(canvas.dataset.tempo || '120', 10);
+  let zoomX = 60;
+  let panX  = 0;
+  const KEY_WIDTH = 36;
+
+  // Sync zoom-x slider so the playhead tracks the visual roll
+  const zoomXSlider = document.getElementById('zoom-x');
+  if (zoomXSlider) {
+    zoomXSlider.addEventListener('input', function() {
+      zoomX = parseInt(this.value, 10);
+    });
+  }
+
+  // ── Build player once Tone is ready ─────────────────────────────────────
+  async function buildPlayer() {
+    if (!midiData || !window.MidiPlayer) return;
+    if (player) { player.dispose(); player = null; }
+
+    player = new window.MidiPlayer(midiData, {
+      bpmOverride: currentBpm,
+      onProgress(beat) {
+        // Update seek bar and time display
+        if (totalBeats > 0 && seekFill) {
+          seekFill.style.width = Math.min(100, (beat / totalBeats) * 100) + '%';
+        }
+        const secs = (beat * 60) / currentBpm;
+        const mm = Math.floor(secs / 60);
+        const ss = Math.floor(secs % 60);
+        if (curTime) curTime.textContent = mm + ':' + String(ss).padStart(2, '0');
+
+        // Draw playhead on overlay canvas
+        if (phCtx && phCanvas) {
+          const outer = document.getElementById('piano-roll-outer');
+          const dpr = window.devicePixelRatio || 1;
+          phCtx.clearRect(0, 0, phCanvas.width, phCanvas.height);
+          phCtx.save();
+          phCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          const x = KEY_WIDTH + (beat - panX) * zoomX;
+          if (x >= KEY_WIDTH && outer && x <= outer.clientWidth) {
+            phCtx.globalAlpha = 0.9;
+            phCtx.strokeStyle = '#f85149';
+            phCtx.lineWidth = 2;
+            phCtx.setLineDash([4, 3]);
+            phCtx.beginPath();
+            phCtx.moveTo(x, 0);
+            phCtx.lineTo(x, phCanvas.height / dpr);
+            phCtx.stroke();
+          }
+          phCtx.restore();
+        }
+      },
+      onEnd() {
+        setUIStopped();
+        if (phCtx && phCanvas) phCtx.clearRect(0, 0, phCanvas.width, phCanvas.height);
+      },
+    });
+  }
+
+  function setUIPlaying() {
+    if (playBtn)  { playBtn.style.display = 'none'; }
+    if (pauseBtn) { pauseBtn.style.display = ''; }
+  }
+  function setUIPaused() {
+    if (playBtn)  { playBtn.style.display = ''; }
+    if (pauseBtn) { pauseBtn.style.display = 'none'; }
+  }
+  function setUIStopped() {
+    if (playBtn)  { playBtn.style.display = ''; }
+    if (pauseBtn) { pauseBtn.style.display = 'none'; }
+    if (seekFill) { seekFill.style.width = '0%'; }
+    if (curTime)  { curTime.textContent = '0:00'; }
+  }
+
+  // Wait for Tone.js to load
+  let toneReady = false;
+  document.addEventListener('tone-ready', async function() {
+    toneReady = true;
+    await buildPlayer();
+  });
+
+  // ── Transport button wiring ───────────────────────────────────────────────
+  if (playBtn) {
+    playBtn.addEventListener('click', async function() {
+      if (!toneReady) {
+        if (toneStatus && toneStatusTxt) {
+          toneStatus.style.display = 'flex';
+          toneStatusTxt.textContent = 'Loading audio engine…';
+        }
+        return;
+      }
+      if (!player) await buildPlayer();
+      if (!player) return;
+      await player.play();
+      setUIPlaying();
+    });
+  }
+
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', function() {
+      if (!player) return;
+      player.pause();
+      setUIPaused();
+    });
+  }
+
+  if (stopBtn) {
+    stopBtn.addEventListener('click', function() {
+      if (!player) return;
+      player.stop();
+      setUIStopped();
+    });
+  }
+
+  // ── Tempo slider ─────────────────────────────────────────────────────────
+  if (tempoSldr) {
+    tempoSldr.addEventListener('input', function() {
+      currentBpm = parseInt(this.value, 10);
+      if (tempoDisp) tempoDisp.textContent = currentBpm + ' BPM';
+      if (player) {
+        const wasPlaying = player.isPlaying;
+        player.stop();
+        buildPlayer().then(() => { if (wasPlaying && player) player.play(); });
+      }
+    });
+  }
+
+  // ── Volume slider ─────────────────────────────────────────────────────────
+  if (volSldr && typeof Tone !== 'undefined') {
+    volSldr.addEventListener('input', function() {
+      try { Tone.getDestination().volume.value = parseInt(this.value, 10); } catch(_) {}
+    });
+  }
+
+  // ── Seek bar click ────────────────────────────────────────────────────────
+  if (seekBar) {
+    seekBar.addEventListener('click', function(e) {
+      if (!player || totalBeats <= 0) return;
+      const rect = this.getBoundingClientRect();
+      const pct  = (e.clientX - rect.left) / rect.width;
+      const beat = pct * totalBeats;
+      player.seek(beat);
+    });
+  }
+
+  // ── Keyboard shortcut: Space = play/pause ─────────────────────────────────
+  document.addEventListener('keydown', async function(e) {
+    if (e.code === 'Space' && e.target === document.body) {
+      e.preventDefault();
+      if (!player) return;
+      if (player.isPlaying) { player.pause(); setUIPaused(); }
+      else { await player.play(); setUIPlaying(); }
+    }
+  });
+})();
+</script>
 {% endblock %}

@@ -31,7 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401 (used in route dependency)
 from starlette.responses import Response
 
 from musehub.api.routes.musehub._templates import templates as _templates
@@ -39,7 +39,7 @@ from musehub.api.routes.musehub.htmx_helpers import is_htmx
 from musehub.auth.dependencies import TokenClaims, require_valid_token
 from musehub.db import get_db
 from musehub.models.musehub import CreateRepoRequest
-from musehub.services import musehub_repository
+from musehub.services import musehub_repository, musehub_domains
 
 logger = logging.getLogger(__name__)
 
@@ -62,18 +62,31 @@ _LICENSES: list[tuple[str, str]] = [
     summary="New repo creation wizard",
     operation_id="newRepoWizardPage",
 )
-async def new_repo_page(request: Request) -> Response:
+async def new_repo_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
     """Render the SSR new repo creation wizard form.
 
-    License options are rendered server-side into the Jinja2 template so no
-    client-side JS is needed to populate the dropdown.  Alpine.js handles only
-    the visibility radio toggle; HTMX handles the live name availability check.
-    Renders without auth so the page is always reachable at a stable URL.
+    License options and available domain plugins are rendered server-side.
+    Alpine.js handles the visibility radio toggle; HTMX handles the live name
+    availability check. Renders without auth so the page is always reachable.
     """
+    domains_result = await musehub_domains.list_domains(db, page_size=50)
     ctx: dict[str, object] = {
         "title": "Create a new repository",
         "licenses": _LICENSES,
         "current_page": "new_repo",
+        "available_domains": [
+            {
+                "domain_id": d.domain_id,
+                "scoped_id": d.scoped_id,
+                "display_name": d.display_name,
+                "viewer_type": d.viewer_type,
+                "dimension_count": len(d.capabilities.get("dimensions", [])),
+            }
+            for d in domains_result.domains
+        ],
     }
     return _templates.TemplateResponse(request, "musehub/pages/new_repo.html", ctx)
 

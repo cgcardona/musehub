@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator, Generator
 # Set before any musehub imports so the Settings lru_cache picks up the value.
 # This is a test-only secret; in CI/Docker the real secret comes from the environment.
 os.environ.setdefault("ACCESS_TOKEN_SECRET", "test-secret-for-unit-tests-do-not-use-in-prod")
+os.environ.setdefault("MUSE_ENV", "test")
 
 import pytest
 import pytest_asyncio

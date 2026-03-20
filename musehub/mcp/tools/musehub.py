@@ -1,6 +1,6 @@
-"""MuseHub MCP tool definitions — all 32 tools for AI agents (MCP 2025-11-25).
+"""MuseHub MCP tool definitions — all 43 tools for AI agents (MCP 2025-11-25).
 
-Covers the full MuseHub surface: reads (15), writes (12), and elicitation-powered
+Covers the full MuseHub surface: reads (24), writes (14), and elicitation-powered
 interactive tools (5).
 
 Elicitation-powered tools use the ToolCallContext to collect user preferences
@@ -125,9 +125,10 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
         "name": "musehub_get_analysis",
         "server_side": True,
         "description": (
+            "[Deprecated — use musehub_get_domain_insights] "
             "Get structured analysis for a MuseHub repository. "
             "Dimensions: 'overview' returns repo stats + branch/commit/object counts; "
-            "'commits' returns commit activity summary (authors, message samples); "
+            "'commits' returns commit activity summary; "
             "'objects' returns artifact inventory grouped by MIME type. "
             "Example: musehub_get_analysis(repo_id='a3f2-...', dimension='overview')."
         ),
@@ -184,11 +185,11 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
         "server_side": True,
         "description": (
             "Get the full AI context document for a MuseHub repository. "
-            "This is the primary read-side interface for music generation agents: it returns "
-            "a structured summary of the repo's musical state — branches, recent commits, "
-            "artifact inventory, and repo metadata — in a single call. "
-            "Feed this document to the agent before generating new music to ensure "
-            "harmonic and structural coherence with existing work. "
+            "This is the primary read-side interface for domain agents: it returns "
+            "a structured summary of the repo's current state — domain plugin, branches, "
+            "recent commits, artifact inventory, and repo metadata — in a single call. "
+            "Feed this document to the agent before creating state changes to ensure "
+            "coherence with the existing multidimensional state. "
             "Example: musehub_get_context(repo_id='a3f2-...')."
         ),
         "inputSchema": {
@@ -234,9 +235,9 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
         "server_side": True,
         "description": (
             "Compare two refs (branches or commit IDs) in a MuseHub repository. "
-            "Returns a musical diff: which artifacts were added, removed, or modified, "
-            "and per-dimension change scores (harmony, rhythm, groove) when analysis data is available. "
-            "Example: musehub_compare(repo_id='a3f2-...', base_ref='main', head_ref='feature/jazz-bridge')."
+            "Returns a multidimensional state diff: which artifacts were added, removed, or modified, "
+            "and per-dimension change scores sourced from the repo's domain plugin capabilities. "
+            "Example: musehub_compare(repo_id='a3f2-...', base_ref='main', head_ref='feature/new-section')."
         ),
         "inputSchema": {
             "type": "object",
@@ -378,10 +379,11 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
         "name": "musehub_search_repos",
         "server_side": True,
         "description": (
-            "Discover public MuseHub repositories by text query or musical attributes. "
-            "Filter by key signature, tempo range, or free-text tags. "
+            "Discover public MuseHub repositories across all domains by text query, "
+            "domain plugin, or free-text tags. "
+            "Filter by domain scoped ID (e.g. '@cgcardona/midi') to browse repos of a specific type. "
             "Returns repos sorted by relevance. "
-            "Example: musehub_search_repos(query='jazz', tempo_min=120, tempo_max=160)."
+            "Example: musehub_search_repos(query='jazz', domain='@cgcardona/midi')."
         ),
         "inputSchema": {
             "type": "object",
@@ -390,21 +392,9 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
                     "type": "string",
                     "description": "Free-text query matched against repo names and descriptions.",
                 },
-                "key_signature": {
+                "domain": {
                     "type": "string",
-                    "description": "Filter by key signature (e.g. 'C major', 'F# minor').",
-                },
-                "tempo_min": {
-                    "type": "integer",
-                    "description": "Minimum tempo (BPM) filter.",
-                    "minimum": 20,
-                    "maximum": 400,
-                },
-                "tempo_max": {
-                    "type": "integer",
-                    "description": "Maximum tempo (BPM) filter.",
-                    "minimum": 20,
-                    "maximum": 400,
+                    "description": "Filter by domain scoped ID, e.g. '@cgcardona/midi' or '@cgcardona/code'.",
                 },
                 "tags": {
                     "type": "array",
@@ -422,6 +412,247 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "required": [],
         },
     },
+    {
+        "name": "musehub_list_domains",
+        "server_side": True,
+        "description": (
+            "List and search all registered Muse domain plugins. "
+            "Domains are the extensibility layer that give Muse its domain-agnostic power — "
+            "each domain defines its own dimensions, viewer, merge semantics, CLI commands, "
+            "and artifact types. "
+            "Filter by query string, viewer_type, or verified status. "
+            "Returns scoped_id (@author/slug), display_name, description, capabilities, "
+            "repo_count, and install_count for each domain. "
+            "Example: musehub_list_domains(query='genomics', verified=true)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Full-text search across name and description.",
+                },
+                "viewer_type": {
+                    "type": "string",
+                    "description": "Filter by viewer type (e.g. 'piano_roll', 'code_graph', 'generic').",
+                },
+                "verified": {
+                    "type": "boolean",
+                    "description": "When true, return only officially-verified domains.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum results (default 20, max 100).",
+                    "default": 20,
+                    "minimum": 1,
+                    "maximum": 100,
+                },
+                "offset": {
+                    "type": "integer",
+                    "description": "Pagination offset.",
+                    "default": 0,
+                    "minimum": 0,
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "musehub_get_domain",
+        "server_side": True,
+        "description": (
+            "Fetch the full manifest for a specific Muse domain plugin by its scoped ID. "
+            "Returns all capabilities: dimensions list, viewer_type, merge_semantics, "
+            "cli_commands, artifact_types, manifest_hash (content-addressed, immutable), "
+            "version, repo_count, and install_count. "
+            "Use this to understand what a domain can do before creating repos or "
+            "generating domain-specific content. "
+            "Example: musehub_get_domain(scoped_id='@cgcardona/midi')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "scoped_id": {
+                    "type": "string",
+                    "description": "Domain scoped identifier in '@author/slug' format.",
+                },
+            },
+            "required": ["scoped_id"],
+        },
+    },
+    {
+        "name": "musehub_get_domain_insights",
+        "server_side": True,
+        "description": (
+            "Get structured insights for a MuseHub repository across any of its domain's dimensions. "
+            "The available dimensions are defined by the repo's domain plugin — call "
+            "musehub_get_domain first to learn the dimension names. "
+            "dimension='overview' always returns cross-domain stats (commits, objects, collaborators). "
+            "Domain-specific dimensions return per-dimension analytics "
+            "(e.g. 'harmonic' for MIDI, 'syntax' for Code). "
+            "Example: musehub_get_domain_insights(repo_id='a3f2-...', dimension='harmonic')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the MuseHub repository.",
+                },
+                "dimension": {
+                    "type": "string",
+                    "description": (
+                        "Insight dimension to fetch. 'overview' is always available; "
+                        "other values depend on the repo's domain plugin."
+                    ),
+                    "default": "overview",
+                },
+                "ref": {
+                    "type": "string",
+                    "description": "Branch name, tag, or commit SHA to scope the insights to. Defaults to HEAD.",
+                },
+            },
+            "required": ["repo_id"],
+        },
+    },
+    {
+        "name": "musehub_get_view",
+        "server_side": True,
+        "description": (
+            "Fetch the universal viewer payload for a repo at a given ref. "
+            "Returns a structured representation of the multidimensional state "
+            "as rendered by the domain's viewer — including dimension slices, "
+            "navigation strip entries, and any domain-specific viewer metadata. "
+            "This is the MCP equivalent of the /{owner}/{repo}/view/{ref} page. "
+            "Useful for agents that need to inspect or reason about the full state "
+            "without screen-scraping the HTML viewer. "
+            "Example: musehub_get_view(repo_id='a3f2-...', ref='main')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the MuseHub repository.",
+                },
+                "ref": {
+                    "type": "string",
+                    "description": "Branch name, tag, or commit SHA. Defaults to HEAD of default branch.",
+                },
+                "dimension": {
+                    "type": "string",
+                    "description": (
+                        "Optional: restrict the view payload to a single dimension slice. "
+                        "Omit to get the full multi-dimensional view."
+                    ),
+                },
+            },
+            "required": ["repo_id"],
+        },
+    },
+    {
+        "name": "musehub_whoami",
+        "server_side": True,
+        "description": (
+            "Return identity information for the currently authenticated caller. "
+            "Call this first to confirm authentication, get your user_id, "
+            "and see how many repos you own. "
+            "Works for both human users and AI agent tokens. "
+            "Returns {authenticated: false} when called without a Bearer token. "
+            "Example: musehub_whoami()."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "muse_clone",
+        "server_side": True,
+        "description": (
+            "Return the clone URL and Muse CLI command for a MuseHub repository. "
+            "Use this to get the information needed to run 'muse clone' locally, "
+            "or to fetch repo metadata before calling muse_pull. "
+            "Example: muse_clone(owner='cgcardona', slug='neo-soul-experiment')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "type": "string",
+                    "description": "Repository owner username.",
+                },
+                "slug": {
+                    "type": "string",
+                    "description": "Repository slug (URL-safe name).",
+                },
+                "ref": {
+                    "type": "string",
+                    "description": "Optional branch or tag to clone. Defaults to the default branch.",
+                },
+            },
+            "required": ["owner", "slug"],
+        },
+    },
+    {
+        "name": "muse_pull",
+        "server_side": True,
+        "description": (
+            "Fetch missing commits and objects from a MuseHub repository. "
+            "Equivalent to 'muse pull' — returns new commits and object metadata "
+            "since the given commit ID. Use since_commit_id to fetch incrementally. "
+            "Pass object_ids to download specific binary objects. "
+            "Example: muse_pull(repo_id='a3f2-...', branch='main', since_commit_id='abc123')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the source repository.",
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Branch to pull from. Defaults to the default branch.",
+                },
+                "since_commit_id": {
+                    "type": "string",
+                    "description": "Only return commits newer than this commit ID.",
+                },
+                "object_ids": {
+                    "type": "array",
+                    "description": "Specific object IDs to fetch (content-addressed).",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["repo_id"],
+        },
+    },
+    {
+        "name": "muse_remote",
+        "server_side": True,
+        "description": (
+            "Return the remote URL and API endpoints for a MuseHub repository. "
+            "Equivalent to 'muse remote -v' — returns the origin URL, "
+            "push/pull API endpoints, and the CLI commands to add this repo as a remote. "
+            "Example: muse_remote(owner='cgcardona', slug='neo-soul-experiment')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "type": "string",
+                    "description": "Repository owner username.",
+                },
+                "slug": {
+                    "type": "string",
+                    "description": "Repository slug (URL-safe name).",
+                },
+            },
+            "required": ["owner", "slug"],
+        },
+    },
 ]
 
 
@@ -433,10 +664,13 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
         "name": "musehub_create_repo",
         "server_side": True,
         "description": (
-            "Create a new MuseHub repository. "
+            "Create a new MuseHub repository for any Muse domain. "
             "The slug is auto-generated from the name. "
-            "Set initialize=true (default) to get an empty initial commit and default branch immediately. "
-            "Example: musehub_create_repo(name='Jazz Experiment', visibility='public')."
+            "Specify a domain scoped ID (e.g. '@cgcardona/midi') to associate the repo with "
+            "a domain plugin — this unlocks domain-specific viewers, insights, and CLI commands. "
+            "Set initialize=true (default) to get an initial commit and default branch. "
+            "Example: musehub_create_repo(name='Genome Edit Session', "
+            "domain='@alice/genomics', visibility='public')."
         ),
         "inputSchema": {
             "type": "object",
@@ -455,20 +689,24 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                     "enum": ["public", "private"],
                     "default": "public",
                 },
+                "domain": {
+                    "type": "string",
+                    "description": (
+                        "Domain plugin scoped ID (e.g. '@cgcardona/midi', '@cgcardona/code'). "
+                        "Call musehub_list_domains first to discover available domains."
+                    ),
+                },
+                "domain_meta": {
+                    "type": "object",
+                    "description": (
+                        "Domain-specific metadata dict declared by the domain plugin "
+                        "(e.g. {\"key_signature\": \"F# minor\", \"tempo_bpm\": 120} for MIDI)."
+                    ),
+                },
                 "tags": {
                     "type": "array",
-                    "description": "Musical category tags (e.g. ['jazz', 'bebop']).",
+                    "description": "Free-form tags for discovery (e.g. ['jazz', 'trio']).",
                     "items": {"type": "string"},
-                },
-                "key_signature": {
-                    "type": "string",
-                    "description": "Musical key (e.g. 'C major', 'F# minor').",
-                },
-                "tempo_bpm": {
-                    "type": "integer",
-                    "description": "Tempo in beats per minute.",
-                    "minimum": 20,
-                    "maximum": 400,
                 },
                 "initialize": {
                     "type": "boolean",
@@ -652,12 +890,15 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
         "name": "musehub_create_pr_comment",
         "server_side": True,
         "description": (
-            "Post a comment on a pull request, optionally anchored to a specific track or beat region. "
-            "Use target_type='track' + target_track to reference a named track. "
-            "Use target_type='region' + target_track + target_beat_start + target_beat_end for bar-level comments. "
+            "Post a comment on a pull request, optionally anchored to a specific dimension reference. "
+            "Pass a dimension_ref object to pinpoint exactly where in the multidimensional state "
+            "the comment applies — the shape of this object is defined by the repo's domain plugin. "
+            "For MIDI: {\"dimension\": \"rhythmic\", \"track\": \"Drums\", \"beat_start\": 8.0, \"beat_end\": 12.0}. "
+            "For Code: {\"dimension\": \"syntax\", \"file\": \"src/main.py\", \"line_start\": 42, \"line_end\": 55}. "
+            "Omit dimension_ref for a general (PR-level) comment. "
             "Example: musehub_create_pr_comment(repo_id='a3f2-...', pr_id='b5e8-...', "
-            "body='This groove feels rushed', target_type='region', target_track='Drums', "
-            "target_beat_start=8.0, target_beat_end=12.0)."
+            "body='Unexpected state divergence here', "
+            "dimension_ref={\"dimension\": \"structural\", \"node\": \"bridge\"})."
         ),
         "inputSchema": {
             "type": "object",
@@ -674,23 +915,13 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                     "type": "string",
                     "description": "Markdown comment body.",
                 },
-                "target_type": {
-                    "type": "string",
-                    "description": "Comment anchor: 'general' (PR-level), 'track', or 'region'.",
-                    "enum": ["general", "track", "region"],
-                    "default": "general",
-                },
-                "target_track": {
-                    "type": "string",
-                    "description": "Track name for 'track' or 'region' comments.",
-                },
-                "target_beat_start": {
-                    "type": "number",
-                    "description": "Start beat for 'region' comments.",
-                },
-                "target_beat_end": {
-                    "type": "number",
-                    "description": "End beat for 'region' comments.",
+                "dimension_ref": {
+                    "type": "object",
+                    "description": (
+                        "Optional domain-specific anchor identifying where in the "
+                        "multidimensional state this comment applies. "
+                        "Schema is defined by the repo's domain plugin."
+                    ),
                 },
             },
             "required": ["repo_id", "pr_id", "body"],
@@ -841,6 +1072,126 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                 },
             },
             "required": ["repo_id", "name", "color"],
+        },
+    },
+    {
+        "name": "musehub_create_agent_token",
+        "server_side": True,
+        "description": (
+            "Mint a long-lived JWT agent token for programmatic MuseHub access. "
+            "Agent tokens have higher rate limits than user tokens and appear "
+            "with an 'agent' badge in the MuseHub activity feed. "
+            "After creating a token, store it with: muse config set musehub.token <token>. "
+            "Requires an authenticated session (the token is issued for the calling user). "
+            "Example: musehub_create_agent_token(agent_name='my-composer-bot/1.0', expires_in_days=90)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "agent_name": {
+                    "type": "string",
+                    "description": (
+                        "Human-readable agent identifier, e.g. 'my-bot/1.0'. "
+                        "Appears in the activity feed alongside agent actions."
+                    ),
+                },
+                "expires_in_days": {
+                    "type": "integer",
+                    "description": "Token validity in days (default: 90, max: 365).",
+                    "default": 90,
+                    "minimum": 1,
+                    "maximum": 365,
+                },
+            },
+            "required": ["agent_name"],
+        },
+    },
+    {
+        "name": "muse_push",
+        "server_side": True,
+        "description": (
+            "Push commits and binary objects to a MuseHub repository. "
+            "Equivalent to 'muse push' — uploads new commits and base64-encoded "
+            "binary objects in a single batch. Enforces fast-forward semantics "
+            "unless force=true. "
+            "Authentication required: call musehub_whoami or musehub_create_agent_token first. "
+            "Example: muse_push(repo_id='a3f2-...', branch='main', head_commit_id='abc123', "
+            "commits=[...], objects=[...])."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_id": {
+                    "type": "string",
+                    "description": "UUID of the target repository.",
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Target branch name (e.g. 'main').",
+                },
+                "head_commit_id": {
+                    "type": "string",
+                    "description": "SHA of the new HEAD commit after this push.",
+                },
+                "commits": {
+                    "type": "array",
+                    "description": (
+                        "List of CommitInput objects to push. Each has: "
+                        "commit_id (str), parent_ids (list[str]), message (str), "
+                        "author (str), timestamp (ISO-8601 str), snapshot_id (str)."
+                    ),
+                    "items": {"type": "object"},
+                },
+                "objects": {
+                    "type": "array",
+                    "description": (
+                        "List of ObjectInput objects to upload. Each has: "
+                        "object_id (str, e.g. 'sha256:abc...'), "
+                        "path (str, e.g. 'tracks/bass.mid'), "
+                        "content_b64 (str, base64-encoded bytes)."
+                    ),
+                    "items": {"type": "object"},
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Allow non-fast-forward push (overwrites remote head). Use with caution.",
+                    "default": False,
+                },
+            },
+            "required": ["repo_id", "branch", "head_commit_id"],
+        },
+    },
+    {
+        "name": "muse_config",
+        "server_side": True,
+        "description": (
+            "Read info about Muse configuration keys or generate a 'muse config set' command. "
+            "Equivalent to 'muse config get <key>' or 'muse config set <key> <value>'. "
+            "Call without arguments to list all known MuseHub-related config keys. "
+            "Pass key and value to get the exact CLI command to run. "
+            "Key examples: musehub.token, musehub.url, musehub.username, user.name. "
+            "Example: muse_config(key='musehub.token', value='eyJhbGc...')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "description": (
+                        "Configuration key to query or set "
+                        "(e.g. 'musehub.token', 'musehub.url', 'user.name'). "
+                        "Omit to list all known keys."
+                    ),
+                },
+                "value": {
+                    "type": "string",
+                    "description": (
+                        "When provided together with key, returns the CLI command "
+                        "'muse config set <key> <value>'."
+                    ),
+                },
+            },
+            "required": [],
         },
     },
 ]

@@ -75,6 +75,8 @@ async def handle_request(
     *,
     user_id: str | None = None,
     session: "MCPSession | None" = None,
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> JSONObject | None:
     """Dispatch a single JSON-RPC 2.0 request and return the response dict.
 
@@ -83,6 +85,8 @@ async def handle_request(
         user_id: Authenticated user ID from JWT (``None`` for anonymous).
         session: Active MCP session for elicitation and progress features,
             or ``None`` for stateless (non-elicitation) clients.
+        is_agent: ``True`` when the caller presents an agent JWT token.
+        agent_name: Optional display name of the agent (from ``agent_name`` claim).
 
     Returns:
         JSON-serialisable response dict, or ``None`` for notifications
@@ -101,7 +105,10 @@ async def handle_request(
     params: JSONObject = raw_params if isinstance(raw_params, dict) else {}
 
     try:
-        result = await _dispatch(method, params, user_id=user_id, session=session)
+        result = await _dispatch(
+            method, params, user_id=user_id, session=session,
+            is_agent=is_agent, agent_name=agent_name,
+        )
         if is_notification:
             return None
         return _success(req_id, result)
@@ -121,6 +128,8 @@ async def handle_batch(
     *,
     user_id: str | None = None,
     session: "MCPSession | None" = None,
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> list[JSONObject]:
     """Dispatch a JSON-RPC 2.0 batch and return all non-notification responses.
 
@@ -128,13 +137,18 @@ async def handle_batch(
         requests: List of parsed JSON-RPC 2.0 request dicts.
         user_id: Authenticated user ID (``None`` for anonymous).
         session: Active MCP session, or ``None`` for stateless clients.
+        is_agent: ``True`` when the caller presents an agent JWT token.
+        agent_name: Optional display name of the agent.
 
     Returns:
         List of response dicts (excluding None responses for notifications).
     """
     results: list[JSONObject] = []
     for req in requests:
-        resp = await handle_request(req, user_id=user_id, session=session)
+        resp = await handle_request(
+            req, user_id=user_id, session=session,
+            is_agent=is_agent, agent_name=agent_name,
+        )
         if resp is not None:
             results.append(resp)
     return results
@@ -157,6 +171,8 @@ async def _dispatch(
     *,
     user_id: str | None,
     session: "MCPSession | None",
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> JSONObject:
     """Route a method name to its handler and return the result dict."""
 
@@ -167,7 +183,10 @@ async def _dispatch(
         return _handle_tools_list()
 
     if method == "tools/call":
-        return await _handle_tools_call(params, user_id=user_id, session=session)
+        return await _handle_tools_call(
+            params, user_id=user_id, session=session,
+            is_agent=is_agent, agent_name=agent_name,
+        )
 
     if method == "resources/list":
         return _handle_resources_list()
@@ -196,6 +215,19 @@ async def _dispatch(
 
     if method == "notifications/initialized":
         # Acknowledgement from client after initialize — no-op.
+        return {}
+
+    # ── MCP 2025-11-25 additional methods ────────────────────────────────────
+
+    if method == "completions/complete":
+        # Stub autocomplete — returns empty values; can be populated per-arg later.
+        return {"completion": {"values": [], "hasMore": False, "total": 0}}
+
+    if method == "logging/setLevel":
+        level = params.get("level")
+        if isinstance(level, str):
+            import logging as _logging
+            _logging.getLogger("musehub").setLevel(level.upper())
         return {}
 
     # ── Standard methods ──────────────────────────────────────────────────────
@@ -232,20 +264,46 @@ def _handle_initialize(params: JSONObject) -> JSONObject:
             "logging": {},
         },
         "instructions": (
-            "MuseHub is a Git-for-music platform. "
-            "Use musehub_browse_repo to explore repositories, "
-            "musehub_compose_with_preferences to interactively compose, "
-            "and musehub_connect_streaming_platform to publish releases. "
-            "Elicitation is supported: call interactive tools to collect "
-            "user preferences for musical composition and platform connections."
+            "MuseHub is the collaboration hub for Muse — the world's first "
+            "domain-agnostic, multi-dimensional version control system. "
+            "Muse tracks multidimensional state across any domain: MIDI (21 dimensions), "
+            "Code (10 languages), Genomics, Circuit Design, and any custom domain plugin. "
+            "Start with musehub_list_domains to discover domains, "
+            "musehub_browse_repo to explore repositories, "
+            "musehub_get_domain to read a domain manifest, "
+            "and musehub_get_view to inspect full multidimensional state. "
+            "Elicitation (MCP 2025-11-25) is fully supported for interactive workflows. "
+            "AI agents are first-class citizens: use an agent JWT for higher rate limits "
+            "and activity feed visibility."
         ),
     }
 
 
 def _handle_tools_list() -> JSONObject:
-    """Return the full tool catalogue."""
+    """Return the full tool catalogue with MCP 2025-11-25 annotations injected."""
+    from musehub.mcp.tools.musehub import MUSEHUB_WRITE_TOOL_NAMES, MUSEHUB_ELICITATION_TOOL_NAMES
+
+    _READ_HINTS: dict[str, bool] = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
+    _WRITE_HINTS: dict[str, bool] = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False}
+    _ELICIT_HINTS: dict[str, bool] = {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True}
+    _DESTRUCTIVE_NAMES = {"muse_push"}
+
     import json as _json
-    raw = _json.dumps([{k: v for k, v in t.items() if k != "server_side"} for t in MCP_TOOLS])
+    stripped = [{k: v for k, v in t.items() if k != "server_side"} for t in MCP_TOOLS]
+    for t in stripped:
+        if "annotations" not in t:
+            name = t.get("name", "")
+            if name in MUSEHUB_ELICITATION_TOOL_NAMES:
+                t["annotations"] = _ELICIT_HINTS
+            elif name in MUSEHUB_WRITE_TOOL_NAMES:
+                hints = dict(_WRITE_HINTS)
+                if name in _DESTRUCTIVE_NAMES:
+                    hints["destructiveHint"] = True
+                t["annotations"] = hints
+            else:
+                t["annotations"] = _READ_HINTS
+
+    raw = _json.dumps(stripped)
     tools: list[JSONValue] = _json.loads(raw)
     return {"tools": tools}
 
@@ -255,6 +313,8 @@ async def _handle_tools_call(
     *,
     user_id: str | None,
     session: "MCPSession | None",
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> JSONObject:
     """Route a ``tools/call`` request to the appropriate executor."""
     name = params.get("name")
@@ -278,7 +338,12 @@ async def _handle_tools_call(
         if isinstance(pt, str):
             progress_token = pt
 
-    ctx = ToolCallContext(user_id=user_id, session=session)
+    ctx = ToolCallContext(
+        user_id=user_id,
+        session=session,
+        is_agent=is_agent,
+        agent_name=agent_name,
+    )
 
     try:
         return await _call_tool(name, arguments, ctx=ctx)
@@ -387,11 +452,31 @@ async def _call_tool(
     elif name == "musehub_search_repos":
         result = await exe.execute_search_repos(
             query=_str_or_none("query"),
-            key_signature=_str_or_none("key_signature"),
-            tempo_min=_int("tempo_min", 0) or None,
-            tempo_max=_int("tempo_max", 0) or None,
+            domain=_str_or_none("domain"),
             tags=_list_str("tags"),
             limit=_int("limit", 20),
+        )
+    elif name == "musehub_list_domains":
+        result = await exe.execute_list_domains(
+            query=_str_or_none("query"),
+            viewer_type=_str_or_none("viewer_type"),
+            verified=bool(arguments["verified"]) if "verified" in arguments else None,
+            limit=_int("limit", 20),
+            offset=_int("offset", 0),
+        )
+    elif name == "musehub_get_domain":
+        result = await exe.execute_get_domain(_str("scoped_id"))
+    elif name == "musehub_get_domain_insights":
+        result = await exe.execute_get_domain_insights(
+            repo_id=_str("repo_id"),
+            dimension=_str_or_none("dimension") or "overview",
+            ref=_str_or_none("ref"),
+        )
+    elif name == "musehub_get_view":
+        result = await exe.execute_get_view(
+            repo_id=_str("repo_id"),
+            ref=_str_or_none("ref"),
+            dimension=_str_or_none("dimension"),
         )
 
     # ── Standard write tools ──────────────────────────────────────────────────
@@ -405,8 +490,6 @@ async def _call_tool(
             description=_str_or_none("description") or "",
             visibility=_str_or_none("visibility") or "public",
             tags=_list_str("tags") or None,
-            key_signature=_str_or_none("key_signature"),
-            tempo_bpm=_int("tempo_bpm", 0) or None,
             initialize=_bool("initialize", True),
         )
     elif name == "musehub_create_issue":
@@ -456,15 +539,18 @@ async def _call_tool(
         )
     elif name == "musehub_create_pr_comment":
         from musehub.mcp.write_tools.pulls import execute_create_pr_comment
+        _dim_ref = arguments.get("dimension_ref") or {}
+        if not isinstance(_dim_ref, dict):
+            _dim_ref = {}
         result = await execute_create_pr_comment(
             repo_id=_str("repo_id"),
             pr_id=_str("pr_id"),
             body=_str("body"),
             actor=user_id or "",
-            target_type=_str_or_none("target_type") or "general",
-            target_track=_str_or_none("target_track"),
-            target_beat_start=_float_or_none("target_beat_start"),
-            target_beat_end=_float_or_none("target_beat_end"),
+            target_type=str(_dim_ref.get("type", "general")),
+            target_track=str(_dim_ref["track"]) if "track" in _dim_ref else None,
+            target_beat_start=float(_dim_ref["beat_start"]) if "beat_start" in _dim_ref else None,  # type: ignore[arg-type]
+            target_beat_end=float(_dim_ref["beat_end"]) if "beat_end" in _dim_ref else None,  # type: ignore[arg-type]
         )
     elif name == "musehub_submit_pr_review":
         from musehub.mcp.write_tools.pulls import execute_submit_pr_review
@@ -535,6 +621,52 @@ async def _call_tool(
         result = await execute_create_release_interactive(
             repo_id=_str("repo_id"),
             ctx=ctx,
+        )
+
+    # ── Muse CLI + auth tools ─────────────────────────────────────────────────
+
+    elif name == "musehub_whoami":
+        result = await exe.execute_whoami(user_id=user_id)
+    elif name == "musehub_create_agent_token":
+        result = await exe.execute_create_agent_token(
+            user_id=user_id or "",
+            agent_name=_str("agent_name"),
+            expires_in_days=_int("expires_in_days", 90),
+        )
+    elif name == "muse_clone":
+        result = await exe.execute_muse_clone(
+            owner=_str("owner"),
+            slug=_str("slug"),
+            ref=_str_or_none("ref"),
+        )
+    elif name == "muse_push":
+        _raw_commits = arguments.get("commits")
+        _raw_objects = arguments.get("objects")
+        result = await exe.execute_muse_push(
+            repo_id=_str("repo_id"),
+            branch=_str("branch"),
+            head_commit_id=_str("head_commit_id"),
+            commits=list(_raw_commits) if isinstance(_raw_commits, list) else [],
+            objects=list(_raw_objects) if isinstance(_raw_objects, list) else [],
+            force=_bool("force", False),
+            user_id=user_id or "",
+        )
+    elif name == "muse_pull":
+        result = await exe.execute_muse_pull(
+            repo_id=_str("repo_id"),
+            branch=_str_or_none("branch"),
+            since_commit_id=_str_or_none("since_commit_id"),
+            object_ids=_list_str("object_ids"),
+        )
+    elif name == "muse_remote":
+        result = await exe.execute_muse_remote(
+            owner=_str("owner"),
+            slug=_str("slug"),
+        )
+    elif name == "muse_config":
+        result = await exe.execute_muse_config(
+            key=_str_or_none("key"),
+            value=_str_or_none("value"),
         )
 
     else:

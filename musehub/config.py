@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     app_name: str = "Muse"
     app_version: str = _app_version_from_package()
     debug: bool = False
+    muse_env: str = "production"  # "test" | "development" | "production"
 
     # Server Configuration
     host: str = "0.0.0.0"
@@ -67,6 +68,12 @@ class Settings(BaseSettings):
     # Asset endpoint rate limits (UUID-only auth, no JWT)
     asset_rate_limit_per_device: str = "30/minute"
     asset_rate_limit_per_ip: str = "120/minute"
+
+    # MCP rate limits — agents get a higher tier than anonymous/human callers.
+    # Agent tokens carry `token_type: "agent"` in their JWT claims.
+    mcp_rate_limit_human: str = "60/minute"
+    mcp_rate_limit_agent: str = "600/minute"
+    mcp_rate_limit_anonymous: str = "20/minute"
 
     # Stdio MCP server: proxy DAW tools to Muse backend
     muse_mcp_url: str | None = None

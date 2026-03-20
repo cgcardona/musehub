@@ -22,9 +22,9 @@ differ between engines and are not needed at this scale.
 """
 
 import logging
-from typing import Literal
+from typing import Any, Literal
 
-from sqlalchemy import Text, desc, func, or_, outerjoin, select
+from sqlalchemy import Integer, Text, desc, func, or_, outerjoin, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.db import musehub_models as db
@@ -127,13 +127,26 @@ async def list_public_repos(
             func.cast(db.MusehubRepo.tags, Text).ilike(f"%{instrumentation.lower()}%")
         )
     if key:
+        # key_signature lives in domain_meta JSON — match via text cast
         base_q = base_q.where(
-            func.lower(db.MusehubRepo.key_signature) == key.lower()
+            func.cast(db.MusehubRepo.domain_meta, Text).ilike(f"%{key.lower()}%")
         )
     if tempo_min is not None:
-        base_q = base_q.where(db.MusehubRepo.tempo_bpm >= tempo_min)
+        # Extract tempo_bpm from domain_meta JSON for numeric comparison.
+        # json_extract works in SQLite and PostgreSQL (via ->>).
+        base_q = base_q.where(
+            func.cast(
+                func.json_extract(db.MusehubRepo.domain_meta, "$.tempo_bpm"),
+                Integer,
+            ) >= tempo_min
+        )
     if tempo_max is not None:
-        base_q = base_q.where(db.MusehubRepo.tempo_bpm <= tempo_max)
+        base_q = base_q.where(
+            func.cast(
+                func.json_extract(db.MusehubRepo.domain_meta, "$.tempo_bpm"),
+                Integer,
+            ) <= tempo_max
+        )
 
     # Multi-select language/instrument chips — filter by musehub_repos.tags JSON (OR across values).
     # Tags may be prefixed (emotion:melancholic) or bare (jazz); ilike with the raw value
@@ -184,8 +197,10 @@ async def list_public_repos(
 
     rows = (await session.execute(base_q.offset(offset).limit(page_size))).all()
 
-    results = [
-        ExploreRepoResult(
+    results = []
+    for row in rows:
+        dmeta: dict[str, Any] = row.MusehubRepo.domain_meta or {}
+        results.append(ExploreRepoResult(
             repo_id=row.MusehubRepo.repo_id,
             name=row.MusehubRepo.name,
             owner=row.MusehubRepo.owner,
@@ -193,14 +208,12 @@ async def list_public_repos(
             owner_user_id=row.MusehubRepo.owner_user_id,
             description=row.MusehubRepo.description,
             tags=list(row.MusehubRepo.tags or []),
-            key_signature=row.MusehubRepo.key_signature,
-            tempo_bpm=row.MusehubRepo.tempo_bpm,
+            key_signature=dmeta.get("key_signature"),
+            tempo_bpm=dmeta.get("tempo_bpm"),
             star_count=row.star_count or 0,
             commit_count=row.commit_count or 0,
             created_at=row.MusehubRepo.created_at,
-        )
-        for row in rows
-    ]
+        ))
 
     logger.debug("✅ Explore query: %d/%d repos (page %d, sort=%s)", len(results), total, page, sort)
     return ExploreResponse(repos=results, total=total, page=page, page_size=page_size)

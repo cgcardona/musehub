@@ -1,13 +1,13 @@
 /*
- * MuseHub Music-Specific Styles
+ * DEPRECATED — _music.scss
  *
- * Visual components for music data: piano roll lanes, waveform display,
- * radar / spider charts for musical dimensions, contribution graphs,
- * and diff heatmaps.  These are purpose-built for the MuseHub domain
- * and have no equivalent in generic UI libraries.
+ * This file has been superseded by _domain.scss (MuseHub V2 domain-agnostic redesign).
+ * All styles have been migrated there, with MIDI-specific components scoped under
+ * [data-domain="midi"] selectors.
  *
- * Each section is self-contained — components from other sections of the
- * design system (cards, badges, layout) are composed at the page level.
+ * This file is no longer imported by app.scss.  It is retained only as a
+ * reference during the migration period.  Do not add new styles here.
+ * Add all new styles to _domain.scss instead.
  */
 
 /* -------------------------------------------------------------------------

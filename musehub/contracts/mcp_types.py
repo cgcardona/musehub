@@ -86,12 +86,31 @@ class MCPInputSchema(TypedDict, total=False):
     required: list[str]
 
 
+class MCPToolAnnotations(TypedDict, total=False):
+    """MCP 2025-11-25 tool annotations — behavioural hints for LLM clients.
+
+    All fields are optional hints; clients must not rely on them for correctness.
+
+    Spec fields:
+        readOnlyHint: True when the tool only reads state (no side effects).
+        destructiveHint: True when the tool may cause irreversible data loss.
+        idempotentHint: True when repeated calls with the same args are safe.
+        openWorldHint: True when the tool interacts with external systems.
+    """
+
+    readOnlyHint: bool     # noqa: N815
+    destructiveHint: bool  # noqa: N815
+    idempotentHint: bool   # noqa: N815
+    openWorldHint: bool    # noqa: N815
+
+
 class MCPToolDef(TypedDict, total=False):
     """Definition of a single MCP tool exposed to LLM clients."""
 
     name: Required[str]
     description: Required[str]
     inputSchema: Required[MCPInputSchema]
+    annotations: MCPToolAnnotations
     server_side: bool
 
 
@@ -389,6 +408,7 @@ class MCPToolDefWire(BaseModel):
         default_factory=MCPInputSchemaWire,
         alias="inputSchema",
     )
+    annotations: dict[str, bool] | None = None
     server_side: bool | None = None
 
 

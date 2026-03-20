@@ -27,6 +27,8 @@ class TokenClaims(TypedDict, total=False):
     ``type``, ``iat``, and ``exp`` are always present.
     ``sub`` is the user ID — omitted for anonymous/machine tokens.
     ``role`` is set to ``"admin"`` for tokens issued with ``is_admin=True``.
+    ``token_type`` is ``"agent"`` for AI agent tokens, ``"human"`` otherwise.
+    ``agent_name`` is an optional display identifier for the agent.
     """
 
     type: Required[str]
@@ -34,6 +36,8 @@ class TokenClaims(TypedDict, total=False):
     exp: Required[int]
     sub: str
     role: str
+    token_type: str   # "human" | "agent"
+    agent_name: str   # e.g. "my-coding-agent/1.0"
 
 
 def _get_secret() -> str:
@@ -59,6 +63,46 @@ def hash_token(token: str) -> str:
         SHA256 hex digest of the token
     """
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def generate_agent_token(
+    user_id: str | None = None,
+    agent_name: str | None = None,
+    duration_days: int = 365,
+    is_admin: bool = False,
+) -> str:
+    """Generate a long-lived JWT token marked as an AI agent token.
+
+    Agent tokens receive higher rate limits and appear with an "agent" badge
+    in the MuseHub activity feed. The ``token_type`` claim is set to ``"agent"``.
+
+    Args:
+        user_id: MuseHub user ID the agent acts on behalf of.
+        agent_name: Optional human-readable agent identifier (e.g. "my-bot/1.0").
+        duration_days: Token validity in days (default 365).
+        is_admin: If True, adds admin role to the token.
+
+    Returns:
+        Signed JWT token string with ``token_type: "agent"`` claim.
+    """
+    secret = _get_secret()
+    now = datetime.now(timezone.utc)
+    expiration = now + timedelta(days=duration_days)
+
+    payload: dict[str, object] = {
+        "type": "access",
+        "token_type": "agent",
+        "iat": int(now.timestamp()),
+        "exp": int(expiration.timestamp()),
+    }
+    if user_id:
+        payload["sub"] = user_id
+    if agent_name:
+        payload["agent_name"] = agent_name
+    if is_admin:
+        payload["role"] = "admin"
+
+    return str(jwt.encode(payload, secret, algorithm=settings.access_token_algorithm))
 
 
 def generate_access_code(
@@ -190,6 +234,18 @@ def validate_access_code(token: str) -> TokenClaims:
             if not isinstance(raw_role, str):
                 raise AccessCodeError("Malformed token: role must be a string")
             claims["role"] = raw_role
+
+        raw_token_type = payload.get("token_type")
+        if raw_token_type is not None:
+            if not isinstance(raw_token_type, str):
+                raise AccessCodeError("Malformed token: token_type must be a string")
+            claims["token_type"] = raw_token_type
+
+        raw_agent_name = payload.get("agent_name")
+        if raw_agent_name is not None:
+            if not isinstance(raw_agent_name, str):
+                raise AccessCodeError("Malformed token: agent_name must be a string")
+            claims["agent_name"] = raw_agent_name
 
         return claims
         

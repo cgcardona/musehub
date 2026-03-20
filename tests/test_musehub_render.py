@@ -150,9 +150,9 @@ async def _seed_render_job(
         repo_id=repo_id,
         commit_id=commit_id,
         status=status,
-        midi_count=1,
-        mp3_object_ids=["sha256:mp3abc"],
-        image_object_ids=["sha256:imgxyz"],
+        artifact_count=1,
+        audio_object_ids=["sha256:mp3abc"],
+        preview_object_ids=["sha256:imgxyz"],
     )
     db_session.add(job)
     await db_session.commit()
@@ -289,7 +289,7 @@ async def test_render_creates_mp3_objects(
 
     assert job is not None
     assert job.status == "complete"
-    assert len(job.mp3_object_ids) == 1
+    assert len(job.audio_object_ids) == 1
 
 
 @pytest.mark.anyio
@@ -324,7 +324,7 @@ async def test_render_creates_piano_roll_images(
 
     assert job is not None
     assert job.status == "complete"
-    assert len(job.image_object_ids) == 1
+    assert len(job.preview_object_ids) == 1
 
 
 @pytest.mark.anyio
@@ -372,7 +372,7 @@ async def test_render_idempotent(
 async def test_render_no_midi_objects(
     db_session: AsyncSession,
 ) -> None:
-    """A push with no MIDI objects creates a render job with midi_count=0 and empty artifacts."""
+    """A push with no MIDI objects creates a render job with artifact_count=0 and empty artifacts."""
     repo_id, _ = await _seed_repo(db_session)
     commit_id = "d" * 64
 
@@ -399,9 +399,9 @@ async def test_render_no_midi_objects(
     job = (await db_session.execute(stmt)).scalar_one_or_none()
 
     assert job is not None
-    assert job.midi_count == 0
-    assert job.mp3_object_ids == []
-    assert job.image_object_ids == []
+    assert job.artifact_count == 0
+    assert job.audio_object_ids == []
+    assert job.preview_object_ids == []
     assert job.status == "complete"
 
 
@@ -452,9 +452,9 @@ async def test_render_status_endpoint_complete(
     data = resp.json()
     assert data["status"] == "complete"
     assert data["commitId"] == commit_id
-    assert data["midiCount"] == 1
-    assert "sha256:mp3abc" in data["mp3ObjectIds"]
-    assert "sha256:imgxyz" in data["imageObjectIds"]
+    assert data["artifactCount"] == 1
+    assert "sha256:mp3abc" in data["audioObjectIds"]
+    assert "sha256:imgxyz" in data["previewObjectIds"]
 
 
 @pytest.mark.anyio

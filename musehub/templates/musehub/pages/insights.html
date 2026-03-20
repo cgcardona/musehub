@@ -3,432 +3,425 @@
 {% block title %}Insights · {{ owner }}/{{ repo_slug }}{% endblock %}
 
 {% block breadcrumb %}
-  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / insights
+<a href="/{{ owner }}">{{ owner }}</a>
+<span class="breadcrumb-sep">/</span>
+<a href="/{{ owner }}/{{ repo_slug }}">{{ repo_slug }}</a>
+<span class="breadcrumb-sep">/</span>
+<span class="breadcrumb-current">insights</span>
 {% endblock %}
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "insights"}{% endblock %}
-
-{% block page_data %}
-window.__insightsCfg = {
-  repoId: {{ repo_id | tojson }},
-  base:   {{ base_url | tojson }},
-  bpmPoints: {{ bpm_points | tojson }},
-  bpmSvg:    {{ bpm_svg | tojson }},
-};
+{% block page_json %}
+{
+  "repoId": {{ repo.repo_id | tojson }},
+  "owner": {{ owner | tojson }},
+  "slug": {{ repo_slug | tojson }},
+  "ref": {{ ref | tojson }},
+  "activeDimension": {{ (active_dimension or "") | tojson }},
+  "dimensions": {{ domain.dimensions | tojson }},
+  "viewerType": {{ domain.viewer_type | tojson }}
+}
 {% endblock %}
 
 {% block content %}
-<div class="content-wide">
+<div class="ins-page">
 
-  {# ── Stats bar ──────────────────────────────────────────────────────── #}
-  <div class="in-stats-bar">
-    <div class="in-stat-card">
-      <div class="in-stat-icon">📝</div>
-      <span class="in-stat-value">{{ total_commits }}</span>
-      <div class="in-stat-label">Total Commits</div>
+  {# ── Page header ─────────────────────────────────────────────────────────── #}
+  <div class="ins-page-header">
+    <div class="ins-page-header__left">
+      <h1 class="ins-page-title">
+        {% if domain.viewer_type == 'symbol_graph' %}⬡{% elif domain.viewer_type == 'piano_roll' %}♪{% else %}◈{% endif %}
+        Insights
+      </h1>
+      {% if domain.scoped_id %}
+      <a class="ins-domain-badge" href="/domains/{{ domain.scoped_id }}">{{ domain.scoped_id }}</a>
+      {% endif %}
+      <span class="ins-ref-pill">{{ ref }}</span>
     </div>
-    <div class="in-stat-card">
-      <div class="in-stat-icon">🌿</div>
-      <span class="in-stat-value">{{ total_branches }}</span>
-      <div class="in-stat-label">Branches</div>
-    </div>
-    <div class="in-stat-card">
-      <div class="in-stat-icon">👥</div>
-      <span class="in-stat-value">{{ unique_contributors }}</span>
-      <div class="in-stat-label">Contributors</div>
-    </div>
-    <div class="in-stat-card">
-      <div class="in-stat-icon">🚀</div>
-      <span class="in-stat-value">{{ total_releases }}</span>
-      <div class="in-stat-label">Releases</div>
-    </div>
-    <div class="in-stat-card">
-      <div class="in-stat-icon">🎙</div>
-      <span class="in-stat-value">{{ total_sessions }}</span>
-      <div class="in-stat-label">Sessions</div>
-    </div>
-    <div class="in-stat-card">
-      <div class="in-stat-icon">⭐</div>
-      <span class="in-stat-value">{{ star_count }}</span>
-      <div class="in-stat-label">Stars</div>
-    </div>
-    <div class="in-stat-card">
-      <div class="in-stat-icon">🍴</div>
-      <span class="in-stat-value">{{ fork_count }}</span>
-      <div class="in-stat-label">Forks</div>
+    <div class="ins-page-header__actions">
+      <a href="/{{ owner }}/{{ repo_slug }}/view/{{ ref }}" class="btn btn-secondary btn-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Viewer
+      </a>
+      <a href="/{{ owner }}/{{ repo_slug }}/commits" class="btn btn-ghost btn-sm">History</a>
     </div>
   </div>
 
-  {# ── Velocity ribbon ────────────────────────────────────────────────── #}
-  <div class="in-velocity-bar">
-    <div class="in-velocity-item">
-      <span class="in-vnum">{{ commits_last_7 }}</span>
-      commits this week
-    </div>
-    <div class="in-velocity-sep"></div>
-    <div class="in-velocity-item">
-      <span class="in-vnum">{{ commits_last_30 }}</span>
-      commits last 30 days
-    </div>
-    <div class="in-velocity-sep"></div>
-    <div class="in-velocity-item">
-      <span class="in-vnum">{{ avg_commits_per_week }}</span>
-      avg commits / week
-    </div>
-    <div class="in-velocity-sep"></div>
-    <div class="in-velocity-item">
-      <span class="in-vnum">{{ commits_last_year }}</span>
-      commits in the last year
-    </div>
-    {%- if pr_merge_rate > 0 %}
-    <div class="in-velocity-sep"></div>
-    <div class="in-velocity-item">
-      <span class="in-vnum">{{ pr_merge_rate }}%</span>
-      PR merge rate
-    </div>
-    {%- endif %}
-    {%- if avg_merge_days is not none %}
-    <div class="in-velocity-sep"></div>
-    <div class="in-velocity-item">
-      <span class="in-vnum">{{ avg_merge_days }}d</span>
-      avg time to merge
-    </div>
-    {%- endif %}
-  </div>
+  {% if domain.viewer_type == 'symbol_graph' and metrics %}
+  {# ══════════════════════════════════════════════════════════════════════════
+     CODE DOMAIN INSIGHTS
+  ══════════════════════════════════════════════════════════════════════════ #}
 
-  {# ── Commit heatmap ─────────────────────────────────────────────────── #}
-  <div class="in-section">
-    <div class="in-section-header">
-      <div class="in-section-title">📅 Commit Activity</div>
-      <div class="in-section-meta">{{ commits_last_year }} commits in the last year</div>
-    </div>
-    <div class="in-section-body">
-      <div class="in-heatmap-wrap">
-        <div class="in-heatmap-grid" id="in-heatmap">
-          {%- for week in heatmap_weeks %}
-          <div class="in-heatmap-week">
-            {%- for day in week %}
-            {%- if day.count == -1 %}
-            <div class="in-heatmap-day" data-level="-1"></div>
-            {%- else %}
-            <div class="in-heatmap-day"
-                 data-level="{{ day.level }}"
-                 data-date="{{ day.date }}"
-                 data-count="{{ day.count }}"
-                 title="{{ day.date }}: {{ day.count }} commit{{ '' if day.count == 1 else 's' }}"></div>
-            {%- endif %}
-            {%- endfor %}
-          </div>
-          {%- endfor %}
-        </div>
+  {# ── Hero stat cards ──────────────────────────────────────────────────── #}
+  <div class="ins-stat-grid">
+    <div class="ins-stat-card ins-stat-card--commits">
+      <div class="ins-stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
       </div>
-      <div class="in-heatmap-legend">
-        <span>Less</span>
-        <div class="in-heatmap-legend-cell" style="opacity:0.15"></div>
-        <div class="in-heatmap-legend-cell" style="opacity:0.35"></div>
-        <div class="in-heatmap-legend-cell" style="opacity:0.6"></div>
-        <div class="in-heatmap-legend-cell" style="opacity:0.8"></div>
-        <div class="in-heatmap-legend-cell" style="opacity:1"></div>
-        <span>More</span>
+      <div class="ins-stat-body">
+        <span class="ins-stat-value">{{ metrics.total_commits }}</span>
+        <span class="ins-stat-label">Commits</span>
+      </div>
+    </div>
+    <div class="ins-stat-card ins-stat-card--files">
+      <div class="ins-stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div class="ins-stat-body">
+        <span class="ins-stat-value">{{ metrics.total_files }}</span>
+        <span class="ins-stat-label">Files</span>
+      </div>
+    </div>
+    <div class="ins-stat-card ins-stat-card--contributors">
+      <div class="ins-stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="ins-stat-body">
+        <span class="ins-stat-value">{{ metrics.contributor_count }}</span>
+        <span class="ins-stat-label">Contributors</span>
+      </div>
+    </div>
+    <div class="ins-stat-card ins-stat-card--branches">
+      <div class="ins-stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      </div>
+      <div class="ins-stat-body">
+        <span class="ins-stat-value">{{ metrics.total_branches }}</span>
+        <span class="ins-stat-label">Branches</span>
+      </div>
+    </div>
+    <div class="ins-stat-card ins-stat-card--size">
+      <div class="ins-stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+      </div>
+      <div class="ins-stat-body">
+        <span class="ins-stat-value">{{ metrics.total_size_kb }}KB</span>
+        <span class="ins-stat-label">Source size</span>
+      </div>
+    </div>
+    <div class="ins-stat-card ins-stat-card--tests">
+      <div class="ins-stat-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="ins-stat-body">
+        <span class="ins-stat-value">{{ metrics.test_ratio }}%</span>
+        <span class="ins-stat-label">Test coverage proxy</span>
       </div>
     </div>
   </div>
 
-  {# ── Branch activity + Contributors (2-col) ─────────────────────────── #}
-  <div class="in-panel-row">
+  {# ── Two column: language chart + contributors ─────────────────────────── #}
+  <div class="ins-two-col">
 
-    {# Branch activity #}
-    <div class="in-section" style="margin-bottom:0">
-      <div class="in-section-header">
-        <div class="in-section-title">🌿 Branch Activity</div>
-        <div class="in-section-meta">by commits</div>
+    {# Language breakdown #}
+    <div class="ins-card">
+      <div class="ins-card-header">
+        <h3 class="ins-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Languages
+        </h3>
+        <span class="ins-card-meta">{{ metrics.languages | length }} detected</span>
       </div>
-      <div class="in-section-body">
-        {%- if branch_bars %}
-        <div class="in-bar-list">
-          {%- for bar in branch_bars %}
-          {%- set btype = "main" if bar.name in ("main","master") else ("feat" if bar.name.startswith("feat") else ("fix" if bar.name.startswith("fix") else ("exp" if bar.name.startswith("exp") else "other"))) %}
-          <div class="in-bar-row">
-            <div class="in-bar-label">
-              <span class="in-branch-dot" data-branch-type="{{ btype }}"></span>
-              {{ bar.name }}
-            </div>
-            <div class="in-bar-track">
-              <div class="in-bar-fill in-bar-fill--branch js-bar-fill"
-                   style="--bar-pct: {{ bar.pct }}%"></div>
-            </div>
-            <div class="in-bar-count">{{ bar.count }}</div>
+
+      {# Stacked bar showing language proportions #}
+      <div class="ins-lang-stack" title="Language distribution by file count">
+        {% for lang in metrics.languages %}
+        <div class="ins-lang-stack-seg" style="width:{{ lang.pct }}%;background:{{ lang.color }}" title="{{ lang.name }}: {{ lang.pct }}%"></div>
+        {% endfor %}
+      </div>
+
+      <div class="ins-lang-list">
+        {% for lang in metrics.languages %}
+        <div class="ins-lang-row">
+          <span class="ins-lang-dot" style="background:{{ lang.color }}"></span>
+          <span class="ins-lang-name">{{ lang.name }}</span>
+          <div class="ins-lang-bar-track">
+            <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ lang.bar_pct }}%;background:{{ lang.color }};opacity:0.75;width:{{ lang.bar_pct }}%"></div>
           </div>
-          {%- endfor %}
+          <span class="ins-lang-count">{{ lang.count }}</span>
+          <span class="ins-lang-pct">{{ lang.pct }}%</span>
         </div>
-        {%- else %}
-        <div class="in-empty">No branch data yet</div>
-        {%- endif %}
+        {% endfor %}
       </div>
     </div>
 
-    {# Contributor leaderboard #}
-    <div class="in-section" style="margin-bottom:0">
-      <div class="in-section-header">
-        <div class="in-section-title">👥 Top Contributors</div>
-        <div class="in-section-meta">by commits</div>
+    {# Contributors #}
+    <div class="ins-card">
+      <div class="ins-card-header">
+        <h3 class="ins-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Contributors
+        </h3>
+        <span class="ins-card-meta">by commit count</span>
       </div>
-      <div class="in-section-body">
-        {%- if contributor_bars %}
-        <div class="in-bar-list">
-          {%- for bar in contributor_bars %}
-          <div class="in-bar-row">
-            <div class="in-bar-label">
-              <div class="in-bar-avatar">{{ bar.avatar_letter }}</div>
-              {{ bar.name }}
-            </div>
-            <div class="in-bar-track">
-              <div class="in-bar-fill in-bar-fill--contrib js-bar-fill"
-                   style="--bar-pct: {{ bar.pct }}%"></div>
-            </div>
-            <div class="in-bar-count">{{ bar.count }}</div>
+      <div class="ins-contributor-list">
+        {% set max_c = metrics.top_contributors[0].commits if metrics.top_contributors else 1 %}
+        {% for c in metrics.top_contributors %}
+        <div class="ins-contributor-row">
+          <span class="ins-contributor-avatar">{{ c.name[0] | upper }}</span>
+          <span class="ins-contributor-name">{{ c.name }}</span>
+          <div class="ins-lang-bar-track" style="flex:1">
+            <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ (c.commits / max_c * 100) | round }}%;background:var(--color-accent);opacity:0.6;width:{{ (c.commits / max_c * 100) | round }}%"></div>
           </div>
-          {%- endfor %}
+          <span class="ins-contributor-count">{{ c.commits }}</span>
         </div>
-        {%- else %}
-        <div class="in-empty">No contributor data yet</div>
-        {%- endif %}
+        {% endfor %}
       </div>
     </div>
 
-  </div>{# /in-panel-row #}
+  </div>
 
-  {# ── Issue health + PR health (2-col) ───────────────────────────────── #}
-  <div class="in-panel-row">
-
-    {# Issue health #}
-    <div class="in-section" style="margin-bottom:0">
-      <div class="in-section-header">
-        <div class="in-section-title">🐛 Issue Health</div>
-        <div class="in-section-meta">{{ total_issues }} total</div>
-      </div>
-      <div class="in-section-body">
-        <div class="in-health-grid">
-          <div class="in-health-card">
-            <div class="in-health-value in-orange">{{ open_issues }}</div>
-            <div class="in-health-label">Open</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value in-green">{{ closed_issues }}</div>
-            <div class="in-health-label">Closed</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value in-blue">{{ issue_close_rate }}%</div>
-            <div class="in-health-label">Close rate</div>
-          </div>
-        </div>
-        {%- if total_issues > 0 %}
-        <div class="in-donut-row">
-          <div class="in-donut-legend-item">
-            <div class="in-donut-swatch" style="background:var(--color-warning)"></div>
-            Open ({{ open_issues }})
-          </div>
-          <div class="in-donut-legend-item">
-            <div class="in-donut-swatch" style="background:var(--color-success)"></div>
-            Closed ({{ closed_issues }})
-          </div>
-        </div>
-        {%- endif %}
-      </div>
+  {# ── Dimension funnel ─────────────────────────────────────────────────── #}
+  {% if not active_dimension %}
+  <div class="ins-funnel-section">
+    <div class="ins-funnel-header">
+      <h2 class="ins-funnel-title">Explore Dimensions</h2>
+      <p class="ins-funnel-subtitle">Each dimension gives you a different lens into the codebase. Choose one to dive deeper.</p>
     </div>
-
-    {# PR health #}
-    <div class="in-section" style="margin-bottom:0">
-      <div class="in-section-header">
-        <div class="in-section-title">🔀 Pull Request Health</div>
-        <div class="in-section-meta">{{ total_prs }} total</div>
-      </div>
-      <div class="in-section-body">
-        <div class="in-health-grid">
-          <div class="in-health-card">
-            <div class="in-health-value in-orange">{{ open_prs }}</div>
-            <div class="in-health-label">Open</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value in-purple">{{ merged_prs }}</div>
-            <div class="in-health-label">Merged</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value in-blue">{{ pr_merge_rate }}%</div>
-            <div class="in-health-label">Merge rate</div>
-          </div>
+    <div class="ins-dim-grid">
+      {% set dim_icons = {
+        'syntax':     '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+        'semantics':  '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>',
+        'types':      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
+        'tests':      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+        'docs':       '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
+        'complexity': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+        'deps':       '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
+        'security':   '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+        'perf':       '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+        'style':      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+      } %}
+      {% for dim in domain.dimensions %}
+      <a class="ins-dim-card ins-dim-card--{{ loop.index0 % 6 }}"
+         href="/{{ owner }}/{{ repo_slug }}/insights/{{ ref }}/{{ dim.name }}">
+        <div class="ins-dim-card__icon">{{ dim_icons.get(dim.name | lower, '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>') | safe }}</div>
+        <div class="ins-dim-card__body">
+          <span class="ins-dim-card__name">{{ dim.name | title }}</span>
+          <p class="ins-dim-card__desc">{{ dim.description }}</p>
         </div>
-        {%- if total_prs > 0 %}
-        <div class="in-donut-row">
-          <div class="in-donut-legend-item">
-            <div class="in-donut-swatch" style="background:var(--color-warning)"></div>
-            Open ({{ open_prs }})
-          </div>
-          <div class="in-donut-legend-item">
-            <div class="in-donut-swatch" style="background:var(--dim-harmonic)"></div>
-            Merged ({{ merged_prs }})
-          </div>
-          <div class="in-donut-legend-item">
-            <div class="in-donut-swatch" style="background:var(--text-muted)"></div>
-            Closed ({{ closed_prs }})
-          </div>
-          {%- if avg_merge_days is not none %}
-          <div class="in-donut-legend-item">
-            ⏱ avg {{ avg_merge_days }}d to merge
-          </div>
-          {%- endif %}
-        </div>
-        {%- endif %}
-      </div>
-    </div>
-
-  </div>{# /in-panel-row #}
-
-  {# ── Musical evolution ──────────────────────────────────────────────── #}
-  <div class="in-section">
-    <div class="in-section-header">
-      <div class="in-section-title">🎵 Musical Evolution</div>
-      <div class="in-section-meta">BPM & key changes over time</div>
-    </div>
-    <div class="in-section-body">
-      {%- if bpm_svg %}
-      <svg class="in-bpm-chart" viewBox="0 0 600 100" preserveAspectRatio="none"
-           role="img" aria-label="BPM over commit history">
-        {# Grid lines #}
-        <line class="in-bpm-axis" x1="0" y1="10"  x2="600" y2="10"  stroke-dasharray="4,4"/>
-        <line class="in-bpm-axis" x1="0" y1="40"  x2="600" y2="40"  stroke-dasharray="4,4"/>
-        <line class="in-bpm-axis" x1="0" y1="70"  x2="600" y2="70"  stroke-dasharray="4,4"/>
-        <line class="in-bpm-axis" x1="0" y1="90"  x2="600" y2="90"/>
-        {# Min / max labels #}
-        <text class="in-bpm-axis-label" x="4" y="14">{{ bpm_max }} BPM</text>
-        <text class="in-bpm-axis-label" x="4" y="88">{{ bpm_min }} BPM</text>
-        {# Area fill #}
-        <polygon class="in-bpm-area"
-                 points="{{ bpm_svg }} 590,90 10,90"/>
-        {# Line #}
-        <polyline class="in-bpm-line" points="{{ bpm_svg }}" id="in-bpm-polyline"/>
-        {# Dots (rendered by TS for interactivity) #}
-        <g id="in-bpm-dots"></g>
-      </svg>
-      {%- else %}
-      <div class="in-bpm-empty">
-        <span>🎼</span>
-        No BPM annotations found — add <code>bpm:120</code> to commit messages to track musical evolution
-      </div>
-      {%- endif %}
-      {# Key changes #}
-      {%- if key_changes %}
-      <div class="in-key-chips">
-        {%- for kc in key_changes %}
-        <div class="in-key-chip">
-          {{ kc.key }}
-          <span style="opacity:0.5">{{ kc.ts }}</span>
-        </div>
-        {%- endfor %}
-      </div>
-      {%- endif %}
+        <span class="ins-dim-card__arrow">→</span>
+      </a>
+      {% endfor %}
     </div>
   </div>
 
-  {# ── Sessions + Releases (2-col) ────────────────────────────────────── #}
-  <div class="in-panel-row">
+  {% else %}
+  {# ── Dimension detail view ─────────────────────────────────────────────── #}
+  <div class="ins-detail">
 
-    {# Sessions #}
-    <div class="in-section" style="margin-bottom:0">
-      <div class="in-section-header">
-        <div class="in-section-title">🎙 Sessions</div>
-        <div class="in-section-meta">{{ total_sessions }} recorded</div>
-      </div>
-      <div class="in-section-body">
-        <div class="in-session-stats">
-          <div class="in-health-card">
-            <div class="in-health-value in-blue">{{ total_sessions }}</div>
-            <div class="in-health-label">Total sessions</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value in-green">{{ active_sessions }}</div>
-            <div class="in-health-label">Active now</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value in-orange">{{ unique_participants }}</div>
-            <div class="in-health-label">Participants</div>
-          </div>
+    {# Breadcrumb / back nav #}
+    <div class="ins-detail-nav">
+      <a href="/{{ owner }}/{{ repo_slug }}/insights/{{ ref }}" class="ins-detail-back">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        All dimensions
+      </a>
+      <nav class="ins-dim-pills">
+    {% for dim in domain.dimensions %}
+    <a class="ins-dim-pill {% if (active_dimension | lower) == (dim.name | lower) %}ins-dim-pill--active{% endif %}"
+           href="/{{ owner }}/{{ repo_slug }}/insights/{{ ref }}/{{ dim.name }}"
+           title="{{ dim.description }}">
+          {{ dim.name | title }}
+        </a>
+        {% endfor %}
+      </nav>
+    </div>
+
+    {# Dimension header #}
+    {% for dim in domain.dimensions %}{% if (dim.name | lower) == (active_dimension | lower) %}
+    <div class="ins-detail-header">
+      <h2 class="ins-detail-title">{{ dim.name | title }}</h2>
+      <p class="ins-detail-desc">{{ dim.description }}</p>
+    </div>
+    {% endif %}{% endfor %}
+
+    {# ── Dimension-specific content ──────────────────────────────────────── #}
+
+    {% if active_dimension | lower == 'syntax' %}
+    <div class="ins-detail-content">
+      <div class="ins-card">
+        <div class="ins-card-header">
+          <h3 class="ins-card-title">Language Distribution</h3>
+          <span class="ins-card-meta">{{ metrics.total_files }} files across {{ metrics.languages | length }} languages</span>
         </div>
-        {%- if avg_session_h > 0 %}
-        <p style="font-size:var(--font-size-sm); color:var(--text-muted); margin:0 0 var(--space-3)">
-          Avg session length: <strong>{{ avg_session_h }}h</strong>
-        </p>
-        {%- endif %}
-        {%- if top_locations %}
-        <div class="in-section-title" style="font-size:var(--font-size-sm); margin-bottom:var(--space-2)">Top Locations</div>
-        <div class="in-locations-list">
-          {%- for loc, cnt in top_locations %}
-          <div class="in-location-row">
-            <span>📍 {{ loc }}</span>
-            <span class="in-location-count">{{ cnt }} session{{ '' if cnt == 1 else 's' }}</span>
-          </div>
-          {%- endfor %}
+        <div class="ins-lang-stack" style="height:16px">
+          {% for lang in metrics.languages %}
+          <div class="ins-lang-stack-seg" style="width:{{ lang.pct }}%;background:{{ lang.color }}" title="{{ lang.name }}: {{ lang.pct }}%"></div>
+          {% endfor %}
         </div>
-        {%- else %}
-        <div class="in-empty" style="padding:var(--space-4)">No sessions recorded yet</div>
-        {%- endif %}
+        <div class="ins-lang-list ins-lang-list--detail">
+          {% for lang in metrics.languages %}
+          <div class="ins-lang-row">
+            <span class="ins-lang-dot" style="background:{{ lang.color }}"></span>
+            <span class="ins-lang-name">{{ lang.name }}</span>
+            <div class="ins-lang-bar-track">
+              <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ lang.bar_pct }}%;background:{{ lang.color }};width:{{ lang.bar_pct }}%"></div>
+            </div>
+            <span class="ins-lang-count">{{ lang.count }} files</span>
+            <span class="ins-lang-pct">{{ lang.pct }}%</span>
+            <span class="ins-lang-size">{{ (lang.bytes / 1024) | round(1) }} KB</span>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
 
-    {# Releases #}
-    <div class="in-section" style="margin-bottom:0">
-      <div class="in-section-header">
-        <div class="in-section-title">🚀 Release Cadence</div>
-        <div class="in-section-meta">{{ total_releases }} total</div>
+    {% elif active_dimension | lower == 'complexity' %}
+    <div class="ins-detail-content">
+      <div class="ins-card">
+        <div class="ins-card-header">
+          <h3 class="ins-card-title">Largest Files</h3>
+          <span class="ins-card-meta">File size as a complexity proxy · avg {{ metrics.avg_file_kb }} KB</span>
+        </div>
+        {% set max_size = metrics.largest_files[0].size if metrics.largest_files else 1 %}
+        <div class="ins-file-list">
+          {% for f in metrics.largest_files %}
+          <div class="ins-file-row">
+            <span class="ins-file-lang-dot" style="background:{{ loop.index0 % 2 == 0 and 'var(--color-accent)' or 'var(--color-warning)' }}"></span>
+            <span class="ins-file-path">{{ f.path }}</span>
+            <div class="ins-lang-bar-track" style="min-width:100px">
+              <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ (f.size / max_size * 100) | round }}%;background:var(--color-accent);opacity:0.5;width:{{ (f.size / max_size * 100) | round }}%"></div>
+            </div>
+            <span class="ins-file-size">{{ (f.size / 1024) | round(1) }} KB</span>
+          </div>
+          {% endfor %}
+        </div>
       </div>
-      <div class="in-section-body">
-        <div class="in-session-stats">
-          <div class="in-health-card">
-            <div class="in-health-value in-green">{{ stable_releases }}</div>
-            <div class="in-health-label">Stable</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value in-orange">{{ prerelease_count }}</div>
-            <div class="in-health-label">Pre-release</div>
-          </div>
-          <div class="in-health-card">
-            <div class="in-health-value" style="color:var(--text-muted)">{{ draft_count }}</div>
-            <div class="in-health-label">Drafts</div>
-          </div>
+      <div class="ins-card" style="margin-top:var(--space-3)">
+        <div class="ins-card-header"><h3 class="ins-card-title">Size Overview</h3></div>
+        <div class="ins-stat-mini-grid">
+          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.total_size_kb }} KB</span><span class="ins-stat-mini-label">Total source</span></div>
+          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.avg_file_kb }} KB</span><span class="ins-stat-mini-label">Avg file</span></div>
+          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ (metrics.largest_files[0].size / 1024) | round(1) }} KB</span><span class="ins-stat-mini-label">Largest file</span></div>
+          <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.code_file_count }}</span><span class="ins-stat-mini-label">Code files</span></div>
         </div>
-        {%- if recent_releases %}
-        <div class="in-release-timeline" style="margin-top:var(--space-3)">
-          {%- for rel in recent_releases %}
-          <div class="in-release-row">
-            <div class="in-release-dot-col">
-              <div class="in-release-dot {% if rel.is_prerelease %}in-prerelease{% elif rel.is_draft %}in-draft{% endif %}"></div>
-            </div>
-            <div>
-              <div class="in-release-tag">{{ rel.tag }}</div>
-              <div class="in-release-title">{{ rel.title }}</div>
-            </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-              <span class="in-release-badge {% if rel.is_prerelease %}in-badge-pre{% elif rel.is_draft %}in-badge-draft{% else %}in-badge-stable{% endif %}">
-                {% if rel.is_draft %}Draft{% elif rel.is_prerelease %}Pre-release{% else %}Stable{% endif %}
-              </span>
-              <span class="in-release-date">{{ rel.date }}</span>
-            </div>
-          </div>
-          {%- endfor %}
-        </div>
-        {%- else %}
-        <div class="in-empty" style="padding:var(--space-4)">No releases yet</div>
-        {%- endif %}
       </div>
     </div>
 
-  </div>{# /in-panel-row #}
+    {% elif active_dimension | lower == 'tests' %}
+    <div class="ins-detail-content">
+      <div class="ins-card">
+        <div class="ins-card-header">
+          <h3 class="ins-card-title">Test Coverage Proxy</h3>
+          <span class="ins-card-meta">Based on test file detection</span>
+        </div>
+        <div class="ins-big-metric">
+          <div class="ins-donut-wrap">
+            <svg class="ins-donut" viewBox="0 0 100 100">
+              {% set r = 38 %}
+              {% set circ = 3.14159 * r * 2 %}
+              {% set dash = (metrics.test_ratio / 100 * circ) | round(1) %}
+              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--border-subtle)" stroke-width="12"/>
+              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--color-success)" stroke-width="12"
+                stroke-dasharray="{{ dash }} {{ circ }}"
+                stroke-dashoffset="{{ circ / 4 }}"
+                stroke-linecap="round" class="ins-donut-fill"/>
+              <text x="50" y="46" text-anchor="middle" fill="var(--text-primary)" font-size="18" font-weight="700" font-family="var(--font-mono)">{{ metrics.test_ratio }}%</text>
+              <text x="50" y="60" text-anchor="middle" fill="var(--text-muted)" font-size="8">test ratio</text>
+            </svg>
+          </div>
+          <div class="ins-big-metric-details">
+            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.test_file_count }}</span><span class="ins-stat-mini-label">Test files detected</span></div>
+            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.code_file_count }}</span><span class="ins-stat-mini-label">Code files</span></div>
+            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.total_files }}</span><span class="ins-stat-mini-label">Total files</span></div>
+          </div>
+        </div>
+        <p class="ins-detail-note">Test ratio = test files ÷ code files. Patterns matched: <code>test_*</code>, <code>*_test.*</code>, <code>*.spec.*</code>, <code>tests/</code>, <code>__tests__/</code></p>
+      </div>
+    </div>
 
-</div>{# /repo-content-wide #}
+    {% elif active_dimension | lower == 'docs' %}
+    <div class="ins-detail-content">
+      <div class="ins-card">
+        <div class="ins-card-header">
+          <h3 class="ins-card-title">Documentation Coverage</h3>
+          <span class="ins-card-meta">{{ metrics.doc_file_count }} doc files · {{ metrics.doc_ratio }}% of total</span>
+        </div>
+        <div class="ins-big-metric">
+          <div class="ins-donut-wrap">
+            <svg class="ins-donut" viewBox="0 0 100 100">
+              {% set r = 38 %}
+              {% set circ = 3.14159 * r * 2 %}
+              {% set dash = (metrics.doc_ratio / 100 * circ) | round(1) %}
+              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--border-subtle)" stroke-width="12"/>
+              <circle cx="50" cy="50" r="{{ r }}" fill="none" stroke="var(--color-info)" stroke-width="12"
+                stroke-dasharray="{{ dash }} {{ circ }}"
+                stroke-dashoffset="{{ circ / 4 }}"
+                stroke-linecap="round" class="ins-donut-fill"/>
+              <text x="50" y="46" text-anchor="middle" fill="var(--text-primary)" font-size="18" font-weight="700" font-family="var(--font-mono)">{{ metrics.doc_ratio }}%</text>
+              <text x="50" y="60" text-anchor="middle" fill="var(--text-muted)" font-size="8">docs</text>
+            </svg>
+          </div>
+          <div class="ins-big-metric-details">
+            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.doc_file_count }}</span><span class="ins-stat-mini-label">Doc files (.md .rst .txt)</span></div>
+            <div class="ins-stat-mini"><span class="ins-stat-mini-val">{{ metrics.total_files }}</span><span class="ins-stat-mini-label">Total files</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-{# Tooltip element managed by insights.ts #}
-<div class="in-tooltip" id="in-tooltip" aria-hidden="true"></div>
+    {% else %}
+    {# Generic dimension — show recent commits and contributor breakdown #}
+    <div class="ins-detail-content">
+      <div class="ins-card">
+        <div class="ins-card-header">
+          <h3 class="ins-card-title">Recent Activity</h3>
+          <span class="ins-card-meta">{{ metrics.total_commits }} total commits</span>
+        </div>
+        <div class="ins-commit-list">
+          {% for c in metrics.recent_commits %}
+          <div class="ins-commit-row">
+            <span class="ins-commit-avatar">{{ c.author[0] | upper }}</span>
+            <div class="ins-commit-body">
+              <span class="ins-commit-msg">{{ c.message }}</span>
+              <span class="ins-commit-meta">{{ c.author }} · ⑂ {{ c.branch }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="ins-card" style="margin-top:var(--space-3)">
+        <div class="ins-card-header"><h3 class="ins-card-title">Contributors</h3></div>
+        <div class="ins-contributor-list">
+          {% set max_c = metrics.top_contributors[0].commits if metrics.top_contributors else 1 %}
+          {% for c in metrics.top_contributors %}
+          <div class="ins-contributor-row">
+            <span class="ins-contributor-avatar">{{ c.name[0] | upper }}</span>
+            <span class="ins-contributor-name">{{ c.name }}</span>
+            <div class="ins-lang-bar-track" style="flex:1">
+              <div class="ins-lang-bar js-bar-fill" style="--bar-pct:{{ (c.commits / max_c * 100) | round }}%;background:var(--color-accent);opacity:0.6;width:{{ (c.commits / max_c * 100) | round }}%"></div>
+            </div>
+            <span class="ins-contributor-count">{{ c.commits }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
+  </div>{# /ins-detail #}
+  {% endif %}
+
+  {% elif domain.viewer_type == 'piano_roll' %}
+  {# ══════════════════════════════════════════════════════════════════════════
+     MIDI DOMAIN INSIGHTS — placeholder until audio analysis is ready
+  ══════════════════════════════════════════════════════════════════════════ #}
+  <div class="ins-empty-domain">
+    <div class="ins-empty-icon">♪</div>
+    <h3>MIDI Insights</h3>
+    <p>Harmonic analysis, tempo mapping, and groove scores are computed when playback is processed. Open the piano roll to trigger analysis.</p>
+    <a href="/{{ owner }}/{{ repo_slug }}/view/{{ ref }}" class="btn btn-primary">Open Piano Roll</a>
+  </div>
+
+  {% else %}
+  {# No domain #}
+  <div class="ins-empty-domain">
+    <div class="ins-empty-icon">◈</div>
+    <h3>No domain registered</h3>
+    <p>Assign a domain plugin to this repository to unlock insights, dimension analysis, and the specialised viewer.</p>
+    <a href="/domains" class="btn btn-primary">Browse domains</a>
+  </div>
+  {% endif %}
+
+</div>{# /ins-page #}
 {% endblock %}

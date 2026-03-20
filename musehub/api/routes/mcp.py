@@ -99,21 +99,47 @@ def _validate_origin(request: Request) -> bool:
 # ── Auth helper ───────────────────────────────────────────────────────────────
 
 
-async def _extract_user_id(request: Request) -> str | None | Response:
-    """Return user_id from JWT, None for anonymous, or a 401 Response.
+class _AuthResult:
+    """Parsed authentication result from a Bearer JWT."""
 
-    Returns a ``Response`` object (not a string) when the token is invalid.
-    Callers must check ``isinstance(result, Response)`` and return early.
+    __slots__ = ("user_id", "is_agent", "agent_name")
+
+    def __init__(
+        self,
+        user_id: str | None,
+        is_agent: bool = False,
+        agent_name: str | None = None,
+    ) -> None:
+        self.user_id = user_id
+        self.is_agent = is_agent
+        self.agent_name = agent_name
+
+
+async def _extract_auth(request: Request) -> _AuthResult | Response:
+    """Return an :class:`_AuthResult` from JWT, anonymous result, or a 401 Response.
+
+    Returns a ``Response`` object (not an ``_AuthResult``) when the token is
+    invalid. Callers must check ``isinstance(result, Response)`` and return early.
+
+    Agent tokens (``token_type: "agent"`` JWT claim) are identified here and
+    propagated into the :class:`~musehub.mcp.context.ToolCallContext` so that
+    downstream services can apply higher rate limits and tag activity events
+    with the "agent" badge.
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        return None
+        return _AuthResult(user_id=None)
 
     token_str = auth_header[7:]
     try:
         from musehub.auth.tokens import validate_access_code
         claims = validate_access_code(token_str)
-        return claims.get("sub")
+        is_agent = claims.get("token_type") == "agent"
+        return _AuthResult(
+            user_id=claims.get("sub"),
+            is_agent=is_agent,
+            agent_name=claims.get("agent_name") if is_agent else None,
+        )
     except Exception:
         return JSONResponse(
             status_code=401,
@@ -154,10 +180,11 @@ async def mcp_post(request: Request) -> Response:
         )
 
     # ── Auth ──────────────────────────────────────────────────────────────────
-    user_id_or_resp = await _extract_user_id(request)
-    if isinstance(user_id_or_resp, Response):
-        return user_id_or_resp
-    user_id: str | None = user_id_or_resp
+    auth_or_resp = await _extract_auth(request)
+    if isinstance(auth_or_resp, Response):
+        return auth_or_resp
+    auth: _AuthResult = auth_or_resp
+    user_id: str | None = auth.user_id
 
     # ── Parse body ────────────────────────────────────────────────────────────
     try:
@@ -238,7 +265,10 @@ async def mcp_post(request: Request) -> Response:
     # ── Dispatch ──────────────────────────────────────────────────────────────
     try:
         if isinstance(raw, list):
-            responses = await handle_batch(raw, user_id=user_id, session=session)
+            responses = await handle_batch(
+                raw, user_id=user_id, session=session,
+                is_agent=auth.is_agent, agent_name=auth.agent_name,
+            )
             if not responses:
                 return Response(status_code=202)
             return JSONResponse(content=responses)
@@ -248,9 +278,15 @@ async def mcp_post(request: Request) -> Response:
             needs_sse = _method_needs_sse(raw) and session is not None
 
             if needs_sse and session is not None:
-                return _make_sse_tool_response(raw, user_id=user_id, session=session)
+                return _make_sse_tool_response(
+                    raw, user_id=user_id, session=session,
+                    is_agent=auth.is_agent, agent_name=auth.agent_name,
+                )
 
-            resp = await handle_request(raw, user_id=user_id, session=session)
+            resp = await handle_request(
+                raw, user_id=user_id, session=session,
+                is_agent=auth.is_agent, agent_name=auth.agent_name,
+            )
             if resp is None:
                 return Response(status_code=202)
 
@@ -382,6 +418,122 @@ async def mcp_delete(request: Request) -> Response:
     return Response(status_code=200)
 
 
+# ── GET /mcp/docs.json ────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/mcp/docs.json",
+    operation_id="mcpDocsJson",
+    summary="MCP capability manifest — machine-readable JSON",
+    include_in_schema=True,
+)
+async def mcp_docs_json() -> JSONResponse:
+    """Return a machine-readable JSON manifest of all MCP capabilities.
+
+    This endpoint is the programmatic complement to ``GET /mcp/docs``.
+    AI agents and tool integrators can fetch this to discover:
+    - The full tool catalogue (names, descriptions, input schemas)
+    - All static and templated resources (URIs, names, descriptions)
+    - All available prompts (names, descriptions, arguments)
+    - Server info and protocol version
+
+    No authentication required — this is intentionally public so agents
+    can bootstrap without prior credentials.
+    """
+    from musehub.mcp.tools import MCP_TOOLS
+    from musehub.mcp.resources import STATIC_RESOURCES, RESOURCE_TEMPLATES
+    from musehub.mcp.prompts import PROMPT_CATALOGUE
+
+    tools_out = [
+        {k: v for k, v in t.items() if k != "server_side"}
+        for t in MCP_TOOLS
+    ]
+    resources_out = [
+        {
+            "uri": r.get("uri"),
+            "name": r.get("name"),
+            "description": r.get("description"),
+            "mimeType": r.get("mimeType"),
+        }
+        for r in STATIC_RESOURCES
+    ]
+    templates_out = [
+        {
+            "uriTemplate": t.get("uriTemplate"),
+            "name": t.get("name"),
+            "description": t.get("description"),
+            "mimeType": t.get("mimeType"),
+        }
+        for t in RESOURCE_TEMPLATES
+    ]
+    prompts_out = [
+        {
+            "name": p["name"],
+            "description": p["description"],
+            "arguments": p.get("arguments", []),
+        }
+        for p in PROMPT_CATALOGUE
+    ]
+
+    return JSONResponse(
+        content={
+            "server": {
+                "name": "musehub-mcp",
+                "version": "1.1.0",
+                "protocolVersion": _PROTOCOL_VERSION,
+                "endpoint": "/mcp",
+                "docsUrl": "/mcp/docs",
+            },
+            "tools": tools_out,
+            "resources": resources_out,
+            "resourceTemplates": templates_out,
+            "prompts": prompts_out,
+        },
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+# ── GET /mcp/docs ─────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/mcp/docs",
+    operation_id="mcpDocs",
+    summary="MCP reference — human-readable documentation page",
+    include_in_schema=True,
+)
+async def mcp_docs(request: Request) -> Response:
+    """Render a human-readable reference page for the MuseHub MCP server.
+
+    Lists all tools, resources, resource templates, and prompts with their
+    descriptions and input schemas. Also shows:
+    - Connection instructions (endpoint URL, auth model, protocol version)
+    - Agent onboarding quick-start guide
+    - Link to ``/mcp/docs.json`` for machine-readable access
+
+    No authentication required.
+    """
+    try:
+        from musehub.api.routes.musehub._templates import templates
+        from musehub.mcp.tools import MCP_TOOLS
+        from musehub.mcp.resources import STATIC_RESOURCES, RESOURCE_TEMPLATES
+        from musehub.mcp.prompts import PROMPT_CATALOGUE
+
+        ctx = {
+            "request": request,
+            "tools": MCP_TOOLS,
+            "static_resources": STATIC_RESOURCES,
+            "resource_templates": RESOURCE_TEMPLATES,
+            "prompts": PROMPT_CATALOGUE,
+            "protocol_version": _PROTOCOL_VERSION,
+        }
+        return templates.TemplateResponse(request, "musehub/pages/mcp_docs.html", ctx)
+    except Exception as exc:
+        logger.warning("MCP docs template missing, falling back to JSON redirect: %s", exc)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/mcp/docs.json")
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -425,6 +577,8 @@ def _make_sse_tool_response(
     *,
     user_id: str | None,
     session: MCPSession,
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> StreamingResponse:
     """Return a StreamingResponse that runs the tool and streams results via SSE."""
     from musehub.mcp.sse import sse_response, sse_notification
@@ -434,7 +588,10 @@ def _make_sse_tool_response(
 
     async def generator() -> AsyncIterator[str]:
         try:
-            result = await handle_request(raw, user_id=user_id, session=session)
+            result = await handle_request(
+                raw, user_id=user_id, session=session,
+                is_agent=is_agent, agent_name=agent_name,
+            )
             if result is not None:
                 yield sse_response(req_id, result)
         except Exception as exc:

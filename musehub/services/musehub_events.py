@@ -24,6 +24,10 @@ branch_deleted — a branch was deleted
 tag_pushed — a tag was pushed
 session_started — a recording session was started
 session_ended — a recording session was ended
+agent_action — an AI agent performed a tracked MCP tool call
+
+Agent events carry `is_agent: true` and optionally `agent_name` in `event_metadata`.
+The activity feed surfaces agent events with a distinct badge.
 """
 
 import logging
@@ -55,6 +59,7 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset(
         "tag_pushed",
         "session_started",
         "session_ended",
+        "agent_action",
     }
 )
 
@@ -79,6 +84,8 @@ async def record_event(
     actor: str,
     description: str,
     metadata: dict[str, object] | None = None,
+    is_agent: bool = False,
+    agent_name: str | None = None,
 ) -> ActivityEventResponse:
     """Append a new event row to the activity stream for ``repo_id``.
 
@@ -89,16 +96,26 @@ async def record_event(
     ``event_type`` must be one of ``KNOWN_EVENT_TYPES``; an unknown type is
     logged as a warning and stored anyway (no hard failure — append-only safety
     beats strict validation at the DB layer).
+
+    When ``is_agent=True`` the event is tagged with ``_is_agent: true`` (and
+    optionally ``_agent_name``) in ``event_metadata``. The activity feed
+    template surfaces these as an "agent" badge beside the event.
     """
     if event_type not in KNOWN_EVENT_TYPES:
         logger.warning("⚠️ Unknown event_type %r recorded for repo %s", event_type, repo_id)
+
+    merged_metadata: dict[str, object] = dict(metadata or {})
+    if is_agent:
+        merged_metadata["_is_agent"] = True
+        if agent_name:
+            merged_metadata["_agent_name"] = agent_name
 
     row = db.MusehubEvent(
         repo_id=repo_id,
         event_type=event_type,
         actor=actor,
         description=description,
-        event_metadata=metadata or {},
+        event_metadata=merged_metadata,
     )
     session.add(row)
     await session.flush() # populate event_id without committing

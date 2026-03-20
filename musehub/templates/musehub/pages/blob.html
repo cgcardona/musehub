@@ -37,7 +37,7 @@
     <div class="blob-meta">
       <span title="Size">📄&nbsp;{{ size_bytes | filesizeformat }}</span>
       {% if line_count %}<span>{{ line_count }} line{{ 's' if line_count != 1 else '' }}</span>{% endif %}
-      {% if lang %}<span>{{ lang }}</span>{% endif %}
+      {% if lang %}<span class="blob-lang-badge">{{ lang }}</span>{% endif %}
     </div>
     <div class="blob-actions">
       <a class="btn-blob btn-blob-secondary"
@@ -71,20 +71,15 @@
         <a href="/musehub/repos/{{ repo_id }}/raw/{{ ref }}/{{ file_path }}" download>Download raw</a>
       </div>
     {% elif lines %}
-      {# Text file — server-rendered line-numbered table; JS adds syntax highlighting #}
-      <div class="blob-viewer" style="overflow-x:auto">
-        <table class="blob-line-table"
-               style="width:100%;border-collapse:collapse;font-family:monospace;font-size:12px">
+      {# Text file — server-rendered line-numbered table; blob.ts adds syntax highlighting via hljs #}
+      <div class="blob-viewer">
+        <table class="blob-line-table">
           <tbody>
           {% for line in lines %}
           {% set i = loop.index %}
           <tr id="L{{ i }}" class="blob-line">
-            <td class="blob-ln"
-                style="width:40px;text-align:right;padding:1px 8px;color:#8b949e;user-select:none">
-              <a href="#L{{ i }}" style="color:inherit">{{ i }}</a>
-            </td>
-            <td class="blob-code"
-                style="padding:1px 8px;white-space:pre">{{ line | e }}</td>
+            <td class="blob-ln"><a href="#L{{ i }}">{{ i }}</a></td>
+            <td class="blob-code">{{ line | e }}</td>
           </tr>
           {% endfor %}
           </tbody>
