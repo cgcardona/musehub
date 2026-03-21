@@ -74,7 +74,9 @@ class WireSnapshot(BaseModel):
     """
 
     snapshot_id: str
-    manifest: dict[str, str] = Field(default_factory=dict)
+    # max_length caps the number of manifest entries — a 10 000-file snapshot
+    # would already be pathologically large; prevent unbounded dict parsing.
+    manifest: dict[str, str] = Field(default_factory=dict, max_length=10_000)
     created_at: str = ""
 
     model_config = {"extra": "ignore"}

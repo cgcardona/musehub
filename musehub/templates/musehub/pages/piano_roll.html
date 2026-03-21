@@ -147,7 +147,7 @@
 {% block body_extra %}
 {# Tone.js v14 — MIT licensed, loaded from CDN. Bundled version is used in
    production; CDN fallback ensures local dev works without a build step. #}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (function() {
   var s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js';

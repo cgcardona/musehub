@@ -35,8 +35,8 @@
   </div>
   <audio id="audio-el" preload="metadata"></audio>
   {# SSR track URL exposed as a global so external scripts can read it #}
-  {% if track_url %}<script>window.__embedTrackUrl = {{ track_url | tojson }};</script>{% endif %}
-  <script>
+  {% if track_url %}<script nonce="{{ request.state.csp_nonce }}">window.__embedTrackUrl = {{ track_url | tojson }};</script>{% endif %}
+  <script nonce="{{ request.state.csp_nonce }}">
     (function() {
       const repoId = {{ repo_id | tojson }};
       const ref    = {{ ref | tojson }};
