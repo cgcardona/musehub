@@ -38,19 +38,25 @@ class TestComputeSnapshotId:
         assert compute_snapshot_id({"a": "1"}) != compute_snapshot_id({"b": "1"})
 
     def test_known_value(self) -> None:
-        """Regression: algorithm must not change without updating this test."""
+        """Regression: algorithm must not change without updating this test.
+
+        Uses the null-byte separator (\\x00) introduced when the CLI migrated
+        from the old ``|``/``:`` scheme to prevent separator-injection attacks.
+        """
+        _SEP = "\x00"
         manifest = {"tracks/piano.mid": "sha256:deadbeef"}
-        parts = sorted(f"{k}:{v}" for k, v in manifest.items())
-        payload = "|".join(parts).encode()
+        parts = sorted(f"{k}{_SEP}{v}" for k, v in manifest.items())
+        payload = _SEP.join(parts).encode()
         expected = hashlib.sha256(payload).hexdigest()
         assert compute_snapshot_id(manifest) == expected
 
     def test_multiple_entries_sorted(self) -> None:
+        _SEP = "\x00"
         m = {"z/file": "oid-z", "a/file": "oid-a", "m/file": "oid-m"}
         result = compute_snapshot_id(m)
-        # Manually compute expected value
-        parts = sorted(f"{k}:{v}" for k, v in m.items())
-        expected = hashlib.sha256("|".join(parts).encode()).hexdigest()
+        # Manually compute expected value using null-byte separator
+        parts = sorted(f"{k}{_SEP}{v}" for k, v in m.items())
+        expected = hashlib.sha256(_SEP.join(parts).encode()).hexdigest()
         assert result == expected
 
 

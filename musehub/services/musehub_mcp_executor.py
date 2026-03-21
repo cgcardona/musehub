@@ -49,6 +49,8 @@ MusehubErrorCode = Literal[
     "push_failed",
     "non_fast_forward",
     "pull_failed",
+    "domain_conflict",
+    "publish_failed",
 ]
 """Enumeration of error codes returned by MuseHub MCP executors.
 
@@ -1464,3 +1466,84 @@ async def execute_muse_config(
         result["hint"] = f"Run this command in your terminal: {cli_cmd}"
 
     return MusehubToolResult(ok=True, data=result)
+
+
+async def execute_musehub_publish_domain(
+    author_slug: str,
+    slug: str,
+    display_name: str,
+    description: str,
+    capabilities: dict[str, JSONValue],
+    viewer_type: str,
+    version: str = "0.1.0",
+    user_id: str = "",
+) -> MusehubToolResult:
+    """Register a new Muse domain plugin in the MuseHub marketplace.
+
+    Validates the capabilities manifest, creates the domain record, and returns
+    the scoped identifier and content-addressed manifest hash.  The domain is
+    immediately discoverable via musehub_list_domains.
+
+    Authentication is required — the caller must provide their user_id (resolved
+    from the MCP session JWT by the dispatcher).
+    """
+    if not user_id:
+        return MusehubToolResult(
+            ok=False,
+            error_code="unauthenticated",
+            error_message=(
+                "Authentication required to publish a domain. "
+                "Call musehub_create_agent_token first, then configure your token with "
+                "muse config set musehub.token <token>."
+            ),
+        )
+
+    if (err := _check_db_available()) is not None:
+        return err
+
+    async with AsyncSessionLocal() as session:
+        from musehub.services import musehub_domains as _domain_svc
+
+        try:
+            domain = await _domain_svc.create_domain(
+                session,
+                author_user_id=user_id,
+                author_slug=author_slug,
+                slug=slug,
+                display_name=display_name,
+                description=description,
+                capabilities=capabilities,
+                viewer_type=viewer_type,
+                version=version,
+            )
+            await session.commit()
+        except Exception as exc:
+            exc_str = str(exc)
+            if "unique" in exc_str.lower() or "duplicate" in exc_str.lower() or "integrity" in exc_str.lower():
+                return MusehubToolResult(
+                    ok=False,
+                    error_code="domain_conflict",
+                    error_message=(
+                        f"Domain '@{author_slug}/{slug}' is already registered. "
+                        "Choose a different slug or use a versioned update."
+                    ),
+                )
+            logger.exception("Failed to publish domain @%s/%s", author_slug, slug)
+            return MusehubToolResult(
+                ok=False,
+                error_code="publish_failed",
+                error_message=f"Failed to publish domain: {exc_str}",
+            )
+
+        return MusehubToolResult(ok=True, data={
+            "domain_id": domain.domain_id,
+            "scoped_id": domain.scoped_id,
+            "manifest_hash": domain.manifest_hash,
+            "display_name": domain.display_name,
+            "version": domain.version,
+            "hint": (
+                f"Domain published! Use scoped_id='{domain.scoped_id}' when creating "
+                "repos with musehub_create_repo. Other agents can discover it via "
+                "musehub_list_domains or musehub_get_domain."
+            ),
+        })
