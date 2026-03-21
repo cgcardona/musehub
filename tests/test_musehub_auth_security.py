@@ -56,9 +56,18 @@ def _make_expired_token(user_id: str = "test-user-id") -> str:
 
 
 def _make_tampered_token(valid_token: str) -> str:
-    """Flip one character in the signature portion of a valid JWT."""
+    """Corrupt the signature portion of a valid JWT.
+
+    We change a character in the middle of the signature rather than the last
+    character.  The last base64url character of a 32-byte HMAC-SHA256 encodes
+    only 4 data bits (the bottom 2 bits are unused padding); changing only
+    those padding bits produces the same decoded bytes, leaving the signature
+    intact.  A middle character carries a full 6 bits of data, so flipping it
+    is guaranteed to corrupt the signature regardless of the token value.
+    """
     header, payload, sig = valid_token.rsplit(".", 2)
-    bad_sig = sig[:-1] + ("A" if sig[-1] != "A" else "B")
+    mid = len(sig) // 2
+    bad_sig = sig[:mid] + ("A" if sig[mid] != "A" else "B") + sig[mid + 1:]
     return f"{header}.{payload}.{bad_sig}"
 
 
