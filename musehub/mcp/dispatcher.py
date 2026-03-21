@@ -661,13 +661,15 @@ async def _call_tool(
         )
     elif name == "muse_push":
         _raw_commits = arguments.get("commits")
+        _raw_snapshots = arguments.get("snapshots")
         _raw_objects = arguments.get("objects")
         result = await exe.execute_muse_push(
             repo_id=_str("repo_id"),
             branch=_str("branch"),
             head_commit_id=_str("head_commit_id"),
             commits=list(_raw_commits) if isinstance(_raw_commits, list) else [],
-            objects=list(_raw_objects) if isinstance(_raw_objects, list) else [],
+            snapshots=list(_raw_snapshots) if isinstance(_raw_snapshots, list) else None,
+            objects=list(_raw_objects) if isinstance(_raw_objects, list) else None,
             force=_bool("force", False),
             user_id=user_id or "",
         )

@@ -1009,13 +1009,17 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
         "name": "muse_push",
         "server_side": True,
         "description": (
-            "Push commits and binary objects to a MuseHub repository. "
-            "Equivalent to 'muse push' — uploads new commits and base64-encoded "
-            "binary objects in a single batch. Enforces fast-forward semantics "
-            "unless force=true. "
-            "Authentication required: call musehub_whoami or musehub_create_agent_token first. "
+            "Push commits, snapshots, and binary objects to a MuseHub repository. "
+            "Equivalent to 'muse push' — uploads new commits, their snapshot manifests, "
+            "and base64-encoded binary objects in a single atomic batch. "
+            "Enforces fast-forward semantics unless force=true. "
+            "All three arrays are optional — a push with only commits and no new file content "
+            "is valid (e.g. a merge commit that modifies no files). "
+            "Authentication required: call musehub_create_agent_token first. "
             "Example: muse_push(repo_id='a3f2-...', branch='main', head_commit_id='abc123', "
-            "commits=[...], objects=[...])."
+            "commits=[{commit_id, parent_ids, message, snapshot_id, ...}], "
+            "snapshots=[{snapshot_id, manifest:{path: object_id}}], "
+            "objects=[{object_id, path, content_b64}])."
         ),
         "inputSchema": {
             "type": "object",
@@ -1035,6 +1039,18 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                         "List of CommitInput objects to push. Each has: "
                         "commit_id (str), parent_ids (list[str]), message (str), "
                         "author (str), timestamp (ISO-8601 str), snapshot_id (str)."
+                    ),
+                    "items": {"type": "object"},
+                },
+                "snapshots": {
+                    "type": "array",
+                    "description": (
+                        "Snapshot manifests for the pushed commits. Each has: "
+                        "snapshot_id (str, SHA-256 of sorted path:oid pairs), "
+                        "manifest (dict[str, str] mapping path → object_id), "
+                        "created_at (ISO-8601 str, optional). "
+                        "Snapshots are idempotent — already-stored snapshots are skipped. "
+                        "Include one snapshot per commit that introduces file changes."
                     ),
                     "items": {"type": "object"},
                 },
@@ -1168,14 +1184,21 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
         "server_side": True,
         "description": (
             "Interactively create new domain state by collecting user preferences via "
-            "form-mode elicitation. Currently implements the MIDI domain's composition "
-            "workflow — eliciting key signature, tempo, time signature, mood, genre, "
-            "reference artist, and duration, then returning a complete composition plan "
+            "form-mode elicitation (MCP 2025-11-25). Currently implements the MIDI domain's "
+            "composition workflow — eliciting key signature, tempo, time signature, mood, "
+            "genre, reference artist, and duration, then returning a complete composition plan "
             "with chord progressions, section structure, harmonic tension profile, and a "
             "step-by-step Muse project workflow. The elicitation schema will evolve to be "
             "fully domain-aware as additional domain plugins are registered. "
-            "Requires an active MCP session with elicitation capability. "
-            "Example: musehub_create_with_preferences(repo_id='a3f2-...')."
+            "ELICITATION BEHAVIOUR: requires an active MCP session (Mcp-Session-Id header). "
+            "Without a session the tool still succeeds — it returns a structured JSON prompt "
+            "listing every preference field with allowed values and defaults so the caller "
+            "can collect the inputs and call again with preferences={...}. "
+            "Non-elicitation clients: pass preferences={key_signature, tempo_bpm, "
+            "time_signature, mood, genre, reference_artist, duration_bars} to skip elicitation. "
+            "Example: musehub_create_with_preferences(repo_id='a3f2-...') "
+            "or musehub_create_with_preferences(repo_id='a3f2-...', "
+            "preferences={key_signature:'C major', tempo_bpm:120, mood:'uplifting'})."
         ),
         "inputSchema": {
             "type": "object",
@@ -1183,6 +1206,16 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
                 "repo_id": {
                     "type": "string",
                     "description": "Optional repository to scaffold the new state into.",
+                },
+                "preferences": {
+                    "type": "object",
+                    "description": (
+                        "Pre-filled preferences to bypass elicitation. "
+                        "Keys: key_signature (e.g. 'C major'), tempo_bpm (int), "
+                        "time_signature (e.g. '4/4'), mood (e.g. 'uplifting'), "
+                        "genre (e.g. 'jazz'), reference_artist (string), "
+                        "duration_bars (int). Omit to trigger interactive elicitation."
+                    ),
                 },
             },
             "required": [],
@@ -1196,9 +1229,12 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
             "dimension (melodic / harmonic / rhythmic / structural / dynamic / all) and "
             "depth (quick / standard / thorough). Returns a deep structured review targeting "
             "the user-chosen dimensions with per-dimension divergence scores. "
-            "For a non-interactive review, use musehub_get_pr + musehub_submit_pr_review. "
-            "Requires an active MCP session with elicitation capability. "
-            "Example: musehub_review_pr_interactive(repo_id='a3f2-...', pr_id='pr-uuid')."
+            "For a non-interactive review, use musehub_get_pr + musehub_submit_pr_review instead. "
+            "ELICITATION BEHAVIOUR: requires an active MCP session (Mcp-Session-Id header). "
+            "Without a session, pass dimension= and depth= directly to skip elicitation. "
+            "Example: musehub_review_pr_interactive(repo_id='a3f2-...', pr_id='pr-uuid') "
+            "or musehub_review_pr_interactive(repo_id='a3f2-...', pr_id='pr-uuid', "
+            "dimension='harmonic', depth='thorough')."
         ),
         "inputSchema": {
             "type": "object",
@@ -1207,6 +1243,19 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
                 "pr_id": {
                     "type": "string",
                     "description": "UUID of the pull request to review.",
+                },
+                "dimension": {
+                    "type": "string",
+                    "description": (
+                        "Focus dimension to bypass elicitation. "
+                        "One of: melodic, harmonic, rhythmic, structural, dynamic, all."
+                    ),
+                    "enum": ["melodic", "harmonic", "rhythmic", "structural", "dynamic", "all"],
+                },
+                "depth": {
+                    "type": "string",
+                    "description": "Review depth to bypass elicitation: quick, standard, or thorough.",
+                    "enum": ["quick", "standard", "thorough"],
                 },
             },
             "required": ["pr_id"],
@@ -1220,7 +1269,9 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
             "Apple Music, TIDAL, Amazon Music, Deezer) via URL-mode elicitation (OAuth). "
             "Directs the user to a MuseHub OAuth start page; once authorised, the agent can "
             "distribute Muse releases directly to the platform. "
-            "Requires an active MCP session with URL elicitation capability. "
+            "ELICITATION BEHAVIOUR: requires an active MCP session with URL elicitation capability. "
+            "Without a session, pass platform= directly to get the OAuth URL returned as text "
+            "so the caller can present it manually. "
             "Example: musehub_connect_streaming_platform(platform='Spotify', repo_id='a3f2-...')."
         ),
         "inputSchema": {
@@ -1249,7 +1300,9 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
             "Connect a cloud DAW or mastering service (LANDR, Splice, Soundtrap, BandLab, "
             "Audiotool) via URL-mode elicitation (OAuth). Once connected, agents can trigger "
             "cloud renders, stems exports, and AI mastering jobs directly from MuseHub workflows. "
-            "Requires an active MCP session with URL elicitation capability. "
+            "ELICITATION BEHAVIOUR: requires an active MCP session with URL elicitation capability. "
+            "Without a session, pass service= directly to get the OAuth URL returned as text "
+            "so the caller can present it manually. "
             "Example: musehub_connect_daw_cloud(service='LANDR')."
         ),
         "inputSchema": {
@@ -1274,13 +1327,34 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
             "(2) URL-mode (optional): offers streaming platform OAuth connection. "
             "Creates the release then returns distribution guidance for connected platforms. "
             "For a non-interactive release, use musehub_create_release with explicit arguments. "
-            "Requires an active MCP session with elicitation capability. "
-            "Example: musehub_create_release_interactive(repo_id='a3f2-...')."
+            "ELICITATION BEHAVIOUR: requires an active MCP session with elicitation capability. "
+            "Without a session, pass tag=, title=, notes= directly to bypass elicitation and "
+            "create the release immediately (identical to musehub_create_release). "
+            "Example: musehub_create_release_interactive(repo_id='a3f2-...') "
+            "or musehub_create_release_interactive(repo_id='a3f2-...', "
+            "tag='v1.0.0', title='First release', notes='Initial commit')."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 **_REPO_ID_PROP,
+                "tag": {
+                    "type": "string",
+                    "description": "Semver tag string (e.g. 'v1.0.0'). Elicited if omitted.",
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Release title. Elicited if omitted.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Release notes markdown. Elicited if omitted.",
+                },
+                "pre_release": {
+                    "type": "boolean",
+                    "description": "Whether this is a pre-release. Default: false.",
+                    "default": False,
+                },
             },
             "required": [],
         },
