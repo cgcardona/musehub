@@ -1363,9 +1363,11 @@ body.compare-mode .compare-check { display: block; }
 }
 .ex-hero-inner {
   max-width: 760px;
+  margin: 0 auto;
   padding: var(--space-8) 0 var(--space-6);
+  text-align: center;
 }
-.ex-hero-left { max-width: 640px; }
+.ex-hero-left { max-width: 640px; margin: 0 auto; }
 .ex-hero-eyebrow {
   font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
   color: #58a6ff; margin-bottom: var(--space-3);
@@ -1379,7 +1381,7 @@ body.compare-mode .compare-check { display: block; }
 .ex-hero-sub {
   font-size: 14px; line-height: 1.6;
   color: var(--text-secondary);
-  max-width: 520px; margin-bottom: var(--space-4);
+  max-width: 520px; margin: 0 auto var(--space-4);
   em { font-style: italic; color: #58a6ff; }
 }
 .ex-hero-stats {
