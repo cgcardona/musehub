@@ -51,6 +51,8 @@ MusehubErrorCode = Literal[
     "pull_failed",
     "domain_conflict",
     "publish_failed",
+    "quota_exceeded",
+    "forbidden",
 ]
 """Enumeration of error codes returned by MuseHub MCP executors.
 
@@ -1293,7 +1295,13 @@ async def execute_muse_push(
     force: bool = False,
     user_id: str = "",
 ) -> MusehubToolResult:
-    """Push commits, snapshots, and binary objects to a MuseHub repository."""
+    """Push commits, snapshots, and binary objects to a MuseHub repository.
+
+    Enforces a per-user storage quota (``MCP_PUSH_PER_USER_QUOTA_BYTES``) to
+    prevent runaway agent loops from filling the disk.  The quota counts bytes
+    already stored across all repos owned by ``user_id`` plus the incoming
+    object payload of this push.
+    """
     if not user_id:
         return MusehubToolResult(
             ok=False, error_code="unauthenticated",
@@ -1310,6 +1318,9 @@ async def execute_muse_push(
             ObjectInput as _ObjectInput,
             SnapshotInput as _SnapshotInput,
         )
+        from musehub.db import musehub_models as _db
+        from musehub.config import settings as _settings
+        from sqlalchemy import select as _select, func as _func
 
         repo = await _repo_svc.get_repo(session, repo_id)
         if repo is None:
@@ -1321,6 +1332,43 @@ async def execute_muse_push(
         commit_inputs = [_CommitInput.model_validate(c) for c in commits]
         snapshot_inputs = [_SnapshotInput.model_validate(s) for s in (snapshots or [])]
         object_inputs = [_ObjectInput.model_validate(o) for o in (objects or [])]
+
+        # ── Per-user storage quota ────────────────────────────────────────────
+        quota_bytes = _settings.mcp_push_per_user_quota_bytes
+        if quota_bytes > 0:
+            # Sum size_bytes for all objects owned by this user across all repos.
+            # We join via musehub_repos.owner_user_id to attribute storage to users.
+            used_q = await session.execute(
+                _select(_func.coalesce(_func.sum(_db.MusehubObject.size_bytes), 0)).where(
+                    _db.MusehubObject.repo_id.in_(
+                        _select(_db.MusehubRepo.repo_id).where(
+                            _db.MusehubRepo.owner_user_id == user_id,
+                            _db.MusehubRepo.deleted_at.is_(None),
+                        )
+                    )
+                )
+            )
+            used_bytes: int = int(used_q.scalar() or 0)
+
+            # Estimate incoming object size from base64 payload (pre-decode).
+            # base64 overhead is 4/3, so raw bytes ≈ len(b64) * 3/4.
+            incoming_bytes = sum(
+                int(len(o.content_b64) * 0.75)
+                for o in object_inputs
+                if hasattr(o, "content_b64") and o.content_b64
+            )
+
+            if used_bytes + incoming_bytes > quota_bytes:
+                quota_gb = quota_bytes / (1024 ** 3)
+                return MusehubToolResult(
+                    ok=False,
+                    error_code="quota_exceeded",
+                    error_message=(
+                        f"Storage quota exceeded: your account has used "
+                        f"{used_bytes / (1024**3):.2f} GB of the {quota_gb:.1f} GB limit. "
+                        "Delete unused objects or contact support to increase your quota."
+                    ),
+                )
 
         try:
             push_result = await _sync_svc.ingest_push(
@@ -1493,7 +1541,9 @@ async def execute_musehub_publish_domain(
     immediately discoverable via musehub_list_domains.
 
     Authentication is required — the caller must provide their user_id (resolved
-    from the MCP session JWT by the dispatcher).
+    from the MCP session JWT by the dispatcher).  The ``author_slug`` must match
+    the handle registered for the authenticated ``user_id`` to prevent namespace
+    squatting (publishing under another user's @handle).
     """
     if not user_id:
         return MusehubToolResult(
@@ -1511,6 +1561,31 @@ async def execute_musehub_publish_domain(
 
     async with AsyncSessionLocal() as session:
         from musehub.services import musehub_domains as _domain_svc
+        from musehub.db import musehub_models as _db
+        from sqlalchemy import select as _select
+
+        # ── Namespace squatting guard ─────────────────────────────────────────
+        # Verify that the authenticated user actually owns the author_slug they
+        # claim.  Look up the identity whose handle == author_slug and whose
+        # user_id (legacy_user_id or id) matches the JWT sub.  If no match,
+        # reject — an agent cannot publish under someone else's @handle.
+        identity_stmt = _select(_db.MusehubIdentity).where(
+            _db.MusehubIdentity.handle == author_slug,
+        )
+        identity_row = (await session.execute(identity_stmt)).scalar_one_or_none()
+        # Accept the publish if:
+        #   (a) an identity with this handle exists and its id == user_id, OR
+        #   (b) no identity row exists yet — the user is publishing their first
+        #       domain before creating a profile (author_user_id will own it).
+        if identity_row is not None and identity_row.id != user_id:
+            return MusehubToolResult(
+                ok=False,
+                error_code="forbidden",
+                error_message=(
+                    f"Cannot publish under '@{author_slug}': that handle belongs to "
+                    "a different account. Use your own handle as author_slug."
+                ),
+            )
 
         try:
             domain = await _domain_svc.create_domain(

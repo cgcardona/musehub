@@ -285,6 +285,9 @@ async def ingest_push(
     return PushResponse(ok=True, remote_head=head_commit_id)
 
 
+_PULL_OBJECTS_PAGE_SIZE: int = 500  # max objects returned per pull response
+
+
 async def compute_pull_delta(
     session: AsyncSession,
     *,
@@ -292,19 +295,27 @@ async def compute_pull_delta(
     branch: str,
     have_commits: list[str],
     have_objects: list[str],
+    cursor: str | None = None,
 ) -> PullResponse:
     """Return commits and objects the caller does not have.
 
-    MVP simplification: ``have_commits`` / ``have_objects`` act as exclusion
-    lists — we return everything stored for this repo/branch that is NOT in
-    those lists. No ancestry traversal is performed; the client gets all
-    missing data in one response.
+    Objects are paginated at ``_PULL_OBJECTS_PAGE_SIZE`` items per response to
+    prevent a single pull from returning an unbounded payload (OOM / timeout).
+
+    Pagination protocol:
+        - First call: ``cursor=None``
+        - When ``has_more=True``, re-issue with ``cursor=response.next_cursor``
+        - The ``next_cursor`` is the ``object_id`` of the last item in this page;
+          the next page starts *after* that ID (keyset pagination, stable sort).
+
+    Commits are never paginated — a repo's commit graph is O(kB per commit),
+    so even 10 000 commits stay well within a single JSON response.
     """
     branch_row = await _get_branch(session, repo_id=repo_id, branch=branch)
     remote_head = branch_row.head_commit_id if branch_row else None
 
     # ------------------------------------------------------------------
-    # Missing commits
+    # Missing commits (no pagination — commit metadata is small)
     # ------------------------------------------------------------------
     commit_stmt = select(db.MusehubCommit).where(
         db.MusehubCommit.repo_id == repo_id,
@@ -318,18 +329,33 @@ async def compute_pull_delta(
     missing_commits = [_to_commit_response(r) for r in commit_rows]
 
     # ------------------------------------------------------------------
-    # Missing objects
+    # Missing objects — keyset-paginated, capped at _PULL_OBJECTS_PAGE_SIZE
     # ------------------------------------------------------------------
-    obj_stmt = select(db.MusehubObject).where(db.MusehubObject.repo_id == repo_id)
+    obj_stmt = (
+        select(db.MusehubObject)
+        .where(db.MusehubObject.repo_id == repo_id)
+        .order_by(db.MusehubObject.object_id)  # stable keyset sort
+        .limit(_PULL_OBJECTS_PAGE_SIZE + 1)    # fetch one extra to detect next page
+    )
     if have_objects:
         obj_stmt = obj_stmt.where(db.MusehubObject.object_id.notin_(have_objects))
-    obj_rows = (await session.execute(obj_stmt)).scalars().all()
+    if cursor:
+        # Resume after the last seen object_id (keyset: strictly greater-than)
+        obj_stmt = obj_stmt.where(db.MusehubObject.object_id > cursor)
+
+    obj_rows = list((await session.execute(obj_stmt)).scalars().all())
+    has_more = len(obj_rows) > _PULL_OBJECTS_PAGE_SIZE
+    if has_more:
+        obj_rows = obj_rows[:_PULL_OBJECTS_PAGE_SIZE]
+
     missing_objects = [_to_object_response(r) for r in obj_rows]
+    next_cursor = obj_rows[-1].object_id if has_more and obj_rows else None
 
     logger.info(
-        "✅ Pull delta: %d commits, %d objects for repo=%s branch=%s",
+        "✅ Pull delta: %d commits, %d objects (has_more=%s) for repo=%s branch=%s",
         len(missing_commits),
         len(missing_objects),
+        has_more,
         repo_id,
         branch,
     )
@@ -337,6 +363,8 @@ async def compute_pull_delta(
         commits=missing_commits,
         objects=missing_objects,
         remote_head=remote_head,
+        has_more=has_more,
+        next_cursor=next_cursor,
     )
 
 

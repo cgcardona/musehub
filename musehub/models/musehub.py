@@ -126,11 +126,19 @@ class ObjectResponse(CamelModel):
 
 
 class PullResponse(CamelModel):
-    """Response for POST /musehub/repos/{repo_id}/pull."""
+    """Response for POST /musehub/repos/{repo_id}/pull.
+
+    Pagination is cursor-based: when ``has_more`` is ``True`` the caller
+    should re-issue the pull with ``cursor`` set to ``next_cursor`` to fetch
+    the next page of objects.  Commits are always returned in full (typically
+    small); only the object list is paginated.
+    """
 
     commits: list[CommitResponse]
     objects: list[ObjectResponse]
     remote_head: str | None
+    has_more: bool = False
+    next_cursor: str | None = None
 
 
 # ── Request models ────────────────────────────────────────────────────────────
