@@ -8,12 +8,33 @@ The wire protocol is intentionally separate from the REST API's CamelModel:
     Wire protocol  /wire/repos/{repo_id}/   ← Muse CLI speaks here
     REST API       /api/repos/{id}/          ← agents and integrations speak here
     MCP            /mcp                      ← agents speak here too
+
+Denial-of-Service limits
+------------------------
+All list fields that arrive over the network are capped so a single large
+request cannot exhaust memory or DB connections:
+
+  MAX_COMMITS_PER_PUSH  = 1 000   — one push should carry at most 1k commits
+  MAX_OBJECTS_PER_PUSH  = 1 000   — ditto for binary blobs
+  MAX_SNAPSHOTS_PER_PUSH = 1 000  — ditto for snapshot manifests
+  MAX_WANT_PER_FETCH    = 1 000   — fetch want/have lists
+  MAX_B64_SIZE          = 52_000_000 — ~38 MB decoded (base64 overhead ≈1.37×)
+                                     single-object cap; 100 MB objects must
+                                     use direct S3/R2 upload instead.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# ── Per-request DoS limits (enforced via Pydantic max_length) ───────────────
+MAX_COMMITS_PER_PUSH: int = 1_000
+MAX_OBJECTS_PER_PUSH: int = 1_000
+MAX_SNAPSHOTS_PER_PUSH: int = 1_000
+MAX_WANT_PER_FETCH: int = 1_000
+# Base64 string length limit — base64 expands by ~1.37×, so 52 MB b64 ≈ 38 MB raw.
+MAX_B64_SIZE: int = 52_000_000
 
 
 class WireCommit(BaseModel):
@@ -63,11 +84,27 @@ class WireObject(BaseModel):
     """Content-addressed object payload — mirrors ObjectPayload from muse.core.pack."""
 
     object_id: str
-    content_b64: str
+    content_b64: str = Field(max_length=MAX_B64_SIZE)
     # path is not in the Muse CLI ObjectPayload TypedDict but we accept it when present
-    path: str = ""
+    path: str = Field(default="", max_length=4096)
 
     model_config = {"extra": "ignore"}
+
+    @field_validator("content_b64")
+    @classmethod
+    def _check_b64_size(cls, v: str) -> str:
+        """Reject oversized objects before attempting base64 decode.
+
+        Checking ``len(v)`` is O(1) on CPython (str stores its length) and
+        prevents the memory spike that would occur when decoding a multi-GB
+        string into bytes.
+        """
+        if len(v) > MAX_B64_SIZE:
+            raise ValueError(
+                f"content_b64 exceeds maximum size ({MAX_B64_SIZE} chars). "
+                "Upload large objects directly to S3/R2 instead."
+            )
+        return v
 
 
 class WireBundle(BaseModel):
@@ -75,11 +112,14 @@ class WireBundle(BaseModel):
 
     Mirrors PackBundle from muse.core.pack.  All fields are optional because
     a minimal push may only contain commits (no new objects).
+
+    List lengths are capped to prevent DoS via an oversized single request.
+    See the module-level ``MAX_*`` constants for the exact limits.
     """
 
-    commits: list[WireCommit] = Field(default_factory=list)
-    snapshots: list[WireSnapshot] = Field(default_factory=list)
-    objects: list[WireObject] = Field(default_factory=list)
+    commits: list[WireCommit] = Field(default_factory=list, max_length=MAX_COMMITS_PER_PUSH)
+    snapshots: list[WireSnapshot] = Field(default_factory=list, max_length=MAX_SNAPSHOTS_PER_PUSH)
+    objects: list[WireObject] = Field(default_factory=list, max_length=MAX_OBJECTS_PER_PUSH)
     branch_heads: dict[str, str] = Field(default_factory=dict)
 
 
@@ -105,8 +145,8 @@ class WireFetchRequest(BaseModel):
     ``have`` — commit SHAs the client already has (exclusion list).
     """
 
-    want: list[str] = Field(default_factory=list)
-    have: list[str] = Field(default_factory=list)
+    want: list[str] = Field(default_factory=list, max_length=MAX_WANT_PER_FETCH)
+    have: list[str] = Field(default_factory=list, max_length=MAX_WANT_PER_FETCH)
 
 
 class WireRefsResponse(BaseModel):

@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     mcp_rate_limit_agent: str = "600/minute"
     mcp_rate_limit_anonymous: str = "20/minute"
 
+    # Per-user storage quota enforced at the MCP muse_push layer.
+    # Agents that loop indefinitely cannot fill the disk beyond this limit.
+    # Set to 0 to disable quota enforcement (not recommended in production).
+    mcp_push_per_user_quota_bytes: int = 10 * 1024 * 1024 * 1024  # 10 GB default
+
     # Stdio MCP server: proxy DAW tools to Muse backend
     muse_mcp_url: str | None = None
     mcp_token: str | None = None

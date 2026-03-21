@@ -89,6 +89,21 @@ class MCPSession:
 _SESSIONS: dict[str, MCPSession] = {}
 _cleanup_task: asyncio.Task[None] | None = None
 
+# Hard cap on simultaneous in-memory sessions.  Each session holds async queues
+# and futures; unbounded growth would exhaust memory under a connection flood.
+# Tune via the MUSEHUB_MAX_MCP_SESSIONS environment variable.  The default of
+# 10 000 comfortably handles tens of thousands of users when sessions are
+# short-lived (sub-minute).  Longer-lived clients should be backed by Redis.
+_MAX_SESSIONS: int = int(__import__("os").environ.get("MUSEHUB_MAX_MCP_SESSIONS", "10000"))
+
+
+class SessionCapacityError(RuntimeError):
+    """Raised when :func:`create_session` is called and the store is full.
+
+    The MCP POST handler converts this to ``503 Service Unavailable`` with a
+    ``Retry-After: 5`` header so well-behaved clients back off automatically.
+    """
+
 
 def create_session(
     user_id: str | None,
@@ -102,7 +117,22 @@ def create_session(
 
     Returns:
         The newly created :class:`MCPSession`.
+
+    Raises:
+        SessionCapacityError: When the number of active sessions already equals
+            ``_MAX_SESSIONS``.  The caller should return HTTP 503.
     """
+    if len(_SESSIONS) >= _MAX_SESSIONS:
+        logger.warning(
+            "⚠️ MCP session store full (%d/%d) — rejecting new session for user=%s",
+            len(_SESSIONS),
+            _MAX_SESSIONS,
+            user_id,
+        )
+        raise SessionCapacityError(
+            f"MCP session capacity ({_MAX_SESSIONS}) reached. Retry after expired "
+            "sessions are evicted (typically within 60 seconds)."
+        )
     session_id = secrets.token_urlsafe(32)
     session = MCPSession(
         session_id=session_id,
