@@ -32,6 +32,7 @@ class CommitInput(CamelModel):
     )
     message: str = Field(
         ...,
+        max_length=10_000,
         description="Musical commit message describing the compositional change",
         examples=["Add dominant 7th chord progression in the bridge — Fm7→Bb7→EbMaj7"],
     )
@@ -384,6 +385,7 @@ class IssueCreate(CamelModel):
     )
     body: str = Field(
         "",
+        max_length=10_000,
         description="Issue description (Markdown)",
         examples=["The Dm→Am→E7→Am progression in the verse doesn't resolve — suggest Dm→G7→CMaj7."],
     )
@@ -401,7 +403,7 @@ class IssueUpdate(CamelModel):
     """
 
     title: str | None = Field(None, min_length=1, max_length=500, description="Updated issue title")
-    body: str | None = Field(None, description="Updated issue body (Markdown)")
+    body: str | None = Field(None, max_length=10_000, description="Updated issue body (Markdown)")
     labels: list[str] | None = Field(None, description="Replacement label list")
 
 
@@ -465,6 +467,7 @@ class IssueCommentCreate(CamelModel):
     body: str = Field(
         ...,
         min_length=1,
+        max_length=10_000,
         description="Comment body (Markdown). Use track:bass, section:chorus, beats:16-24 for musical refs.",
         examples=["The bass in section:chorus beats:16-24 clashes with the chord progression."],
     )
@@ -601,6 +604,7 @@ class PRCreate(CamelModel):
     )
     body: str = Field(
         "",
+        max_length=10_000,
         description="PR description (Markdown)",
         examples=["This branch adds an 8-bar bossa nova bridge in 5/4 with guitar and upright bass."],
     )
@@ -721,6 +725,7 @@ class PRCommentCreate(CamelModel):
     body: str = Field(
         ...,
         min_length=1,
+        max_length=10_000,
         description="Review comment body (Markdown)",
         examples=["The bass line in beats 16-24 feels rhythmically stiff — try adding some swing."],
     )
@@ -880,6 +885,7 @@ class PRReviewCreate(CamelModel):
     )
     body: str = Field(
         "",
+        max_length=10_000,
         description="Review body (Markdown). Required when event='request_changes'.",
         examples=["Sounds great — the harmonic transitions in the bridge are exactly right."],
     )
@@ -903,6 +909,7 @@ class ReleaseCreate(CamelModel):
     )
     body: str = Field(
         "",
+        max_length=10_000,
         description="Release notes (Markdown)",
         examples=["## Summer Sessions 2024\n\nFinal arrangement with full brass section and 132 BPM tempo."],
     )

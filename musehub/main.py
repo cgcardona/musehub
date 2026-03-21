@@ -6,6 +6,7 @@ GitHub for music — push commits, open pull requests, track issues, publish rel
 """
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from typing import Awaitable, Callable
@@ -64,6 +65,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        # Generate a per-request nonce before rendering so templates can use
+        # request.state.csp_nonce in <script nonce="..."> attributes, replacing
+        # the blanket 'unsafe-inline' allowance.
+        nonce = secrets.token_urlsafe(16)
+        request.state.csp_nonce = nonce
+
         response = await call_next(request)
 
         if "X-Frame-Options" not in response.headers:
@@ -76,9 +83,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "gyroscope=(), magnetometer=(), microphone=(), "
             "payment=(), usb=()"
         )
+        # 'unsafe-eval' kept for Alpine.js expression evaluation (required by
+        # Alpine v3).  'unsafe-inline' removed in favour of per-request nonces;
+        # any inline <script> must carry nonce="{{ request.state.csp_nonce }}".
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            f"script-src 'self' 'unsafe-eval' 'nonce-{nonce}'; "
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
             "font-src 'self' https://fonts.bunny.net; "
             "img-src 'self' data: https:; "
@@ -122,6 +132,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             raise RuntimeError(
                 "Production requires DB_PASSWORD set to a strong value. "
                 "Generate with: openssl rand -hex 16"
+            )
+
+    # M4: Enforce a minimum 256-bit (32-byte) entropy on the JWT signing secret.
+    # A secret shorter than 32 bytes is trivially brute-forced.
+    if not settings.debug:
+        raw_secret = settings.access_token_secret or ""
+        if len(raw_secret.encode()) < 32:
+            raise RuntimeError(
+                "Production requires ACCESS_TOKEN_SECRET of at least 32 bytes. "
+                "Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
             )
 
     yield
