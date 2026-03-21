@@ -41,7 +41,7 @@
     <p style="font-size:0.82rem;color:var(--color-muted,#9ca3af);margin:0 0 1rem">
       This tab will close automatically in <span id="countdown">5</span>s.
     </p>
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
       let n = 5;
       const el = document.getElementById("countdown");
       const t = setInterval(() => {

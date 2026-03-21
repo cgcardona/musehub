@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/app.css?v={{ static_version }}">
-  <script>document.documentElement.classList.add('css-ready')</script>
+  <script nonce="{{ request.state.csp_nonce }}">document.documentElement.classList.add('css-ready')</script>
   <title>{% block title %}MuseHub{% endblock %} — MuseHub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
   {% block oembed_link %}<link rel="alternate" type="application/json+oembed"
@@ -86,7 +86,7 @@
     Functions that must be reachable from HTML onclick="" handlers must be
     explicitly assigned to window (e.g. window.myFn = function() {...}).
   #}
-  <script>(function () {
+  <script nonce="{{ request.state.csp_nonce }}">(function () {
 {% block page_data %}{% endblock %}
 {% block page_script %}{% endblock %}
   })();</script>

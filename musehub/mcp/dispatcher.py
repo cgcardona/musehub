@@ -64,6 +64,7 @@ _INVALID_REQUEST = -32600
 _METHOD_NOT_FOUND = -32601
 _INVALID_PARAMS = -32602
 _INTERNAL_ERROR = -32603
+_UNAUTHORIZED = -32000  # Authentication required (application-level sentinel)
 _URL_ELICITATION_REQUIRED = -32042  # MCP 2025-11-25 new error code
 
 
@@ -120,7 +121,9 @@ async def handle_request(
         logger.exception("Unhandled error in MCP dispatcher (method=%s): %s", method, exc)
         if is_notification:
             return None
-        return _error(req_id, _INTERNAL_ERROR, f"Internal error: {exc}")
+        # Do not propagate exc details to the client — they may contain
+        # stack traces, DB query fragments, or internal paths.
+        return _error(req_id, _INTERNAL_ERROR, "Internal error")
 
 
 async def handle_batch(
@@ -224,6 +227,10 @@ async def _dispatch(
         return {"completion": {"values": [], "hasMore": False, "total": 0}}
 
     if method == "logging/setLevel":
+        # M5: Only authenticated users may change the server log level.
+        # An anonymous caller could otherwise suppress all security-relevant logs.
+        if user_id is None:
+            raise _MCPError(_UNAUTHORIZED, "Authentication required for logging/setLevel")
         level = params.get("level")
         if isinstance(level, str):
             import logging as _logging
@@ -360,7 +367,8 @@ async def _handle_tools_call(
         return await _call_tool(name, arguments, ctx=ctx)
     except Exception as exc:
         logger.exception("Tool execution error (tool=%s): %s", name, exc)
-        return _tool_error(f"Internal error executing tool '{name}': {exc}")
+        # Strip exc details from the response — full trace is logged server-side only.
+        return _tool_error(f"Internal error executing tool '{name}'")
 
 
 async def _resolve_repo_id(owner: str, slug: str) -> tuple[str, str | None]:

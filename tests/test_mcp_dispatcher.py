@@ -98,9 +98,17 @@ async def test_completions_complete_returns_empty() -> None:
 
 
 @pytest.mark.asyncio
-async def test_logging_set_level_returns_empty() -> None:
-    """logging/setLevel should return an empty result dict (MCP 2025-11-25)."""
-    resp = await handle_request(_req("logging/setLevel", {"level": "info"}))
+async def test_logging_set_level_requires_auth_anonymous_rejected() -> None:
+    """logging/setLevel must return an error for unauthenticated callers (M5)."""
+    resp = await handle_request(_req("logging/setLevel", {"level": "info"}), user_id=None)
+    assert resp is not None
+    assert "error" in resp
+
+
+@pytest.mark.asyncio
+async def test_logging_set_level_authenticated_returns_empty() -> None:
+    """logging/setLevel returns empty result for authenticated callers (MCP 2025-11-25)."""
+    resp = await handle_request(_req("logging/setLevel", {"level": "info"}), user_id="test-user")
     assert resp is not None
     assert resp["result"] == {}
 

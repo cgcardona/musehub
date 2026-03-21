@@ -58,10 +58,20 @@ async def init_db() -> None:
     if database_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
     
+    # pool_size=20/max_overflow=40: handles ~20 concurrent requests without
+    # queueing, with headroom for bursty agent traffic.  SQLite uses
+    # StaticPool/NullPool instead, so these params are only forwarded for
+    # Postgres connections.
+    pool_kwargs: dict[str, int] = (
+        {"pool_size": 20, "max_overflow": 40, "pool_recycle": 1800}
+        if not database_url.startswith("sqlite")
+        else {}
+    )
     _engine = create_async_engine(
         database_url,
         echo=settings.debug,
         connect_args=connect_args,
+        **pool_kwargs,
     )
     
     _async_session_factory = async_sessionmaker(
