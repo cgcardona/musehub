@@ -257,7 +257,7 @@ async def test_push_non_fast_forward_rejected(
         "force": False,
     }
     resp = await client.post(f"/{repo.owner}/{repo.slug}/push", json=payload, headers=wire_headers)
-    assert resp.status_code == 422
+    assert resp.status_code == 409  # 409 Conflict for non-fast-forward
     assert "non-fast-forward" in resp.json()["detail"]
 
 

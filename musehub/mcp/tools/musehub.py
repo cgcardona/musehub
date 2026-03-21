@@ -1090,6 +1090,72 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
             "required": [],
         },
     },
+    {
+        "name": "musehub_publish_domain",
+        "server_side": True,
+        "description": (
+            "Register a new Muse domain plugin in the MuseHub marketplace. "
+            "After registration the domain appears in musehub_list_domains and can be "
+            "selected when creating repos (musehub_create_repo). "
+            "The scoped identifier '@{author_slug}/{slug}' must be globally unique. "
+            "Authentication required: call musehub_create_agent_token first. "
+            "The 'capabilities' object must follow the Muse domain schema:\n"
+            "  dimensions: list of {name, description} objects\n"
+            "  viewer_type: primary viewer identifier (e.g. 'midi', 'code', 'spatial')\n"
+            "  artifact_types: list of MIME types the domain produces\n"
+            "  merge_semantics: 'ot' | 'crdt' | 'three_way'\n"
+            "  supported_commands: list of muse CLI commands this domain supports\n"
+            "Returns: {domain_id, scoped_id, manifest_hash} on success. "
+            "Example: musehub_publish_domain(author_slug='cgcardona', slug='genomics', "
+            "display_name='Genomics', description='Version DNA sequences', "
+            "capabilities={...}, viewer_type='sequence', version='0.1.0')."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "author_slug": {
+                    "type": "string",
+                    "description": "Your MuseHub username (owner of the domain).",
+                },
+                "slug": {
+                    "type": "string",
+                    "description": "URL-safe domain name (e.g. 'genomics', 'spatial-3d').",
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "Human-readable name shown in the marketplace.",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What this domain models and why it benefits from semantic VCS.",
+                },
+                "capabilities": {
+                    "type": "object",
+                    "description": (
+                        "Domain capabilities manifest. Required keys: "
+                        "dimensions (list of {name, description}), "
+                        "viewer_type (string), "
+                        "artifact_types (list of MIME strings), "
+                        "merge_semantics ('ot'|'crdt'|'three_way'), "
+                        "supported_commands (list of muse CLI command names)."
+                    ),
+                },
+                "viewer_type": {
+                    "type": "string",
+                    "description": "Primary viewer identifier (e.g. 'midi', 'code', 'spatial', 'genome').",
+                },
+                "version": {
+                    "type": "string",
+                    "description": "Semver string (e.g. '0.1.0').",
+                    "default": "0.1.0",
+                },
+            },
+            "required": [
+                "author_slug", "slug", "display_name",
+                "description", "capabilities", "viewer_type",
+            ],
+        },
+    },
 ]
 
 

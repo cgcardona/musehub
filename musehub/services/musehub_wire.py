@@ -270,9 +270,9 @@ async def wire_push(
         )
         session.add(branch_row)
     else:
-        # fast-forward check
+        # fast-forward check: existing HEAD must appear in the parent chain of
+        # any pushed commit.  BFS both parents so merge commits are handled.
         if not req.force and branch_row.head_commit_id:
-            # Accept if current head is an ancestor of the push (parent chain)
             if not _is_ancestor_in_bundle(branch_row.head_commit_id, bundle.commits):
                 await session.rollback()
                 return WirePushResponse(
@@ -287,7 +287,17 @@ async def wire_push(
 
     # ── 5. Update repo ────────────────────────────────────────────────────────
     repo_row.pushed_at = _utc_now()
-    repo_row.default_branch = branch_name
+    # Only set default_branch on the very first push (no other branches exist).
+    # Never overwrite on subsequent pushes — doing so would silently corrupt the
+    # published default every time anyone pushes a non-default branch.
+    other_branches_q = await session.execute(
+        select(db.MusehubBranch).where(
+            db.MusehubBranch.repo_id == repo_id,
+            db.MusehubBranch.name != branch_name,
+        )
+    )
+    if other_branches_q.scalars().first() is None:
+        repo_row.default_branch = branch_name
 
     await session.commit()
 
@@ -307,6 +317,14 @@ async def wire_push(
     )
 
 
+async def _fetch_commit(
+    session: AsyncSession,
+    commit_id: str,
+) -> db.MusehubCommit | None:
+    """Load a single commit by primary key — avoids full-table scans."""
+    return await session.get(db.MusehubCommit, commit_id)
+
+
 async def wire_fetch(
     session: AsyncSession,
     repo_id: str,
@@ -314,8 +332,13 @@ async def wire_fetch(
 ) -> WireFetchResponse | None:
     """Return the minimal set of commits/snapshots/objects to satisfy ``want``.
 
-    Implements a simple server-side graph traversal from ``want`` to ``have``,
-    collecting all commits reachable from ``want`` that are not in ``have``.
+    BFS from each ``want`` commit toward its ancestors, stopping at any commit
+    in ``have`` (already on client) or when a commit is missing (orphan).
+
+    Commits are loaded one at a time by primary key rather than doing a
+    full ``SELECT … WHERE repo_id = ?`` table scan.  This keeps memory
+    proportional to the *delta* (commits the client needs) rather than the
+    total repository history.
     """
     repo_row = await session.get(db.MusehubRepo, repo_id)
     if repo_row is None or repo_row.deleted_at is not None:
@@ -324,16 +347,9 @@ async def wire_fetch(
     have_set = set(req.have)
     want_set = set(req.want)
 
-    # Load all commits for this repo (acceptable for repos with <10k commits)
-    all_commits_q = await session.execute(
-        select(db.MusehubCommit).where(db.MusehubCommit.repo_id == repo_id)
-    )
-    all_commits: list[db.MusehubCommit] = list(all_commits_q.scalars().all())
-    commit_by_id = {c.commit_id: c for c in all_commits}
-
-    # BFS from want → collect commits not in have
-    needed_ids: list[str] = []
-    frontier = list(want_set - have_set)
+    # BFS from want → collect commits not in have (on-demand PK lookups)
+    needed_rows: dict[str, db.MusehubCommit] = {}
+    frontier: list[str] = list(want_set - have_set)
     visited: set[str] = set()
 
     while frontier:
@@ -341,15 +357,16 @@ async def wire_fetch(
         if cid in visited or cid in have_set:
             continue
         visited.add(cid)
-        needed_ids.append(cid)
-        row = commit_by_id.get(cid)
-        if row is None:
+        row = await _fetch_commit(session, cid)
+        if row is None or row.repo_id != repo_id:
+            # Unknown commit or cross-repo reference — stop this path.
             continue
+        needed_rows[cid] = row
         for pid in (row.parent_ids or []):
             if pid not in visited and pid not in have_set:
                 frontier.append(pid)
 
-    needed_commits = [_to_wire_commit(commit_by_id[cid]) for cid in needed_ids if cid in commit_by_id]
+    needed_commits = [_to_wire_commit(needed_rows[cid]) for cid in needed_rows]
 
     # Collect snapshot IDs we need to send
     snap_ids = {c.snapshot_id for c in needed_commits if c.snapshot_id}
@@ -439,22 +456,37 @@ def _topological_sort(commits: list[WireCommit]) -> list[WireCommit]:
 
 
 def _is_ancestor_in_bundle(head_id: str, commits: list[WireCommit]) -> bool:
-    """Return True if ``head_id`` appears in the parent chain of any pushed commit.
+    """Return True if ``head_id`` appears in the ancestor graph of any pushed commit.
 
-    This validates fast-forward: the existing branch head must be an ancestor
-    of one of the newly pushed commits.
+    BFS both parents so merge commits are handled correctly: a merge commit
+    has parent_commit_id (first parent, the branch being merged into) and
+    parent2_commit_id (second parent, the branch being merged from).  The
+    remote HEAD may be either parent.
+
+    The walk stops when it leaves the bundle (parent not found in commit_by_id)
+    since commits outside the bundle already exist on the server — if the
+    remote HEAD is outside the bundle, the client intentionally excluded it
+    via ``have``, which means it IS an ancestor (incremental push).
     """
     commit_by_id = {c.commit_id: c for c in commits}
-    for commit in commits:
-        # Walk the parent chain from this commit
-        visited: set[str] = set()
-        current_id: str | None = commit.commit_id
-        while current_id and current_id not in visited:
-            if current_id == head_id:
-                return True
-            visited.add(current_id)
-            current = commit_by_id.get(current_id)
-            if current is None:
-                break
-            current_id = current.parent_commit_id
+    visited: set[str] = set()
+    frontier: list[str] = [c.commit_id for c in commits]
+
+    while frontier:
+        cid = frontier.pop()
+        if cid in visited:
+            continue
+        visited.add(cid)
+        if cid == head_id:
+            return True
+        row = commit_by_id.get(cid)
+        if row is None:
+            # This commit is outside the bundle (already on server).
+            # The client used ``have`` to exclude it, meaning they consider
+            # this commit an ancestor they share — keep walking is pointless.
+            continue
+        for pid in filter(None, [row.parent_commit_id, row.parent2_commit_id]):
+            if pid not in visited:
+                frontier.append(pid)
+
     return False

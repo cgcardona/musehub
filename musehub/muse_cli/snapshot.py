@@ -4,16 +4,25 @@ The full snapshot module was extracted to cgcardona/muse.
 Only compute_snapshot_id and compute_commit_id are retained here
 because MuseHub test fixtures use them to generate deterministic IDs.
 
-TODO(musehub-extraction): remove when MuseHub is extracted.
+IMPORTANT: the separator must stay in sync with muse.core.snapshot._SEP.
+The CLI migrated from ``|``/``:`` to a null-byte separator to prevent
+separator-injection collisions (filenames cannot contain \\x00 on POSIX).
 """
 
 import hashlib
 
+# Must match muse.core.snapshot._SEP exactly.
+_SEP = "\x00"
+
 
 def compute_snapshot_id(manifest: dict[str, str]) -> str:
-    """Return sha256 of the sorted ``path:object_id`` pairs."""
-    parts = sorted(f"{path}:{oid}" for path, oid in manifest.items())
-    payload = "|".join(parts).encode()
+    """Return sha256 of the sorted ``path NUL object_id`` pairs.
+
+    Uses a null-byte separator to prevent collision attacks via filenames or
+    object IDs that contain the previous ``|``/``:`` separators.
+    """
+    parts = sorted(f"{path}{_SEP}{oid}" for path, oid in manifest.items())
+    payload = _SEP.join(parts).encode()
     return hashlib.sha256(payload).hexdigest()
 
 

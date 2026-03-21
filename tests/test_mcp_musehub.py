@@ -150,7 +150,7 @@ class TestMusehubToolsRegistered:
             )
 
     def test_all_tools_defined(self) -> None:
-        """All 40 MuseHub tools (20 read + 15 write + 5 elicitation) are defined."""
+        """All 41 MuseHub tools (20 read + 16 write + 5 elicitation) are defined."""
         expected_read = {
             # Core repo reads
             "musehub_list_branches",
@@ -193,6 +193,8 @@ class TestMusehubToolsRegistered:
             "musehub_create_agent_token",
             "muse_push",
             "muse_config",
+            # Domain marketplace
+            "musehub_publish_domain",
         }
         expected_elicitation = {
             "musehub_create_with_preferences",

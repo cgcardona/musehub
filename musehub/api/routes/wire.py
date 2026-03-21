@@ -142,8 +142,10 @@ async def push(
     result = await wire_push(session, repo_id, body, pusher_id)
 
     if not result.ok:
+        # 409 Conflict for non-fast-forward (diverged history, use --force).
+        # 422 would imply a malformed request body; this is a semantic conflict.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_409_CONFLICT,
             detail=result.message,
         )
 
