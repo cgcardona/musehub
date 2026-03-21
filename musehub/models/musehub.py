@@ -60,6 +60,22 @@ class ObjectInput(CamelModel):
     content_b64: str = Field(..., description="Base64-encoded binary content")
 
 
+class SnapshotInput(CamelModel):
+    """A snapshot manifest transferred in a push payload.
+
+    A snapshot maps file paths to content-addressed object IDs.  Snapshots
+    are idempotent: pushing a snapshot whose ``snapshot_id`` already exists
+    is a no-op.
+    """
+
+    snapshot_id: str = Field(..., description="Content-addressed snapshot ID (SHA-256 of sorted path:oid pairs)")
+    manifest: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of relative file path → object_id, e.g. {'tracks/bass.mid': 'sha256:abc...'}",
+    )
+    created_at: str = Field(default="", description="ISO-8601 UTC creation timestamp")
+
+
 class PushRequest(CamelModel):
     """Body for POST /musehub/repos/{repo_id}/push."""
 
@@ -74,6 +90,7 @@ class PushRequest(CamelModel):
         examples=["a3f8c1d2e4b5"],
     )
     commits: list[CommitInput] = Field(default_factory=list, description="New commits to push")
+    snapshots: list[SnapshotInput] = Field(default_factory=list, description="Snapshot manifests for new commits")
     objects: list[ObjectInput] = Field(default_factory=list, description="Binary artifacts to upload")
     # Set true to allow non-fast-forward updates (overwrites remote head)
     force: bool = Field(False, description="Allow non-fast-forward push (overwrites remote head)")

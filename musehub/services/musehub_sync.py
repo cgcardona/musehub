@@ -33,6 +33,7 @@ from musehub.models.musehub import (
     ObjectResponse,
     PullResponse,
     PushResponse,
+    SnapshotInput,
 )
 
 logger = logging.getLogger(__name__)
@@ -134,6 +135,7 @@ async def ingest_push(
     branch: str,
     head_commit_id: str,
     commits: list[CommitInput],
+    snapshots: list[SnapshotInput] | None = None,
     objects: list[ObjectInput],
     force: bool,
     author: str,
@@ -195,7 +197,31 @@ async def ingest_push(
         logger.info("✅ Ingested %d new commits for repo=%s", len(new_commits), repo_id)
 
     # ------------------------------------------------------------------
-    # 4. Upsert objects (write bytes to disk, metadata to DB)
+    # 4. Upsert snapshots (idempotent — skip any already stored)
+    # ------------------------------------------------------------------
+    ingest_snapshots = snapshots or []
+    if ingest_snapshots:
+        existing_snap_ids_q = await session.execute(
+            select(db.MusehubSnapshot.snapshot_id).where(
+                db.MusehubSnapshot.snapshot_id.in_([s.snapshot_id for s in ingest_snapshots])
+            )
+        )
+        existing_snap_ids: set[str] = set(existing_snap_ids_q.scalars().all())
+        new_snaps: list[db.MusehubSnapshot] = [
+            db.MusehubSnapshot(
+                snapshot_id=s.snapshot_id,
+                repo_id=repo_id,
+                manifest=s.manifest,
+            )
+            for s in ingest_snapshots
+            if s.snapshot_id not in existing_snap_ids
+        ]
+        if new_snaps:
+            session.add_all(new_snaps)
+            logger.info("✅ Ingested %d new snapshots for repo=%s", len(new_snaps), repo_id)
+
+    # ------------------------------------------------------------------
+    # 5. Upsert objects (write bytes to disk, metadata to DB)
     # ------------------------------------------------------------------
     existing_object_ids: set[str] = set()
     if objects:
@@ -212,7 +238,7 @@ async def ingest_push(
         await _write_object(session, repo_id=repo_id, obj=obj)
 
     # ------------------------------------------------------------------
-    # 5. Update branch head
+    # 6. Update branch head
     # ------------------------------------------------------------------
     branch_row.head_commit_id = head_commit_id
     logger.info(

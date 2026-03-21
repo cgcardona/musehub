@@ -1288,11 +1288,12 @@ async def execute_muse_push(
     branch: str,
     head_commit_id: str,
     commits: list[object],
-    objects: list[object],
+    snapshots: list[object] | None = None,
+    objects: list[object] | None = None,
     force: bool = False,
     user_id: str = "",
 ) -> MusehubToolResult:
-    """Push commits and binary objects to a MuseHub repository."""
+    """Push commits, snapshots, and binary objects to a MuseHub repository."""
     if not user_id:
         return MusehubToolResult(
             ok=False, error_code="unauthenticated",
@@ -1304,7 +1305,11 @@ async def execute_muse_push(
 
     async with AsyncSessionLocal() as session:
         from musehub.services import musehub_repository as _repo_svc, musehub_sync as _sync_svc
-        from musehub.models.musehub import CommitInput as _CommitInput, ObjectInput as _ObjectInput
+        from musehub.models.musehub import (
+            CommitInput as _CommitInput,
+            ObjectInput as _ObjectInput,
+            SnapshotInput as _SnapshotInput,
+        )
 
         repo = await _repo_svc.get_repo(session, repo_id)
         if repo is None:
@@ -1314,7 +1319,8 @@ async def execute_muse_push(
             )
 
         commit_inputs = [_CommitInput.model_validate(c) for c in commits]
-        object_inputs = [_ObjectInput.model_validate(o) for o in objects]
+        snapshot_inputs = [_SnapshotInput.model_validate(s) for s in (snapshots or [])]
+        object_inputs = [_ObjectInput.model_validate(o) for o in (objects or [])]
 
         try:
             push_result = await _sync_svc.ingest_push(
@@ -1323,6 +1329,7 @@ async def execute_muse_push(
                 branch=branch,
                 head_commit_id=head_commit_id,
                 commits=commit_inputs,
+                snapshots=snapshot_inputs,
                 objects=object_inputs,
                 force=force,
                 author=user_id,
@@ -1334,6 +1341,7 @@ async def execute_muse_push(
                 "branch": branch,
                 "remote_head": push_result.remote_head,
                 "commits_pushed": len(commit_inputs),
+                "snapshots_pushed": len(snapshot_inputs),
                 "objects_pushed": len(object_inputs),
             })
         except ValueError as exc:
