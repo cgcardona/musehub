@@ -726,7 +726,53 @@ Mint a long-lived agent JWT with higher rate limits and an activity badge in the
 
 #### `muse_push`
 
-Push a Muse commit to MuseHub — equivalent of `muse push` on the command line.
+Push a Muse commit bundle to MuseHub — equivalent of `muse push` on the command line.
+
+Accepts the full wire format: commits, snapshot manifests, and content-addressed
+objects in a single round-trip.  Snapshots are stored idempotently — re-pushing an
+existing `snapshot_id` is a safe no-op.
+
+```json
+{
+  "name": "muse_push",
+  "arguments": {
+    "owner": "alice",
+    "slug": "my-song",
+    "branch": "main",
+    "head_commit_id": "sha256:abc...",
+    "commits": [
+      {
+        "commit_id": "sha256:abc...",
+        "parent_ids": ["sha256:parent..."],
+        "message": "feat: add bridge section",
+        "author": "alice",
+        "timestamp": "2026-03-21T18:00:00Z",
+        "snapshot_id": "sha256:snap..."
+      }
+    ],
+    "snapshots": [
+      {
+        "snapshot_id": "sha256:snap...",
+        "manifest": {
+          "tracks/piano.mid": "sha256:obj-piano...",
+          "tracks/strings.mid": "sha256:obj-strings..."
+        }
+      }
+    ],
+    "objects": [
+      {
+        "object_id": "sha256:obj-piano...",
+        "path": "tracks/piano.mid",
+        "size": 4096,
+        "content_b64": "<base64-encoded bytes>"
+      }
+    ]
+  }
+}
+```
+
+**Fast-forward enforcement:** rejected with `HTTP 409 Conflict` if the push would
+create a non-linear history.  Use `force: true` to override (destructive — use with care).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -734,7 +780,11 @@ Push a Muse commit to MuseHub — equivalent of `muse push` on the command line.
 | `owner` | string | no | Owner username (use with `slug`) |
 | `slug` | string | no | Repository slug (use with `owner`) |
 | `branch` | string | yes | Target branch name |
-| `commit_data` | object | yes | Commit payload (message, snapshot, author) |
+| `head_commit_id` | string | yes | SHA of the new branch tip |
+| `commits` | array | yes | List of `CommitInput` objects (see wire format) |
+| `snapshots` | array | no | List of `SnapshotInput` objects — `snapshot_id` + `manifest` dict |
+| `objects` | array | no | List of `ObjectInput` objects — content-addressed blobs |
+| `force` | boolean | no | Override fast-forward check (default: `false`) |
 
 ---
 
@@ -754,80 +804,176 @@ Read or write per-repo Muse configuration values — equivalent of `muse config`
 
 ### Elicitation-Powered Tools (5)
 
-> All elicitation tools require `Authorization: Bearer <jwt>`, an active session (`Mcp-Session-Id`), and a client that declared elicitation capability during `initialize`. They degrade gracefully for stateless clients, returning an `elicitation_unavailable` error that includes instructions for the non-interactive equivalent.
+> **Three execution paths — no session required for bypass or schema guide.**
+>
+> | Path | Requirements | Behaviour |
+> |------|-------------|-----------|
+> | **Elicitation** | Active session + elicitation capability declared | Interactive form / URL presented to user mid-call |
+> | **Bypass** | Supply bypass params (see each tool) | Returns result immediately; zero round-trips |
+> | **Schema guide** | No session, no bypass params | Returns `ok: true` with `mode: "schema_guide"` — a complete field guide for the next call |
+>
+> The bypass path makes all five tools usable in any headless agent, CI pipeline, or client that does not support MCP sessions.
 
-#### `musehub_create_with_preferences` _(form elicitation)_
+#### `musehub_create_with_preferences` _(form elicitation | bypass: `preferences`)_
 
-Interview the user about a creation, then return a complete domain-specific plan.
+Generate a complete domain-specific composition plan, either interactively or directly.
 
-**Elicits (MIDI/music domain):** key, tempo (BPM), time signature, mood, genre, reference artist, duration (bars), key modulation preference.
+**Elicitation path** — elicits: key signature, tempo (BPM), time signature, mood, genre, reference artist, duration (bars), key modulation.
 
-**Returns:** chord progressions per section, structural form (intro/verse/chorus/bridge/outro), harmonic tension profile, texture guidance, and a step-by-step Muse project workflow.
+**Bypass path** — pass `preferences` dict; every field is optional (falls back to sensible defaults):
+
+```json
+{
+  "name": "musehub_create_with_preferences",
+  "arguments": {
+    "repo_id": "repo-uuid",
+    "preferences": {
+      "key_signature": "G major",
+      "tempo_bpm": 140,
+      "mood": "joyful",
+      "genre": "jazz",
+      "reference_artist": "Bill Evans",
+      "duration_bars": 64,
+      "include_modulation": false
+    }
+  }
+}
+```
+
+**Schema guide** (no session, no `preferences`) — returns available field names, types, and valid values.
+
+**Returns:** `composition_plan` dict with chord progressions per section, structural form, harmonic tension profile, texture guidance, and a step-by-step Muse project workflow.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `repo_id` | string | no | Optional target repo to scaffold the plan into (or use `owner` + `slug`) |
+| `repo_id` | string | no | Optional target repo to scaffold the plan into |
+| `preferences` | object | no | **Bypass:** key\_signature, tempo\_bpm, time\_signature, mood, genre, reference\_artist, duration\_bars, include\_modulation |
 | `owner` | string | no | Owner username (use with `slug`) |
 | `slug` | string | no | Repository slug (use with `owner`) |
 
 ---
 
-#### `musehub_review_pr_interactive` _(form elicitation)_
+#### `musehub_review_pr_interactive` _(form elicitation | bypass: `dimension`, `depth`)_
 
-Interactive PR review: collect the reviewer's focus before running the divergence analysis.
+Deep musical PR review, either interactively or from explicit parameters.
 
-**Elicits:** dimension focus (all/melodic/harmonic/rhythmic/structural/dynamic), review depth (quick/standard/thorough), harmonic tension check, rhythmic consistency check, reviewer note.
+**Elicitation path** — elicits: dimension focus, review depth, harmonic tension check, rhythmic consistency check, reviewer note.
 
-**Returns:** per-dimension divergence scores, findings list, and a recommendation (APPROVE / REQUEST_CHANGES / COMMENT).
+**Bypass path** — pass `dimension` and/or `depth` directly:
+
+```json
+{
+  "name": "musehub_review_pr_interactive",
+  "arguments": {
+    "repo_id": "repo-uuid",
+    "pr_id": "pr-uuid",
+    "dimension": "harmonic",
+    "depth": "thorough"
+  }
+}
+```
+
+Either or both bypass params may be provided; missing values default to `"all"` and `"standard"` respectively.
+
+**Schema guide** (no session, no bypass params) — returns `dimension_options` and `depth_options` lists.
+
+**Returns:** per-dimension divergence scores, findings list (with harmonic tension and rhythmic checks), and a recommendation (APPROVE / REQUEST_CHANGES / COMMENT).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `repo_id` | string | yes | Repository UUID |
 | `pr_id` | string | yes | Pull request UUID |
+| `dimension` | string | no | **Bypass:** one of `melodic`, `harmonic`, `rhythmic`, `structural`, `dynamic`, `all` |
+| `depth` | string | no | **Bypass:** one of `quick`, `standard`, `thorough` |
 
 ---
 
-#### `musehub_connect_streaming_platform` _(URL elicitation)_
+#### `musehub_connect_streaming_platform` _(URL elicitation | bypass: `platform`)_
 
-OAuth-connect a streaming platform account for agent-triggered release distribution.
+OAuth-connect a streaming platform.  When no session is present but a valid `platform`
+is supplied, the OAuth URL is returned directly for manual browser navigation.
 
-**Elicits (form, if platform not supplied):** platform name, confirm checkbox.  
-**Elicits (URL):** directs user to `GET /musehub/ui/mcp/connect/{platform}?elicitation_id=...` OAuth start page.
+**Elicitation path** — full interactive OAuth flow via SSE session.
+
+**Bypass path** (no session, `platform` known):
+
+```json
+{
+  "name": "musehub_connect_streaming_platform",
+  "arguments": { "platform": "Spotify" }
+}
+```
+
+Returns `{ "status": "pending_oauth", "oauth_url": "https://...", "platform": "Spotify" }`.
+Open `oauth_url` in a browser to complete the OAuth flow.
+
+**Schema guide** (no session, no `platform`) — returns `platform_options` list.
 
 **Supported platforms:** Spotify, SoundCloud, Bandcamp, YouTube Music, Apple Music, TIDAL, Amazon Music, Deezer.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `platform` | string | no | Platform name (elicited if omitted) |
-| `repo_id` | string | no | Repository context for distribution |
+| `platform` | string | no | **Bypass:** platform name (elicited via form if omitted and session exists) |
+| `repo_id` | string | no | Repository context for release distribution |
 
 ---
 
-#### `musehub_connect_daw_cloud` _(URL elicitation)_
+#### `musehub_connect_daw_cloud` _(URL elicitation | bypass: `service`)_
 
-OAuth-connect a cloud DAW or mastering service for cloud renders and exports.
+OAuth-connect a cloud DAW or mastering service.  When no session is present but a valid
+`service` is supplied, the OAuth URL is returned directly.
 
-**Elicits (form, if service not supplied):** service name, confirm checkbox.  
-**Elicits (URL):** directs user to `GET /musehub/ui/mcp/connect/daw/{service}?elicitation_id=...`.
+**Bypass path** (no session, `service` known):
+
+```json
+{
+  "name": "musehub_connect_daw_cloud",
+  "arguments": { "service": "LANDR" }
+}
+```
+
+Returns `{ "status": "pending_oauth", "oauth_url": "https://...", "service": "LANDR", "capabilities": [...] }`.
+
+**Schema guide** (no session, no `service`) — returns `service_options` list.
 
 **Supported services:** LANDR (AI mastering + distribution), Splice (sample sync + backup), Soundtrap, BandLab, Audiotool.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `service` | string | no | Service name (elicited if omitted) |
+| `service` | string | no | **Bypass:** service name (elicited via form if omitted and session exists) |
 
 ---
 
-#### `musehub_create_release_interactive` _(chained form + URL elicitation)_
+#### `musehub_create_release_interactive` _(chained form + URL elicitation | bypass: `tag`)_
 
-Two-phase interactive release creator:
+Two-phase interactive release creator, or direct release creation via bypass params.
 
-1. **Form elicitation:** collects tag, title, release notes, changelog highlight, and pre-release flag.
-2. **URL elicitation (optional):** offers Spotify connection OAuth for immediate distribution.
+**Elicitation path:**
+1. **Form:** collects tag, title, release notes, changelog highlight, and pre-release flag.
+2. **URL (optional):** offers Spotify OAuth for immediate distribution.
+
+**Bypass path** — supply `tag` (required); `title` and `notes` are optional:
+
+```json
+{
+  "name": "musehub_create_release_interactive",
+  "arguments": {
+    "repo_id": "repo-uuid",
+    "tag": "v1.2.0",
+    "title": "Spring release",
+    "notes": "New chord voicings, tempo map fixes."
+  }
+}
+```
+
+**Schema guide** (no session, no `tag`) — returns field guide with required/optional labels.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `repo_id` | string | yes | Repository to create the release in |
+| `tag` | string | no | **Bypass:** semantic version tag (e.g. `v1.2.0`); triggers direct release creation |
+| `title` | string | no | **Bypass:** human-readable release title (defaults to `tag`) |
+| `notes` | string | no | **Bypass:** release notes / changelog body |
 
 ---
 

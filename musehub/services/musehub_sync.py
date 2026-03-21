@@ -140,12 +140,45 @@ async def ingest_push(
     force: bool,
     author: str,
 ) -> PushResponse:
-    """Store commits and objects from a push request and update the branch head.
+    """Store commits, snapshot manifests, and objects from a push; update the branch head.
+
+    Execution steps (in order):
+
+    1. **Resolve / create branch** — upsert the branch row; first push initialises
+       ``head_commit_id = None`` and ``default_branch`` is set only when this is the
+       repo's inaugural branch.
+    2. **Fast-forward check** — BFS traverses both ``parent_commit_id`` and
+       ``parent2_commit_id`` to support merge commits.  Rejected with
+       ``ValueError("non_fast_forward")`` when the current tip is not an ancestor of
+       the new head and ``force`` is False.  The route handler maps this to HTTP 409.
+    3. **Upsert commits** — existing commit IDs are skipped; new rows are bulk-inserted.
+    4. **Upsert snapshots** — each :class:`SnapshotInput` is stored with
+       ``(repo_id, snapshot_id)`` as a composite key. Re-pushing an identical
+       snapshot is a safe no-op (idempotent via ``merge`` / ``ON CONFLICT DO NOTHING``).
+    5. **Upsert objects** — binary blobs are written to the configured storage backend
+       and their metadata rows are inserted or skipped if already present.
+    6. **Update branch head** — the branch row's ``head_commit_id`` is set to
+       ``head_commit_id`` and ``pushed_at`` is refreshed.
+
+    Args:
+        session:       Active async SQLAlchemy session.
+        repo_id:       Repository UUID; must already exist in the DB.
+        branch:        Target branch name (created on first push).
+        head_commit_id: SHA of the new branch tip after the push.
+        commits:       Ordered list of :class:`CommitInput` objects to store.
+        snapshots:     Optional list of :class:`SnapshotInput` objects; ``None``
+                       or ``[]`` are both treated as "no snapshots in this push".
+        objects:       Content-addressed blob payloads.
+        force:         When ``True``, skip the fast-forward check (destructive).
+        author:        Username performing the push (used for the response summary).
+
+    Returns:
+        :class:`PushResponse` with commit / snapshot / object counts and the
+        new branch head commit ID.
 
     Raises:
-        ValueError: with key ``"non_fast_forward"`` when the update would be
-            non-fast-forward and ``force`` is False. The route handler maps
-            this to HTTP 409.
+        ValueError: with key ``"non_fast_forward"`` when the update would create
+            a non-linear history and ``force`` is False.
     """
     # ------------------------------------------------------------------
     # 1. Resolve (or create) the branch
