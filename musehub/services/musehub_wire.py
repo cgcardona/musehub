@@ -22,7 +22,6 @@ from __future__ import annotations
 import base64
 import logging
 from datetime import datetime, timezone
-from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +57,25 @@ def _parse_iso(s: str) -> datetime:
         return _utc_now()
 
 
+def _str_values(d: object) -> dict[str, str]:
+    """Safely coerce a dict with unknown value types to ``dict[str, str]``."""
+    if not isinstance(d, dict):
+        return {}
+    return {str(k): str(v) for k, v in d.items()}
+
+
+def _str_list(v: object) -> list[str]:
+    """Safely coerce a list with unknown element types to ``list[str]``."""
+    if not isinstance(v, list):
+        return []
+    return [str(x) for x in v]
+
+
+def _int_safe(v: object, default: int = 0) -> int:
+    """Return *v* as an int when it is numeric; fall back to *default*."""
+    return int(v) if isinstance(v, (int, float)) else default
+
+
 def _to_wire_commit(row: db.MusehubCommit) -> WireCommit:
     """Convert a DB commit row back to WireCommit format for fetch responses."""
     meta: dict[str, object] = row.commit_meta if isinstance(row.commit_meta, dict) else {}
@@ -72,19 +90,19 @@ def _to_wire_commit(row: db.MusehubCommit) -> WireCommit:
         parent_commit_id=parent_ids[0] if len(parent_ids) >= 1 else None,
         parent2_commit_id=parent_ids[1] if len(parent_ids) >= 2 else None,
         author=row.author or "",
-        metadata=cast(dict[str, str], meta["metadata"]) if isinstance(meta.get("metadata"), dict) else {},
+        metadata=_str_values(meta.get("metadata")),
         structured_delta=meta.get("structured_delta"),
         sem_ver_bump=str(meta.get("sem_ver_bump") or "none"),
-        breaking_changes=[str(x) for x in cast(list[object], meta["breaking_changes"])] if isinstance(meta.get("breaking_changes"), list) else [],
+        breaking_changes=_str_list(meta.get("breaking_changes")),
         agent_id=str(meta.get("agent_id") or ""),
         model_id=str(meta.get("model_id") or ""),
         toolchain_id=str(meta.get("toolchain_id") or ""),
         prompt_hash=str(meta.get("prompt_hash") or ""),
         signature=str(meta.get("signature") or ""),
         signer_key_id=str(meta.get("signer_key_id") or ""),
-        format_version=cast(int, meta.get("format_version") or 1),
-        reviewed_by=[str(x) for x in cast(list[object], meta["reviewed_by"])] if isinstance(meta.get("reviewed_by"), list) else [],
-        test_runs=cast(int, meta.get("test_runs") or 0),
+        format_version=_int_safe(meta.get("format_version"), default=1),
+        reviewed_by=_str_list(meta.get("reviewed_by")),
+        test_runs=_int_safe(meta.get("test_runs")),
     )
 
 

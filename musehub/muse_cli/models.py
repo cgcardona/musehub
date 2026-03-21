@@ -1,10 +1,9 @@
-"""Re-exports of Muse CLI ORM models for MuseHub compatibility.
+"""Muse CLI ORM model re-exports for MuseHub consumers.
 
-The canonical definitions now live in musehub.db.muse_cli_models.
-This module exists only so that MuseHub code and tests can keep importing
-from the original path while MuseHub extraction is pending.
-
-TODO(musehub-extraction): remove when MuseHub is extracted to its own repo.
+The canonical definitions live in ``musehub.db.muse_cli_models``.
+This module provides a stable import path (``musehub.muse_cli.models``)
+so internal services and tests can reference Muse CLI DB rows without
+coupling to the internal DB package structure.
 """
 
 from musehub.db.muse_cli_models import (

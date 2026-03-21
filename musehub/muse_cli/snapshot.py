@@ -1,12 +1,14 @@
-"""Pure snapshot hashing utilities retained for MuseHub tests.
+"""Snapshot and commit ID hashing — MuseHub-side implementation.
 
-The full snapshot module was extracted to cgcardona/muse.
-Only compute_snapshot_id and compute_commit_id are retained here
-because MuseHub test fixtures use them to generate deterministic IDs.
+This module provides the canonical server-side ID computation functions used
+by MuseHub services and test fixtures.  It intentionally mirrors the hashing
+logic in ``muse.core.snapshot`` (the Muse CLI) so that IDs generated on the
+server can be cross-verified against IDs sent by the CLI.
 
-IMPORTANT: the separator must stay in sync with muse.core.snapshot._SEP.
-The CLI migrated from ``|``/``:`` to a null-byte separator to prevent
-separator-injection collisions (filenames cannot contain \\x00 on POSIX).
+CONTRACT: The separator constant ``_SEP`` and the hash construction algorithm
+MUST remain identical to ``muse.core.snapshot._SEP`` and
+``muse.core.snapshot.compute_snapshot_id``.  Any change to either side must
+be applied to both simultaneously.  A mismatch is a silent data-integrity bug.
 """
 
 import hashlib
