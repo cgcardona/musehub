@@ -618,8 +618,13 @@ async def _call_tool(
 
     elif name == "musehub_create_with_preferences":
         from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
+        _raw_prefs = arguments.get("preferences")
+        _prefs: dict[str, JSONValue] | None = (
+            dict(_raw_prefs) if isinstance(_raw_prefs, dict) else None
+        )
         result = await execute_compose_with_preferences(
             repo_id=_str_or_none("repo_id"),
+            preferences=_prefs,
             ctx=ctx,
         )
     elif name == "musehub_review_pr_interactive":
@@ -627,6 +632,8 @@ async def _call_tool(
         result = await execute_review_pr_interactive(
             repo_id=_str("repo_id"),
             pr_id=_str("pr_id"),
+            dimension=_str_or_none("dimension"),
+            depth=_str_or_none("depth"),
             ctx=ctx,
         )
     elif name == "musehub_connect_streaming_platform":
@@ -646,6 +653,9 @@ async def _call_tool(
         from musehub.mcp.write_tools.elicitation_tools import execute_create_release_interactive
         result = await execute_create_release_interactive(
             repo_id=_str("repo_id"),
+            tag=_str_or_none("tag"),
+            title=_str_or_none("title"),
+            notes=_str_or_none("notes"),
             ctx=ctx,
         )
 

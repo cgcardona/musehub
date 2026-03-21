@@ -322,14 +322,16 @@ async def test_progress_with_session_pushes_sse_event() -> None:
 
 
 @pytest.mark.anyio
-async def test_compose_with_preferences_no_session() -> None:
-    """musehub_create_with_preferences without session must return error."""
+async def test_compose_with_preferences_no_session_no_prefs() -> None:
+    """musehub_create_with_preferences with no prefs + no session returns schema guide."""
     from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
 
     ctx = ToolCallContext(user_id=None, session=None)
     result = await execute_compose_with_preferences(repo_id=None, ctx=ctx)
-    assert result.ok is False
-    assert result.error_code == "elicitation_unavailable"
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("mode") == "schema_guide"
+    assert "fields" in result.data
 
 
 @pytest.mark.anyio
@@ -339,41 +341,75 @@ async def test_review_pr_interactive_no_session() -> None:
 
     ctx = ToolCallContext(user_id=None, session=None)
     result = await execute_review_pr_interactive("repo-1", "pr-1", ctx=ctx)
-    assert result.ok is False
-    assert result.error_code == "elicitation_unavailable"
+    # No bypass params + no session → schema guide (ok=True, not an error)
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("mode") == "schema_guide"
 
 
 @pytest.mark.anyio
-async def test_connect_streaming_platform_no_session() -> None:
-    """musehub_connect_streaming_platform without session must return error."""
+async def test_connect_streaming_platform_no_session_with_platform() -> None:
+    """musehub_connect_streaming_platform with platform + no session returns OAuth URL."""
     from musehub.mcp.write_tools.elicitation_tools import execute_connect_streaming_platform
 
     ctx = ToolCallContext(user_id=None, session=None)
     result = await execute_connect_streaming_platform("Spotify", None, ctx=ctx)
-    assert result.ok is False
-    assert result.error_code == "elicitation_unavailable"
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("status") == "pending_oauth"
+    assert "oauth_url" in result.data
 
 
 @pytest.mark.anyio
-async def test_connect_daw_cloud_no_session() -> None:
-    """musehub_connect_daw_cloud without session must return error."""
+async def test_connect_streaming_platform_no_session_no_platform() -> None:
+    """musehub_connect_streaming_platform with no platform + no session returns schema guide."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_connect_streaming_platform
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    result = await execute_connect_streaming_platform(None, None, ctx=ctx)
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("mode") == "schema_guide"
+    assert "platform_options" in result.data
+
+
+@pytest.mark.anyio
+async def test_connect_daw_cloud_no_session_with_service() -> None:
+    """musehub_connect_daw_cloud with service + no session returns OAuth URL."""
     from musehub.mcp.write_tools.elicitation_tools import execute_connect_daw_cloud
 
     ctx = ToolCallContext(user_id=None, session=None)
     result = await execute_connect_daw_cloud("LANDR", ctx=ctx)
-    assert result.ok is False
-    assert result.error_code == "elicitation_unavailable"
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("status") == "pending_oauth"
+    assert "oauth_url" in result.data
 
 
 @pytest.mark.anyio
-async def test_create_release_interactive_no_session() -> None:
-    """musehub_create_release_interactive without session must return error."""
+async def test_connect_daw_cloud_no_session_no_service() -> None:
+    """musehub_connect_daw_cloud with no service + no session returns schema guide."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_connect_daw_cloud
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    result = await execute_connect_daw_cloud(None, ctx=ctx)
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("mode") == "schema_guide"
+    assert "service_options" in result.data
+
+
+@pytest.mark.anyio
+async def test_create_release_interactive_no_session_no_params() -> None:
+    """musehub_create_release_interactive with no params + no session returns schema guide."""
     from musehub.mcp.write_tools.elicitation_tools import execute_create_release_interactive
 
     ctx = ToolCallContext(user_id=None, session=None)
     result = await execute_create_release_interactive("repo-1", ctx=ctx)
-    assert result.ok is False
-    assert result.error_code == "elicitation_unavailable"
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("mode") == "schema_guide"
+    assert "fields" in result.data
 
 
 # ── New prompts ───────────────────────────────────────────────────────────────
@@ -461,3 +497,152 @@ async def test_notifications_cancelled_resolves_future() -> None:
 
     assert fut.cancelled()
     delete_session(session.session_id)
+
+
+# ── Bypass path tests (no session, params provided directly) ──────────────────
+
+
+@pytest.mark.anyio
+async def test_compose_with_preferences_bypass_minimal() -> None:
+    """Bypass: preferences dict produces a composition plan without session."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    result = await execute_compose_with_preferences(
+        repo_id=None,
+        preferences={"key_signature": "G major", "tempo_bpm": 140, "mood": "joyful", "genre": "jazz"},
+        ctx=ctx,
+    )
+    assert result.ok is True
+    data = result.data
+    assert data is not None
+    # Plan is nested under "composition_plan"
+    plan = data.get("composition_plan") or data
+    assert plan.get("key") == "G major"
+    assert plan.get("tempo_bpm") == 140
+
+
+@pytest.mark.anyio
+async def test_compose_with_preferences_bypass_with_repo() -> None:
+    """Bypass: repo_id is injected into the plan and scaffold_hint is set."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    result = await execute_compose_with_preferences(
+        repo_id="repo-xyz",
+        preferences={"mood": "ethereal", "genre": "ambient"},
+        ctx=ctx,
+    )
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.get("repo_id") == "repo-xyz"
+    assert "scaffold_hint" in result.data
+
+
+@pytest.mark.anyio
+async def test_compose_with_preferences_bypass_defaults() -> None:
+    """Bypass: empty preferences dict uses sensible defaults."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_compose_with_preferences
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    result = await execute_compose_with_preferences(repo_id=None, preferences={}, ctx=ctx)
+    assert result.ok is True
+    data = result.data
+    assert data is not None
+    plan = data.get("composition_plan") or data
+    assert plan.get("tempo_bpm") == 120
+    assert plan.get("key") == "C major"
+
+
+@pytest.mark.anyio
+async def test_review_pr_interactive_bypass_dimension_and_depth() -> None:
+    """Bypass: dimension+depth skip elicitation, run divergence analysis path."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_review_pr_interactive
+    from musehub.services.musehub_mcp_executor import MusehubToolResult
+
+    ctx = ToolCallContext(user_id=None, session=None)
+
+    # DB is unavailable in unit tests — expect a graceful db_unavailable result,
+    # which proves the bypass path was taken (no elicitation_unavailable error).
+    result = await execute_review_pr_interactive(
+        "repo-1", "pr-1",
+        dimension="harmonic",
+        depth="thorough",
+        ctx=ctx,
+    )
+    # Accepted bypass — should proceed to DB lookup, not hit schema_guide
+    assert result.data is None or result.data.get("mode") != "schema_guide"
+    # If DB is down the error_code is db_unavailable, not elicitation_unavailable
+    if not result.ok:
+        assert result.error_code != "elicitation_unavailable"
+
+
+@pytest.mark.anyio
+async def test_review_pr_interactive_bypass_dimension_only() -> None:
+    """Bypass: dimension alone (depth defaults to standard) skips elicitation."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_review_pr_interactive
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    result = await execute_review_pr_interactive(
+        "repo-1", "pr-2",
+        dimension="melodic",
+        ctx=ctx,
+    )
+    # Must not be schema_guide — dimension was supplied so bypass took effect.
+    if result.data:
+        assert result.data.get("mode") != "schema_guide"
+    if not result.ok:
+        assert result.error_code != "elicitation_unavailable"
+
+
+@pytest.mark.anyio
+async def test_connect_streaming_platform_bypass_returns_oauth_url() -> None:
+    """Bypass: known platform + no session returns a usable OAuth URL."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_connect_streaming_platform
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    for platform in ["Spotify", "SoundCloud", "Bandcamp"]:
+        result = await execute_connect_streaming_platform(platform, None, ctx=ctx)
+        assert result.ok is True
+        assert result.data is not None
+        assert result.data.get("status") == "pending_oauth"
+        url = str(result.data.get("oauth_url", ""))
+        assert "http" in url
+        assert result.data.get("platform") == platform
+
+
+@pytest.mark.anyio
+async def test_connect_daw_cloud_bypass_returns_oauth_url() -> None:
+    """Bypass: known service + no session returns a usable OAuth URL."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_connect_daw_cloud
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    for service in ["LANDR", "Splice", "BandLab"]:
+        result = await execute_connect_daw_cloud(service, ctx=ctx)
+        assert result.ok is True
+        assert result.data is not None
+        assert result.data.get("status") == "pending_oauth"
+        url = str(result.data.get("oauth_url", ""))
+        assert "http" in url
+        assert "capabilities" in result.data
+
+
+@pytest.mark.anyio
+async def test_create_release_interactive_bypass_tag_only() -> None:
+    """Bypass: tag supplied directly — proceeds to execute_create_release (DB may fail)."""
+    from musehub.mcp.write_tools.elicitation_tools import execute_create_release_interactive
+
+    ctx = ToolCallContext(user_id=None, session=None)
+    result = await execute_create_release_interactive(
+        "repo-1",
+        tag="v0.9.0",
+        title="Beta",
+        notes="First beta.",
+        ctx=ctx,
+    )
+    # If DB is unavailable the create_release call fails, but it must NOT
+    # return elicitation_unavailable — that proves bypass was taken.
+    if not result.ok:
+        assert result.error_code != "elicitation_unavailable"
+    if result.data:
+        assert result.data.get("mode") != "schema_guide"
