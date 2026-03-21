@@ -56,36 +56,86 @@ logger = logging.getLogger(__name__)
 async def execute_compose_with_preferences(
     repo_id: str | None,
     *,
+    preferences: dict[str, JSONValue] | None = None,
     ctx: "ToolCallContext",
 ) -> MusehubToolResult:
-    """Interactively compose a musical piece by eliciting user preferences.
+    """Compose a musical piece, optionally eliciting preferences via MCP.
 
-    Sends a form elicitation to collect key, tempo, mood, genre, and optional
-    reference artist. Returns a structured composition plan including:
-    - Suggested chord progressions per section
-    - Structural form (intro / verse / chorus / bridge / outro)
-    - Tempo map and metric feel
-    - Harmonic rhythm suggestions
-    - A ready-to-commit Muse project scaffold outline
+    Bypass path (no session needed): pass ``preferences`` directly to skip
+    elicitation and receive a composition plan immediately.  Missing fields
+    fall back to sensible defaults.
+
+    Elicitation path (session required): when ``preferences`` is omitted and
+    an active MCP session exists, a form is presented to collect preferences
+    interactively.
+
+    No-session, no-preferences path: returns a structured guide listing every
+    available field so the caller can populate ``preferences`` and call again.
 
     Args:
         repo_id: Optional target repository for the composition scaffold.
-        ctx: Tool call context (must have active session for elicitation).
-
-    Returns:
-        MusehubToolResult with a composition plan dict on success.
+        preferences: Pre-filled preference dict (bypasses elicitation).
+        ctx: Tool call context (session required for elicitation).
     """
+    # ── Bypass: preferences provided directly ─────────────────────────────────
+    if preferences is not None:
+        key = str(preferences.get("key_signature") or preferences.get("key") or "C major")
+        _tempo = preferences.get("tempo_bpm", 120)
+        tempo = int(_tempo) if isinstance(_tempo, (int, float)) else 120
+        time_sig = str(preferences.get("time_signature") or "4/4")
+        mood = str(preferences.get("mood") or "peaceful")
+        genre = str(preferences.get("genre") or "ambient")
+        reference = str(preferences.get("reference_artist") or "")
+        _duration = preferences.get("duration_bars", 64)
+        duration = int(_duration) if isinstance(_duration, (int, float)) else 64
+        modulate = bool(preferences.get("include_modulation", False))
+        plan = _build_composition_plan(
+            key=key, tempo=tempo, time_sig=time_sig, mood=mood, genre=genre,
+            reference=reference, duration_bars=duration, modulate=modulate,
+        )
+        if repo_id:
+            plan["repo_id"] = repo_id
+            plan["scaffold_hint"] = (
+                f"Create a commit in repo {repo_id} with a 'composition.json' file "
+                "containing the above plan. Use musehub_create_issue to track each "
+                "section as a task."
+            )
+        return MusehubToolResult(ok=True, data=plan)
+
+    # ── No session and no preferences: return field guide ─────────────────────
     if not ctx.has_session:
         return MusehubToolResult(
-            ok=False,
-            error_code="elicitation_unavailable",
-            error_message=(
-                "musehub_create_with_preferences requires an active session "
-                "(Mcp-Session-Id header) and a client with elicitation capability. "
-                "Use musehub_create_repo with explicit arguments instead."
-            ),
+            ok=True,
+            data={
+                "mode": "schema_guide",
+                "message": (
+                    "No active MCP session — pass 'preferences' directly to bypass elicitation. "
+                    "Call musehub_create_with_preferences(preferences={...}) with the fields below."
+                ),
+                "fields": {
+                    "key_signature": {"type": "string", "example": "C major", "options": [
+                        "C major", "G major", "D major", "A major", "E major",
+                        "F major", "Bb major", "Eb major",
+                        "A minor", "E minor", "D minor", "G minor",
+                    ]},
+                    "tempo_bpm": {"type": "integer", "example": 120, "range": "40–240"},
+                    "time_signature": {"type": "string", "example": "4/4", "options": ["4/4", "3/4", "6/8", "5/4"]},
+                    "mood": {"type": "string", "example": "peaceful", "options": [
+                        "joyful", "melancholic", "tense", "peaceful", "energetic",
+                        "mysterious", "romantic", "triumphant", "nostalgic", "ethereal",
+                    ]},
+                    "genre": {"type": "string", "example": "jazz", "options": [
+                        "ambient", "jazz", "classical", "electronic", "hip-hop",
+                        "folk", "film score", "pop", "r&b", "lo-fi",
+                    ]},
+                    "reference_artist": {"type": "string", "example": "Bill Evans"},
+                    "duration_bars": {"type": "integer", "example": 64, "range": "8–256"},
+                    "include_modulation": {"type": "boolean", "example": False},
+                },
+            },
         )
 
+    # ── Elicitation path: active session ──────────────────────────────────────
     await ctx.progress("compose", 0, 4, "Requesting composition preferences from user…")
 
     prefs = await ctx.elicit_form(
@@ -255,51 +305,73 @@ async def execute_review_pr_interactive(
     repo_id: str,
     pr_id: str,
     *,
+    dimension: str | None = None,
+    depth: str | None = None,
     ctx: "ToolCallContext",
 ) -> MusehubToolResult:
     """Review a PR interactively by eliciting the reviewer's focus and depth.
 
-    Collects: dimension focus (melodic / harmonic / rhythmic / structural /
-    dynamic / all), review depth (quick / standard / thorough), and optional
-    flags for harmonic tension and rhythmic consistency checks.
+    Bypass path (no session needed): supply ``dimension`` and ``depth`` directly
+    to run the divergence analysis without any elicitation round-trip.
 
-    Returns a structured review with dimension-specific findings.
+    Elicitation path (session required): when bypass params are omitted and an
+    active session exists, a form collects dimension focus, review depth, and
+    optional reviewer notes.
+
+    Collects: dimension focus (melodic / harmonic / rhythmic / structural /
+    dynamic / all), review depth (quick / standard / thorough).
 
     Args:
         repo_id: Repository ID containing the PR.
         pr_id: Pull request ID to review.
-        ctx: Tool call context (must have active session for elicitation).
+        dimension: Bypass param — one of: melodic, harmonic, rhythmic, structural, dynamic, all.
+        depth: Bypass param — one of: quick, standard, thorough.
+        ctx: Tool call context (session required only when bypass params are absent).
     """
-    if not ctx.has_session:
+    check_harmonic = True
+    check_rhythmic = True
+    note = ""
+
+    # ── Bypass: dimension + depth provided directly ───────────────────────────
+    if dimension is not None or depth is not None:
+        dimension = dimension or "all"
+        depth = depth or "standard"
+    elif not ctx.has_session:
+        # No session and no bypass params — return actionable guide.
         return MusehubToolResult(
-            ok=False,
-            error_code="elicitation_unavailable",
-            error_message=(
-                "musehub_review_pr_interactive requires an active session. "
-                "Use musehub_get_pr + musehub_submit_pr_review for stateless review."
+            ok=True,
+            data={
+                "mode": "schema_guide",
+                "message": (
+                    "No active MCP session. Pass dimension and depth to bypass elicitation: "
+                    "musehub_review_pr_interactive(repo_id=..., pr_id=..., dimension='all', depth='standard')"
+                ),
+                "dimension_options": ["melodic", "harmonic", "rhythmic", "structural", "dynamic", "all"],
+                "depth_options": ["quick", "standard", "thorough"],
+            },
+        )
+    else:
+        # ── Elicitation path: active session ──────────────────────────────────
+        prefs = await ctx.elicit_form(
+            SCHEMAS["pr_review_focus"],
+            message=(
+                f"I'll review PR {pr_id[:8]}. How would you like me to focus the review? "
+                "Choose a musical dimension and depth level."
             ),
         )
 
-    prefs = await ctx.elicit_form(
-        SCHEMAS["pr_review_focus"],
-        message=(
-            f"I'll review PR {pr_id[:8]}. How would you like me to focus the review? "
-            "Choose a musical dimension and depth level."
-        ),
-    )
+        if prefs is None:
+            return MusehubToolResult(
+                ok=False,
+                error_code="elicitation_declined",
+                error_message="User declined the PR review focus form.",
+            )
 
-    if prefs is None:
-        return MusehubToolResult(
-            ok=False,
-            error_code="elicitation_declined",
-            error_message="User declined the PR review focus form.",
-        )
-
-    dimension = str(prefs.get("dimension_focus", "all"))
-    depth = str(prefs.get("review_depth", "standard"))
-    check_harmonic = bool(prefs.get("check_harmonic_tension", True))
-    check_rhythmic = bool(prefs.get("check_rhythmic_consistency", True))
-    note = str(prefs.get("reviewer_note", ""))
+        dimension = str(prefs.get("dimension_focus", "all"))
+        depth = str(prefs.get("review_depth", "standard"))
+        check_harmonic = bool(prefs.get("check_harmonic_tension", True))
+        check_rhythmic = bool(prefs.get("check_rhythmic_consistency", True))
+        note = str(prefs.get("reviewer_note", ""))
 
     await ctx.progress("review", 0, 3, f"Analysing PR {pr_id[:8]}… ({dimension} / {depth})")
 
@@ -422,15 +494,36 @@ async def execute_connect_streaming_platform(
         repo_id: Optional repository context for release distribution.
         ctx: Tool call context (must have active session for URL elicitation).
     """
+    # ── Bypass: platform known + no session → return OAuth URL for manual use ──
+    if platform and platform in AVAILABLE_PLATFORMS and not ctx.has_session:
+        import secrets as _secrets
+        elicitation_id = _secrets.token_urlsafe(16)
+        connect_url = oauth_connect_url(platform, elicitation_id)
+        return MusehubToolResult(
+            ok=True,
+            data={
+                "platform": platform,
+                "status": "pending_oauth",
+                "oauth_url": connect_url,
+                "elicitation_id": elicitation_id,
+                "message": (
+                    f"Open this URL to connect {platform} to MuseHub. "
+                    "No active MCP session detected — manual browser navigation required."
+                ),
+            },
+        )
+
     if not ctx.has_session:
         return MusehubToolResult(
-            ok=False,
-            error_code="elicitation_unavailable",
-            error_message=(
-                "musehub_connect_streaming_platform requires an active MCP session "
-                "with URL elicitation support. Connect your MCP client with a "
-                "session-capable transport to use this tool."
-            ),
+            ok=True,
+            data={
+                "mode": "schema_guide",
+                "message": (
+                    "No active MCP session. Pass platform directly to get an OAuth URL: "
+                    "musehub_connect_streaming_platform(platform='Spotify')"
+                ),
+                "platform_options": AVAILABLE_PLATFORMS,
+            },
         )
 
     # If platform not supplied as argument, elicit it.
@@ -514,11 +607,37 @@ async def execute_connect_daw_cloud(
         service: Target cloud DAW service name (optional; elicited if absent).
         ctx: Tool call context (must have active session for URL elicitation).
     """
+    # ── Bypass: service known + no session → return OAuth URL for manual use ───
+    if service and service in AVAILABLE_DAW_CLOUDS and not ctx.has_session:
+        import secrets as _secrets
+        elicitation_id = _secrets.token_urlsafe(16)
+        connect_url = daw_cloud_connect_url(service, elicitation_id)
+        return MusehubToolResult(
+            ok=True,
+            data={
+                "service": service,
+                "status": "pending_oauth",
+                "oauth_url": connect_url,
+                "elicitation_id": elicitation_id,
+                "capabilities": _daw_capabilities(service),
+                "message": (
+                    f"Open this URL to connect {service} to MuseHub. "
+                    "No active MCP session — manual browser navigation required."
+                ),
+            },
+        )
+
     if not ctx.has_session:
         return MusehubToolResult(
-            ok=False,
-            error_code="elicitation_unavailable",
-            error_message="musehub_connect_daw_cloud requires an active MCP session.",
+            ok=True,
+            data={
+                "mode": "schema_guide",
+                "message": (
+                    "No active MCP session. Pass service directly to get an OAuth URL: "
+                    "musehub_connect_daw_cloud(service='LANDR')"
+                ),
+                "service_options": AVAILABLE_DAW_CLOUDS,
+            },
         )
 
     if not service or service not in AVAILABLE_DAW_CLOUDS:
@@ -615,30 +734,85 @@ def _daw_capabilities(service: str) -> list[JSONValue]:
 async def execute_create_release_interactive(
     repo_id: str,
     *,
+    tag: str | None = None,
+    title: str | None = None,
+    notes: str | None = None,
     ctx: "ToolCallContext",
 ) -> MusehubToolResult:
-    """Create a release interactively: collect metadata via form, then publish.
+    """Create a release interactively or directly via bypass params.
 
-    Step 1 (form elicitation): collects tag, title, release notes, changelog
-    highlight, and whether it is a pre-release.
+    Bypass path (no session needed): supply ``tag`` (required), plus optional
+    ``title`` and ``notes`` to create the release without any elicitation.
 
-    Step 2 (URL elicitation, optional): if streaming platforms aren't yet
-    connected, triggers the OAuth flow for the user's primary platform.
+    Elicitation path (session required): when bypass params are omitted and an
+    active MCP session exists, a form collects tag, title, release notes, and
+    pre-release flag, followed by an optional Spotify OAuth URL prompt.
+
+    No-session, no-params path: returns a schema guide listing every field.
 
     Args:
         repo_id: Repository to tag the release against.
-        ctx: Tool call context with session for elicitation.
+        tag: Bypass param — semantic version tag (e.g. "v1.2.0").
+        title: Bypass param — human-readable release title.
+        notes: Bypass param — release notes / changelog body.
+        ctx: Tool call context (session required only when bypass params absent).
     """
-    if not ctx.has_session:
-        return MusehubToolResult(
-            ok=False,
-            error_code="elicitation_unavailable",
-            error_message=(
-                "musehub_create_release_interactive requires an active MCP session. "
-                "Use musehub_create_release with explicit arguments instead."
-            ),
+    highlight = ""
+
+    # ── Bypass: tag provided directly ────────────────────────────────────────
+    if tag is not None:
+        resolved_title = title or tag
+        release_notes = notes or ""
+        await ctx.progress("release", 0, 2, f"Creating release {tag}…")
+
+        from musehub.mcp.write_tools.releases import execute_create_release
+
+        result = await execute_create_release(
+            repo_id=repo_id,
+            tag=tag,
+            title=resolved_title,
+            body=release_notes,
+            commit_id=None,
+            is_prerelease=False,
+            actor=ctx.user_id or "",
         )
 
+        await ctx.progress("release", 2, 2, "Done.")
+
+        if not result.ok:
+            return result
+
+        release_data = result.data or {}
+        return MusehubToolResult(
+            ok=True,
+            data={
+                **release_data,
+                "workflow_hint": (
+                    "Release published! Call musehub_connect_streaming_platform to "
+                    "distribute to Spotify, SoundCloud, Bandcamp, and more."
+                ),
+            },
+        )
+
+    # ── No session and no bypass params: return field guide ──────────────────
+    if not ctx.has_session:
+        return MusehubToolResult(
+            ok=True,
+            data={
+                "mode": "schema_guide",
+                "message": (
+                    "No active MCP session. Pass 'tag' to bypass elicitation: "
+                    "musehub_create_release_interactive(repo_id=..., tag='v1.0.0', title='...', notes='...')"
+                ),
+                "fields": {
+                    "tag": {"type": "string", "required": True, "example": "v1.0.0"},
+                    "title": {"type": "string", "required": False, "example": "First release"},
+                    "notes": {"type": "string", "required": False, "example": "Bug fixes and improvements"},
+                },
+            },
+        )
+
+    # ── Elicitation path: active session ──────────────────────────────────────
     await ctx.progress("release", 0, 3, "Collecting release metadata…")
 
     # Step 1: collect release metadata via form elicitation.
@@ -658,7 +832,7 @@ async def execute_create_release_interactive(
         )
 
     tag = str(prefs.get("tag", "v1.0.0"))
-    title = str(prefs.get("title", tag))
+    resolved_title = str(prefs.get("title", tag))
     release_notes = str(prefs.get("release_notes", ""))
     is_prerelease = bool(prefs.get("is_prerelease", False))
     highlight = str(prefs.get("highlight", ""))
@@ -674,7 +848,7 @@ async def execute_create_release_interactive(
     result = await execute_create_release(
         repo_id=repo_id,
         tag=tag,
-        title=title,
+        title=resolved_title,
         body=release_notes,
         commit_id=None,
         is_prerelease=is_prerelease,
