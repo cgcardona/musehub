@@ -31,7 +31,7 @@
     </span>
   </div>
 
-  <div class="id-comment-body">{{ comment.body | safe }}</div>
+  <div class="id-comment-body">{{ comment.body | markdown | safe }}</div>
 
   {# Musical refs parsed at write time #}
   {%- if comment.musical_refs %}
@@ -56,7 +56,7 @@
         <span class="id-reply-author">{{ reply.author or 'unknown' }}</span>
         <span class="id-reply-date">{{ reply.created_at | fmtrelative }}</span>
       </div>
-      <div class="id-reply-body">{{ reply.body | safe }}</div>
+      <div class="id-reply-body">{{ reply.body | markdown | safe }}</div>
     </div>
     {%- endfor %}
   </div>

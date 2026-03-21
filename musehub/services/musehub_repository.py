@@ -274,6 +274,21 @@ async def transfer_repo_ownership(
     return _to_repo_response(row)
 
 
+async def get_repo_row_by_owner_slug(
+    session: AsyncSession, owner: str, slug: str
+) -> db.MusehubRepo | None:
+    """Return the raw ORM row for owner/slug, or None if not found.
+
+    Use this when you need access to internal fields (e.g. ``owner_user_id``,
+    ``visibility``) that are not exposed by :class:`RepoResponse`.
+    """
+    stmt = select(db.MusehubRepo).where(
+        db.MusehubRepo.owner == owner,
+        db.MusehubRepo.slug == slug,
+    )
+    return (await session.execute(stmt)).scalars().first()
+
+
 async def get_repo_by_owner_slug(
     session: AsyncSession, owner: str, slug: str
 ) -> RepoResponse | None:
@@ -281,11 +296,7 @@ async def get_repo_by_owner_slug(
 
     This is the primary resolver for all external /{owner}/{slug} routes.
     """
-    stmt = select(db.MusehubRepo).where(
-        db.MusehubRepo.owner == owner,
-        db.MusehubRepo.slug == slug,
-    )
-    row = (await session.execute(stmt)).scalars().first()
+    row = await get_repo_row_by_owner_slug(session, owner, slug)
     if row is None:
         return None
     return _to_repo_response(row)

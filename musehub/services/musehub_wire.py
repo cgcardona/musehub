@@ -175,6 +175,17 @@ async def wire_push(
     if repo_row is None or repo_row.deleted_at is not None:
         return WirePushResponse(ok=False, message="repo not found", branch_heads={})
 
+    # ── Authorization: only the repo owner may push ───────────────────────────
+    # Future: expand to a collaborators table with write-permission check.
+    if not pusher_id or pusher_id != repo_row.owner_user_id:
+        logger.warning(
+            "⚠️ Push rejected: pusher=%s is not owner of repo=%s (owner=%s)",
+            pusher_id,
+            repo_id,
+            repo_row.owner_user_id,
+        )
+        return WirePushResponse(ok=False, message="push rejected: not authorized", branch_heads={})
+
     backend = get_backend()
     bundle: WireBundle = req.bundle
     branch_name: str = req.branch or "main"

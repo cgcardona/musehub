@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from musehub.auth.dependencies import optional_token, require_valid_token, TokenClaims
 from musehub.db import musehub_models as db
 from musehub.db.database import get_db as get_session
+from musehub.rate_limits import limiter, AUTH_LIMIT
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,9 @@ async def list_identities(
 
 
 @router.post("/api/identities", summary="Register a new identity", status_code=status.HTTP_201_CREATED)
+@limiter.limit(AUTH_LIMIT)
 async def create_identity(
+    request: Request,
     body: dict[str, object],
     claims: TokenClaims = Depends(require_valid_token),
     session: AsyncSession = Depends(get_session),
