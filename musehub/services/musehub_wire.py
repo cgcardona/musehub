@@ -376,24 +376,35 @@ async def wire_fetch(
     have_set = set(req.have)
     want_set = set(req.want)
 
-    # BFS from want → collect commits not in have (on-demand PK lookups)
+    # BFS from want → collect commits not in have.
+    # Each BFS level is fetched in a single batched SELECT … WHERE commit_id IN (…)
+    # rather than one query per commit, keeping N round-trips proportional to
+    # the *depth* of the delta (number of BFS levels) rather than its *width*.
     needed_rows: dict[str, db.MusehubCommit] = {}
-    frontier: list[str] = list(want_set - have_set)
+    frontier: set[str] = want_set - have_set
     visited: set[str] = set()
 
     while frontier:
-        cid = frontier.pop()
-        if cid in visited or cid in have_set:
-            continue
-        visited.add(cid)
-        row = await _fetch_commit(session, cid)
-        if row is None or row.repo_id != repo_id:
-            # Unknown commit or cross-repo reference — stop this path.
-            continue
-        needed_rows[cid] = row
-        for pid in (row.parent_ids or []):
-            if pid not in visited and pid not in have_set:
-                frontier.append(pid)
+        # Remove already-visited from this level's batch
+        batch = frontier - visited
+        if not batch:
+            break
+        visited.update(batch)
+
+        # One IN query for the entire frontier level
+        rows_q = await session.execute(
+            select(db.MusehubCommit).where(
+                db.MusehubCommit.commit_id.in_(batch),
+                db.MusehubCommit.repo_id == repo_id,
+            )
+        )
+        next_frontier: set[str] = set()
+        for row in rows_q.scalars().all():
+            needed_rows[row.commit_id] = row
+            for pid in (row.parent_ids or []):
+                if pid not in visited and pid not in have_set:
+                    next_frontier.add(pid)
+        frontier = next_frontier
 
     needed_commits = [_to_wire_commit(needed_rows[cid]) for cid in needed_rows]
 

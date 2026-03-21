@@ -37,3 +37,6 @@ MCP_LIMIT: str = settings.mcp_rate_limit_agent
 AUTH_LIMIT: str = "20/minute"
 # Search — can trigger Qdrant; cap to protect the embedding service.
 SEARCH_LIMIT: str = "60/minute"
+# muse_push via MCP — tighter than the global MCP cap because each push
+# writes to disk and DB; an agent loop should never exceed 30 pushes/minute.
+MCP_PUSH_LIMIT: str = "30/minute"

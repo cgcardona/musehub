@@ -44,6 +44,7 @@ from musehub.contracts.json_types import JSONObject, JSONValue
 from musehub.mcp.dispatcher import handle_batch, handle_request
 from musehub.mcp.session import (
     MCPSession,
+    SessionCapacityError,
     create_session,
     delete_session,
     get_session,
@@ -294,7 +295,22 @@ async def mcp_post(request: Request) -> Response:
 
             # Attach Mcp-Session-Id on initialize.
             if is_initialize:
-                new_session = _create_session_from_initialize(raw, user_id)
+                try:
+                    new_session = _create_session_from_initialize(raw, user_id)
+                except SessionCapacityError as cap_exc:
+                    logger.warning("MCP session capacity exceeded: %s", cap_exc)
+                    return JSONResponse(
+                        status_code=503,
+                        content={
+                            "jsonrpc": "2.0",
+                            "id": None,
+                            "error": {
+                                "code": -32000,
+                                "message": str(cap_exc),
+                            },
+                        },
+                        headers={"Retry-After": "5"},
+                    )
                 return JSONResponse(
                     content=resp,
                     headers={"Mcp-Session-Id": new_session.session_id},
