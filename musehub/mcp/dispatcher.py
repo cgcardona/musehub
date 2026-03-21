@@ -689,6 +689,18 @@ async def _call_tool(
             key=_str_or_none("key"),
             value=_str_or_none("value"),
         )
+    elif name == "musehub_publish_domain":
+        _raw_capabilities = arguments.get("capabilities")
+        result = await exe.execute_musehub_publish_domain(
+            author_slug=_str("author_slug"),
+            slug=_str("slug"),
+            display_name=_str("display_name"),
+            description=_str("description"),
+            capabilities=dict(_raw_capabilities) if isinstance(_raw_capabilities, dict) else {},
+            viewer_type=_str("viewer_type"),
+            version=_str("version") or "0.1.0",
+            user_id=user_id or "",
+        )
 
     else:
         return _tool_error(f"Unknown tool: {name!r}")
