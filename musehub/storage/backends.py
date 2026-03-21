@@ -65,9 +65,25 @@ class LocalBackend:
         self._root = Path(objects_dir or settings.musehub_objects_dir)
 
     def _path(self, repo_id: str, object_id: str) -> Path:
+        """Resolve a safe, jail-rooted path for storing or reading an object.
+
+        Both ``repo_id`` and ``object_id`` are canonicalized to prevent path
+        traversal.  The resolved path must stay inside ``self._root``; if it
+        escapes (e.g. ``repo_id="../../../etc"``), :class:`ValueError` is raised
+        so the caller returns a 400/404 rather than reading arbitrary files.
+        """
         # Strip any URI prefix the object_id might carry (e.g. "sha256:")
         safe_id = object_id.replace(":", "_").replace("/", "_")
-        return self._root / repo_id / safe_id
+        # Sanitize repo_id: strip leading/trailing slashes and collapse any
+        # ".." components by resolving against the root and checking containment.
+        safe_repo = repo_id.strip("/")
+        candidate = (self._root / safe_repo / safe_id).resolve()
+        root_resolved = self._root.resolve()
+        if not str(candidate).startswith(str(root_resolved) + "/") and candidate != root_resolved:
+            raise ValueError(
+                f"Path traversal detected: repo_id={repo_id!r} escapes storage root"
+            )
+        return candidate
 
     def uri_for(self, repo_id: str, object_id: str) -> str:
         return f"local://{repo_id}/{object_id}"

@@ -35,15 +35,17 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.auth.dependencies import optional_token, require_valid_token, TokenClaims
+from musehub.db import musehub_models as db
 from musehub.db.database import get_db as get_session
 from musehub.models.wire import WireFetchRequest, WirePushRequest
+from musehub.rate_limits import limiter, WIRE_PUSH_LIMIT, WIRE_FETCH_LIMIT
 from musehub.services import musehub_qdrant as qdrant_svc
-from musehub.services.musehub_repository import get_repo_by_owner_slug
+from musehub.services.musehub_repository import get_repo_by_owner_slug, get_repo_row_by_owner_slug
 from musehub.services.musehub_wire import wire_fetch, wire_push, wire_refs
 from musehub.storage import get_backend
 
@@ -54,19 +56,46 @@ router = APIRouter(tags=["Wire Protocol"])
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
-async def _resolve_repo_id(
+async def _resolve_repo(
     session: AsyncSession,
     owner: str,
     slug: str,
-) -> str:
-    """Resolve owner/slug → repo_id or raise 404."""
-    repo = await get_repo_by_owner_slug(session, owner, slug)
+) -> db.MusehubRepo:
+    """Resolve owner/slug → repo row or raise 404."""
+    repo = await get_repo_row_by_owner_slug(session, owner, slug)
     if repo is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"repo '{owner}/{slug}' not found",
         )
-    return repo.repo_id
+    return repo
+
+
+async def _resolve_repo_id(
+    session: AsyncSession,
+    owner: str,
+    slug: str,
+) -> str:
+    """Resolve owner/slug → repo_id or raise 404 (kept for push — push does its own auth)."""
+    return (await _resolve_repo(session, owner, slug)).repo_id
+
+
+def _assert_readable(repo: db.MusehubRepo, claims: TokenClaims | None) -> None:
+    """Raise 404 if *repo* is private and the caller is not the owner.
+
+    Returns a 404 (not 403) to avoid leaking that the repo exists.
+    Private repos are invisible to unauthenticated callers and to users
+    who are not the owner.  Collaborator access can be added here once
+    a collaborators table exists.
+    """
+    if repo.visibility == "public":
+        return
+    caller_id: str | None = claims.get("sub") if claims else None
+    if caller_id != repo.owner_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"repo not found",
+        )
 
 
 # ── wire endpoints ─────────────────────────────────────────────────────────────
@@ -76,7 +105,9 @@ async def _resolve_repo_id(
     summary="Get branch heads (muse pull / muse push pre-flight)",
     response_description="Repo metadata and current branch heads",
 )
+@limiter.limit(WIRE_FETCH_LIMIT)
 async def get_refs(
+    request: Request,
     owner: str,
     slug: str,
     _claims: TokenClaims | None = Depends(optional_token),
@@ -88,6 +119,10 @@ async def get_refs(
     what the remote already has.  Equivalent to Git's:
     ``GET /owner/repo/info/refs?service=git-upload-pack``
 
+    Private repos are only visible to their owner — unauthenticated callers
+    receive a 404 (same response as a non-existent repo, to avoid leaking
+    the existence of private repos).
+
     Response:
     ```json
     {
@@ -98,8 +133,9 @@ async def get_refs(
     }
     ```
     """
-    repo_id = await _resolve_repo_id(session, owner, slug)
-    result = await wire_refs(session, repo_id)
+    repo = await _resolve_repo(session, owner, slug)
+    _assert_readable(repo, _claims)
+    result = await wire_refs(session, repo.repo_id)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="repo not found")
     return Response(content=result.model_dump_json(), media_type="application/json")
@@ -110,7 +146,9 @@ async def get_refs(
     summary="Accept a pack bundle from muse push",
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit(WIRE_PUSH_LIMIT)
 async def push(
+    request: Request,
     owner: str,
     slug: str,
     body: WirePushRequest,
@@ -159,7 +197,9 @@ async def push(
     summary="Fetch a pack bundle for muse pull / muse clone",
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit(WIRE_FETCH_LIMIT)
 async def fetch(
+    request: Request,
     owner: str,
     slug: str,
     body: WireFetchRequest,
@@ -171,11 +211,16 @@ async def fetch(
     Equivalent to Git's:
     ``POST /owner/repo/git-upload-pack``
 
+    Private repos require a valid Bearer token belonging to the repo owner.
+    Unauthenticated callers receive a 404 (not 403) to avoid confirming the
+    repo's existence.
+
     ``want`` — commit SHAs the client wants.
     ``have`` — commit SHAs the client already has (exclusion list).
     """
-    repo_id = await _resolve_repo_id(session, owner, slug)
-    result = await wire_fetch(session, repo_id, body)
+    repo = await _resolve_repo(session, owner, slug)
+    _assert_readable(repo, _claims)
+    result = await wire_fetch(session, repo.repo_id, body)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="repo not found")
     return Response(content=result.model_dump_json(), media_type="application/json")
@@ -202,7 +247,10 @@ async def get_object(
     """
     backend = get_backend()
     effective_repo_id = repo_id or "shared"
-    raw = await backend.get(effective_repo_id, object_id)
+    try:
+        raw = await backend.get(effective_repo_id, object_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid object path")
     if raw is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="object not found")
 

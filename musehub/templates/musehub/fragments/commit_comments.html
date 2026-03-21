@@ -20,7 +20,7 @@
     <span class="comment-author">{{ comment.author or 'unknown' }}</span>
     <span class="comment-date">{{ comment.created_at | fmtrelative }}</span>
   </div>
-  <div class="comment-body">{{ comment.body | safe }}</div>
+  <div class="comment-body">{{ comment.body | markdown | safe }}</div>
   {# Nested replies #}
   {% set replies = comments | selectattr('parent_id', 'equalto', comment.comment_id) | list %}
   {% if replies %}
@@ -32,7 +32,7 @@
         <span class="comment-author">{{ reply.author or 'unknown' }}</span>
         <span class="comment-date">{{ reply.created_at | fmtrelative }}</span>
       </div>
-      <div class="comment-body">{{ reply.body | safe }}</div>
+      <div class="comment-body">{{ reply.body | markdown | safe }}</div>
     </div>
     {% endfor %}
   </div>
