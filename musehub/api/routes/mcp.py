@@ -38,6 +38,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
+from musehub.rate_limits import limiter, MCP_LIMIT
 
 from musehub.contracts.json_types import JSONObject, JSONValue
 from musehub.mcp.dispatcher import handle_batch, handle_request
@@ -157,6 +158,7 @@ async def _extract_auth(request: Request) -> _AuthResult | Response:
     summary="MCP Streamable HTTP — POST endpoint (2025-11-25)",
     include_in_schema=True,
 )
+@limiter.limit(MCP_LIMIT)
 async def mcp_post(request: Request) -> Response:
     """MCP Streamable HTTP POST endpoint.
 

@@ -156,7 +156,7 @@ async def test_refs_empty_repo_has_empty_branch_heads(
 
 @pytest.mark.asyncio
 async def test_push_requires_auth(client: AsyncClient, db_session: AsyncSession) -> None:
-    repo = await factory_create_repo(db_session, slug="push-auth-test")
+    repo = await factory_create_repo(db_session, slug="push-auth-test", owner_user_id="test-user-wire")
     resp = await client.post(
         f"/{repo.owner}/{repo.slug}/push",
         json={"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"},
@@ -178,12 +178,33 @@ async def test_push_404_for_unknown_repo(
 
 
 @pytest.mark.asyncio
+async def test_push_rejected_for_non_owner(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    wire_headers: dict,
+) -> None:
+    """Authenticated user who is NOT the repo owner must be rejected."""
+    repo = await factory_create_repo(
+        db_session,
+        slug="push-nonowner-test",
+        owner_user_id="someone-else",  # different from test-user-wire
+    )
+    resp = await client.post(
+        f"/{repo.owner}/{repo.slug}/push",
+        json={"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"},
+        headers=wire_headers,
+    )
+    assert resp.status_code == 409
+    assert "not authorized" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_push_ingests_commit_and_branch(
     client: AsyncClient,
     db_session: AsyncSession,
     wire_headers: dict,
 ) -> None:
-    repo = await factory_create_repo(db_session, slug="push-ingest-test")
+    repo = await factory_create_repo(db_session, slug="push-ingest-test", owner_user_id="test-user-wire")
 
     commit_id = uuid.uuid4().hex
     obj = _make_object()
@@ -220,7 +241,7 @@ async def test_push_is_idempotent(
     wire_headers: dict,
 ) -> None:
     """Pushing the same commit twice must succeed both times."""
-    repo = await factory_create_repo(db_session, slug="push-idempotent-test")
+    repo = await factory_create_repo(db_session, slug="push-idempotent-test", owner_user_id="test-user-wire")
     commit = _make_commit(repo.repo_id)
     payload = {
         "bundle": {"commits": [commit], "snapshots": [], "objects": []},
@@ -239,7 +260,7 @@ async def test_push_non_fast_forward_rejected(
     db_session: AsyncSession,
     wire_headers: dict,
 ) -> None:
-    repo = await factory_create_repo(db_session, slug="push-nff-test")
+    repo = await factory_create_repo(db_session, slug="push-nff-test", owner_user_id="test-user-wire")
     existing_commit_id = uuid.uuid4().hex
     branch = db.MusehubBranch(
         repo_id=repo.repo_id,
@@ -267,7 +288,7 @@ async def test_push_force_overwrites_branch(
     db_session: AsyncSession,
     wire_headers: dict,
 ) -> None:
-    repo = await factory_create_repo(db_session, slug="push-force-test")
+    repo = await factory_create_repo(db_session, slug="push-force-test", owner_user_id="test-user-wire")
     old_head = uuid.uuid4().hex
     branch = db.MusehubBranch(
         repo_id=repo.repo_id,
