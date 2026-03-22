@@ -513,6 +513,18 @@ async def _call_tool(
             dimension=_str_or_none("dimension"),
         )
 
+    elif name == "musehub_get_prompt":
+        raw_prompt_args = arguments.get("arguments")
+        prompt_args: dict[str, str] | None = (
+            {str(k): str(v) for k, v in raw_prompt_args.items()}
+            if isinstance(raw_prompt_args, dict)
+            else None
+        )
+        result = exe.execute_get_prompt(
+            name=_str("name"),
+            arguments=prompt_args,
+        )
+
     # ── Standard write tools ──────────────────────────────────────────────────
 
     elif name == "musehub_create_repo":

@@ -24,6 +24,7 @@ dependencies = [
     "boto3>=1.42.71",
     "mido>=1.3.3",
     "pyyaml>=6.0.2",
+    "mistune>=3.0.0",
     "typer>=0.15.4",
 ]
 
@@ -55,6 +56,9 @@ filterwarnings = [
     # aiosqlite uses Python's deprecated default datetime adapter internally;
     # this is a third-party library issue, not ours (production uses asyncpg).
     "ignore:The default datetime adapter is deprecated:DeprecationWarning:aiosqlite",
+    # slowapi uses asyncio.iscoroutinefunction which is deprecated in 3.14+.
+    # This is a third-party library issue; suppress until slowapi ships a fix.
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:slowapi",
 ]
 
 [tool.coverage.run]

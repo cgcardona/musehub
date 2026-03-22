@@ -8,7 +8,7 @@ Covers:
   - prompts/get: known prompt assembly and unknown prompt error
   - Batch request handling
   - Notification handling (no id → returns None)
-  - Tool catalogue completeness (41 tools)
+  - Tool catalogue completeness (42 tools)
   - Resource catalogue completeness (12 static, 17 templated)
   - Prompt catalogue completeness (10 prompts)
   - MCP 2025-11-25: elicitation capability in initialize, new notifications
@@ -132,7 +132,7 @@ async def test_tools_list_returns_40_tools() -> None:
     assert isinstance(result, dict)
     tools = result["tools"]
     assert isinstance(tools, list)
-    assert len(tools) == 41  # 20 read + 16 write + 5 elicitation
+    assert len(tools) == 42  # 21 read + 16 write + 5 elicitation
 
 
 @pytest.mark.asyncio
@@ -158,7 +158,7 @@ async def test_tools_list_all_have_required_fields() -> None:
 
 def test_tool_catalogue_has_40_tools() -> None:
     """The MCP_TOOLS list must contain exactly 40 tools."""
-    assert len(MCP_TOOLS) == 41
+    assert len(MCP_TOOLS) == 42
 
 
 def test_write_tool_names_all_in_catalogue() -> None:
