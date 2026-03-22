@@ -5,8 +5,34 @@
  * include `"repo_id"` in their page_json block).  More complex pages extend
  * this and register their own key in MusePages.
  *
+ * Also runs highlight.js over any .rh-readme-body code blocks so that fenced
+ * code in READMEs gets syntax highlighting without a separate page module.
+ *
  * Registered as: window.MusePages['repo']
  */
+
+import hljs from 'highlight.js/lib/core';
+import python     from 'highlight.js/lib/languages/python';
+import typescript from 'highlight.js/lib/languages/typescript';
+import javascript from 'highlight.js/lib/languages/javascript';
+import bash       from 'highlight.js/lib/languages/bash';
+import rust       from 'highlight.js/lib/languages/rust';
+import go         from 'highlight.js/lib/languages/go';
+import yaml       from 'highlight.js/lib/languages/yaml';
+import json       from 'highlight.js/lib/languages/json';
+import toml       from 'highlight.js/lib/languages/ini';  // toml ~= ini
+
+hljs.registerLanguage('python',     python);
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('bash',       bash);
+hljs.registerLanguage('sh',         bash);
+hljs.registerLanguage('shell',      bash);
+hljs.registerLanguage('rust',       rust);
+hljs.registerLanguage('go',         go);
+hljs.registerLanguage('yaml',       yaml);
+hljs.registerLanguage('json',       json);
+hljs.registerLanguage('toml',       toml);
 
 export interface RepoPageData {
   page?: string;
@@ -56,6 +82,12 @@ function initStarToggle(): void {
   });
 }
 
+function highlightReadme(): void {
+  document.querySelectorAll<HTMLElement>('.rh-readme-body pre code').forEach((block) => {
+    hljs.highlightElement(block);
+  });
+}
+
 export function initRepoPage(data: RepoPageData): void {
   const repoId = data.repo_id;
   if (repoId && typeof window.initRepoNav === 'function') {
@@ -70,4 +102,5 @@ export function initRepoPage(data: RepoPageData): void {
     initCopyClone();
   }
   initStarToggle();
+  highlightReadme();
 }
