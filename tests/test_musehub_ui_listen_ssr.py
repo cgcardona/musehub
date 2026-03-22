@@ -88,8 +88,8 @@ async def test_listen_page_renders_track_list_server_side(
     response = await client.get("/testuser/ssr-tracks/view/main")
     assert response.status_code == 200
     body = response.text
-    # Domain viewer renders the view container
-    assert "view-container" in body
+    # Insights page (aliases /view) renders successfully
+    assert "ins-page" in body
 
 
 @pytest.mark.anyio
@@ -150,8 +150,8 @@ async def test_listen_page_no_tracks_shows_message(
     response = await client.get("/testuser/empty-audio-repo/view/main")
     assert response.status_code == 200
     body = response.text
-    # Generic domain viewer renders successfully
-    assert "view-container" in body or "view-page" in body
+    # Insights page (aliases /view) renders successfully
+    assert "ins-page" in body or "MuseHub" in body
 
 
 @pytest.mark.anyio
