@@ -76,7 +76,7 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'commits':       () => initCommits(),
   'issue-detail':    () => initIssueDetail(),
   'release-detail':  () => initReleaseDetail(),
-  'graph':           () => initGraph(),
+  'graph':           (d) => initGraph(d),
   'domain-detail':   (d) => initDomainDetail(d),
   'diff':            () => initDiff(),
   'settings':        () => initSettings(),

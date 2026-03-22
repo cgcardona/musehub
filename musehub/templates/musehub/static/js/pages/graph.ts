@@ -37,8 +37,8 @@ interface DagData  { nodes: DagNode[]; edges: DagEdge[]; headCommitId: string; }
 interface SessionEntry { sessionId: string; intent?: string; startedAt: string; commits?: string[]; }
 interface SessionMap   { [cid: string]: { intent: string; sessionId: string }; }
 
-// SSR-injected DAG shape matches the /repos/{id}/dag JSON response but uses
-// snake_case keys (Python serialisation). We normalise to camelCase below.
+// SSR-injected DAG shape — Python model_dump(mode="json") produces snake_case.
+// We normalise to the camelCase DagData shape that the rest of graph.ts expects.
 interface SsrDagNode {
   commit_id: string; message: string; author: string; timestamp: string;
   branch: string; parent_ids: string[]; is_head: boolean;
@@ -53,10 +53,15 @@ interface SsrDagData {
   head_commit_id: string | null;
 }
 
+interface GraphPageData {
+  page: string;
+  repoId?: string;
+  baseUrl?: string;
+  dagData?: SsrDagData;
+}
+
 declare global {
   interface Window {
-    __graphCfg?:  GraphCfg;
-    __graphData?: SsrDagData;
     escHtml:  (s: string) => string;
     apiFetch: (path: string, init?: RequestInit) => Promise<unknown>;
     fmtDate:  (d: string) => string;
@@ -1149,15 +1154,14 @@ function normaliseSsrDag(ssr: SsrDagData): DagData {
   };
 }
 
-async function load(cfg: GraphCfg): Promise<void> {
+async function load(cfg: GraphCfg, ssrDag: SsrDagData | undefined): Promise<void> {
   if (typeof window.initRepoNav === 'function') window.initRepoNav(cfg.repoId);
 
   const loadingEl = document.getElementById('dag-loading');
 
   try {
-    // Use SSR-injected DAG data when available to avoid a round-trip on first paint.
+    // Use SSR-injected DAG data to skip the /dag fetch entirely on first paint.
     // The sessions fetch is always async (not worth SSR-ing for this panel).
-    const ssrDag = window.__graphData;
     const [dagData, sessData] = await Promise.all([
       ssrDag
         ? Promise.resolve(normaliseSsrDag(ssrDag))
@@ -1215,8 +1219,10 @@ async function load(cfg: GraphCfg): Promise<void> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initGraph(): void {
-  const cfg = window.__graphCfg;
-  if (!cfg) return;
-  void load(cfg);
+export function initGraph(rawData: Record<string, unknown>): void {
+  const data = rawData as GraphPageData;
+  const repoId  = data.repoId ?? '';
+  const baseUrl = data.baseUrl ?? '';
+  if (!repoId) return;
+  void load({ repoId, baseUrl }, data.dagData);
 }
