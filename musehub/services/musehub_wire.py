@@ -190,6 +190,13 @@ async def wire_push(
     bundle: WireBundle = req.bundle
     branch_name: str = req.branch or "main"
 
+    # Resolve the pusher's public username to use as the author fallback when
+    # commits arrive without an --author flag from the CLI.
+    _pusher_profile = await session.get(db.MusehubProfile, pusher_id)
+    _pusher_username: str = (
+        _pusher_profile.username if _pusher_profile is not None else pusher_id or ""
+    )
+
     # ── 1. Objects ────────────────────────────────────────────────────────────
     for wire_obj in bundle.objects:
         if not wire_obj.object_id or not wire_obj.content_b64:
@@ -264,13 +271,15 @@ async def wire_push(
             "test_runs": wire_commit.test_runs,
         }
 
+        # Fall back to the pusher's username when the CLI didn't supply --author.
+        author = wire_commit.author or _pusher_username
         commit_row = db.MusehubCommit(
             commit_id=wire_commit.commit_id,
             repo_id=repo_id,
             branch=branch_name,
             parent_ids=parent_ids,
             message=wire_commit.message,
-            author=wire_commit.author,
+            author=author,
             timestamp=_parse_iso(wire_commit.committed_at) if wire_commit.committed_at else _utc_now(),
             snapshot_id=wire_commit.snapshot_id,
             commit_meta=commit_meta,

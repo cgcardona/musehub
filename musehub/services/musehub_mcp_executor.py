@@ -27,8 +27,11 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from musehub.contracts.json_types import JSONValue
+from musehub.db import musehub_models as _db_models
 from musehub.db.database import AsyncSessionLocal
 from musehub.services import musehub_repository
+
+_MusehubSnapshot = _db_models.MusehubSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -591,12 +594,38 @@ async def execute_get_context(repo_id: str) -> MusehubToolResult:
         commits, total_commits = await musehub_repository.list_commits(
             session, repo_id, limit=10
         )
-        objects = await musehub_repository.list_objects(session, repo_id)
+
+        # Collect file paths from snapshot manifests rather than musehub_objects.path,
+        # which is always empty because the wire protocol's ObjectPayload carries no
+        # path hint.  Snapshot manifests store the authoritative {path: object_id} map.
+        snapshot_ids: list[str] = []
+        for c in commits:
+            if c.snapshot_id:
+                snapshot_ids.append(c.snapshot_id)
+        for b in branches:
+            if b.head_commit_id:
+                head = await musehub_repository.get_commit(session, repo_id, b.head_commit_id)
+                if head and head.snapshot_id and head.snapshot_id not in snapshot_ids:
+                    snapshot_ids.append(head.snapshot_id)
+
+        seen_paths: set[str] = set()
+        sorted_paths: list[str] = []
+        for snap_id in snapshot_ids:
+            snap_row = await session.get(_MusehubSnapshot, snap_id)
+            if snap_row is None:
+                continue
+            for path in snap_row.manifest:
+                if path and path not in seen_paths:
+                    seen_paths.add(path)
+                    sorted_paths.append(path)
+        sorted_paths.sort()
 
         by_mime: dict[str, int] = {}
-        for obj in objects:
-            mime = _mime_for_path(obj.path)
+        for path in sorted_paths:
+            mime = _mime_for_path(path)
             by_mime[mime] = by_mime.get(mime, 0) + 1
+
+        all_paths: list[JSONValue] = list(sorted_paths)
 
         context: dict[str, JSONValue] = {
             "repo": {
@@ -628,9 +657,9 @@ async def execute_get_context(repo_id: str) -> MusehubToolResult:
                 "shown": len(commits),
             },
             "artifacts": {
-                "total_count": len(objects),
+                "total_count": len(all_paths),
                 "by_mime_type": {k: v for k, v in by_mime.items()},
-                "paths": [obj.path for obj in objects],
+                "paths": all_paths,
             },
             "musical_analysis": {
                 "key": None,
