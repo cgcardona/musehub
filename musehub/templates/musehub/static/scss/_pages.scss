@@ -8551,32 +8551,8 @@ $pr-closed: #f85149;
   padding: var(--space-2) 0 var(--space-6);
 }
 
-// Domain-style stat strip — matches Domain and MCP page aesthetic
-.ins-strip {
-  display: flex; align-items: stretch;
-  border-bottom: 1px solid var(--border-default);
-  margin-bottom: var(--space-4);
-}
-.ins-strip__cell {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  flex: 1; gap: 4px;
-  padding: var(--space-3) var(--space-2);
-  border-right: 1px solid var(--border-default);
-  text-align: center;
-  &:last-child { border-right: none; }
-}
-.ins-strip__num {
-  font-size: 22px; font-weight: 700; font-family: var(--font-mono);
-  color: var(--text-primary); line-height: 1;
-}
-.ins-strip__num--add    { color: var(--color-success); }
-.ins-strip__num--del    { color: var(--color-danger); }
-.ins-strip__num--danger { color: var(--color-danger); }
-.ins-strip__num--agent  { color: #bc8cff; }
-.ins-strip__lbl {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-muted);
-}
+// Insights stat strip reuses .ph-stats-strip / .ph-stat from _layout.scss.
+// Color modifiers (.ins-val--add / --del / --agent) are co-located in _layout.scss.
 
 // Three-column intel row
 .ins-intel-row {

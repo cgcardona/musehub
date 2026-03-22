@@ -43,32 +43,32 @@
 
   {% if domain.viewer_type == 'code' and metrics %}
 
-  {# ── Stat strip ─────────────────────────────────────────────────────────── #}
-  <div class="ins-strip">
-    <div class="ins-strip__cell">
-      <span class="ins-strip__num">{{ metrics.total_commits }}</span>
-      <span class="ins-strip__lbl">Commits</span>
+  {# ── Stat strip — same component as Domain detail page ─────────────────── #}
+  <div class="ph-stats-strip">
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ metrics.total_commits }}</span>
+      <span class="ph-stat-label">Commits</span>
     </div>
-    <div class="ins-strip__cell">
-      <span class="ins-strip__num ins-strip__num--add">+{{ metrics.sym_added_total }}</span>
-      <span class="ins-strip__lbl">Symbols added</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value ins-val--add">+{{ metrics.sym_added_total }}</span>
+      <span class="ph-stat-label">Symbols added</span>
     </div>
-    <div class="ins-strip__cell">
-      <span class="ins-strip__num ins-strip__num--del">−{{ metrics.sym_removed_total }}</span>
-      <span class="ins-strip__lbl">Symbols removed</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value ins-val--del">−{{ metrics.sym_removed_total }}</span>
+      <span class="ph-stat-label">Symbols removed</span>
     </div>
-    <div class="ins-strip__cell">
-      <span class="ins-strip__num{% if metrics.breaking_count > 0 %} ins-strip__num--danger{% endif %}">{{ metrics.breaking_count }}</span>
-      <span class="ins-strip__lbl">Breaking changes</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value{% if metrics.breaking_count > 0 %} ins-val--del{% endif %}">{{ metrics.breaking_count }}</span>
+      <span class="ph-stat-label">Breaking changes</span>
     </div>
-    <div class="ins-strip__cell">
-      <span class="ins-strip__num">{{ metrics.conventional_pct }}%</span>
-      <span class="ins-strip__lbl">Conventional</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value">{{ metrics.conventional_pct }}%</span>
+      <span class="ph-stat-label">Conventional</span>
     </div>
     {% if metrics.agent_count > 0 %}
-    <div class="ins-strip__cell">
-      <span class="ins-strip__num ins-strip__num--agent">{{ metrics.agent_pct }}%</span>
-      <span class="ins-strip__lbl">Agent-authored</span>
+    <div class="ph-stat">
+      <span class="ph-stat-value ins-val--agent">{{ metrics.agent_pct }}%</span>
+      <span class="ph-stat-label">Agent-authored</span>
     </div>
     {% endif %}
   </div>
