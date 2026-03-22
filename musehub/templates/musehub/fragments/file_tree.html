@@ -8,10 +8,13 @@
 #}
 {% from "musehub/macros/empty_state.html" import empty_state %}
 
-{# SVG icon helpers — Lucide icon set, color-coded by file type #}
+{# SVG icon helpers — filled, minimal icons for maximum clarity at small sizes #}
 {% macro folder_icon() %}
 <span class="file-icon file-icon-folder">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+  {# Filled folder with tab — clearly a folder at any size #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" d="M2 5.5A2.5 2.5 0 0 1 4.5 3h3.086a2.5 2.5 0 0 1 1.768.732l.914.914H15.5A2.5 2.5 0 0 1 18 7v7.5A2.5 2.5 0 0 1 15.5 17h-11A2.5 2.5 0 0 1 2 14.5V5.5Z"/>
+  </svg>
 </span>
 {% endmacro %}
 
@@ -19,27 +22,52 @@
 {% set ext = name.rsplit('.', 1)[-1].lower() if '.' in name else '' %}
 {% if ext in ['mid', 'midi'] %}
 <span class="file-icon file-icon-midi">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  {# Filled music note #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" d="M8 3.5A1.5 1.5 0 0 1 9.5 2h6A1.5 1.5 0 0 1 17 3.5v7a3 3 0 1 1-2-2.83V5h-4v7a3 3 0 1 1-2-2.83V3.5Z"/>
+  </svg>
 </span>
 {% elif ext in ['mp3', 'wav', 'ogg', 'flac', 'aiff', 'aif', 'm4a'] %}
 <span class="file-icon file-icon-audio">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+  {# Filled waveform / audio speaker #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" d="M9.383 3.076A1 1 0 0 1 10 4v12a1 1 0 0 1-1.707.707L4.586 13H2a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h2.586l3.707-3.707a1 1 0 0 1 1.09-.217ZM14.657 2.929a1 1 0 0 1 1.414 0A9.972 9.972 0 0 1 19 10a9.972 9.972 0 0 1-2.929 7.071 1 1 0 0 1-1.414-1.414A7.971 7.971 0 0 0 17 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 0 1 0-1.414Zm-2.829 2.828a1 1 0 0 1 1.415 0A5.983 5.983 0 0 1 15 10a5.984 5.984 0 0 1-1.757 4.243 1 1 0 0 1-1.415-1.415A3.984 3.984 0 0 0 13 10a3.983 3.983 0 0 0-1.172-2.828 1 1 0 0 1 0-1.415Z"/>
+  </svg>
 </span>
 {% elif ext in ['abc', 'musicxml', 'mxl', 'xml', 'ly', 'lilypond'] %}
 <span class="file-icon file-icon-score">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+  {# Filled score/document with lines #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" fill-rule="evenodd" d="M4 4a2 2 0 0 1 2-2h4.586A2 2 0 0 1 12 2.586L15.414 6A2 2 0 0 1 16 7.414V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm2 6a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1Zm1 3a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2H7Z" clip-rule="evenodd"/>
+  </svg>
 </span>
 {% elif ext in ['json', 'yaml', 'yml', 'toml'] %}
 <span class="file-icon file-icon-data">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+  {# Filled code/braces icon #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L3.56 9l2.72 2.72a.75.75 0 0 1-1.06 1.06L1.97 9.53a.75.75 0 0 1 0-1.06l3.25-3.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 1 1-1.06-1.06L16.44 9l-2.72-2.72a.75.75 0 0 1 0-1.06ZM11.377 3.07a.75.75 0 0 1 .553.898l-2.25 9a.75.75 0 0 1-1.451-.363l2.25-9a.75.75 0 0 1 .898-.535Z" clip-rule="evenodd"/>
+  </svg>
 </span>
 {% elif ext in ['txt', 'md', 'rst', 'pdf'] %}
 <span class="file-icon file-icon-text">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+  {# Filled text document #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" fill-rule="evenodd" d="M4 4a2 2 0 0 1 2-2h4.586A2 2 0 0 1 12 2.586L15.414 6A2 2 0 0 1 16 7.414V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm2 7a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1Zm1 3a1 1 0 1 0 0 2h3a1 1 0 1 0 0-2H7Z" clip-rule="evenodd"/>
+  </svg>
+</span>
+{% elif ext in ['py', 'js', 'ts', 'jsx', 'tsx', 'go', 'rs', 'rb', 'java', 'c', 'cpp', 'h', 'sh', 'bash'] %}
+<span class="file-icon file-icon-code">
+  {# Filled code file #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" fill-rule="evenodd" d="M4 4a2 2 0 0 1 2-2h4.586A2 2 0 0 1 12 2.586L15.414 6A2 2 0 0 1 16 7.414V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm6.5 5.25a.75.75 0 0 0-1.5 0v.553l-.354-.353a.75.75 0 1 0-1.06 1.06l1.06 1.061-1.06 1.06a.75.75 0 1 0 1.06 1.061l.354-.353v.555a.75.75 0 0 0 1.5 0v-.555l.354.353a.75.75 0 1 0 1.06-1.06L10.56 11.56l1.061-1.06a.75.75 0 1 0-1.061-1.061l-.354.353V9.25Z" clip-rule="evenodd"/>
+  </svg>
 </span>
 {% else %}
 <span class="file-icon file-icon-default">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+  {# Generic filled document #}
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 20 20">
+    <path fill="currentColor" fill-rule="evenodd" d="M4 4a2 2 0 0 1 2-2h4.586A2 2 0 0 1 12 2.586L15.414 6A2 2 0 0 1 16 7.414V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Z" clip-rule="evenodd"/>
+  </svg>
 </span>
 {% endif %}
 {% endmacro %}
@@ -50,13 +78,20 @@
 {% if latest_commit %}
 {% set lc = latest_commit %}
 {% set lc_sha = lc.commit_id[:8] %}
+{% set lc_display_author = lc.author.split('@')[0] if lc.author else 'unknown' %}
 <div class="ft-latest-commit">
   <div class="ft-lc-left">
-    {% set _cidx = lc.author | length % 6 %}
-    <span class="rh-avatar rh-avatar-{{ _cidx }} ft-lc-avatar">{{ lc.author[0] | upper if lc.author else '?' }}</span>
-    <span class="ft-lc-author">{{ lc.author }}</span>
+    {% if lc_display_author and lc_display_author != 'unknown' %}
+    {% set _cidx = lc_display_author | length % 6 %}
+    <span class="rh-avatar rh-avatar-{{ _cidx }} ft-lc-avatar">{{ lc_display_author[0] | upper }}</span>
+    {% else %}
+    <span class="rh-avatar rh-avatar-bot ft-lc-avatar">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    </span>
+    {% endif %}
+    <span class="ft-lc-author">{{ lc_display_author }}</span>
     <a href="{{ base_url }}/commits/{{ lc_sha }}" class="ft-lc-message" title="{{ lc.message }}">
-      {{ lc.message.split('\n')[0] | truncate(72, True, '…') }}
+      {{ lc.message.split('\n')[0] }}
     </a>
   </div>
   <div class="ft-lc-right">

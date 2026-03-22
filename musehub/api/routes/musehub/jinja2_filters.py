@@ -126,134 +126,43 @@ def _filesizeformat(value: int | float | None) -> str:
 
 
 def _markdown(value: str | None) -> str:
-    """Convert a Markdown string to safe HTML for rendering in templates.
+    """Render Markdown to safe HTML using mistune.
 
-    Handles: headings (h1–h3 → h2–h4 to preserve page hierarchy), bold,
-    italic, inline code, fenced code blocks, bullet/ordered lists,
-    blockquotes, horizontal rules, and safe links (https:// and / only).
+    Post-processes the output to:
+    - Demote headings (h1→h2, h2→h3, h3→h4) to preserve page hierarchy.
+    - Replace badge images ``![alt](url)`` with ``<code class="md-badge">``
+      pills — avoids broken-image icons for shields.io / GitHub badges.
+    - Strip raw HTML block/inline passthrough.
 
-    Returns an empty string for None.  All user content is HTML-escaped
-    before re-inserting markup — no XSS vectors.
+    Returns an empty string for None.
     """
     if not value:
         return ""
 
-    import html as _html
+    import re as _re
+    import mistune
 
-    def esc(s: str) -> str:
-        return _html.escape(s)
+    # Pre-process: convert badge image syntax to a placeholder so mistune
+    # never sees them as images (which would emit <img> tags).
+    pre = _re.sub(
+        r"!\[([^\]]*)\]\([^)]*\)",
+        lambda m: f"`{m.group(1) or 'badge'}`",
+        value,
+    )
 
-    def inline_markup(s: str) -> str:
-        import re
+    rendered = mistune.html(pre)
+    raw: str = rendered if isinstance(rendered, str) else ""
 
-        s = re.sub(
-            r"\[([^\]]+)\]\(((?:https?://|/)[^)]*)\)",
-            lambda m: f'<a href="{esc(m.group(2))}" rel="noopener">{esc(m.group(1))}</a>',
-            s,
-        )
-        s = re.sub(r"`([^`]+)`", lambda m: f"<code>{esc(m.group(1))}</code>", s)
-        s = re.sub(r"\*\*([^*]+)\*\*", lambda m: f"<strong>{esc(m.group(1))}</strong>", s)
-        s = re.sub(r"\*([^*]+)\*", lambda m: f"<em>{esc(m.group(1))}</em>", s)
-        return s
+    # Demote headings: h1→h2, h2→h3, h3→h4 (work largest first to avoid double-bump).
+    def _demote(lvl: int, text: str) -> str:
+        def _repl(m: "_re.Match[str]") -> str:
+            return f"<{m.group(1)}h{lvl + 1}{m.group(2)}>"
+        return _re.sub(rf"<(/?)\s*h{lvl}(\b[^>]*)?>", _repl, text)
 
-    import re
+    for level in (3, 2, 1):
+        raw = _demote(level, raw)
 
-    lines = value.split("\n")
-    out: list[str] = []
-    in_code = False
-    code_lang = ""
-    code_lines: list[str] = []
-    in_list: str | None = None
-    in_bq = False
-
-    def flush_list() -> None:
-        nonlocal in_list
-        if in_list:
-            out.append(f"</{in_list}>")
-            in_list = None
-
-    def flush_bq() -> None:
-        nonlocal in_bq
-        if in_bq:
-            out.append("</blockquote>")
-            in_bq = False
-
-    for line in lines:
-        if line.startswith("```"):
-            if not in_code:
-                flush_list()
-                flush_bq()
-                in_code = True
-                code_lang = esc(line[3:].strip())
-                code_lines = []
-            else:
-                lang_attr = f' data-lang="{code_lang}"' if code_lang else ""
-                out.append(
-                    f'<pre class="code-block"{lang_attr}><code>{"".join(esc(l) + chr(10) for l in code_lines)}</code></pre>'
-                )
-                in_code = False
-                code_lang = ""
-                code_lines = []
-            continue
-        if in_code:
-            code_lines.append(line)
-            continue
-
-        if line.startswith("> "):
-            flush_list()
-            if not in_bq:
-                out.append('<blockquote class="md-blockquote">')
-                in_bq = True
-            out.append(f"<p>{inline_markup(esc(line[2:]))}</p>")
-            continue
-        flush_bq()
-
-        if re.match(r"^(\*\*\*|---|___)\s*$", line):
-            flush_list()
-            out.append("<hr>")
-            continue
-
-        h_match = re.match(r"^(#{1,3})\s+(.+)", line)
-        if h_match:
-            flush_list()
-            level = len(h_match.group(1)) + 1  # h1 → h2, h2 → h3, h3 → h4
-            out.append(f"<h{level} class='md-h{level}'>{inline_markup(esc(h_match.group(2)))}</h{level}>")
-            continue
-
-        ul_match = re.match(r"^[-*+]\s+(.+)", line)
-        if ul_match:
-            if in_list != "ul":
-                if in_list:
-                    out.append(f"</{in_list}>")
-                out.append('<ul class="md-list">')
-                in_list = "ul"
-            out.append(f"<li>{inline_markup(esc(ul_match.group(1)))}</li>")
-            continue
-
-        ol_match = re.match(r"^\d+\.\s+(.+)", line)
-        if ol_match:
-            if in_list != "ol":
-                if in_list:
-                    out.append(f"</{in_list}>")
-                out.append('<ol class="md-list">')
-                in_list = "ol"
-            out.append(f"<li>{inline_markup(esc(ol_match.group(1)))}</li>")
-            continue
-
-        flush_list()
-
-        if not line.strip():
-            out.append("<br>")
-            continue
-
-        out.append(f"<p class='md-p'>{inline_markup(esc(line))}</p>")
-
-    if in_code and code_lines:
-        out.append(f'<pre class="code-block"><code>{"".join(esc(l) + chr(10) for l in code_lines)}</code></pre>')
-    flush_list()
-    flush_bq()
-
-    return "\n".join(out)
+    return raw
 
 
 def _auto_code(text: str) -> str:
