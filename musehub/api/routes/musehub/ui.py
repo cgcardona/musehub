@@ -27,7 +27,6 @@ Endpoint summary (repo-scoped):
   GET /{owner}/{repo_slug}/context/{ref}             -- AI context viewer
   GET /{owner}/{repo_slug}/credits                   -- dynamic credits (liner notes)
   GET /{owner}/{repo_slug}/embed/{ref}               -- iframe-safe audio player
-  GET /{owner}/{repo_slug}/search                    -- in-repo search (4 modes)
   GET /{owner}/{repo_slug}/compare/{base}...{head}   -- multi-dimensional musical diff between two refs
   GET /{owner}/{repo_slug}/divergence                -- branch divergence radar chart
   GET /{owner}/{repo_slug}/timeline                  -- chronological SVG timeline
@@ -2055,6 +2054,13 @@ async def credits_page(
     longest_active = max(contributors, key=lambda c: (c.last_active - c.first_active).days,    default=None)
 
     # --- Per-author dimension + branch breakdown (one extra query) ------
+    import re as _re
+    _CONV_PREFIX = _re.compile(
+        r"^(feat|fix|refactor|docs|test|perf|chore|ci|build|style|revert)"
+        r"(\(.+?\))?!?:",
+        _re.IGNORECASE,
+    )
+
     commit_rows_r = await db.execute(
         sa_select(
             musehub_db.MusehubCommit.author,
@@ -2062,19 +2068,45 @@ async def credits_page(
             musehub_db.MusehubCommit.branch,
         ).where(musehub_db.MusehubCommit.repo_id == repo_id)
     )
+    # Collect into list so we can iterate once for all classifiers.
+    commit_rows: list[tuple[str, str, str]] = [
+        (str(r[0]), str(r[1]), str(r[2])) for r in commit_rows_r.all()
+    ]
+
     author_dim_counts: dict[str, dict[str, int]] = {}
     author_branches:   dict[str, set[str]]       = {}
-    for author, message, branch in commit_rows_r:
+    # Conventional-commit type counts per author (code-domain enrichment).
+    author_code_types: dict[str, dict[str, int]] = {}
+    project_code_counts: dict[str, int]          = {}
+
+    for author, message, branch in commit_rows:
         if author not in author_dim_counts:
-            author_dim_counts[author] = {}
-            author_branches[author]   = set()
+            author_dim_counts[author]  = {}
+            author_branches[author]    = set()
+            author_code_types[author]  = {}
         author_branches[author].add(branch)
+
+        # Music-domain dimension classification (used for MIDI repos).
         for dim in musehub_divergence.classify_message(message):
             author_dim_counts[author][dim] = author_dim_counts[author].get(dim, 0) + 1
+
+        # Code-domain: parse conventional commit prefix (feat:, fix:, …).
+        m = _CONV_PREFIX.match(message.strip())
+        if m:
+            ctype = m.group(1).lower()
+            # Normalise aliases.
+            ctype = {"build": "chore", "style": "chore", "ci": "chore"}.get(ctype, ctype)
+            author_code_types[author][ctype] = author_code_types[author].get(ctype, 0) + 1
+            project_code_counts[ctype] = project_code_counts.get(ctype, 0) + 1
 
     author_top_dims: dict[str, list[tuple[str, int]]] = {
         author: sorted(dims.items(), key=lambda x: -x[1])[:3]
         for author, dims in author_dim_counts.items()
+    }
+    # Top-3 code semantic types per author, sorted by count descending.
+    author_top_code_types: dict[str, list[tuple[str, int]]] = {
+        author: sorted(ctypes.items(), key=lambda x: -x[1])[:4]
+        for author, ctypes in author_code_types.items()
     }
     author_branch_counts: dict[str, int] = {
         a: len(brs) for a, brs in author_branches.items()
@@ -2084,6 +2116,9 @@ async def credits_page(
     all_roles: set[str] = set()
     for c in contributors:
         all_roles.update(c.contribution_types)
+
+    # Detect whether this is a code-domain repo (conventional commits present).
+    is_code_domain: bool = bool(project_code_counts)
 
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2108,7 +2143,11 @@ async def credits_page(
         "longest_active": longest_active,
         # Per-author enrichment
         "author_top_dims": author_top_dims,
+        "author_top_code_types": author_top_code_types,
         "author_branch_counts": author_branch_counts,
+        # Code-domain project-level stats
+        "project_code_counts": project_code_counts,
+        "is_code_domain": is_code_domain,
     }
     ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/credits.html", ctx)
@@ -2151,183 +2190,6 @@ async def analysis_dashboard_page(
         ctx,
         full_template="musehub/pages/analysis/dashboard.html",
         fragment_template="musehub/fragments/analysis/dashboard_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/search",
-    summary="MuseHub in-repo search page",
-)
-async def search_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    q: str = Query("", description="Search query"),
-    mode: str = Query("keyword", description="Search mode: keyword | pattern | ask"),
-    search_type: str = Query("all", description="Result type filter: all | commits | issues | prs | releases | sessions"),
-    limit: int = Query(20, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the in-repo multi-type search page with SSR results.
-
-    Searches commits, issues, pull requests, releases, and sessions in
-    parallel.  The ``type`` param filters which category is shown; the
-    ``mode`` param (keyword/pattern/ask) applies only to commit search.
-
-    HTMX live-search swaps only the ``#sr-results`` fragment on debounced
-    input, avoiding a full-page reload for subsequent queries.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    safe_mode = mode if mode in ("keyword", "pattern", "ask") else "keyword"
-    safe_type = search_type if search_type in ("all", "commits", "issues", "prs", "releases", "sessions") else "all"
-
-    commit_result = None
-    issue_hits: list[Any] = []
-    pr_hits: list[Any] = []
-    release_hits: list[Any] = []
-    session_hits: list[Any] = []
-
-    if q and len(q.strip()) >= 2:
-        q_lower = q.strip().lower()
-
-        async def _search_commits() -> Any:
-            if safe_mode == "keyword":
-                return await musehub_search.search_by_keyword(
-                    db, repo_id=repo_id, keyword=q, limit=limit
-                )
-            if safe_mode == "ask":
-                return await musehub_search.search_by_ask(
-                    db, repo_id=repo_id, question=q, limit=limit
-                )
-            return await musehub_search.search_by_pattern(
-                db, repo_id=repo_id, pattern=q, limit=limit
-            )
-
-        async def _search_issues() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubIssue.issue_id,
-                    musehub_db.MusehubIssue.number,
-                    musehub_db.MusehubIssue.title,
-                    musehub_db.MusehubIssue.state,
-                    musehub_db.MusehubIssue.author,
-                    musehub_db.MusehubIssue.labels,
-                    musehub_db.MusehubIssue.created_at,
-                ).where(
-                    musehub_db.MusehubIssue.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubIssue.title).contains(q_lower),
-                ).order_by(musehub_db.MusehubIssue.created_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        async def _search_prs() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubPullRequest.pr_id,
-                    musehub_db.MusehubPullRequest.title,
-                    musehub_db.MusehubPullRequest.state,
-                    musehub_db.MusehubPullRequest.author,
-                    musehub_db.MusehubPullRequest.from_branch,
-                    musehub_db.MusehubPullRequest.to_branch,
-                    musehub_db.MusehubPullRequest.created_at,
-                ).where(
-                    musehub_db.MusehubPullRequest.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubPullRequest.title).contains(q_lower),
-                ).order_by(musehub_db.MusehubPullRequest.created_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        async def _search_releases() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubRelease.release_id,
-                    musehub_db.MusehubRelease.tag,
-                    musehub_db.MusehubRelease.title,
-                    musehub_db.MusehubRelease.is_prerelease,
-                    musehub_db.MusehubRelease.is_draft,
-                    musehub_db.MusehubRelease.created_at,
-                ).where(
-                    musehub_db.MusehubRelease.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubRelease.title).contains(q_lower)
-                    | func.lower(musehub_db.MusehubRelease.tag).contains(q_lower),
-                ).order_by(musehub_db.MusehubRelease.created_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        async def _search_sessions() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubSession.session_id,
-                    musehub_db.MusehubSession.intent,
-                    musehub_db.MusehubSession.location,
-                    musehub_db.MusehubSession.participants,
-                    musehub_db.MusehubSession.is_active,
-                    musehub_db.MusehubSession.started_at,
-                ).where(
-                    musehub_db.MusehubSession.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubSession.intent).contains(q_lower)
-                    | func.lower(musehub_db.MusehubSession.location).contains(q_lower),
-                ).order_by(musehub_db.MusehubSession.started_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        (
-            commit_result,
-            issue_hits,
-            pr_hits,
-            release_hits,
-            session_hits,
-        ) = await asyncio.gather(
-            _search_commits(),
-            _search_issues(),
-            _search_prs(),
-            _search_releases(),
-            _search_sessions(),
-        )
-
-    commit_count  = len(commit_result.matches) if commit_result else 0
-    issue_count   = len(issue_hits)
-    pr_count      = len(pr_hits)
-    release_count = len(release_hits)
-    session_count = len(session_hits)
-    total_count   = commit_count + issue_count + pr_count + release_count + session_count
-
-    ctx: dict[str, Any] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "base_url": base_url,
-        "current_page": "search",
-        "query": q,
-        "mode": safe_mode,
-        "search_type": safe_type,
-        "limit": limit,
-        # Commit search result
-        "search_result": commit_result,
-        # Multi-type hits
-        "issue_hits": issue_hits,
-        "pr_hits": pr_hits,
-        "release_hits": release_hits,
-        "session_hits": session_hits,
-        # Counts (for type tabs)
-        "commit_count": commit_count,
-        "issue_count": issue_count,
-        "pr_count": pr_count,
-        "release_count": release_count,
-        "session_count": session_count,
-        "total_count": total_count,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/search.html",
-        fragment_template="musehub/fragments/search_results.html",
     )
 
 

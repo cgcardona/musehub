@@ -2,60 +2,54 @@
 {% from "musehub/macros/pagination.html" import pagination %}
 
 {% block title %}Activity · {{ owner }}/{{ repo_slug }}{% endblock %}
-
 {% block breadcrumb %}
   <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / activity
 {% endblock %}
-
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block page_json %}{"page": "activity"}{% endblock %}
 
-{% block page_data %}
-window.__activityCfg = {
-  base: {{ base_url | tojson }},
-};
-{% endblock %}
-
 {% block content %}
-<div class="content-wide" style="padding:0; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; margin-top:var(--space-4)">
+<div class="av-page">
+<div class="av-card">
 
-  {# ── Stats bar ──────────────────────────────────────────────────────── #}
-  <div class="av-stats-bar">
+  {# ── Stat strip ──────────────────────────────────────────────────────────── #}
+  <div class="av-stat-strip">
     <div class="av-stat">
       <span class="av-stat-value">{{ total_all }}</span>
-      <span class="av-stat-label">Total events</span>
+      <span class="av-stat-label">Events</span>
     </div>
-    <div class="av-stats-sep"></div>
+    <div class="av-stat-sep"></div>
     <div class="av-stat">
       <span class="av-stat-value">{{ unique_actors }}</span>
       <span class="av-stat-label">Contributors</span>
     </div>
-    <div class="av-stats-sep"></div>
+    <div class="av-stat-sep"></div>
     <div class="av-stat">
       <span class="av-stat-value">{{ event_types | length }}</span>
-      <span class="av-stat-label">Event types</span>
+      <span class="av-stat-label">Event Types</span>
     </div>
-    {%- if first_event_at %}
-    <div class="av-stats-sep"></div>
+    {% if first_event_at %}
+    <div class="av-stat-sep"></div>
     <div class="av-stat">
-      <span class="av-stat-value" style="font-size:var(--font-size-sm)">{{ first_event_at | fmtdate }}</span>
-      <span class="av-stat-label">First event</span>
+      <span class="av-stat-value av-stat-value--sm">{{ first_event_at | fmtdate }}</span>
+      <span class="av-stat-label">First Event</span>
     </div>
-    {%- endif %}
-    {%- if last_event_at %}
-    <div class="av-stats-sep"></div>
+    {% endif %}
+    {% if last_event_at %}
+    <div class="av-stat-sep"></div>
     <div class="av-stat">
-      <span class="av-stat-value" style="font-size:var(--font-size-sm)">{{ last_event_at | fmtdate }}</span>
-      <span class="av-stat-label">Latest event</span>
+      <span class="av-stat-value av-stat-value--sm">{{ last_event_at | fmtdate }}</span>
+      <span class="av-stat-label">Latest Event</span>
     </div>
-    {%- endif %}
+    {% endif %}
   </div>
 
-  {# ── Main feed (HTMX target — includes filter pills + rows) ─────────── #}
+  {# ── Feed (HTMX target) ──────────────────────────────────────────────────── #}
   <div id="av-feed">
     {% include "musehub/fragments/activity_rows.html" %}
   </div>
 
+</div>
 </div>
 {% endblock %}

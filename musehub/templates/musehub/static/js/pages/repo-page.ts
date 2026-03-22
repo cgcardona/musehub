@@ -84,7 +84,9 @@ function initStarToggle(): void {
 
 function highlightReadme(): void {
   document.querySelectorAll<HTMLElement>('.rh-readme-body pre code').forEach((block) => {
-    hljs.highlightElement(block);
+    if (block.dataset['highlighted'] !== 'yes') {
+      hljs.highlightElement(block);
+    }
   });
 }
 

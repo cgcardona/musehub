@@ -12,3 +12,12 @@
 @use "icons";
 @use "domain";   // supersedes "music" — domain-agnostic styles + [data-domain] scoping
 @use "pages";
+@use "prs";        // pull request list page
+@use "issues";     // issue list + detail pages
+@use "branches";   // branches page
+@use "tags";       // tags page
+@use "releases";   // releases list page
+@use "credits";    // credits / attribution page
+@use "activity";   // activity feed page
+@use "repo-home";  // repository home page (.rh-* and .ft-*)
+@use "repo-nav";   // repo tab strip + branch picker (shared across all repo pages)
