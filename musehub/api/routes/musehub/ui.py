@@ -2069,7 +2069,9 @@ async def credits_page(
         ).where(musehub_db.MusehubCommit.repo_id == repo_id)
     )
     # Collect into list so we can iterate once for all classifiers.
-    commit_rows: list[tuple[str, str, str]] = list(commit_rows_r)
+    commit_rows: list[tuple[str, str, str]] = [
+        (str(r[0]), str(r[1]), str(r[2])) for r in commit_rows_r.all()
+    ]
 
     author_dim_counts: dict[str, dict[str, int]] = {}
     author_branches:   dict[str, set[str]]       = {}
