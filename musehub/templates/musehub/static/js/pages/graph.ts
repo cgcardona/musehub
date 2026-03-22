@@ -77,33 +77,45 @@ const PALETTE = [
   '#d2a8ff','#ff9492','#2dd4bf','#fbbf24',
 ];
 
-// Commit type → node fill color (semantic primary encoding)
+// ── Canonical 4-color intent palette ─────────────────────────────────────────
+// These four hex values are the single source of truth for semantic intent
+// across the DAG graph, symbol graph, diff view, and CLI output.
+//   added / feat / insert       → #34d399  emerald
+//   removed / breaking / delete → #f87171  red
+//   modified / fix / replace    → #fbbf24  amber
+//   structural / refactor       → #60a5fa  blue
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Commit type → node fill color
 const TYPE_COLORS: Record<string, string> = {
-  feat:     '#3fb950',  // green   — new capability
-  fix:      '#f85149',  // red     — bug fix
-  refactor: '#bc8cff',  // purple  — structural change
+  feat:     '#34d399',  // emerald — added / new capability
+  fix:      '#f87171',  // red     — removed / bug fixed
+  refactor: '#60a5fa',  // blue    — structural change
+  revert:   '#f87171',  // red     — removal of prior work
   init:     '#58a6ff',  // blue    — initialisation
   docs:     '#6e96c9',  // muted blue
-  style:    '#fbbf24',  // yellow  — formatting
+  style:    '#fbbf24',  // amber   — formatting
   test:     '#2dd4bf',  // teal    — tests
   chore:    '#6e7681',  // gray    — housekeeping
   perf:     '#f0883e',  // orange  — performance
   build:    '#a78bfa',  // violet  — build system
-  ci:       '#60a5fa',  // sky     — CI/CD
-  revert:   '#fb923c',  // amber   — revert
+  ci:       '#60a5fa',  // blue    — CI/CD
 };
 
-// Semver pip colors (top-right corner badge on the node)
+// Semver pip colors — aligned to the 4-color palette:
+//   minor bump = new feature = added = emerald
+//   major bump = breaking    = removed = red
+//   patch bump = bug fix     = modified = amber
 const SEMVER_COLORS: Record<string, string> = {
-  major: '#ef4444',   // red   — breaking version bump
-  minor: '#3b82f6',   // blue  — feature version bump
-  patch: '#22c55e',   // green — patch/fix bump
+  major: '#f87171',   // red     — breaking version bump
+  minor: '#34d399',   // emerald — feature version bump
+  patch: '#fbbf24',   // amber   — patch/fix bump
 };
 
 const HEAD_COLOR     = '#f0883e';
-const MERGE_COLOR    = '#bc8cff';
+const MERGE_COLOR    = '#60a5fa';
 const SESSION_COLOR  = '#2dd4bf';
-const BREAKING_COLOR = '#ef4444';
+const BREAKING_COLOR = '#f87171';
 const AGENT_COLOR    = '#a78bfa';   // violet for agent-authored nodes
 const DIM_ALPHA      = 0.18;
 
