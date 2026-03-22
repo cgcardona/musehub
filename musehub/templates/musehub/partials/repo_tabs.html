@@ -7,10 +7,10 @@
 <nav class="repo-tabs" id="repo-tabs" hx-boost="true" aria-label="Repository navigation">
 <div class="repo-tabs-inner">
   <a href="{{ base_url }}"
-     class="repo-tab{% if current_page == 'commits' %} active{% endif %}"
-     {% if current_page == 'commits' %}aria-current="page"{% endif %}>
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
-    Commits
+     class="repo-tab{% if current_page == 'code' %} active{% endif %}"
+     {% if current_page == 'code' %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    Code
   </a>
 
   <a href="{{ base_url }}/graph"

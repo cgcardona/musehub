@@ -89,10 +89,30 @@ async def create_repo_endpoint(
     claims: TokenClaims = Depends(require_valid_token),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    """Create a new repo under the authenticated identity."""
-    owner = claims.get("sub") or ""
-    if not owner:
+    """Create a new repo under the authenticated identity.
+
+    ``owner`` is resolved from the caller's registered identity handle — the
+    URL-visible slug (e.g. "gabriel").  ``owner_user_id`` is the stable UUID
+    from the JWT ``sub`` claim.  The two are stored separately so handle renames
+    only require updating identity rows, not every repo row.
+    """
+    user_id: str = claims.get("sub") or ""
+    if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="no subject in token")
+
+    # Resolve the identity handle for this user — the URL-visible slug.
+    # Identities link to the JWT ``sub`` via the ``legacy_user_id`` column.
+    identity_row = (
+        await session.execute(
+            select(db.MusehubIdentity).where(db.MusehubIdentity.legacy_user_id == user_id)
+        )
+    ).scalars().first()
+    if identity_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="No identity registered for this account. Create an identity first via POST /api/identities.",
+        )
+    owner_handle: str = identity_row.handle
 
     name = str(body.get("name") or body.get("slug") or "")
     description = str(body.get("description") or "")
@@ -104,9 +124,9 @@ async def create_repo_endpoint(
     result = await create_repo(
         session,
         name=name,
-        owner=owner,
+        owner=owner_handle,
         visibility=visibility,
-        owner_user_id=owner,
+        owner_user_id=user_id,
         description=description,
     )
     return Response(

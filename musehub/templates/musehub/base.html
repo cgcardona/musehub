@@ -25,6 +25,26 @@
   {% if muse_resource_uri is defined %}<link rel="muse-resource" href="{{ muse_resource_uri }}">{% endif %}
   <link rel="muse-mcp" href="/mcp">
   <link rel="muse-docs" href="/mcp/docs">
+  <style>
+    /* ── Repo tab strip — full-width on desktop, scroll on mobile ──────────── */
+    @media (min-width: 768px) {
+      .repo-tabs { overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
+      .repo-tabs-inner { justify-content: space-evenly; padding: 0; }
+      .repo-tab { flex: 1; justify-content: center; flex-shrink: 1; padding-left: var(--space-2); padding-right: var(--space-2); }
+    }
+    @media (max-width: 767px) {
+      .repo-tabs-inner { width: max-content; }
+      .repo-tab { flex-shrink: 0; }
+    }
+    /* ── Branch picker ──────────────────────────────────────────────────────── */
+    .rh-branch-picker { display: inline-flex; align-items: center; gap: 5px; }
+    .rh-branch-select {
+      background: transparent; border: none; border-bottom: 1px solid var(--color-accent);
+      color: var(--text-primary); font-size: 12px; font-weight: 500; font-family: inherit;
+      padding: 2px 0; cursor: pointer; outline: none;
+    }
+    .rh-branch-select:focus { border-bottom-color: var(--color-accent); }
+  </style>
   {% block extra_css %}{% endblock %}
   {% block jsonld %}{% endblock %}
   <script src="/static/alpinejs.min.js" defer></script>
