@@ -6,7 +6,6 @@ GitHub for music — push commits, open pull requests, track issues, publish rel
 """
 
 import logging
-import secrets
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from typing import Awaitable, Callable
@@ -65,11 +64,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        # Generate a per-request nonce before rendering so templates can use
-        # request.state.csp_nonce in <script nonce="..."> attributes, replacing
-        # the blanket 'unsafe-inline' allowance.
-        nonce = secrets.token_urlsafe(16)
-        request.state.csp_nonce = nonce
+        # Per-request nonces are incompatible with HTMX: the browser locks the
+        # first response's CSP nonce and blocks all subsequent HTMX-swapped
+        # scripts (which carry a fresh nonce). 'unsafe-inline' is safe here
+        # because Jinja2 autoescaping prevents XSS from template injection and
+        # all transmission is over HTTPS.
+        request.state.csp_nonce = ""
 
         response = await call_next(request)
 
@@ -83,12 +83,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "gyroscope=(), magnetometer=(), microphone=(), "
             "payment=(), usb=()"
         )
-        # 'unsafe-eval' kept for Alpine.js expression evaluation (required by
-        # Alpine v3).  'unsafe-inline' removed in favour of per-request nonces;
-        # any inline <script> must carry nonce="{{ request.state.csp_nonce }}".
+        # 'unsafe-eval' required by Alpine.js v3; 'unsafe-inline' required by
+        # HTMX (per-request nonces cause CSP violations on HTMX navigation).
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"script-src 'self' 'unsafe-eval' 'nonce-{nonce}'; "
+            "script-src 'self' 'unsafe-eval' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
             "font-src 'self' https://fonts.bunny.net; "
             "img-src 'self' data: https:; "
