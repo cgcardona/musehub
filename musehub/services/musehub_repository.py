@@ -1556,6 +1556,7 @@ def _manifest_to_tree(
                         name=dir_name,
                         path=prefix + dir_name,
                         size_bytes=None,
+                        object_id=None,
                     )
                 )
 
@@ -1614,6 +1615,7 @@ async def list_tree(
                     name=remainder,
                     path=path,
                     size_bytes=obj.size_bytes,
+                    object_id=None,
                 )
             )
         else:
@@ -1627,6 +1629,7 @@ async def list_tree(
                         name=dir_name,
                         path=dir_full_path,
                         size_bytes=None,
+                        object_id=None,
                     )
                 )
 
