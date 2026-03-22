@@ -241,6 +241,7 @@ async def domain_viewer_page(
         "repo": repo,
         "owner": owner,
         "repo_slug": repo_slug,
+        "base_url": f"/{owner}/{repo_slug}",
         "ref": ref,
         "domain": domain_ctx,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
@@ -248,7 +249,6 @@ async def domain_viewer_page(
     }
     return _templates.TemplateResponse(
         request, "musehub/pages/view.html", ctx,
-        headers={"X-Page-Json": str(page_json)},
     )
 
 
@@ -293,6 +293,7 @@ async def domain_viewer_file_page(
         "repo": repo,
         "owner": owner,
         "repo_slug": repo_slug,
+        "base_url": f"/{owner}/{repo_slug}",
         "ref": ref,
         "path": path,
         "domain": domain_ctx,
@@ -301,7 +302,6 @@ async def domain_viewer_file_page(
     }
     return _templates.TemplateResponse(
         request, "musehub/pages/view.html", ctx,
-        headers={"X-Page-Json": str(page_json)},
     )
 
 
