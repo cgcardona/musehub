@@ -1970,6 +1970,7 @@ class TreeEntryResponse(CamelModel):
     name: str = Field(..., description="Entry filename or directory name")
     path: str = Field(..., description="Full relative path from repo root, e.g. 'tracks/bass.mid'")
     size_bytes: int | None = Field(None, description="File size in bytes; None for directories")
+    object_id: str | None = Field(None, description="Content-addressed object ID; None for directories and legacy entries")
 
 
 class TreeListResponse(CamelModel):

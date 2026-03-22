@@ -1528,7 +1528,7 @@ def _manifest_to_tree(
     dirs: list[TreeEntryResponse] = []
     files: list[TreeEntryResponse] = []
 
-    for path in manifest:
+    for path, object_id in manifest.items():
         norm = path.lstrip("/")
         if not norm.startswith(prefix):
             continue
@@ -1543,6 +1543,7 @@ def _manifest_to_tree(
                     name=remainder,
                     path=norm,
                     size_bytes=None,
+                    object_id=object_id,
                 )
             )
         else:
