@@ -37,9 +37,26 @@ interface DagData  { nodes: DagNode[]; edges: DagEdge[]; headCommitId: string; }
 interface SessionEntry { sessionId: string; intent?: string; startedAt: string; commits?: string[]; }
 interface SessionMap   { [cid: string]: { intent: string; sessionId: string }; }
 
+// SSR-injected DAG shape matches the /repos/{id}/dag JSON response but uses
+// snake_case keys (Python serialisation). We normalise to camelCase below.
+interface SsrDagNode {
+  commit_id: string; message: string; author: string; timestamp: string;
+  branch: string; parent_ids: string[]; is_head: boolean;
+  branch_labels: string[]; tag_labels: string[];
+  commit_type: string; sem_ver_bump: string;
+  is_breaking: boolean; is_agent: boolean;
+  sym_added: number; sym_removed: number;
+}
+interface SsrDagData {
+  nodes: SsrDagNode[];
+  edges: Array<{ source: string; target: string }>;
+  head_commit_id: string | null;
+}
+
 declare global {
   interface Window {
-    __graphCfg?: GraphCfg;
+    __graphCfg?:  GraphCfg;
+    __graphData?: SsrDagData;
     escHtml:  (s: string) => string;
     apiFetch: (path: string, init?: RequestInit) => Promise<unknown>;
     fmtDate:  (d: string) => string;
@@ -1106,14 +1123,45 @@ function buildSessionMap(sessions: SessionEntry[]): SessionMap {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
+function normaliseSsrDag(ssr: SsrDagData): DagData {
+  // The SSR payload uses Python snake_case; normalise to the camelCase shape
+  // that the rest of graph.ts expects (matching the /repos/{id}/dag API response).
+  return {
+    headCommitId: ssr.head_commit_id ?? '',
+    edges: ssr.edges,
+    nodes: ssr.nodes.map(n => ({
+      commitId:     n.commit_id,
+      message:      n.message,
+      author:       n.author,
+      timestamp:    n.timestamp,
+      branch:       n.branch,
+      parentIds:    n.parent_ids,
+      isHead:       n.is_head,
+      branchLabels: n.branch_labels,
+      tagLabels:    n.tag_labels,
+      commitType:   n.commit_type,
+      semVerBump:   n.sem_ver_bump,
+      isBreaking:   n.is_breaking,
+      isAgent:      n.is_agent,
+      symAdded:     n.sym_added,
+      symRemoved:   n.sym_removed,
+    })),
+  };
+}
+
 async function load(cfg: GraphCfg): Promise<void> {
   if (typeof window.initRepoNav === 'function') window.initRepoNav(cfg.repoId);
 
   const loadingEl = document.getElementById('dag-loading');
 
   try {
+    // Use SSR-injected DAG data when available to avoid a round-trip on first paint.
+    // The sessions fetch is always async (not worth SSR-ing for this panel).
+    const ssrDag = window.__graphData;
     const [dagData, sessData] = await Promise.all([
-      window.apiFetch('/repos/' + cfg.repoId + '/dag'),
+      ssrDag
+        ? Promise.resolve(normaliseSsrDag(ssrDag))
+        : window.apiFetch('/repos/' + cfg.repoId + '/dag') as Promise<DagData>,
       window.apiFetch('/repos/' + cfg.repoId + '/sessions?limit=200').catch(() => ({ sessions: [] })),
     ]) as [DagData, { sessions?: SessionEntry[] }];
 
