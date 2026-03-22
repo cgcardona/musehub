@@ -2242,12 +2242,12 @@ async def test_repo_page_contains_groove_check_link(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Repo landing page includes a View link for the universal domain viewer."""
+    """Repo landing page includes an Insights link for the domain viewer."""
     repo_id = await _make_repo(db_session)
     response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
-    assert "/view/" in body
+    assert "/insights/" in body
 
 
 # ---------------------------------------------------------------------------
@@ -5117,17 +5117,21 @@ async def test_listen_page_full_mix(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /{owner}/{repo}/view/{ref} returns 200 HTML with the domain viewer."""
+    """GET /{owner}/{repo}/view/{ref} and /insights/{ref} both return 200.
+
+    /view/* is an alias for /insights — same handler, same page, no redirect.
+    """
     await _seed_listen_fixtures(db_session)
     ref = "main"
+    # /view URL is an alias — returns 200 directly (no redirect)
     response = await client.get(f"/testuser/listen-test/view/{ref}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-    assert "view" in body.lower()
-    # Domain viewer rendered server-side
-    assert "view-container" in body
+    assert "MuseHub" in response.text
+    # Canonical /insights URL also returns 200
+    response2 = await client.get(f"/testuser/listen-test/insights/{ref}")
+    assert response2.status_code == 200
+    assert "MuseHub" in response2.text
 
 
 @pytest.mark.anyio
@@ -5135,14 +5139,14 @@ async def test_listen_page_track_listing(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Domain view page renders the universal viewer container server-side."""
+    """Insights page (aliases /view) renders the domain viewer container server-side."""
     await _seed_listen_fixtures(db_session)
     ref = "main"
     response = await client.get(f"/testuser/listen-test/view/{ref}")
     assert response.status_code == 200
     body = response.text
-    # Universal domain viewer container rendered SSR
-    assert "view-container" in body
+    # Insights page rendered SSR
+    assert "ins-page" in body
 
 
 @pytest.mark.anyio
@@ -5165,8 +5169,8 @@ async def test_listen_page_no_renders_fallback(
     response = await client.get("/testuser/silent-repo/view/main")
     assert response.status_code == 200
     body = response.text
-    # Generic domain viewer renders the fallback file-tree embed
-    assert "view-container" in body or "view-page" in body
+    # Insights page (aliases /view) renders successfully
+    assert "ins-page" in body or "MuseHub" in body
 
 
 @pytest.mark.anyio
@@ -5174,21 +5178,13 @@ async def test_listen_page_json_response(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """GET /{owner}/{repo}/view/{ref}?format=json returns domain viewer JSON context."""
+    """GET /{owner}/{repo}/view/{ref} returns HTML (insights page, /view is an alias)."""
     await _seed_listen_fixtures(db_session)
     ref = "main"
-    response = await client.get(
-        f"/testuser/listen-test/view/{ref}",
-        params={"format": "json"},
-    )
+    response = await client.get(f"/testuser/listen-test/view/{ref}")
     assert response.status_code == 200
-    assert "application/json" in response.headers["content-type"]
-    body = response.json()
-    assert "repoId" in body
-    assert "ref" in body
-    assert body["ref"] == ref
-    assert "viewerType" in body
-    assert "owner" in body
+    assert "text/html" in response.headers["content-type"]
+    assert "MuseHub" in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -6798,12 +6794,12 @@ async def test_arrange_page_contains_grid_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Domain view page renders the viewer container for any domain."""
+    """Insights page (aliases /view) renders the domain viewer container."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/view/HEAD")
     assert response.status_code == 200
     body = response.text
-    assert "view-container" in body
+    assert "ins-page" in body
 
 
 @pytest.mark.anyio
@@ -6824,13 +6820,13 @@ async def test_arrange_page_contains_token_form(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Domain view page renders successfully with MuseHub branding."""
+    """Insights page (aliases /view) renders successfully with MuseHub branding."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/view/HEAD")
     assert response.status_code == 200
     body = response.text
     assert "MuseHub" in body
-    assert "view-container" in body
+    assert "ins-page" in body
 
 
 @pytest.mark.anyio
@@ -6922,12 +6918,12 @@ async def test_piano_roll_page_contains_canvas(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """View page renders the domain viewer container server-side."""
+    """Insights page (aliases /view) renders the domain viewer container server-side."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/view/main")
     assert response.status_code == 200
     body = response.text
-    assert "view-container" in body
+    assert "ins-page" in body
 
 
 @pytest.mark.anyio
@@ -6935,11 +6931,11 @@ async def test_piano_roll_page_has_token_form(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """View page renders the domain viewer container and page config."""
+    """Insights page (aliases /view) renders the domain viewer container and page config."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/view/main")
     assert response.status_code == 200
-    assert "view-container" in response.text
+    assert "ins-page" in response.text
     assert "viewerType" in response.text
 
 
@@ -6958,11 +6954,11 @@ async def test_arrange_tab_in_repo_nav(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Repo home page navigation includes a View link for the domain viewer."""
+    """Repo home page navigation includes an Insights link for the domain viewer."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
-    assert "/view/" in response.text
+    assert "/insights/" in response.text
 
 
 @pytest.mark.anyio

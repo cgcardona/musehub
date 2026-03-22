@@ -99,8 +99,8 @@ async def test_piano_roll_page_renders_instrument_sidebar(
     )
     assert response.status_code == 200
     body = response.text
-    # Domain viewer renders SSR HTML
-    assert "view-container" in body
+    # Insights page (aliases /view) renders SSR HTML
+    assert "ins-page" in body
 
 
 @pytest.mark.anyio
@@ -122,13 +122,13 @@ async def test_piano_roll_page_transport_bar_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """View page renders the domain viewer container for any ref."""
+    """Insights page (aliases /view) renders the domain viewer container for any ref."""
     await _make_repo(db_session)
     response = await client.get(
         "/canvasuser/canvas-test-beats/view/main"
     )
     assert response.status_code == 200
-    assert "view-container" in response.text
+    assert "ins-page" in response.text
 
 
 @pytest.mark.anyio

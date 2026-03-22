@@ -70,7 +70,7 @@
             Diff
           </a>
           {% if audio_url %}
-          <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-listen btn-sm">
+          <a href="{{ base_url }}/insights/{{ commit.commit_id }}" class="btn btn-listen btn-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Play
           </a>
@@ -297,7 +297,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--color-accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           <span class="cd3-section-title">Audio Preview</span>
         </div>
-        <a href="{{ base_url }}/view/{{ commit.commit_id }}" class="btn btn-ghost btn-sm" style="font-size:11px">Open player ↗</a>
+        <a href="{{ base_url }}/insights/{{ commit.commit_id }}" class="btn btn-ghost btn-sm" style="font-size:11px">Open player ↗</a>
       </div>
       <div class="cd3-audio-wrap">
         <div class="cd3-waveform" id="cd-waveform" data-audio-url="{{ audio_url }}">
