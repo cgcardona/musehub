@@ -57,6 +57,37 @@
 .rh-stat-cell { display:flex; flex-direction:column; }
 .rh-stat-cell-val { font-size:14px; font-weight:600; color:var(--text-primary); line-height:1.1; }
 .rh-stat-cell-lbl { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+/* ── Recently pushed branch banners ────────────────────────────────────── */
+.rh-recent-branch { display:flex; align-items:center; gap:8px; padding:8px 12px; margin-bottom:6px;
+  background:var(--bg-card); border:1px solid var(--border-default); border-radius:6px;
+  font-size:12px; color:var(--text-secondary); }
+.rh-recent-branch svg { color:var(--color-accent); flex-shrink:0; }
+.rh-recent-branch-name { font-weight:600; color:var(--color-accent); font-family:var(--font-mono,monospace); }
+.rh-recent-branch-ts { color:var(--text-muted); }
+.rh-recent-branch-btn { margin-left:auto; white-space:nowrap; }
+.btn-xs { padding:2px 8px; font-size:11px; }
+/* ── Latest commit header row ───────────────────────────────────────────── */
+.ft-latest-commit { display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:8px 12px; background:var(--bg-subtle,var(--bg-card)); border:1px solid var(--border-subtle);
+  border-radius:6px 6px 0 0; border-bottom:none; font-size:12px; }
+.ft-lc-left { display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; }
+.ft-lc-avatar { width:20px; height:20px; font-size:10px; flex-shrink:0; }
+.ft-lc-author { font-weight:600; color:var(--text-primary); white-space:nowrap; }
+.ft-lc-message { color:var(--text-secondary); text-decoration:none; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.ft-lc-message:hover { color:var(--color-accent); }
+.ft-lc-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.ft-lc-sha { font-family:var(--font-mono,monospace); font-size:11px; color:var(--color-accent);
+  text-decoration:none; background:var(--bg-inset); padding:1px 6px; border-radius:3px; }
+.ft-lc-sha:hover { text-decoration:underline; }
+.ft-lc-ts { color:var(--text-muted); font-size:11px; white-space:nowrap; }
+/* ── File tree columns ──────────────────────────────────────────────────── */
+.file-tree-cell-commit { color:var(--text-muted); font-size:11.5px; padding-right:12px; }
+.file-tree-cell-ts { color:var(--text-muted); font-size:11px; white-space:nowrap; text-align:right;
+  padding-right:10px; min-width:80px; }
+.ft-row-commit-msg { color:var(--text-muted); text-decoration:none; }
+.ft-row-commit-msg:hover { color:var(--color-accent); }
+.ft-row-ts { color:var(--text-muted); }
 </style>
 {% endblock %}
 
@@ -129,6 +160,17 @@
 
   {# ── Main column ──────────────────────────────────────────────────────────── #}
   <main class="rh-main">
+
+    {# Recently pushed branches — like GitHub's "branch had recent pushes" banners #}
+    {% for rb in (recently_pushed or []) %}
+    <div class="rh-recent-branch">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      <span class="rh-recent-branch-name">{{ rb.name }}</span>
+      <span class="rh-recent-branch-msg">had recent pushes</span>
+      <span class="rh-recent-branch-ts" data-ts="{{ rb.timestamp }}">{{ rb.timestamp | fmtrelative }}</span>
+      <a href="{{ base_url }}?ref={{ rb.name }}" class="btn btn-secondary btn-xs rh-recent-branch-btn">Compare &amp; pull request</a>
+    </div>
+    {% endfor %}
 
     {# Branch bar + file tree #}
     <div class="rh-branch-bar">

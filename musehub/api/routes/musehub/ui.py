@@ -632,6 +632,7 @@ async def repo_page(
             )
         ),
         musehub_repository.get_repo_home_stats(db, repo_id, ref),
+        musehub_repository.get_recently_pushed_branches(db, repo_id, ref),
     )
     tree_response = cast("TreeListResponse", _gathered[0])
     commits = cast("list[CommitResponse]", cast("tuple[Any, Any]", _gathered[1])[0])
@@ -640,7 +641,12 @@ async def repo_page(
     pr_count_result = cast("CursorResult[Any]", _gathered[4])
     issue_count_result = cast("CursorResult[Any]", _gathered[5])
     repo_stats = cast("dict[str, Any]", _gathered[6])
+    recently_pushed = cast("list[dict[str, str]]", _gathered[7])
     tags_count = len(releases)
+
+    # Per-file last-commit info (sequential — depends on tree_response).
+    file_paths = [e.path for e in tree_response.entries if e.type == "file"]
+    file_last_commits = await musehub_repository.get_file_last_commits(db, repo_id, file_paths)
     nav_ctx: dict[str, Any] = {
         "repo_key": repo.key_signature or "",
         "repo_bpm": repo.tempo_bpm,
@@ -724,6 +730,9 @@ async def repo_page(
         "domain": domain_ctx,
         "domain_meta_display": domain_meta_display,
         "readme_content": await _fetch_readme(db, repo_id, ref, tree_response.entries),
+        "file_last_commits": file_last_commits,
+        "recently_pushed": recently_pushed,
+        "latest_commit": commits[0] if commits else None,
     }
     ctx.update(nav_ctx)
     return await htmx_fragment_or_full(

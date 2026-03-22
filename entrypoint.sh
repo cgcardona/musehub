@@ -8,5 +8,6 @@ echo "Starting MuseHub..."
 exec uvicorn musehub.main:app \
     --host 0.0.0.0 \
     --port 10003 \
+    --workers 4 \
     --proxy-headers \
     --forwarded-allow-ips='*'
