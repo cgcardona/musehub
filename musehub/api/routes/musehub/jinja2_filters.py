@@ -152,30 +152,30 @@ def _markdown(value: str | None) -> str:
         import urllib.parse
         return urllib.parse.quote(s, safe=":/?#[]@!$&'()*+,;=%~.-_")
 
-    class _MuseRenderer(mistune.HTMLRenderer):  # type: ignore[misc]
+    class _MuseRenderer(mistune.HTMLRenderer):
         """HTMLRenderer subclass that customises output for MuseHub."""
 
-        def heading(self, children: str, level: int, **attrs: object) -> str:  # type: ignore[override]
+        def heading(self, text: str, level: int, **attrs: str) -> str:
             # Shift h1→h2, h2→h3, etc. so READMEs don't stomp the page <h1>.
             shifted = min(level + 1, 6)
-            return f"<h{shifted}>{children}</h{shifted}>\n"
+            return f"<h{shifted}>{text}</h{shifted}>\n"
 
-        def link(self, text: str, url: str | None, title: str | None = None) -> str:  # type: ignore[override]
-            safe_url = _esc_url(url or "")
+        def link(self, text: str, url: str, title: str | None = None) -> str:
+            safe_url = _esc_url(url)
             title_attr = f' title="{_esc(title)}"' if title else ""
             return f'<a href="{safe_url}" rel="noopener noreferrer"{title_attr}>{text}</a>'
 
-        def image(self, alt: str, url: str | None, title: str | None = None) -> str:  # type: ignore[override]
-            safe_url = _esc_url(url or "")
+        def image(self, text: str, url: str, title: str | None = None) -> str:
+            safe_url = _esc_url(url)
             title_attr = f' title="{_esc(title)}"' if title else ""
-            return f'<img src="{safe_url}" alt="{_esc(alt)}"{title_attr} loading="lazy">'
+            return f'<img src="{safe_url}" alt="{_esc(text)}"{title_attr} loading="lazy">'
 
-        def codespan(self, code: str) -> str:  # type: ignore[override]
-            return f"<code>{_esc(code)}</code>"
+        def codespan(self, text: str) -> str:
+            return f"<code>{_esc(text)}</code>"
 
-        def block_code(self, code: str, **attrs: object) -> str:  # type: ignore[override]
-            info = str(attrs.get("info") or "").strip()
-            lang = _re.split(r"\s+", info)[0] if info else ""
+        def block_code(self, code: str, info: str | None = None, **attrs: str) -> str:
+            lang_str = (info or "").strip()
+            lang = _re.split(r"\s+", lang_str)[0] if lang_str else ""
             lang_class = f' class="language-{_esc(lang)}"' if lang else ""
             return f'<pre class="code-block"><code{lang_class}>{_esc(code)}</code></pre>\n'
 
