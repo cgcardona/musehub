@@ -37,9 +37,31 @@ interface DagData  { nodes: DagNode[]; edges: DagEdge[]; headCommitId: string; }
 interface SessionEntry { sessionId: string; intent?: string; startedAt: string; commits?: string[]; }
 interface SessionMap   { [cid: string]: { intent: string; sessionId: string }; }
 
+// SSR-injected DAG shape — Python model_dump(mode="json") produces snake_case.
+// We normalise to the camelCase DagData shape that the rest of graph.ts expects.
+interface SsrDagNode {
+  commit_id: string; message: string; author: string; timestamp: string;
+  branch: string; parent_ids: string[]; is_head: boolean;
+  branch_labels: string[]; tag_labels: string[];
+  commit_type: string; sem_ver_bump: string;
+  is_breaking: boolean; is_agent: boolean;
+  sym_added: number; sym_removed: number;
+}
+interface SsrDagData {
+  nodes: SsrDagNode[];
+  edges: Array<{ source: string; target: string }>;
+  head_commit_id: string | null;
+}
+
+interface GraphPageData {
+  page: string;
+  repoId?: string;
+  baseUrl?: string;
+  dagData?: SsrDagData;
+}
+
 declare global {
   interface Window {
-    __graphCfg?: GraphCfg;
     escHtml:  (s: string) => string;
     apiFetch: (path: string, init?: RequestInit) => Promise<unknown>;
     fmtDate:  (d: string) => string;
@@ -55,33 +77,45 @@ const PALETTE = [
   '#d2a8ff','#ff9492','#2dd4bf','#fbbf24',
 ];
 
-// Commit type → node fill color (semantic primary encoding)
+// ── Canonical 4-color intent palette ─────────────────────────────────────────
+// These four hex values are the single source of truth for semantic intent
+// across the DAG graph, symbol graph, diff view, and CLI output.
+//   added / feat / insert       → #34d399  emerald
+//   removed / breaking / delete → #f87171  red
+//   modified / fix / replace    → #fbbf24  amber
+//   structural / refactor       → #60a5fa  blue
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Commit type → node fill color
 const TYPE_COLORS: Record<string, string> = {
-  feat:     '#3fb950',  // green   — new capability
-  fix:      '#f85149',  // red     — bug fix
-  refactor: '#bc8cff',  // purple  — structural change
+  feat:     '#34d399',  // emerald — added / new capability
+  fix:      '#f87171',  // red     — removed / bug fixed
+  refactor: '#60a5fa',  // blue    — structural change
+  revert:   '#f87171',  // red     — removal of prior work
   init:     '#58a6ff',  // blue    — initialisation
   docs:     '#6e96c9',  // muted blue
-  style:    '#fbbf24',  // yellow  — formatting
+  style:    '#fbbf24',  // amber   — formatting
   test:     '#2dd4bf',  // teal    — tests
   chore:    '#6e7681',  // gray    — housekeeping
   perf:     '#f0883e',  // orange  — performance
   build:    '#a78bfa',  // violet  — build system
-  ci:       '#60a5fa',  // sky     — CI/CD
-  revert:   '#fb923c',  // amber   — revert
+  ci:       '#60a5fa',  // blue    — CI/CD
 };
 
-// Semver pip colors (top-right corner badge on the node)
+// Semver pip colors — aligned to the 4-color palette:
+//   minor bump = new feature = added = emerald
+//   major bump = breaking    = removed = red
+//   patch bump = bug fix     = modified = amber
 const SEMVER_COLORS: Record<string, string> = {
-  major: '#ef4444',   // red   — breaking version bump
-  minor: '#3b82f6',   // blue  — feature version bump
-  patch: '#22c55e',   // green — patch/fix bump
+  major: '#f87171',   // red     — breaking version bump
+  minor: '#34d399',   // emerald — feature version bump
+  patch: '#fbbf24',   // amber   — patch/fix bump
 };
 
 const HEAD_COLOR     = '#f0883e';
-const MERGE_COLOR    = '#bc8cff';
+const MERGE_COLOR    = '#60a5fa';
 const SESSION_COLOR  = '#2dd4bf';
-const BREAKING_COLOR = '#ef4444';
+const BREAKING_COLOR = '#f87171';
 const AGENT_COLOR    = '#a78bfa';   // violet for agent-authored nodes
 const DIM_ALPHA      = 0.18;
 
@@ -1106,14 +1140,44 @@ function buildSessionMap(sessions: SessionEntry[]): SessionMap {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
-async function load(cfg: GraphCfg): Promise<void> {
+function normaliseSsrDag(ssr: SsrDagData): DagData {
+  // The SSR payload uses Python snake_case; normalise to the camelCase shape
+  // that the rest of graph.ts expects (matching the /repos/{id}/dag API response).
+  return {
+    headCommitId: ssr.head_commit_id ?? '',
+    edges: ssr.edges,
+    nodes: ssr.nodes.map(n => ({
+      commitId:     n.commit_id,
+      message:      n.message,
+      author:       n.author,
+      timestamp:    n.timestamp,
+      branch:       n.branch,
+      parentIds:    n.parent_ids,
+      isHead:       n.is_head,
+      branchLabels: n.branch_labels,
+      tagLabels:    n.tag_labels,
+      commitType:   n.commit_type,
+      semVerBump:   n.sem_ver_bump,
+      isBreaking:   n.is_breaking,
+      isAgent:      n.is_agent,
+      symAdded:     n.sym_added,
+      symRemoved:   n.sym_removed,
+    })),
+  };
+}
+
+async function load(cfg: GraphCfg, ssrDag: SsrDagData | undefined): Promise<void> {
   if (typeof window.initRepoNav === 'function') window.initRepoNav(cfg.repoId);
 
   const loadingEl = document.getElementById('dag-loading');
 
   try {
+    // Use SSR-injected DAG data to skip the /dag fetch entirely on first paint.
+    // The sessions fetch is always async (not worth SSR-ing for this panel).
     const [dagData, sessData] = await Promise.all([
-      window.apiFetch('/repos/' + cfg.repoId + '/dag'),
+      ssrDag
+        ? Promise.resolve(normaliseSsrDag(ssrDag))
+        : window.apiFetch('/repos/' + cfg.repoId + '/dag') as Promise<DagData>,
       window.apiFetch('/repos/' + cfg.repoId + '/sessions?limit=200').catch(() => ({ sessions: [] })),
     ]) as [DagData, { sessions?: SessionEntry[] }];
 
@@ -1167,8 +1231,10 @@ async function load(cfg: GraphCfg): Promise<void> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initGraph(): void {
-  const cfg = window.__graphCfg;
-  if (!cfg) return;
-  void load(cfg);
+export function initGraph(rawData: Record<string, unknown>): void {
+  const data = rawData as GraphPageData;
+  const repoId  = data.repoId ?? '';
+  const baseUrl = data.baseUrl ?? '';
+  if (!repoId) return;
+  void load({ repoId, baseUrl }, data.dagData);
 }

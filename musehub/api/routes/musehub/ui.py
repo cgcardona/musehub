@@ -1047,7 +1047,7 @@ async def commit_page(
     # ── Audio — MIDI domain only ──────────────────────────────────────────
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
-        if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "piano_roll"
+        if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "midi"
         else None
     )
 
@@ -1252,20 +1252,10 @@ async def graph_page(
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
-    commits, _total = await musehub_repository.list_commits(db, repo_id, limit=100)
+    # Build the full DAG once server-side so graph.ts can render immediately
+    # without an extra round-trip to /repos/{id}/dag.
+    dag = await musehub_repository.list_commits_dag(db, repo_id)
     branches = await musehub_repository.list_branches(db, repo_id)
-
-    graph_data = [
-        {
-            "sha": c.commit_id,
-            "shortSha": c.commit_id[:8],
-            "message": c.message,
-            "author": c.author,
-            "timestamp": c.timestamp.isoformat(),
-            "parents": c.parent_ids,
-        }
-        for c in commits
-    ]
 
     ctx: dict[str, object] = {
         "owner": owner,
@@ -1273,8 +1263,8 @@ async def graph_page(
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "graph",
-        "graph_data_json": graph_data,
-        "commit_count": len(commits),
+        "dag_ssr": dag.model_dump(mode="json"),
+        "commit_count": len(dag.nodes),
         "branch_count": len(branches),
     }
     ctx.update(nav_ctx)
