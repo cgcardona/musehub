@@ -723,6 +723,11 @@ body.player-open .container-wide {
   white-space: nowrap;
 }
 
+// Color modifiers for ph-stat-value — used by insights page
+.ins-val--add   { color: var(--color-success); }
+.ins-val--del   { color: var(--color-danger); }
+.ins-val--agent { color: #bc8cff; }
+
 /* ── Page body: sidebar + main content ───────────────────────────────────── */
 .ph-body {
   display: grid;

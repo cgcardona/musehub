@@ -674,7 +674,6 @@ function drawBreakingBlast(timeline: CommitEntry[]): void {
   node.filter(d => !d.isCenter)
     .append('text')
     .attr('text-anchor', 'middle')
-    .attr('dy', '-' + ((d: BlastNode) => d.r + 4))
     .attr('dy', (d) => -(d.r + 5))
     .attr('font-size', 9)
     .attr('fill', 'var(--text-muted)')

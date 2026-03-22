@@ -8551,32 +8551,8 @@ $pr-closed: #f85149;
   padding: var(--space-2) 0 var(--space-6);
 }
 
-// Muse-exclusive banner
-.ins-muse-banner {
-  display: flex; align-items: center; gap: var(--space-2);
-  margin-bottom: var(--space-4);
-  padding: var(--space-2) var(--space-3);
-  background: color-mix(in srgb, #bc8cff 8%, transparent);
-  border: 1px solid color-mix(in srgb, #bc8cff 20%, transparent);
-  border-radius: var(--radius-base);
-}
-.ins-muse-badge {
-  display: inline-flex; align-items: center;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  background: color-mix(in srgb, #bc8cff 18%, transparent);
-  color: #bc8cff; border: 1px solid color-mix(in srgb, #bc8cff 30%, transparent);
-  border-radius: 4px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
-}
-.ins-muse-banner-text { font-size: 12px; color: var(--text-muted); }
-
-// Stat card icon variants
-.ins-stat-icon--breaking { color: #f87171; }
-.ins-stat-icon--agent    { color: #a78bfa; }
-.ins-stat-icon--sym-add  { color: #34d399; }
-.ins-stat-icon--sym-del  { color: #f87171; }
-.ins-stat-icon--conventional { color: #34d399; }
-.ins-stat-card--warning .ins-stat-value { color: #f87171; }
-.ins-stat-card--agent   .ins-stat-value { color: #bc8cff; }
+// Insights stat strip reuses .ph-stats-strip / .ph-stat from _layout.scss.
+// Color modifiers (.ins-val--add / --del / --agent) are co-located in _layout.scss.
 
 // Three-column intel row
 .ins-intel-row {
@@ -8709,7 +8685,7 @@ $pr-closed: #f85149;
   background: var(--bg-overlay); border-radius: 4px; padding: 2px 6px;
 }
 
-// Hero stat cards
+// Legacy stat card classes kept for repo_home.html compatibility
 .ins-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -8723,23 +8699,14 @@ $pr-closed: #f85149;
   border-radius: var(--radius-md);
   padding: var(--space-3);
   display: flex; align-items: center; gap: var(--space-2);
-  transition: border-color 0.15s, transform 0.15s;
-  &:hover { border-color: var(--color-accent); transform: translateY(-1px); }
 }
 .ins-stat-icon {
-  width: 40px; height: 40px; border-radius: var(--radius-sm);
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  background: var(--bg-overlay);
+  flex-shrink: 0; background: var(--bg-overlay);
 }
-.ins-stat-card--commits .ins-stat-icon { background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent); }
-.ins-stat-card--files .ins-stat-icon { background: color-mix(in srgb, var(--color-info) 12%, transparent); color: var(--color-info); }
-.ins-stat-card--contributors .ins-stat-icon { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
-.ins-stat-card--branches .ins-stat-icon { background: color-mix(in srgb, var(--color-warning) 12%, transparent); color: var(--color-warning); }
-.ins-stat-card--size .ins-stat-icon { background: color-mix(in srgb, #a371f7 12%, transparent); color: #a371f7; }
-.ins-stat-card--tests .ins-stat-icon { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .ins-stat-body { display: flex; flex-direction: column; min-width: 0; }
-.ins-stat-value { font-size: 20px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); line-height: 1; }
+.ins-stat-value { font-size: 18px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); line-height: 1; }
 .ins-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
 // Two column layout
