@@ -4619,12 +4619,13 @@ async def test_repo_home_shows_stats(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Repo home page renders SSR stats (commit count link and hero section)."""
+    """Repo home page renders SSR stat grid with commit count, branches, files, size."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
-    assert "Recent Commits" in body
+    assert "rh-stat-grid" in body
+    assert "Commits" in body
 
 
 @pytest.mark.anyio
@@ -4632,12 +4633,13 @@ async def test_repo_home_recent_commits(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Repo home page renders a SSR recent commits sidebar section."""
+    """Repo home page links to commit history via the Explore sidebar and stat grid."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats")
     assert response.status_code == 200
     body = response.text
-    assert "Recent Commits" in body
+    assert "History" in body
+    assert "Commits" in body
 
 
 @pytest.mark.anyio
@@ -8537,8 +8539,9 @@ async def test_repo_home_clone_widget_renders(
 
     # Clone URLs injected server-side by repo_page()
     assert "musehub://cloneowner/clone-widget-test" in body
-    assert "ssh://git@musehub.app/cloneowner/clone-widget-test.git" in body
-    assert "https://musehub.app/cloneowner/clone-widget-test.git" in body
+    assert "https://musehub.ai/cloneowner/clone-widget-test" in body
+    # SSH is not supported — must not appear
+    assert "git@" not in body
     # SSR clone widget DOM elements
     assert "clone-input" in body
 async def test_explore_page_returns_200(
