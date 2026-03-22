@@ -126,134 +126,61 @@ def _filesizeformat(value: int | float | None) -> str:
 
 
 def _markdown(value: str | None) -> str:
-    """Convert a Markdown string to safe HTML for rendering in templates.
+    """Convert a Markdown string to safe HTML using mistune.
 
-    Handles: headings (h1–h3 → h2–h4 to preserve page hierarchy), bold,
-    italic, inline code, fenced code blocks, bullet/ordered lists,
-    blockquotes, horizontal rules, and safe links (https:// and / only).
+    Uses mistune's CommonMark-compliant parser with:
+    - Images rendered as <img> (badges, screenshots)
+    - Fenced code blocks with ``language-*`` class for highlight.js
+    - All links marked rel="noopener noreferrer"
+    - Headings shifted down one level (h1→h2) to preserve page hierarchy
+    - HTML sanitised via mistune's built-in escaping
 
-    Returns an empty string for None.  All user content is HTML-escaped
-    before re-inserting markup — no XSS vectors.
+    Returns an empty string for None.
     """
     if not value:
         return ""
 
+    import re as _re
     import html as _html
+    import mistune
 
-    def esc(s: str) -> str:
-        return _html.escape(s)
+    def _esc(s: str) -> str:
+        return _html.escape(s, quote=True)
 
-    def inline_markup(s: str) -> str:
-        import re
+    def _esc_url(s: str) -> str:
+        # Allow only safe URL characters; strip everything else.
+        import urllib.parse
+        return urllib.parse.quote(s, safe=":/?#[]@!$&'()*+,;=%~.-_")
 
-        s = re.sub(
-            r"\[([^\]]+)\]\(((?:https?://|/)[^)]*)\)",
-            lambda m: f'<a href="{esc(m.group(2))}" rel="noopener">{esc(m.group(1))}</a>',
-            s,
-        )
-        s = re.sub(r"`([^`]+)`", lambda m: f"<code>{esc(m.group(1))}</code>", s)
-        s = re.sub(r"\*\*([^*]+)\*\*", lambda m: f"<strong>{esc(m.group(1))}</strong>", s)
-        s = re.sub(r"\*([^*]+)\*", lambda m: f"<em>{esc(m.group(1))}</em>", s)
-        return s
+    class _MuseRenderer(mistune.HTMLRenderer):
+        """HTMLRenderer subclass that customises output for MuseHub."""
 
-    import re
+        def heading(self, text: str, level: int, **attrs: str) -> str:
+            # Shift h1→h2, h2→h3, etc. so READMEs don't stomp the page <h1>.
+            shifted = min(level + 1, 6)
+            return f"<h{shifted}>{text}</h{shifted}>\n"
 
-    lines = value.split("\n")
-    out: list[str] = []
-    in_code = False
-    code_lang = ""
-    code_lines: list[str] = []
-    in_list: str | None = None
-    in_bq = False
+        def link(self, text: str, url: str, title: str | None = None) -> str:
+            safe_url = _esc_url(url)
+            title_attr = f' title="{_esc(title)}"' if title else ""
+            return f'<a href="{safe_url}" rel="noopener noreferrer"{title_attr}>{text}</a>'
 
-    def flush_list() -> None:
-        nonlocal in_list
-        if in_list:
-            out.append(f"</{in_list}>")
-            in_list = None
+        def image(self, text: str, url: str, title: str | None = None) -> str:
+            safe_url = _esc_url(url)
+            title_attr = f' title="{_esc(title)}"' if title else ""
+            return f'<img src="{safe_url}" alt="{_esc(text)}"{title_attr} loading="lazy">'
 
-    def flush_bq() -> None:
-        nonlocal in_bq
-        if in_bq:
-            out.append("</blockquote>")
-            in_bq = False
+        def codespan(self, text: str) -> str:
+            return f"<code>{_esc(text)}</code>"
 
-    for line in lines:
-        if line.startswith("```"):
-            if not in_code:
-                flush_list()
-                flush_bq()
-                in_code = True
-                code_lang = esc(line[3:].strip())
-                code_lines = []
-            else:
-                lang_attr = f' data-lang="{code_lang}"' if code_lang else ""
-                out.append(
-                    f'<pre class="code-block"{lang_attr}><code>{"".join(esc(l) + chr(10) for l in code_lines)}</code></pre>'
-                )
-                in_code = False
-                code_lang = ""
-                code_lines = []
-            continue
-        if in_code:
-            code_lines.append(line)
-            continue
+        def block_code(self, code: str, info: str | None = None, **attrs: str) -> str:
+            lang_str = (info or "").strip()
+            lang = _re.split(r"\s+", lang_str)[0] if lang_str else ""
+            lang_class = f' class="language-{_esc(lang)}"' if lang else ""
+            return f'<pre class="code-block"><code{lang_class}>{_esc(code)}</code></pre>\n'
 
-        if line.startswith("> "):
-            flush_list()
-            if not in_bq:
-                out.append('<blockquote class="md-blockquote">')
-                in_bq = True
-            out.append(f"<p>{inline_markup(esc(line[2:]))}</p>")
-            continue
-        flush_bq()
-
-        if re.match(r"^(\*\*\*|---|___)\s*$", line):
-            flush_list()
-            out.append("<hr>")
-            continue
-
-        h_match = re.match(r"^(#{1,3})\s+(.+)", line)
-        if h_match:
-            flush_list()
-            level = len(h_match.group(1)) + 1  # h1 → h2, h2 → h3, h3 → h4
-            out.append(f"<h{level} class='md-h{level}'>{inline_markup(esc(h_match.group(2)))}</h{level}>")
-            continue
-
-        ul_match = re.match(r"^[-*+]\s+(.+)", line)
-        if ul_match:
-            if in_list != "ul":
-                if in_list:
-                    out.append(f"</{in_list}>")
-                out.append('<ul class="md-list">')
-                in_list = "ul"
-            out.append(f"<li>{inline_markup(esc(ul_match.group(1)))}</li>")
-            continue
-
-        ol_match = re.match(r"^\d+\.\s+(.+)", line)
-        if ol_match:
-            if in_list != "ol":
-                if in_list:
-                    out.append(f"</{in_list}>")
-                out.append('<ol class="md-list">')
-                in_list = "ol"
-            out.append(f"<li>{inline_markup(esc(ol_match.group(1)))}</li>")
-            continue
-
-        flush_list()
-
-        if not line.strip():
-            out.append("<br>")
-            continue
-
-        out.append(f"<p class='md-p'>{inline_markup(esc(line))}</p>")
-
-    if in_code and code_lines:
-        out.append(f'<pre class="code-block"><code>{"".join(esc(l) + chr(10) for l in code_lines)}</code></pre>')
-    flush_list()
-    flush_bq()
-
-    return "\n".join(out)
+    _md = mistune.create_markdown(renderer=_MuseRenderer(), plugins=["strikethrough", "table", "task_lists"])
+    return str(_md(value))
 
 
 def _auto_code(text: str) -> str:
