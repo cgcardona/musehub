@@ -262,3 +262,8 @@ muse_tourdeforce/*.db
 
 # CSS source maps (generated build artifacts)
 **/*.css.map
+
+# Muse VCS metadata
+.muse/
+.museattributes
+.museignore
