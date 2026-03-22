@@ -9,88 +9,53 @@
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block content %}
+<div class="br-page">
 
-{# ── Stats bar ────────────────────────────────────────────────────────────── #}
-<div class="branch-stats-bar">
-  <div class="branch-stat-card">
-    <div class="branch-stat-icon branch-stat-icon-total">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
-        <path d="M18 9a9 9 0 0 1-9 9"/>
-      </svg>
-    </div>
-    <div>
-      <div class="branch-stat-value">{{ total_branch_count }}</div>
-      <div class="branch-stat-label">Total Branches</div>
-    </div>
+{# ── Stat strip ───────────────────────────────────────────────────────────── #}
+<div class="br-stat-strip">
+  <div class="br-stat">
+    <div class="br-stat-num">{{ total_branch_count }}</div>
+    <div class="br-stat-lbl">Branches</div>
   </div>
-
-  <div class="branch-stat-card">
-    <div class="branch-stat-icon branch-stat-icon-active">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-      </svg>
-    </div>
-    <div>
-      <div class="branch-stat-value">{{ active_branch_count }}</div>
-      <div class="branch-stat-label">Active Branches</div>
-    </div>
+  <div class="br-stat-divider"></div>
+  <div class="br-stat">
+    <div class="br-stat-num br-stat-num--active">{{ active_branch_count }}</div>
+    <div class="br-stat-lbl">Active</div>
   </div>
-
-  <div class="branch-stat-card">
-    <div class="branch-stat-icon branch-stat-icon-diverged">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>
-      </svg>
-    </div>
-    <div>
-      <div class="branch-stat-value">{{ ahead_branch_count }}</div>
-      <div class="branch-stat-label">Ahead of Main</div>
-    </div>
+  <div class="br-stat-divider"></div>
+  <div class="br-stat">
+    <div class="br-stat-num br-stat-num--ahead">{{ ahead_branch_count }}</div>
+    <div class="br-stat-lbl">Ahead of Main</div>
   </div>
-
-  <div class="branch-stat-card">
-    <div class="branch-stat-icon branch-stat-icon-authors">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-    </div>
-    <div>
-      <div class="branch-stat-value">{{ unique_author_count }}</div>
-      <div class="branch-stat-label">Contributors</div>
-    </div>
+  <div class="br-stat-divider"></div>
+  <div class="br-stat">
+    <div class="br-stat-num br-stat-num--authors">{{ unique_author_count }}</div>
+    <div class="br-stat-lbl">Contributors</div>
   </div>
 </div>
 
-{# ── Default branch hero ─────────────────────────────────────────────────── #}
+{# ── Default branch ────────────────────────────────────────────────────────── #}
 {% if default_branch %}
 {% set def_meta = commit_meta.get(default_branch.head_commit_id, {}) %}
-<div class="branch-default-card">
-  <div>
-    <div class="branch-default-label">Default Branch</div>
-    <div class="branch-default-name">
+<div class="br-default">
+  <div class="br-default-left">
+    <div class="br-default-eyebrow">Default Branch</div>
+    <div class="br-default-name">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
         <path d="M18 9a9 9 0 0 1-9 9"/>
       </svg>
       {{ default_branch.name }}
     </div>
-    <div class="branch-default-commit">
+    <div class="br-default-commit">
       {% if default_branch.head_commit_id %}
-        <a href="{{ base_url }}/commits/{{ default_branch.head_commit_id }}" class="branch-sha">
-          {{ default_branch.head_commit_id | shortsha }}
-        </a>
-        {% if def_meta.message %}
-          <span style="color:var(--text-secondary);font-size:12px">{{ def_meta.message }}</span>
-        {% endif %}
-        {% if def_meta.timestamp %}
-          <span class="branch-date">· {{ def_meta.timestamp | fmtrelative }}</span>
-        {% endif %}
+        <a href="{{ base_url }}/commits/{{ default_branch.head_commit_id }}" class="br-sha">{{ default_branch.head_commit_id | shortsha }}</a>
+        {% if def_meta.message %}<span>{{ def_meta.message }}</span>{% endif %}
+        {% if def_meta.timestamp %}<span>· {{ def_meta.timestamp | fmtrelative }}</span>{% endif %}
       {% endif %}
     </div>
   </div>
-  <div style="display:flex;gap:var(--space-2)">
+  <div class="br-default-actions">
     <a href="{{ base_url }}/tree/{{ default_branch.name }}" class="btn btn-secondary btn-sm">
       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       Browse Files
@@ -103,54 +68,47 @@
 </div>
 {% endif %}
 
-{# ── Toolbar: type tabs + search ─────────────────────────────────────────── #}
+{# ── Branch list card ─────────────────────────────────────────────────────── #}
 {% set non_default_count = branches | selectattr("is_default", "false") | list | length %}
 
-{# Tab definitions: label, filter key, symbol #}
 {% set tab_defs = [
-  ("✦ Feature",    "feature",    type_counts.get("feature",    0)),
-  ("⬡ Experiment", "experiment", type_counts.get("experiment", 0)),
-  ("♩ Structure",  "structure",  type_counts.get("structure",  0)),
-  ("↬ Collab",     "collab",     type_counts.get("collab",     0)),
-  ("◎ Source",     "source",     type_counts.get("source",     0)),
-  ("⊕ Version",    "version",    type_counts.get("version",    0)),
+  ("Feature",    "feature"),
+  ("Experiment", "experiment"),
+  ("Fix",        "fix"),
+  ("Structure",  "structure"),
+  ("Collab",     "collab"),
+  ("Source",     "source"),
+  ("Version",    "version"),
 ] %}
 
-<div class="branch-toolbar">
-  <div class="branch-type-tabs">
-    <a href="#" class="branch-type-tab active" data-filter="all">
-      All
-      <span class="branch-type-tab-count">{{ non_default_count }}</span>
-    </a>
-    {% for label, key, count in tab_defs %}
-      {% if count > 0 %}
-      <a href="#" class="branch-type-tab" data-filter="{{ key }}">
-        {{ label }}
-        <span class="branch-type-tab-count">{{ count }}</span>
+<div class="br-card">
+  <div class="br-toolbar">
+    <div class="br-tabs">
+      <a href="#" class="br-tab br-tab--active" data-filter="all">
+        All <span class="br-tab-ct">{{ non_default_count }}</span>
       </a>
-      {% endif %}
-    {% endfor %}
+      {% for label, key in tab_defs %}
+        {% set ct = type_counts.get(key, 0) %}
+        {% if ct > 0 %}
+        <a href="#" class="br-tab" data-filter="{{ key }}">
+          {{ label }} <span class="br-tab-ct">{{ ct }}</span>
+        </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <label class="br-search" for="branch-search">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="branch-search" type="text" placeholder="Search branches…" autocomplete="off">
+    </label>
   </div>
 
-  <label class="branch-search-wrap" for="branch-search">
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input id="branch-search" type="text" placeholder="Search branches…" autocomplete="off">
-  </label>
-</div>
-
-{# ── Branch list ─────────────────────────────────────────────────────────── #}
-{% if non_default_count > 0 %}
-<div class="branch-list" id="branch-list">
-  <div class="branch-list-header">
-    <span>Branch</span>
-    <span>Activity</span>
+  <div class="br-list" id="branch-list">
+    {% include "musehub/fragments/branch_rows.html" %}
   </div>
-  {% include "musehub/fragments/branch_rows.html" %}
 </div>
-{% else %}
-  {{ empty_state("🌿", "No branches yet", "Create a branch to start developing a new musical idea or experiment.") }}
-{% endif %}
 
+</div>
 {% endblock %}
 
 {% block page_json %}{"page": "branches"}{% endblock %}

@@ -1,152 +1,147 @@
 {#  fragments/pr_rows.html — HTMX fragment: pull request list rows.
-    Rendered inline by pr_list.html and returned as a bare fragment on tab/sort HTMX requests.
-
+    Rendered inline by pr_list.html and returned as a bare fragment on tab/sort requests.
     Required context: prs (list[dict]), base_url (str), state (str)
 #}
-{% from "musehub/macros/empty_state.html" import empty_state %}
 
-{# ── Jinja2 helper macro: extract branch type prefix ── #}
-{% macro branch_type(branch) %}
+{% macro branch_prefix(branch) %}
   {%- set parts = branch.split('/') -%}
   {%- if parts | length > 1 -%}{{ parts[0] }}{%- endif -%}
 {% endmacro %}
 
-{# ── Jinja2 helper macro: type badge class ── #}
-{% macro type_class(btype) %}
-  {%- if btype == 'feat' %}pr-type-feat
-  {%- elif btype == 'fix' %}pr-type-fix
-  {%- elif btype == 'experiment' or btype == 'exp' %}pr-type-experiment
-  {%- elif btype == 'refactor' %}pr-type-refactor
-  {%- else %}pr-type-chore
+{% macro type_cls(btype) %}
+  {%- if btype == 'feat' %}prl-badge--feat
+  {%- elif btype == 'fix' %}prl-badge--fix
+  {%- elif btype in ('experiment', 'exp') %}prl-badge--exp
+  {%- elif btype == 'refactor' %}prl-badge--refactor
+  {%- elif btype == 'chore' %}prl-badge--chore
+  {%- else %}prl-badge--other
   {%- endif %}
 {% endmacro %}
 
-{# ── Jinja2 macro: author color (simple hash) ── #}
-{% macro author_bg(name) %}
-  {%- set colors = ['#1d4ed8','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c'] -%}
-  {%- set idx = (name | length) % (colors | length) -%}
-  {{ colors[idx] }}
+{% macro avatar_color(name) %}
+  {%- set palette = ['#1d4ed8','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c'] -%}
+  {{ palette[(name | length) % (palette | length)] }}
 {% endmacro %}
 
-{# ── Body preview: strip markdown headers and get first meaningful line ── #}
-{% macro body_preview(body) %}
-  {%- set lines = body.split('\n') -%}
-  {%- set preview = namespace(text='') -%}
-  {%- for line in lines -%}
-    {%- set stripped = line.strip() -%}
-    {%- if stripped and not stripped.startswith('#') and not stripped.startswith('---') and preview.text == '' -%}
-      {%- set preview.text = stripped -%}
+{% macro body_snippet(body) %}
+  {%- set ns = namespace(out='') -%}
+  {%- for line in body.split('\n') -%}
+    {%- set s = line.strip() -%}
+    {%- if s and not s.startswith('#') and not s.startswith('---') and ns.out == '' -%}
+      {%- set ns.out = s -%}
     {%- endif -%}
   {%- endfor -%}
-  {{ preview.text[:160] }}{% if preview.text | length > 160 %}…{% endif %}
+  {{ ns.out[:180] }}{% if ns.out | length > 180 %}…{% endif %}
 {% endmacro %}
 
 {% if prs %}
-<div class="pr-list">
+<div class="prl-list">
   {% for pr in prs %}
-    {%- set btype = branch_type(pr.from_branch) -%}
-    {%- set preview = body_preview(pr.body or '') -%}
-    <div class="pr-card pr-card-{{ pr.state }}">
+    {%- set btype = branch_prefix(pr.from_branch) | trim -%}
+    {%- set snippet = body_snippet(pr.body or '') | trim -%}
+    <a href="{{ base_url }}/pulls/{{ pr.pr_id }}" class="prl-row prl-row--{{ pr.state }}">
 
-      {# ── Status pill ── #}
-      <div class="pr-card-status">
+      {# Left: state indicator ─────────────────────────────────────────────── #}
+      <div class="prl-row-indicator">
         {% if pr.state == 'merged' %}
-          <span class="pr-status-pill pr-status-merged">
-            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Merged
-          </span>
+          {# Merged — filled check circle #}
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="prl-icon prl-icon--merged"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         {% elif pr.state == 'closed' %}
-          <span class="pr-status-pill pr-status-closed">
-            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Closed
-          </span>
+          {# Closed — X circle #}
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="prl-icon prl-icon--closed"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
         {% else %}
-          <span class="pr-status-pill pr-status-open">
-            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
-            Open
-          </span>
+          {# Open — PR branch icon #}
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="prl-icon prl-icon--open"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
         {% endif %}
       </div>
 
-      {# ── Body ── #}
-      <div class="pr-card-body">
+      {# Body ──────────────────────────────────────────────────────────────── #}
+      <div class="prl-row-body">
 
-        {# Title row #}
-        <a href="{{ base_url }}/pulls/{{ pr.pr_id }}" class="pr-card-title">
+        {# Title line #}
+        <div class="prl-row-title">
           {%- if btype %}
-            <span class="pr-type-badge {{ type_class(btype) | trim }}">{{ btype }}</span>
+            <span class="prl-badge {{ type_cls(btype) | trim }}">{{ btype }}</span>
           {%- endif %}
-          {{ pr.title }}
-        </a>
+          <span class="prl-row-title-text">{{ pr.title }}</span>
+        </div>
 
         {# Branch path #}
-        <div class="pr-branch-path">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);flex-shrink:0"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-          <span class="pr-branch-pill pr-branch-pill-from">{{ pr.from_branch }}</span>
-          <span class="pr-branch-arrow">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        <div class="prl-row-meta">
+          <span class="prl-branch-pill prl-branch-pill--from">{{ pr.from_branch }}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);flex-shrink:0"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <span class="prl-branch-pill">{{ pr.to_branch }}</span>
+
+          <span class="prl-meta-sep">·</span>
+
+          {# Author chip #}
+          <span class="prl-author">
+            <span class="prl-avatar" style="background:{{ avatar_color(pr.author or '?') }}">{{ (pr.author or '?')[0] | upper }}</span>
+            {{ pr.author or 'unknown' }}
           </span>
-          <span class="pr-branch-pill">{{ pr.to_branch }}</span>
+
+          <span class="prl-meta-sep">·</span>
+          <span>{{ pr.created_at | fmtdate }}</span>
+
+          {%- if pr.state == 'merged' and pr.merged_at %}
+            <span class="prl-meta-sep">·</span>
+            <span class="prl-merged-at">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Merged {{ pr.merged_at | fmtdate }}
+            </span>
+          {%- endif %}
+
           {%- if pr.state == 'merged' and pr.merge_commit_id %}
-            <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}" class="pr-merge-sha">
-              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+            <a href="{{ base_url }}/commits/{{ pr.merge_commit_id }}" class="prl-sha" onclick="event.stopPropagation()">
               {{ pr.merge_commit_id[:8] }}
             </a>
           {%- endif %}
         </div>
 
-        {# Body preview #}
-        {%- if preview | trim %}
-          <div class="pr-body-preview">{{ preview | trim }}</div>
+        {# Body snippet #}
+        {%- if snippet %}
+          <div class="prl-row-snippet">{{ snippet }}</div>
         {%- endif %}
 
-        {# Meta row #}
-        <div class="pr-card-meta">
-          {# Author chip #}
-          <span class="pr-author-chip">
-            <span class="pr-author-avatar" style="background:{{ author_bg(pr.author or '?') }}">{{ (pr.author or '?')[0] | upper }}</span>
-            <span class="pr-author-name">{{ pr.author or 'unknown' }}</span>
-          </span>
-
-          {# Date #}
-          <span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            {{ pr.created_at | fmtdate }}
-          </span>
-
-          {# Merged-at #}
-          {%- if pr.state == 'merged' and pr.merged_at %}
-            <span style="color:#a78bfa">
-              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="20 6 9 17 4 12"/></svg>
-              Merged {{ pr.merged_at | fmtdate }}
-            </span>
-          {%- endif %}
-        </div>
       </div>
 
-      {# ── Action ── #}
-      <div class="pr-card-action">
-        <a href="{{ base_url }}/pulls/{{ pr.pr_id }}" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:11px">
-          View
-          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
+      {# Right: chevron ────────────────────────────────────────────────────── #}
+      <div class="prl-row-chevron">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
 
-    </div>
+    </a>
   {% endfor %}
 </div>
 
 {% else %}
-<div class="pr-empty">
-  <div class="pr-empty-icon">
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted)"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+{# ── Empty state ─────────────────────────────────────────────────────────── #}
+<div class="prl-empty">
+  <div class="prl-empty-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
   </div>
-  <div class="pr-empty-title">No pull requests</div>
-  <div class="pr-empty-desc">
-    {% if state == 'open' %}There are no open pull requests. Create one to propose changes.
-    {% elif state == 'merged' %}No pull requests have been merged yet.
-    {% elif state == 'closed' %}No pull requests have been closed.
-    {% else %}No pull requests found.{% endif %}
+  <div class="prl-empty-title">
+    {% if state == 'open' %}No open pull requests
+    {% elif state == 'merged' %}No merged pull requests
+    {% elif state == 'closed' %}No closed pull requests
+    {% else %}No pull requests yet{% endif %}
   </div>
+  <div class="prl-empty-desc">
+    {% if state == 'open' %}
+      Propose changes by pushing a branch and opening a pull request.
+    {% elif state == 'merged' %}
+      Merged pull requests will appear here once changes land.
+    {% elif state == 'closed' %}
+      Pull requests that were closed without merging appear here.
+    {% else %}
+      Create a branch, push your changes, and open a pull request to start collaborating.
+    {% endif %}
+  </div>
+  {% if state in ('open', 'all') %}
+  <div class="prl-empty-cmd">
+    <code>muse push origin</code>
+    <span class="prl-empty-cmd-hint">then open a pull request above</span>
+  </div>
+  {% endif %}
 </div>
 {% endif %}

@@ -25,7 +25,6 @@ import { initUserProfile } from './pages/user-profile.ts';
 import { initTimeline } from './pages/timeline.ts';
 import { initAnalysis } from './pages/analysis.ts';
 import { initInsights } from './pages/insights.ts';
-import { initSearch }   from './pages/search.ts';
 import { initArrange }  from './pages/arrange.ts';
 import { initActivity }     from './pages/activity.ts';
 import { initPRDetail }     from './pages/pr-detail.ts';
@@ -67,8 +66,7 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'timeline':      () => initTimeline(),
   'analysis':      () => initAnalysis(),
   'insights':      (d) => initInsights(d),
-  'search':        () => initSearch(),
-  'global-search': () => initSearch(),
+  'global-search': () => {},
   'arrange':       () => initArrange(),
   'activity':      () => initActivity(),
   'pr-detail':     () => initPRDetail(),

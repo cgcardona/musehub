@@ -1,0 +1,442 @@
+// _credits.scss — Credits page  (.crd-* prefix)
+// Code-domain contributor attribution — the liner notes for software.
+
+// ── Page wrapper ─────────────────────────────────────────────────────────────
+.crd-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+// ── Stat strip ────────────────────────────────────────────────────────────────
+.crd-stat-strip {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.crd-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: var(--space-4) var(--space-3);
+  gap: 4px;
+}
+
+.crd-stat-divider {
+  width: 1px;
+  background: var(--border-default);
+  flex-shrink: 0;
+}
+
+.crd-stat-num {
+  font-size: 22px;
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  line-height: 1;
+}
+.crd-stat-num--commits { color: var(--color-accent); }
+.crd-stat-num--span    { color: #a371f7; }
+.crd-stat-num--types   { color: #3fb950; }
+
+.crd-stat-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: var(--font-weight-medium);
+}
+
+// ── Commit type breakdown bar (project-level) ─────────────────────────────────
+.crd-type-bar-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.crd-type-bar-label {
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.crd-type-bar {
+  display: flex;
+  height: 8px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  gap: 2px;
+}
+
+.crd-type-seg {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: opacity var(--transition-fast);
+  &:hover { opacity: 0.8; }
+}
+
+.crd-type-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.crd-type-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.crd-type-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.crd-type-legend-ct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+// ── Spotlight trio ────────────────────────────────────────────────────────────
+.crd-spotlights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+
+  @media (max-width: 700px) { grid-template-columns: 1fr; }
+}
+
+.crd-spotlight {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.crd-spotlight--gold   { border-top: 2px solid #e3b341; }
+.crd-spotlight--blue   { border-top: 2px solid var(--color-accent); }
+.crd-spotlight--purple { border-top: 2px solid #a371f7; }
+
+.crd-spotlight-eyebrow {
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.crd-spotlight--gold   .crd-spotlight-eyebrow { color: #e3b341; }
+.crd-spotlight--blue   .crd-spotlight-eyebrow { color: var(--color-accent); }
+.crd-spotlight--purple .crd-spotlight-eyebrow { color: #a371f7; }
+
+.crd-spotlight-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.crd-spotlight-name {
+  font-size: 15px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.crd-spotlight-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+// ── Controls toolbar ──────────────────────────────────────────────────────────
+.crd-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.crd-toolbar-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.crd-sort-select {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+  &:focus { border-color: var(--color-accent); }
+}
+
+.crd-count-badge {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+// ── Contributor list ──────────────────────────────────────────────────────────
+.crd-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.crd-contributor {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-4);
+  align-items: start;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+  &:hover {
+    border-color: var(--border-default);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  }
+}
+
+// Avatar
+.crd-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: var(--font-weight-bold);
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: -0.5px;
+}
+
+// Body
+.crd-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.crd-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.crd-author-name {
+  font-size: 16px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  text-decoration: none;
+  &:hover { text-decoration: underline; color: var(--color-accent-link); }
+}
+
+.crd-role-badge {
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+// Commit type chips
+.crd-type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.crd-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+}
+// Colors per semantic type
+.crd-chip--feat     { background: rgba(63,185,80,0.12);   color: #3fb950; border: 1px solid rgba(63,185,80,0.25); }
+.crd-chip--fix      { background: rgba(248,81,73,0.12);   color: #f85149; border: 1px solid rgba(248,81,73,0.25); }
+.crd-chip--refactor { background: rgba(163,113,247,0.12); color: #a371f7; border: 1px solid rgba(163,113,247,0.25); }
+.crd-chip--docs     { background: rgba(56,139,253,0.12);  color: #58a6ff; border: 1px solid rgba(56,139,253,0.25); }
+.crd-chip--test     { background: rgba(45,212,191,0.12);  color: #2dd4bf; border: 1px solid rgba(45,212,191,0.25); }
+.crd-chip--perf     { background: rgba(227,179,65,0.12);  color: #e3b341; border: 1px solid rgba(227,179,65,0.25); }
+.crd-chip--chore    { background: var(--bg-overlay);       color: var(--text-muted); border: 1px solid var(--border-subtle); }
+.crd-chip--revert   { background: rgba(248,81,73,0.08);   color: #f85149; border: 1px solid rgba(248,81,73,0.2); }
+
+.crd-chip-ct {
+  opacity: 0.7;
+  font-size: 10px;
+}
+
+.crd-chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+// Activity bar
+.crd-activity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.crd-activity-track {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-overlay);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.crd-activity-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.6s ease;
+}
+
+.crd-activity-pct {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+
+// Date range
+.crd-date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.crd-date-arrow { color: var(--border-default); }
+
+.crd-date-span {
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+// Right stats column
+.crd-stats-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.crd-commit-count {
+  font-size: 22px;
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.crd-commit-lbl {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.crd-branch-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+}
+
+// ── Muse-exclusive callout ────────────────────────────────────────────────────
+.crd-muse-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(56,139,253,0.06);
+  border: 1px solid rgba(56,139,253,0.2);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.crd-muse-note-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+.crd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  gap: var(--space-3);
+}
+.crd-empty-icon  { opacity: 0.3; }
+.crd-empty-title { font-size: 18px; font-weight: var(--font-weight-semibold); color: var(--text-secondary); }
+.crd-empty-desc  { font-size: 14px; color: var(--text-muted); max-width: 380px; line-height: 1.6; }

@@ -1,0 +1,127 @@
+// _repo-home.scss — Repository home page  (.rh-* and .ft-* prefixes)
+
+// ── Sidebar pulse rows ────────────────────────────────────────────────────────
+.rh-pulse-row--sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .rh-pulse-content { flex: unset; width: 100%; }
+  svg.rh-spark { width: 100%; height: 32px; }
+}
+.rh-pulse-row--top-gap { margin-top: 10px; }
+.rh-pulse-langs--sidebar { flex-wrap: wrap; gap: 6px 10px; }
+
+// ── README below file tree ────────────────────────────────────────────────────
+.rh-readme {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+}
+.rh-readme-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.rh-readme-body {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-primary);
+
+  h1, h2 { font-size: 15px; font-weight: 600; margin: 1.2em 0 0.4em; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.3em; }
+  h3, h4  { font-size: 13px; font-weight: 600; margin: 1em 0 0.3em; }
+  p       { margin: 0.5em 0; }
+  code    { font-size: 12px; background: var(--bg-inset); padding: 1px 5px; border-radius: 3px; }
+  pre     { background: var(--bg-inset); padding: var(--space-3); border-radius: 6px; overflow-x: auto; margin: 0.8em 0; }
+  pre code { background: none; padding: 0; }
+  a       { color: var(--color-accent); }
+  ul, ol  { padding-left: 1.4em; margin: 0.5em 0; }
+  blockquote { border-left: 3px solid var(--border-subtle); margin: 0.5em 0; padding-left: 0.8em; color: var(--text-muted); }
+  img     { max-width: 100%; height: auto; }
+}
+
+// ── Sidebar about section ─────────────────────────────────────────────────────
+.rh-about-desc  { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: var(--space-2); }
+.rh-about-pills { display: flex; flex-direction: column; gap: 4px; }
+.rh-about-pill  {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  a { color: var(--color-accent); text-decoration: none; &:hover { text-decoration: underline; } }
+}
+
+// ── Sidebar stats grid (2×2) ──────────────────────────────────────────────────
+.rh-stat-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 0; margin-top: var(--space-2); }
+.rh-stat-cell    { display: flex; flex-direction: column; }
+.rh-stat-cell-val { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.1; }
+.rh-stat-cell-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+// ── Recently pushed branch banners ───────────────────────────────────────────
+.rh-recent-branch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: var(--bg-card, var(--bg-surface));
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+
+  svg { color: var(--color-accent); flex-shrink: 0; }
+}
+.rh-recent-branch-name { font-weight: 600; color: var(--color-accent); font-family: var(--font-mono, monospace); }
+.rh-recent-branch-ts   { color: var(--text-muted); }
+.rh-recent-branch-btn  { margin-left: auto; white-space: nowrap; }
+
+// ── Latest commit header row (file tree) ─────────────────────────────────────
+.ft-latest-commit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-subtle, var(--bg-card, var(--bg-surface)));
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+  font-size: 12px;
+}
+.ft-lc-left    { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; }
+.ft-lc-avatar  { width: 20px; height: 20px; font-size: 10px; flex-shrink: 0; }
+.ft-lc-author  { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.ft-lc-message {
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  &:hover { color: var(--color-accent); }
+}
+.ft-lc-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.ft-lc-sha {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--color-accent);
+  text-decoration: none;
+  background: var(--bg-inset);
+  padding: 1px 6px;
+  border-radius: 3px;
+  &:hover { text-decoration: underline; }
+}
+.ft-lc-ts { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+
+// ── File tree columns ─────────────────────────────────────────────────────────
+.file-tree-cell-commit { color: var(--text-muted); font-size: 11.5px; padding-right: 12px; }
+.file-tree-cell-ts     { color: var(--text-muted); font-size: 11px; white-space: nowrap; text-align: right; padding-right: 10px; min-width: 80px; }
+.ft-row-commit-msg     { color: var(--text-muted); text-decoration: none; &:hover { color: var(--color-accent); } }
+.ft-row-ts             { color: var(--text-muted); }

@@ -1,12 +1,12 @@
 {#
-  fragments/activity_rows.html — HTMX fragment: activity filter pills + date-grouped timeline.
+  fragments/activity_rows.html — HTMX fragment: filter tabs + date-grouped event timeline.
 
-  Required context variables:
+  Context:
     event_groups  : list[{label, events}]  — events grouped by calendar date
-    type_pills    : list[{type, count}]    — per-type counts for filter pills
-    event_type    : str                    — current active type filter (or "")
-    total         : int                    — total filtered event count
-    total_all     : int                    — total unfiltered event count
+    type_pills    : list[{type, count}]    — per-type counts for filter tabs
+    event_type    : str                    — active type filter (or "")
+    total         : int                    — filtered event count
+    total_all     : int                    — unfiltered total
     page          : int
     total_pages   : int
     base_url      : str
@@ -14,7 +14,7 @@
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
 
-{# ── SVG icon macro — one clean place for all activity icons ───────────── #}
+{# ── Event icon macro ─────────────────────────────────────────────────────── #}
 {% macro ev_icon(type) %}
 {%- if type == 'commit_pushed' -%}
 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
@@ -32,156 +32,128 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
 {%- elif type == 'tag_pushed' -%}
 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-{%- elif type == 'session_started' -%}
-<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-{%- elif type == 'session_ended' -%}
-<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+{%- elif type == 'session_started' or type == 'session_ended' -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
 {%- else -%}
 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/></svg>
-{%- endif -%}
+{%- endif %}
 {% endmacro %}
 
-{# ── Event type label map ────────────────────────────────────────────────── #}
+{# ── Event type config ────────────────────────────────────────────────────── #}
 {%- set ev_cfg = {
-  "commit_pushed":   {"label": "Commit"},
-  "pr_opened":       {"label": "PR Opened"},
-  "pr_merged":       {"label": "PR Merged"},
-  "pr_closed":       {"label": "PR Closed"},
-  "issue_opened":    {"label": "Issue Opened"},
-  "issue_closed":    {"label": "Issue Closed"},
-  "branch_created":  {"label": "Branch Created"},
-  "branch_deleted":  {"label": "Branch Deleted"},
-  "tag_pushed":      {"label": "Tag Pushed"},
-  "session_started": {"label": "Session Started"},
-  "session_ended":   {"label": "Session Ended"},
+  "commit_pushed":   "Commit",
+  "pr_opened":       "PR Opened",
+  "pr_merged":       "PR Merged",
+  "pr_closed":       "PR Closed",
+  "issue_opened":    "Issue",
+  "issue_closed":    "Issue Closed",
+  "branch_created":  "Branch",
+  "branch_deleted":  "Branch Deleted",
+  "tag_pushed":      "Tag",
+  "session_started": "Session",
+  "session_ended":   "Session Ended",
 } %}
 
-{# ── Filter pills ──────────────────────────────────────────────────────── #}
+{# ── Filter tabs ──────────────────────────────────────────────────────────── #}
 {%- set pill_base = base_url ~ "/activity" %}
 <div class="av-filter-bar">
-  <span class="av-filter-label">Filter:</span>
-
-  {# All pill #}
   <a class="av-pill {% if not event_type %}av-pill--active{% endif %}"
      href="{{ pill_base }}"
      hx-get="{{ pill_base }}"
      hx-target="#av-feed"
      hx-push-url="true">
-    All
-    <span class="av-pill-count">{{ total_all }}</span>
+    All <span class="av-pill-count">{{ total_all }}</span>
   </a>
 
-  {# Per-type pills — sorted by count descending #}
   {%- for pill in type_pills %}
   {%- if pill.count > 0 %}
-  {%- set cfg = ev_cfg.get(pill.type, {"label": pill.type | replace("_"," ") | title}) %}
+  {%- set label = ev_cfg.get(pill.type, pill.type | replace("_"," ") | title) %}
   <a class="av-pill {% if event_type == pill.type %}av-pill--active{% endif %}"
      href="{{ pill_base }}?event_type={{ pill.type }}"
      hx-get="{{ pill_base }}?event_type={{ pill.type }}"
      hx-target="#av-feed"
-     hx-push-url="true"
-     title="{{ cfg.label }}">
-    {{ ev_icon(pill.type) }} {{ cfg.label }}
+     hx-push-url="true">
+    {{ ev_icon(pill.type) }} {{ label }}
     <span class="av-pill-count">{{ pill.count }}</span>
   </a>
   {%- endif %}
   {%- endfor %}
 
-  {# Filtered count badge #}
   {%- if event_type %}
-  <span style="margin-left:auto;font-size:var(--font-size-xs);color:var(--text-muted)">
-    {{ total }} matching
-  </span>
+  <span class="av-filter-count">{{ total }} shown</span>
   {%- endif %}
 </div>
 
-{# ── Timeline ──────────────────────────────────────────────────────────── #}
+{# ── Timeline ─────────────────────────────────────────────────────────────── #}
 {%- if event_groups %}
 
 {%- for group in event_groups %}
-{# Date header #}
 <div class="av-date-header">
   <span>{{ group.label }}</span>
   <div class="av-date-line"></div>
   <span>{{ group.events | length }} event{{ '' if group.events | length == 1 else 's' }}</span>
 </div>
 
-{# Event rows in this date group #}
 {%- for event in group.events %}
-{%- set cfg = ev_cfg.get(event.event_type, {"label": event.event_type | replace("_"," ") | title}) %}
+{%- set label = ev_cfg.get(event.event_type, event.event_type | replace("_"," ") | title) %}
 {%- set meta = event.metadata | default({}) %}
-{%- set is_last_in_group = loop.last %}
 
 <div class="av-row" id="event-{{ event.event_id }}">
-
-  {# Icon column with connector line #}
   <div class="av-row-icon-col">
     <div class="av-icon-badge av-type-{{ event.event_type }}">{{ ev_icon(event.event_type) }}</div>
-    {%- if not is_last_in_group or not loop.last %}
+    {%- if not loop.last %}
     <div class="av-row-connector"></div>
     {%- endif %}
   </div>
 
-  {# Body #}
   <div class="av-row-body">
     <div class="av-row-title">{{ event.description }}</div>
 
     <div class="av-row-meta">
-      {# Actor with avatar #}
       <a href="/{{ event.actor }}" class="av-actor-link">
         <span class="av-actor-avatar">{{ event.actor[0] | upper if event.actor else '?' }}</span>
         {{ event.actor }}
       </a>
 
-      {# Type badge #}
-      <span class="av-type-label">{{ cfg.label }}</span>
+      <span class="av-type-label">{{ label }}</span>
 
-      {# Rich metadata chips from event_metadata JSON #}
       {%- if meta.get("commit_id") %}
-      <a href="{{ base_url }}/commits/{{ meta.commit_id }}"
-         class="av-chip av-chip-commit"
-         title="View commit">
-        {{ meta.commit_id[:7] }}
-      </a>
+      <a href="{{ base_url }}/commits/{{ meta.commit_id }}" class="av-chip av-chip-commit">{{ meta.commit_id[:7] }}</a>
       {%- endif %}
 
       {%- if meta.get("branch") %}
-      <span class="av-chip av-chip-branch"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> {{ meta.branch }}</span>
+      <span class="av-chip av-chip-branch">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        {{ meta.branch }}
+      </span>
       {%- endif %}
 
       {%- if meta.get("pr_number") %}
-      <a href="{{ base_url }}/pull-requests"
-         class="av-chip av-chip-pr"
-         title="Pull request #{{ meta.pr_number }}">
-        #{{ meta.pr_number }}
-      </a>
+      <a href="{{ base_url }}/pull-requests" class="av-chip av-chip-pr">#{{ meta.pr_number }}</a>
       {%- elif meta.get("pr_id") %}
       <span class="av-chip av-chip-pr">PR</span>
       {%- endif %}
 
       {%- if meta.get("tag") %}
-      <span class="av-chip av-chip-tag"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> {{ meta.tag }}</span>
-      {%- endif %}
-
-      {%- if meta.get("session_id") %}
-      <span class="av-chip av-chip-session"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> session</span>
+      <span class="av-chip av-chip-tag">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        {{ meta.tag }}
+      </span>
       {%- endif %}
 
       {%- if meta.get("participants") %}
-      <span class="av-chip">{{ meta.participants | length }} participant{{ '' if meta.participants | length == 1 else 's' }}</span>
+      <span class="av-chip av-chip-session">{{ meta.participants | length }} participant{{ '' if meta.participants | length == 1 else 's' }}</span>
       {%- endif %}
 
-      {# Timestamp #}
-      <span title="{{ event.created_at }}">{{ event.created_at | fmtrelative }}</span>
+      <span data-iso="{{ event.created_at }}">{{ event.created_at | fmtrelative }}</span>
     </div>
   </div>
 </div>
-{%- endfor %}{# event loop #}
-{%- endfor %}{# group loop #}
+{%- endfor %}
+{%- endfor %}
 
-{# ── Pagination ────────────────────────────────────────────────────────── #}
 {%- if total_pages > 1 %}
-<div style="padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border-default); background: var(--bg-overlay)">
+<div class="av-pagination">
   {{ pagination(page, total_pages, base_url ~ '/activity',
                extra_params={'event_type': event_type} if event_type else {}) }}
 </div>
@@ -190,18 +162,22 @@
 {%- else %}
 <div class="av-empty">
   {%- if event_type %}
-  <p style="font-size:1.5rem;margin-bottom:var(--space-2)">🔇</p>
-  <p>No <strong>{{ ev_cfg.get(event_type, {}).get("label", event_type) }}</strong> events yet.</p>
+  <div class="av-empty-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+  </div>
+  <div class="av-empty-title">No {{ ev_cfg.get(event_type, event_type) | lower }} events</div>
+  <div class="av-empty-desc">No events of this type have been recorded yet.</div>
   <a href="{{ base_url }}/activity"
      hx-get="{{ base_url }}/activity"
      hx-target="#av-feed"
      hx-push-url="true"
-     style="color:var(--color-accent);font-size:var(--font-size-sm)">
-    Clear filter →
-  </a>
+     class="av-empty-link">Clear filter →</a>
   {%- else %}
-  <p style="font-size:1.5rem;margin-bottom:var(--space-2)">🌱</p>
-  <p>No activity yet. Push a commit to see the feed come alive.</p>
+  <div class="av-empty-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+  </div>
+  <div class="av-empty-title">No activity yet</div>
+  <div class="av-empty-desc">Push a commit to see the feed come alive.</div>
   {%- endif %}
 </div>
 {%- endif %}
