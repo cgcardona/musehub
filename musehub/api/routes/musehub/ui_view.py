@@ -1,25 +1,19 @@
-"""Generic domain viewer and insights UI routes.
+"""Domain insights UI routes.
 
-Routes:
-  GET /{owner}/{repo}/view/{ref}               — universal domain viewer
-  GET /{owner}/{repo}/view/{ref}/{path:path}   — domain viewer for a specific file
-  GET /{owner}/{repo}/insights/{ref}            — domain insights dashboard
-  GET /{owner}/{repo}/insights/{ref}/{dim}      — single insight dimension
+Canonical routes:
+  GET /{owner}/{repo}/insights/{ref}       — domain insights (symbol graph + analytics)
+  GET /{owner}/{repo}/insights/{ref}/{dim} — single insight dimension
+
+Legacy aliases (same handler, no redirect — preserved for backward compat):
+  GET /{owner}/{repo}/view/{ref}           → same as insights/{ref}
+  GET /{owner}/{repo}/view/{ref}/{path}    → same as insights/{ref}
 
 Redirect routes (301):
-  GET /{owner}/{repo}/piano-roll/{ref}          → view/{ref}
-  GET /{owner}/{repo}/listen/{ref}              → view/{ref}
-  GET /{owner}/{repo}/arrange/{ref}             → view/{ref}
-  GET /{owner}/{repo}/analysis/{ref}            → insights/{ref}
-  GET /{owner}/{repo}/analysis/{ref}/{dim}      → insights/{ref}/{dim}
-
-The ``view`` route delegates rendering to the domain's ``viewer_type``:
-  - midi     → renders piano roll canvas via the TypeScript module
-  - code     → renders symbol dependency graph
-  - generic  (fallback) → renders file tree
-
-The ``insights`` route populates dimension tabs from ``domain.capabilities.dimensions``.
-MIDI repos show harmony/rhythm/groove/etc; code repos show hotspots/coupling/symbols/etc.
+  GET /{owner}/{repo}/piano-roll/{ref}     → insights/{ref}
+  GET /{owner}/{repo}/listen/{ref}         → insights/{ref}
+  GET /{owner}/{repo}/arrange/{ref}        → insights/{ref}
+  GET /{owner}/{repo}/analysis/{ref}       → insights/{ref}
+  GET /{owner}/{repo}/analysis/{ref}/{dim} → insights/{ref}/{dim}
 """
 from __future__ import annotations
 
@@ -44,71 +38,39 @@ from musehub.services import musehub_repository, musehub_domains, musehub_analys
 
 logger = logging.getLogger(__name__)
 
-# Two separate routers: fixed_router for redirect paths, wildcard_router for the new paths.
-# Both are exported and registered in main.py.
-view_router = APIRouter(prefix="", tags=["musehub-ui-view"])
+insights_router = APIRouter(prefix="", tags=["musehub-ui-insights"])
 redirect_router = APIRouter(prefix="", tags=["musehub-ui-redirects"])
 
 
 # ── Redirect routes (301) ─────────────────────────────────────────────────────
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/piano-roll/{ref:path}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/piano-roll/{ref:path}", include_in_schema=False)
 async def redirect_piano_roll(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/view/{ref}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/listen/{ref:path}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/listen/{ref:path}", include_in_schema=False)
 async def redirect_listen(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/view/{ref}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/arrange/{ref:path}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/arrange/{ref:path}", include_in_schema=False)
 async def redirect_arrange(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/view/{ref}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/{dim}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/analysis/{ref}/{dim}", include_in_schema=False)
 async def redirect_analysis_dim(owner: str, repo_slug: str, ref: str, dim: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/insights/{ref}/{dim}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}/{dim}", status_code=301)
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/analysis/{ref}", include_in_schema=False)
 async def redirect_analysis(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/insights/{ref}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
-# ── View route ────────────────────────────────────────────────────────────────
+# ── Insights route ─────────────────────────────────────────────────────────────
 
 
 async def _get_domain_for_repo(
@@ -180,129 +142,6 @@ async def _get_symbol_graph_data(
             initial_delta = meta["structured_delta"]
             break
     return slim, initial_delta
-
-
-@view_router.get(
-    "/{owner}/{repo_slug}/view/{ref}",
-    response_class=HTMLResponse,
-    summary="Universal domain viewer",
-    operation_id="domainViewerPage",
-)
-async def domain_viewer_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    format: str = "html",
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the universal domain viewer for a repository at a given ref.
-
-    The viewer adapts to the repo's domain plugin (``viewer_type``):
-    - ``midi``  → piano roll canvas (21-dimensional state)
-    - ``code``  → symbol dependency graph
-    - generic   → file tree fallback
-    """
-    repo = await musehub_repository.get_repo_by_owner_slug(db, owner, repo_slug)
-    if repo is None:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Repository not found.")
-
-    nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
-    domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
-
-    # For the symbol-graph viewer, pre-load commits + initial delta so the
-    # TypeScript module renders without an extra round-trip on first paint.
-    slim_commits: list[dict[str, object]] = []
-    initial_delta: object = None
-    if domain_ctx.get("viewer_type") == "code":
-        slim_commits, initial_delta = await _get_symbol_graph_data(db, repo.repo_id)
-
-    page_json: dict[str, object] = {
-        "page": "view",
-        "repoId": repo.repo_id,
-        "owner": owner,
-        "slug": repo_slug,
-        "ref": ref,
-        "viewerType": domain_ctx["viewer_type"],
-        "domainScopedId": domain_ctx["scoped_id"],
-        "domainDisplayName": domain_ctx["display_name"],
-        "commits": slim_commits,
-        "initialDelta": initial_delta,
-    }
-
-    if format == "json":
-        from fastapi.responses import JSONResponse
-        return JSONResponse(content=page_json)
-
-    ctx: dict[str, object] = {
-        "title": f"View · {owner}/{repo_slug}@{ref}",
-        "current_page": "view",
-        "repo": repo,
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "base_url": f"/{owner}/{repo_slug}",
-        "ref": ref,
-        "domain": domain_ctx,
-        "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
-        **nav_ctx,
-    }
-    return _templates.TemplateResponse(
-        request, "musehub/pages/view.html", ctx,
-    )
-
-
-@view_router.get(
-    "/{owner}/{repo_slug}/view/{ref}/{path:path}",
-    response_class=HTMLResponse,
-    summary="Universal domain viewer — specific file",
-    operation_id="domainViewerFilePage",
-    include_in_schema=False,
-)
-async def domain_viewer_file_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    path: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the viewer for a specific file within the snapshot."""
-    repo = await musehub_repository.get_repo_by_owner_slug(db, owner, repo_slug)
-    if repo is None:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Repository not found.")
-
-    nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
-    domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
-
-    page_json: dict[str, object] = {
-        "repoId": repo.repo_id,
-        "owner": owner,
-        "slug": repo_slug,
-        "ref": ref,
-        "path": path,
-        "viewerType": domain_ctx["viewer_type"],
-        "domainScopedId": domain_ctx["scoped_id"],
-        "domainDisplayName": domain_ctx["display_name"],
-    }
-
-    ctx: dict[str, object] = {
-        "title": f"View · {owner}/{repo_slug}@{ref}/{path}",
-        "current_page": "view",
-        "repo": repo,
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "base_url": f"/{owner}/{repo_slug}",
-        "ref": ref,
-        "path": path,
-        "domain": domain_ctx,
-        "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
-        **nav_ctx,
-    }
-    return _templates.TemplateResponse(
-        request, "musehub/pages/view.html", ctx,
-    )
 
 
 # ── Insights data helpers ─────────────────────────────────────────────────────
@@ -611,17 +450,28 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
 # ── Insights route ────────────────────────────────────────────────────────────
 
 
-@view_router.get(
+@insights_router.get(
     "/{owner}/{repo_slug}/insights/{ref}",
     response_class=HTMLResponse,
     summary="Domain insights dashboard",
     operation_id="insightsDashboardPage",
+)
+@insights_router.get(
+    "/{owner}/{repo_slug}/view/{ref}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+@insights_router.get(
+    "/{owner}/{repo_slug}/view/{ref}/{path:path}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
 )
 async def insights_dashboard_page(
     request: Request,
     owner: str,
     repo_slug: str,
     ref: str,
+    path: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Render the domain insights dashboard for a repository at a given ref.
@@ -679,7 +529,7 @@ async def insights_dashboard_page(
     )
 
 
-@view_router.get(
+@insights_router.get(
     "/{owner}/{repo_slug}/insights/{ref}/{dim}",
     response_class=HTMLResponse,
     summary="Single domain insight dimension",
