@@ -175,6 +175,8 @@ class TestMusehubToolsRegistered:
             "musehub_whoami",
             "muse_pull",
             "muse_remote",
+            # Prompt access shim
+            "musehub_get_prompt",
         }
         expected_write = {
             "musehub_create_repo",
