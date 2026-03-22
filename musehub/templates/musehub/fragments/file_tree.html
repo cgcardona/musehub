@@ -45,9 +45,31 @@
 {% endmacro %}
 
 {% if tree %}
+
+{# ── Latest commit header (GitHub-style) ─────────────────────────────────── #}
+{% if latest_commit %}
+{% set lc = latest_commit %}
+{% set lc_sha = lc.commit_id[:8] %}
+<div class="ft-latest-commit">
+  <div class="ft-lc-left">
+    {% set _cidx = lc.author | length % 6 %}
+    <span class="rh-avatar rh-avatar-{{ _cidx }} ft-lc-avatar">{{ lc.author[0] | upper if lc.author else '?' }}</span>
+    <span class="ft-lc-author">{{ lc.author }}</span>
+    <a href="{{ base_url }}/commits/{{ lc_sha }}" class="ft-lc-message" title="{{ lc.message }}">
+      {{ lc.message.split('\n')[0] | truncate(72, True, '…') }}
+    </a>
+  </div>
+  <div class="ft-lc-right">
+    <a href="{{ base_url }}/commits/{{ lc_sha }}" class="ft-lc-sha">{{ lc_sha }}</a>
+    <span class="ft-lc-ts">{{ lc.timestamp | fmtrelative }}</span>
+  </div>
+</div>
+{% endif %}
+
 <table class="file-tree-table">
   <tbody>
   {% for entry in tree %}
+  {% set lc_info = file_last_commits.get(entry.path, {}) if file_last_commits is defined else {} %}
   <tr class="file-tree-row {% if entry.type == 'dir' %}file-tree-dir{% endif %}">
     <td class="file-tree-cell-name">
       {% if entry.type == 'dir' %}
@@ -62,8 +84,17 @@
       </a>
       {% endif %}
     </td>
-    <td class="file-tree-cell-size">
-      {% if entry.type != 'dir' and entry.size_bytes %}{{ entry.size_bytes | filesizeformat }}{% endif %}
+    <td class="file-tree-cell-commit">
+      {% if lc_info %}
+      <a href="{{ base_url }}/commits/{{ lc_info.sha }}" class="ft-row-commit-msg" title="{{ lc_info.message }}">
+        {{ lc_info.message | truncate(60, True, '…') }}
+      </a>
+      {% endif %}
+    </td>
+    <td class="file-tree-cell-ts">
+      {% if lc_info and lc_info.timestamp %}
+      <span class="ft-row-ts" data-ts="{{ lc_info.timestamp }}">{{ lc_info.timestamp | fmtrelative }}</span>
+      {% endif %}
     </td>
   </tr>
   {% endfor %}

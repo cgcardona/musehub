@@ -1906,6 +1906,129 @@ async def get_repo_home_stats(
     }
 
 
+async def get_file_last_commits(
+    session: AsyncSession,
+    repo_id: str,
+    paths: list[str],
+    max_commits: int = 60,
+) -> dict[str, dict[str, str]]:
+    """Return the last-touching commit for each file path.
+
+    Walks commits newest→oldest, comparing consecutive snapshot manifests.
+    A path is "claimed" when its object_id first changes (or appears).
+    Caps at ``max_commits`` to bound query time on large repos.
+
+    Returns ``{path: {sha: str, message: str, author: str, timestamp: str}}``
+    where ``sha`` is the first 8 chars and ``timestamp`` is ISO-8601 UTC.
+    """
+    from datetime import timezone as _tz
+
+    if not paths:
+        return {}
+
+    commits_result = await session.execute(
+        select(db.MusehubCommit)
+        .where(db.MusehubCommit.repo_id == repo_id)
+        .order_by(db.MusehubCommit.timestamp.desc())
+        .limit(max_commits)
+    )
+    commits = list(commits_result.scalars().all())
+
+    # Load all snapshot manifests in one pass.
+    snap_ids = [c.snapshot_id for c in commits if c.snapshot_id]
+    if not snap_ids:
+        return {}
+
+    snaps_result = await session.execute(
+        select(db.MusehubSnapshot).where(db.MusehubSnapshot.snapshot_id.in_(snap_ids))
+    )
+    snap_by_id: dict[str, dict[str, str]] = {
+        s.snapshot_id: dict(s.manifest or {})
+        for s in snaps_result.scalars().all()
+    }
+
+    result: dict[str, dict[str, str]] = {}
+    remaining = set(paths)
+    prev_manifest: dict[str, str] = {}
+
+    for commit in commits:
+        if not remaining:
+            break
+        cur_manifest = snap_by_id.get(commit.snapshot_id or "", {})
+        claimed: set[str] = set()
+        for p in list(remaining):
+            cur_oid = cur_manifest.get(p)
+            prev_oid = prev_manifest.get(p)
+            # Claim if file appeared or its content changed in this commit.
+            if cur_oid and cur_oid != prev_oid:
+                ts = commit.timestamp
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=_tz.utc)
+                result[p] = {
+                    "sha": commit.commit_id[:8],
+                    "message": commit.message.split("\n")[0][:72],
+                    "author": commit.author,
+                    "timestamp": ts.isoformat(),
+                }
+                claimed.add(p)
+        remaining -= claimed
+        prev_manifest = cur_manifest
+
+    return result
+
+
+async def get_recently_pushed_branches(
+    session: AsyncSession,
+    repo_id: str,
+    current_ref: str,
+    within_hours: int = 72,
+) -> list[dict[str, str]]:
+    """Return branches (other than current_ref) whose head commit is recent.
+
+    Used to render GitHub-style "branch had recent pushes N minutes ago" banners.
+    Returns list of ``{name, sha, message, timestamp}`` sorted newest-first.
+    """
+    from datetime import timezone as _tz, timedelta
+
+    branches_result = await session.execute(
+        select(db.MusehubBranch).where(db.MusehubBranch.repo_id == repo_id)
+    )
+    branches = [
+        b for b in branches_result.scalars().all()
+        if b.name != current_ref and b.head_commit_id
+    ]
+    if not branches:
+        return []
+
+    head_ids = [b.head_commit_id for b in branches if b.head_commit_id]
+    commits_result = await session.execute(
+        select(db.MusehubCommit).where(db.MusehubCommit.commit_id.in_(head_ids))
+    )
+    commit_by_id: dict[str, db.MusehubCommit] = {
+        c.commit_id: c for c in commits_result.scalars().all()
+    }
+
+    cutoff = datetime.now(_tz.utc) - timedelta(hours=within_hours)
+    recent: list[dict[str, str]] = []
+    for branch in branches:
+        commit = commit_by_id.get(branch.head_commit_id or "")
+        if not commit:
+            continue
+        ts = commit.timestamp
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=_tz.utc)
+        if ts >= cutoff:
+            recent.append({
+                "name": branch.name,
+                "sha": commit.commit_id[:8],
+                "message": commit.message.split("\n")[0][:72],
+                "timestamp": ts.isoformat(),
+            })
+
+    recent.sort(key=lambda x: x["timestamp"], reverse=True)
+    return recent
+
+
 async def get_user_forks(db_session: AsyncSession, username: str) -> UserForksResponse:
     """Return all repos that ``username`` has forked, with source attribution.
 
