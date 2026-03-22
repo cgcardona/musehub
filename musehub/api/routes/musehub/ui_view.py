@@ -14,9 +14,9 @@ Redirect routes (301):
   GET /{owner}/{repo}/analysis/{ref}/{dim}      → insights/{ref}/{dim}
 
 The ``view`` route delegates rendering to the domain's ``viewer_type``:
-  - piano_roll   (MIDI)     → renders piano roll canvas via the TypeScript module
-  - symbol_graph (Code)     → renders symbol dependency graph
-  - generic      (fallback) → renders file tree
+  - midi     → renders piano roll canvas via the TypeScript module
+  - code     → renders symbol dependency graph
+  - generic  (fallback) → renders file tree
 
 The ``insights`` route populates dimension tabs from ``domain.capabilities.dimensions``.
 MIDI repos show harmony/rhythm/groove/etc; code repos show hotspots/coupling/symbols/etc.
@@ -140,6 +140,48 @@ async def _get_domain_for_repo(
     }
 
 
+def _slim_commit(row: musehub_db.MusehubCommit) -> dict[str, object]:
+    """Return a minimal commit dict for the symbol-graph commit navigator."""
+    meta: dict[str, object] = row.commit_meta if isinstance(row.commit_meta, dict) else {}
+    return {
+        "id": row.commit_id,
+        "message": row.message,
+        "author": row.author,
+        "branch": row.branch,
+        "ts": row.timestamp.isoformat() if row.timestamp else "",
+        "agentId": str(meta.get("agent_id", "")),
+    }
+
+
+async def _get_symbol_graph_data(
+    db: AsyncSession,
+    repo_id: str,
+    limit: int = 20,
+) -> tuple[list[dict[str, object]], object]:
+    """Fetch the last ``limit`` commits and the most-recent structured_delta.
+
+    Returns (slim_commits, initial_delta) where initial_delta may be None
+    if no commit carries symbol data.
+    """
+    from sqlalchemy import select, desc as sa_desc
+
+    stmt = (
+        select(musehub_db.MusehubCommit)
+        .where(musehub_db.MusehubCommit.repo_id == repo_id)
+        .order_by(sa_desc(musehub_db.MusehubCommit.timestamp))
+        .limit(limit)
+    )
+    rows = list((await db.execute(stmt)).scalars().all())
+    slim = [_slim_commit(r) for r in rows]
+    initial_delta: object = None
+    for r in rows:
+        meta: dict[str, object] = r.commit_meta if isinstance(r.commit_meta, dict) else {}
+        if meta.get("structured_delta"):
+            initial_delta = meta["structured_delta"]
+            break
+    return slim, initial_delta
+
+
 @view_router.get(
     "/{owner}/{repo_slug}/view/{ref}",
     response_class=HTMLResponse,
@@ -156,10 +198,10 @@ async def domain_viewer_page(
 ) -> Response:
     """Render the universal domain viewer for a repository at a given ref.
 
-    The viewer adapts to the repo's domain plugin:
-    - MIDI domain → piano roll canvas (21-dimensional state)
-    - Code domain → symbol dependency graph
-    - Generic      → file tree fallback
+    The viewer adapts to the repo's domain plugin (``viewer_type``):
+    - ``midi``  → piano roll canvas (21-dimensional state)
+    - ``code``  → symbol dependency graph
+    - generic   → file tree fallback
     """
     repo = await musehub_repository.get_repo_by_owner_slug(db, owner, repo_slug)
     if repo is None:
@@ -169,8 +211,15 @@ async def domain_viewer_page(
     nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
-    # Determine page_json for the TypeScript view module
+    # For the symbol-graph viewer, pre-load commits + initial delta so the
+    # TypeScript module renders without an extra round-trip on first paint.
+    slim_commits: list[dict[str, object]] = []
+    initial_delta: object = None
+    if domain_ctx.get("viewer_type") == "code":
+        slim_commits, initial_delta = await _get_symbol_graph_data(db, repo.repo_id)
+
     page_json: dict[str, object] = {
+        "page": "view",
         "repoId": repo.repo_id,
         "owner": owner,
         "slug": repo_slug,
@@ -178,6 +227,8 @@ async def domain_viewer_page(
         "viewerType": domain_ctx["viewer_type"],
         "domainScopedId": domain_ctx["scoped_id"],
         "domainDisplayName": domain_ctx["display_name"],
+        "commits": slim_commits,
+        "initialDelta": initial_delta,
     }
 
     if format == "json":
@@ -515,7 +566,7 @@ async def insights_dashboard_page(
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
     metrics: dict[str, Any] = {}
-    if domain_ctx["viewer_type"] == "symbol_graph":
+    if domain_ctx["viewer_type"] == "code":
         metrics = await _compute_code_insights(db, repo.repo_id)
 
     # Pre-compute all dimension data for the dashboard cards
@@ -573,7 +624,7 @@ async def insights_dimension_page(
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
     metrics: dict[str, Any] = {}
-    if domain_ctx["viewer_type"] == "symbol_graph":
+    if domain_ctx["viewer_type"] == "code":
         metrics = await _compute_code_insights(db, repo.repo_id)
 
     base_url = f"/{owner}/{repo_slug}"
