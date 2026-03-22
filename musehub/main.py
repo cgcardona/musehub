@@ -50,7 +50,7 @@ from musehub.api.routes.musehub import (
 )
 from musehub.api.routes import musehub as musehub_router_pkg
 from musehub.api.routes.mcp import router as mcp_router
-from musehub.api.routes.musehub.ui_view import view_router as musehub_ui_view_router
+from musehub.api.routes.musehub.ui_view import insights_router as musehub_ui_insights_router
 from musehub.api.routes.musehub.ui_view import redirect_router as musehub_ui_redirect_router
 from musehub.api.routes.wire import router as wire_router
 from musehub.api.routes.api.repos import router as api_repos_router
@@ -264,10 +264,10 @@ app.include_router(mcp_router)
 
 # Wildcard UI routes — /{owner}/{repo_slug} and deeper paths.
 # Must come after all fixed-path routers above.
-# Redirect router must come before view_router so /piano-roll, /listen, /arrange
+# Redirect router must come before insights_router so /piano-roll, /listen, /arrange
 # are caught and 301'd before they'd match as owner names.
 app.include_router(musehub_ui_redirect_router, tags=["musehub-ui-redirects"])
-app.include_router(musehub_ui_view_router, tags=["musehub-ui-view"])
+app.include_router(musehub_ui_insights_router, tags=["musehub-ui-insights"])
 app.include_router(musehub_ui_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_blame_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_settings_routes.router, tags=["musehub-ui-settings"])
