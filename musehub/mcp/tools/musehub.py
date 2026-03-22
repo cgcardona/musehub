@@ -18,7 +18,7 @@ Naming convention:
   ``muse_<verb>`` — Muse CLI-analogous tools (push, pull, remote, config).
 
 Addressing: all repo-scoped tools accept either ``repo_id`` (UUID) or both
-``owner`` + ``slug`` (e.g. ``owner='cgcardona'``, ``slug='jazz-standards'``).
+``owner`` + ``slug`` (e.g. ``owner='gabriel'``, ``slug='jazz-standards'``).
 The dispatcher resolves ``owner``+``slug`` to ``repo_id`` transparently.
 
 All tools carry ``server_side: True`` so the dispatcher routes them to the
@@ -41,7 +41,7 @@ _REPO_ID_PROP: dict[str, MCPPropertyDef] = {
     "owner": {
         "type": "string",
         "description": (
-            "Repository owner username (e.g. 'cgcardona'). "
+            "Repository owner username (e.g. 'gabriel'). "
             "Use with 'slug' as an alternative to 'repo_id'."
         ),
     },
@@ -70,8 +70,9 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "or modifying state to ensure coherence with the existing multidimensional content. "
             "For computed analytics (per-dimension scores), follow up with musehub_get_domain_insights. "
             "For the full viewer payload (dimension slices, navigation strip), follow up with musehub_get_view. "
+            "Repo identifier required: provide repo_id OR both owner+slug. "
             "Example: musehub_get_context(repo_id='a3f2-...') "
-            "or musehub_get_context(owner='cgcardona', slug='jazz-standards')."
+            "or musehub_get_context(owner='gabriel', slug='jazz-standards')."
         ),
         "inputSchema": {
             "type": "object",
@@ -86,7 +87,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "List all branches in a MuseHub repository with their head commit IDs. "
             "Call before musehub_list_commits to identify the target branch ref. "
             "Example: musehub_list_branches(repo_id='a3f2-...') "
-            "or musehub_list_branches(owner='cgcardona', slug='jazz-standards')."
+            "or musehub_list_branches(owner='gabriel', slug='jazz-standards')."
         ),
         "inputSchema": {
             "type": "object",
@@ -101,7 +102,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "List commits on a MuseHub repository (newest first). "
             "Optionally filter by branch name and cap the result count. "
             "Example: musehub_list_commits(repo_id='a3f2-...', branch='main', limit=10) "
-            "or musehub_list_commits(owner='cgcardona', slug='jazz-standards', branch='main')."
+            "or musehub_list_commits(owner='gabriel', slug='jazz-standards', branch='main')."
         ),
         "inputSchema": {
             "type": "object",
@@ -152,7 +153,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "mode 'commit' searches commit messages (e.g. 'add bass'). "
             "Returns matching items with their metadata. "
             "Example: musehub_search(repo_id='a3f2-...', query='bass', mode='path') "
-            "or musehub_search(owner='cgcardona', slug='jazz-standards', query='bass')."
+            "or musehub_search(owner='gabriel', slug='jazz-standards', query='bass')."
         ),
         "inputSchema": {
             "type": "object",
@@ -201,7 +202,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "Returns a multidimensional state diff: which artifacts were added, removed, or modified, "
             "and per-dimension change scores sourced from the repo's domain plugin capabilities. "
             "Example: musehub_compare(repo_id='a3f2-...', base_ref='main', head_ref='feature/new-section') "
-            "or musehub_compare(owner='cgcardona', slug='jazz-standards', base_ref='main', head_ref='feature/bridge')."
+            "or musehub_compare(owner='gabriel', slug='jazz-standards', base_ref='main', head_ref='feature/bridge')."
         ),
         "inputSchema": {
             "type": "object",
@@ -228,7 +229,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "Returns issue summaries (title, state, labels) — "
             "call musehub_get_issue with the number to get the full body and comment thread. "
             "Example: musehub_list_issues(repo_id='a3f2-...', state='open', label='bug') "
-            "or musehub_list_issues(owner='cgcardona', slug='jazz-standards')."
+            "or musehub_list_issues(owner='gabriel', slug='jazz-standards')."
         ),
         "inputSchema": {
             "type": "object",
@@ -255,7 +256,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "Get a single issue by its per-repo number, including the full body and comment thread. "
             "Use musehub_list_issues to discover issue numbers, then this tool to read the detail. "
             "Example: musehub_get_issue(repo_id='a3f2-...', issue_number=42) "
-            "or musehub_get_issue(owner='cgcardona', slug='jazz-standards', issue_number=42)."
+            "or musehub_get_issue(owner='gabriel', slug='jazz-standards', issue_number=42)."
         ),
         "inputSchema": {
             "type": "object",
@@ -277,7 +278,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "Filter by state (open/merged/closed/all). "
             "Returns PR summaries — call musehub_get_pr with the pr_id to get reviews and inline comments. "
             "Example: musehub_list_prs(repo_id='a3f2-...', state='open') "
-            "or musehub_list_prs(owner='cgcardona', slug='jazz-standards')."
+            "or musehub_list_prs(owner='gabriel', slug='jazz-standards')."
         ),
         "inputSchema": {
             "type": "object",
@@ -300,7 +301,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "Get a single pull request by ID, including all reviews and inline dimension-anchored comments. "
             "Use musehub_list_prs to discover pr_ids, then this tool to read the full detail. "
             "Example: musehub_get_pr(repo_id='a3f2-...', pr_id='b5e8-...') "
-            "or musehub_get_pr(owner='cgcardona', slug='jazz-standards', pr_id='b5e8-...')."
+            "or musehub_get_pr(owner='gabriel', slug='jazz-standards', pr_id='b5e8-...')."
         ),
         "inputSchema": {
             "type": "object",
@@ -321,7 +322,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "List all releases for a MuseHub repository, ordered newest first. "
             "Each release includes tag, title, release notes summary, and asset counts. "
             "Example: musehub_list_releases(repo_id='a3f2-...') "
-            "or musehub_list_releases(owner='cgcardona', slug='jazz-standards')."
+            "or musehub_list_releases(owner='gabriel', slug='jazz-standards')."
         ),
         "inputSchema": {
             "type": "object",
@@ -335,9 +336,9 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
         "description": (
             "Discover public MuseHub repositories across all domains by text query, "
             "domain plugin, or free-text tags. "
-            "Filter by domain scoped ID (e.g. '@cgcardona/midi') to browse repos of a specific type. "
+            "Filter by domain scoped ID (e.g. '@gabriel/midi') to browse repos of a specific type. "
             "Returns repos sorted by relevance including repo_id, owner, and slug for each result. "
-            "Example: musehub_search_repos(query='jazz', domain='@cgcardona/midi')."
+            "Example: musehub_search_repos(query='jazz', domain='@gabriel/midi')."
         ),
         "inputSchema": {
             "type": "object",
@@ -348,7 +349,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
                 },
                 "domain": {
                     "type": "string",
-                    "description": "Filter by domain scoped ID, e.g. '@cgcardona/midi' or '@cgcardona/code'.",
+                    "description": "Filter by domain scoped ID, e.g. '@gabriel/midi' or '@gabriel/code'.",
                 },
                 "tags": {
                     "type": "array",
@@ -421,7 +422,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "version, repo_count, and install_count. "
             "Call this after musehub_get_context to understand the domain a repo uses, "
             "or before creating a repo to verify domain capabilities. "
-            "Example: musehub_get_domain(scoped_id='@cgcardona/midi')."
+            "Example: musehub_get_domain(scoped_id='@gabriel/midi')."
         ),
         "inputSchema": {
             "type": "object",
@@ -481,7 +482,7 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "For quantitative analytics (scores, metrics), use musehub_get_domain_insights instead. "
             "For repo identity and inventory, use musehub_get_context instead. "
             "Example: musehub_get_view(repo_id='a3f2-...', ref='main') "
-            "or musehub_get_view(owner='cgcardona', slug='jazz-standards', ref='main')."
+            "or musehub_get_view(owner='gabriel', slug='jazz-standards', ref='main')."
         ),
         "inputSchema": {
             "type": "object",
@@ -507,10 +508,11 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
         "server_side": True,
         "description": (
             "Return identity information for the currently authenticated caller. "
-            "Call this first to confirm authentication, get your user_id, "
-            "and see how many repos you own. "
+            "Call this first to confirm authentication before any write operations. "
             "Works for both human users and AI agent tokens. "
-            "Returns {authenticated: false} when called without a Bearer token. "
+            "Authenticated response includes: user_id (UUID), username (handle), "
+            "display_name, repo_count, is_admin, and token_type ('human' or 'agent'). "
+            "Returns {authenticated: false} when called without a Bearer token — never errors. "
             "Example: musehub_whoami()."
         ),
         "inputSchema": {
@@ -526,9 +528,11 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "Fetch missing commits and objects from a MuseHub repository. "
             "Equivalent to 'muse pull' — returns new commits and object metadata "
             "since the given commit ID. Use since_commit_id to fetch incrementally. "
-            "Pass object_ids to download specific binary objects. "
+            "Pass object_ids to download specific binary objects — their content is returned "
+            "as base64-encoded strings in the 'content_b64' field of each object entry; "
+            "decode with base64.b64decode() before writing to disk. "
             "Example: muse_pull(repo_id='a3f2-...', branch='main', since_commit_id='abc123') "
-            "or muse_pull(owner='cgcardona', slug='jazz-standards', branch='main')."
+            "or muse_pull(owner='gabriel', slug='jazz-standards', branch='main')."
         ),
         "inputSchema": {
             "type": "object",
@@ -560,8 +564,8 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
             "Returns: origin URL, push endpoint, pull endpoint, clone command (with optional ref), "
             "and the 'muse remote add origin' command. "
             "Use this when setting up a local repo to push to MuseHub, or to get the clone URL. "
-            "Example: muse_remote(owner='cgcardona', slug='neo-soul-experiment') "
-            "or muse_remote(owner='cgcardona', slug='neo-soul-experiment', ref='feat/jazz-bridge')."
+            "Example: muse_remote(owner='gabriel', slug='neo-soul-experiment') "
+            "or muse_remote(owner='gabriel', slug='neo-soul-experiment', ref='feat/jazz-bridge')."
         ),
         "inputSchema": {
             "type": "object",
@@ -595,7 +599,7 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
         "description": (
             "Create a new MuseHub repository for any Muse domain. "
             "The slug is auto-generated from the name. "
-            "Specify a domain scoped ID (e.g. '@cgcardona/midi') to associate the repo with "
+            "Specify a domain scoped ID (e.g. '@gabriel/midi') to associate the repo with "
             "a domain plugin — this unlocks domain-specific viewers, insights, and CLI commands. "
             "Call musehub_list_domains first to discover available domains. "
             "Set initialize=true (default) to get an initial commit and default branch. "
@@ -622,7 +626,7 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                 "domain": {
                     "type": "string",
                     "description": (
-                        "Domain plugin scoped ID (e.g. '@cgcardona/midi', '@cgcardona/code'). "
+                        "Domain plugin scoped ID (e.g. '@gabriel/midi', '@gabriel/code'). "
                         "Call musehub_list_domains first to discover available domains."
                     ),
                 },
@@ -654,7 +658,7 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
             "Open a new issue in a MuseHub repository. "
             "Use issues to track problems, feature requests, or collaboration needs. "
             "Example: musehub_create_issue(repo_id='a3f2-...', title='Bass too muddy in bars 8-16') "
-            "or musehub_create_issue(owner='cgcardona', slug='jazz-standards', title='Harmony conflict in bridge')."
+            "or musehub_create_issue(owner='gabriel', slug='jazz-standards', title='Harmony conflict in bridge')."
         ),
         "inputSchema": {
             "type": "object",
@@ -901,7 +905,7 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                 },
                 "commit_id": {
                     "type": "string",
-                    "description": "Optional commit UUID to pin this release to.",
+                    "description": "Optional commit SHA to pin this release to. Defaults to HEAD of the default branch.",
                 },
                 "is_prerelease": {
                     "type": "boolean",
@@ -918,8 +922,9 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
         "description": (
             "Star a MuseHub repository to show appreciation and follow its activity. "
             "Starred repos appear in the user's starred list. Idempotent. "
+            "Repo identifier required: provide repo_id OR both owner+slug. "
             "Example: musehub_star_repo(repo_id='a3f2-...') "
-            "or musehub_star_repo(owner='cgcardona', slug='jazz-standards')."
+            "or musehub_star_repo(owner='gabriel', slug='jazz-standards')."
         ),
         "inputSchema": {
             "type": "object",
@@ -934,8 +939,9 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
             "Fork a public MuseHub repository under the authenticated user's account. "
             "Creates a new repo with all branches and establishes fork lineage. "
             "Only public repos can be forked. "
+            "Repo identifier required: provide repo_id OR both owner+slug. "
             "Example: musehub_fork_repo(repo_id='a3f2-...') "
-            "or musehub_fork_repo(owner='cgcardona', slug='jazz-standards')."
+            "or musehub_fork_repo(owner='gabriel', slug='jazz-standards')."
         ),
         "inputSchema": {
             "type": "object",
@@ -979,8 +985,9 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
             "Mint a long-lived JWT agent token for programmatic MuseHub access. "
             "Agent tokens have higher rate limits than user tokens and appear "
             "with an 'agent' badge in the MuseHub activity feed. "
-            "The response includes the exact CLI command to store the token: "
-            "'muse config set musehub.token <token>'. "
+            "The response includes the token value and the exact command to store it: "
+            "write it to ~/.muse/identity.toml under your hub hostname, or run "
+            "'muse auth login --token <token> --hub https://musehub.ai'. "
             "Requires an authenticated session (the token is issued for the calling user). "
             "Example: musehub_create_agent_token(agent_name='my-composer-bot/1.0', expires_in_days=90)."
         ),
@@ -1079,10 +1086,12 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
         "description": (
             "Read info about Muse configuration keys or generate a 'muse config set' command. "
             "Equivalent to 'muse config get <key>' or 'muse config set <key> <value>'. "
-            "Call without arguments to list all known MuseHub-related config keys. "
+            "Call without arguments to list all known config keys. "
             "Pass key and value to get the exact CLI command to run. "
-            "Key examples: musehub.token, musehub.url, musehub.username, user.name. "
-            "Example: muse_config(key='musehub.token', value='eyJhbGc...')."
+            "Repo-level keys (stored in .muse/config.toml): hub.url, user.type. "
+            "Auth tokens are stored per-hub in ~/.muse/identity.toml — use 'muse auth login' "
+            "or write the token directly under the hub hostname section. "
+            "Example: muse_config(key='hub.url', value='https://musehub.ai')."
         ),
         "inputSchema": {
             "type": "object",
@@ -1091,7 +1100,8 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                     "type": "string",
                     "description": (
                         "Configuration key to query or set "
-                        "(e.g. 'musehub.token', 'musehub.url', 'user.name'). "
+                        "(e.g. 'hub.url', 'user.type'). "
+                        "Note: auth tokens live in ~/.muse/identity.toml, not config.toml. "
                         "Omit to list all known keys."
                     ),
                 },
@@ -1122,7 +1132,7 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
             "  merge_semantics: 'ot' | 'crdt' | 'three_way'\n"
             "  supported_commands: list of muse CLI commands this domain supports\n"
             "Returns: {domain_id, scoped_id, manifest_hash} on success. "
-            "Example: musehub_publish_domain(author_slug='cgcardona', slug='genomics', "
+            "Example: musehub_publish_domain(author_slug='gabriel', slug='genomics', "
             "display_name='Genomics', description='Version DNA sequences', "
             "capabilities={...}, viewer_type='sequence', version='0.1.0')."
         ),
@@ -1226,9 +1236,12 @@ MUSEHUB_ELICITATION_TOOLS: list[MCPToolDef] = [
         "server_side": True,
         "description": (
             "Review a pull request interactively by first eliciting the reviewer's focus "
-            "dimension (melodic / harmonic / rhythmic / structural / dynamic / all) and "
-            "depth (quick / standard / thorough). Returns a deep structured review targeting "
-            "the user-chosen dimensions with per-dimension divergence scores. "
+            "dimension and depth (quick / standard / thorough). Returns a deep structured "
+            "review targeting the chosen dimensions with per-dimension divergence scores. "
+            "Currently implements the MIDI domain's dimension vocabulary "
+            "(melodic / harmonic / rhythmic / structural / dynamic / all). "
+            "For repos on other domains, call musehub_get_domain first to learn the correct "
+            "dimension names, then pass dimension= directly to skip elicitation. "
             "For a non-interactive review, use musehub_get_pr + musehub_submit_pr_review instead. "
             "ELICITATION BEHAVIOUR: requires an active MCP session (Mcp-Session-Id header). "
             "Without a session, pass dimension= and depth= directly to skip elicitation. "
