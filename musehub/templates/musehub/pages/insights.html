@@ -41,33 +41,7 @@
 {% block content %}
 <div class="ins-page">
 
-  {# ── Page header ─────────────────────────────────────────────────────────── #}
-  <div class="ins-page-header">
-    <div class="ins-page-header__left">
-      <h1 class="ins-page-title">
-        {% if domain.viewer_type == 'code' %}⬡{% elif domain.viewer_type == 'midi' %}♪{% else %}◈{% endif %}
-        Insights
-      </h1>
-      {% if domain.scoped_id %}
-      <a class="ins-domain-badge" href="/domains/{{ domain.scoped_id }}">{{ domain.scoped_id }}</a>
-      {% endif %}
-      <span class="ins-ref-pill">{{ ref }}</span>
-    </div>
-    <div class="ins-page-header__actions">
-      <a href="/{{ owner }}/{{ repo_slug }}/graph" class="btn btn-ghost btn-sm">Graph</a>
-      <a href="/{{ owner }}/{{ repo_slug }}/commits" class="btn btn-ghost btn-sm">History</a>
-    </div>
-  </div>
-
   {% if domain.viewer_type == 'code' and metrics %}
-  {# ══════════════════════════════════════════════════════════════════════════
-     MUSE-EXCLUSIVE SEMANTIC INTELLIGENCE — impossible with Git
-  ══════════════════════════════════════════════════════════════════════════ #}
-
-  <div class="ins-muse-banner">
-    <span class="ins-muse-badge">Muse exclusive</span>
-    <span class="ins-muse-banner-text">Semantic commit intelligence — structured metadata Git cannot express</span>
-  </div>
 
   {# ── Hero stat strip ────────────────────────────────────────────────────── #}
   <div class="ins-stat-grid">
