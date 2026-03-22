@@ -239,30 +239,30 @@ async def mcp_post(request: Request) -> Response:
         if session_id_header:
             session = get_session(session_id_header)
             if session is None:
-                # Session expired or unknown → client must re-initialize.
-                return JSONResponse(
-                    status_code=404,
-                    content={
-                        "jsonrpc": "2.0",
-                        "id": None,
-                        "error": {
-                            "code": -32600,
-                            "message": "Session not found. Send a new InitializeRequest without Mcp-Session-Id.",
-                        },
-                    },
+                # Session not found in this worker's memory — common with multi-worker
+                # deployments where sessions are stored in-process.  For stateless
+                # operations (tools/call, resources/read, prompts/get, etc.) the
+                # session is only needed for elicitation state, so we continue with
+                # session=None and let auth carry the user identity.  Only elicitation
+                # *responses* (JSON-RPC responses, no "method" key) actually need the
+                # session; those are rejected below if session is None.
+                logger.debug(
+                    "MCP session %.8s... not found in this worker — continuing sessionless "
+                    "(multi-worker deployment or expired session).",
+                    session_id_header,
                 )
 
     # ── Check if this is an elicitation response (client→server) ─────────────
     # When the client sends the result of an elicitation/create back, it's a
     # JSON-RPC *response* (has "result" or "error" but no "method"). Route it
     # to the session's pending Future resolver.
-    if session and isinstance(raw, dict) and "method" not in raw and "id" in raw:
+    if isinstance(raw, dict) and "method" not in raw and "id" in raw:
         req_id = raw.get("id")
-        if "result" in raw and req_id is not None:
+        if "result" in raw and req_id is not None and session is not None:
             resolved = resolve_elicitation(session, req_id, raw["result"])
             if resolved:
                 return Response(status_code=202)
-        # Unknown response — ignore per spec.
+        # Unknown response or no session to resolve against — ignore per spec.
         return Response(status_code=202)
 
     # ── Dispatch ──────────────────────────────────────────────────────────────
