@@ -67,7 +67,7 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'user-profile':  (d) => void initUserProfile(d),
   'timeline':      () => initTimeline(),
   'analysis':      () => initAnalysis(),
-  'insights':      () => initInsights(),
+  'insights':      (d) => initInsights(d),
   'search':        () => initSearch(),
   'global-search': () => initSearch(),
   'arrange':       () => initArrange(),
