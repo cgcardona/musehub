@@ -1047,7 +1047,7 @@ async def commit_page(
     # ── Audio — MIDI domain only ──────────────────────────────────────────
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
-        if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "piano_roll"
+        if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "midi"
         else None
     )
 
