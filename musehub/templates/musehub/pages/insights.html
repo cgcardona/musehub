@@ -43,38 +43,33 @@
 
   {% if domain.viewer_type == 'code' and metrics %}
 
-  {# ── Compact stat bar ───────────────────────────────────────────────────── #}
-  <div class="ins-stat-bar">
-    <span class="ins-stat-bar__item">
-      <span class="ins-stat-bar__value">{{ metrics.total_commits }}</span>
-      <span class="ins-stat-bar__label">commits</span>
-    </span>
-    <span class="ins-stat-bar__sep"></span>
-    <span class="ins-stat-bar__item">
-      <span class="ins-stat-bar__value ins-stat-bar__value--sym-add">+{{ metrics.sym_added_total }}</span>
-      <span class="ins-stat-bar__label">symbols added</span>
-    </span>
-    <span class="ins-stat-bar__sep"></span>
-    <span class="ins-stat-bar__item">
-      <span class="ins-stat-bar__value ins-stat-bar__value--sym-del">−{{ metrics.sym_removed_total }}</span>
-      <span class="ins-stat-bar__label">removed</span>
-    </span>
-    <span class="ins-stat-bar__sep"></span>
-    <span class="ins-stat-bar__item">
-      <span class="ins-stat-bar__value{% if metrics.breaking_count > 0 %} ins-stat-bar__value--breaking{% endif %}">{{ metrics.breaking_count }}</span>
-      <span class="ins-stat-bar__label">breaking</span>
-    </span>
-    <span class="ins-stat-bar__sep"></span>
-    <span class="ins-stat-bar__item">
-      <span class="ins-stat-bar__value">{{ metrics.conventional_pct }}%</span>
-      <span class="ins-stat-bar__label">conventional</span>
-    </span>
+  {# ── Stat strip ─────────────────────────────────────────────────────────── #}
+  <div class="ins-strip">
+    <div class="ins-strip__cell">
+      <span class="ins-strip__num">{{ metrics.total_commits }}</span>
+      <span class="ins-strip__lbl">Commits</span>
+    </div>
+    <div class="ins-strip__cell">
+      <span class="ins-strip__num ins-strip__num--add">+{{ metrics.sym_added_total }}</span>
+      <span class="ins-strip__lbl">Symbols added</span>
+    </div>
+    <div class="ins-strip__cell">
+      <span class="ins-strip__num ins-strip__num--del">−{{ metrics.sym_removed_total }}</span>
+      <span class="ins-strip__lbl">Symbols removed</span>
+    </div>
+    <div class="ins-strip__cell">
+      <span class="ins-strip__num{% if metrics.breaking_count > 0 %} ins-strip__num--danger{% endif %}">{{ metrics.breaking_count }}</span>
+      <span class="ins-strip__lbl">Breaking changes</span>
+    </div>
+    <div class="ins-strip__cell">
+      <span class="ins-strip__num">{{ metrics.conventional_pct }}%</span>
+      <span class="ins-strip__lbl">Conventional</span>
+    </div>
     {% if metrics.agent_count > 0 %}
-    <span class="ins-stat-bar__sep"></span>
-    <span class="ins-stat-bar__item">
-      <span class="ins-stat-bar__value ins-stat-bar__value--agent">{{ metrics.agent_pct }}%</span>
-      <span class="ins-stat-bar__label">agent-authored</span>
-    </span>
+    <div class="ins-strip__cell">
+      <span class="ins-strip__num ins-strip__num--agent">{{ metrics.agent_pct }}%</span>
+      <span class="ins-strip__lbl">Agent-authored</span>
+    </div>
     {% endif %}
   </div>
 

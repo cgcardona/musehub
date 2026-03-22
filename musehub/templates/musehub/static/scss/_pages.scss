@@ -8551,34 +8551,31 @@ $pr-closed: #f85149;
   padding: var(--space-2) 0 var(--space-6);
 }
 
-// Compact inline stat bar
-.ins-stat-bar {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: 0;
-  margin-bottom: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-base);
-  font-size: 12px;
+// Domain-style stat strip — matches Domain and MCP page aesthetic
+.ins-strip {
+  display: flex; align-items: stretch;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: var(--space-4);
 }
-.ins-stat-bar__item {
-  display: flex; align-items: baseline; gap: 5px;
-  padding: 2px var(--space-2);
-  white-space: nowrap;
+.ins-strip__cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; gap: 4px;
+  padding: var(--space-3) var(--space-2);
+  border-right: 1px solid var(--border-default);
+  text-align: center;
+  &:last-child { border-right: none; }
 }
-.ins-stat-bar__value {
-  font-size: 14px; font-weight: 700; font-family: var(--font-mono);
+.ins-strip__num {
+  font-size: 22px; font-weight: 700; font-family: var(--font-mono);
   color: var(--text-primary); line-height: 1;
 }
-.ins-stat-bar__value--sym-add  { color: var(--color-added); }
-.ins-stat-bar__value--sym-del  { color: var(--color-removed); }
-.ins-stat-bar__value--breaking { color: var(--color-removed); }
-.ins-stat-bar__value--agent    { color: #bc8cff; }
-.ins-stat-bar__label { font-size: 11px; color: var(--text-muted); }
-.ins-stat-bar__sep {
-  width: 1px; height: 14px; background: var(--border-default);
-  flex-shrink: 0; margin: 0 2px;
+.ins-strip__num--add    { color: var(--color-success); }
+.ins-strip__num--del    { color: var(--color-danger); }
+.ins-strip__num--danger { color: var(--color-danger); }
+.ins-strip__num--agent  { color: #bc8cff; }
+.ins-strip__lbl {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 // Three-column intel row
