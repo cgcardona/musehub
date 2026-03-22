@@ -169,17 +169,16 @@ async def test_repo_home_shows_tempo_bpm(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Repo with tempo_bpm set → BPM value appears in the rendered HTML sidebar.
+    """Repo with tempo_bpm set → BPM value appears in the About sidebar pill.
 
-    The SSR migration must pass repo metadata to the template so music-specific
-    properties (key, tempo) are visible without a client-side API call.
+    The route passes repo_bpm to the template so music-specific metadata
+    (tempo) is visible in the About section without a client-side API call.
     """
     await _make_repo(db_session, tempo_bpm=132)
 
     resp = await client.get(f"/{_OWNER}/{_SLUG}")
     assert resp.status_code == 200
-    assert "132" in resp.text
-    assert "BPM" in resp.text
+    assert "132 BPM" in resp.text
 
 
 async def test_repo_home_empty_tree_shows_empty_state(

@@ -540,6 +540,38 @@ async def trending_page(
 # Repo-scoped pages
 # ---------------------------------------------------------------------------
 
+_README_NAMES = {"readme.md", "readme", "readme.txt", "readme.rst"}
+
+
+async def _fetch_readme(
+    db: AsyncSession,
+    repo_id: str,
+    ref: str,
+    entries: list[Any],
+) -> str:
+    """Return the raw text of the first README found in the tree root, or ''.
+
+    Objects are stored on disk (not as DB blobs) so we resolve the disk_path
+    from the ORM row and read via the storage backend.
+    """
+    readme_entry = next(
+        (e for e in entries if getattr(e, "name", "").lower() in _README_NAMES),
+        None,
+    )
+    if readme_entry is None:
+        return ""
+    object_id: str = getattr(readme_entry, "object_id", "") or ""
+    if not object_id:
+        return ""
+    try:
+        storage = _get_storage_backend()
+        raw: bytes | None = await storage.get(repo_id, object_id)
+        if not raw:
+            return ""
+        return raw.decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
 
 @router.get(
     "/{owner}/{repo_slug}",
@@ -565,9 +597,8 @@ async def repo_page(
     - Default → full SSR page via ``repo_home.html``.
 
     Clone URL variants passed to the template:
-    - ``clone_url_musehub``: native DAW protocol (``musehub://{owner}/{slug}``)
-    - ``clone_url_ssh``: SSH git remote (``ssh://git@musehub.app/{owner}/{slug}.git``)
-    - ``clone_url_https``: HTTPS git remote (``https://musehub.app/{owner}/{slug}.git``)
+    - ``clone_url_musehub``: native Muse protocol (``musehub://{owner}/{slug}``) → ``muse clone musehub://…``
+    - ``clone_url_https``: HTTPS wire URL (``https://musehub.ai/{owner}/{slug}``) → ``muse clone https://…``
     """
     repo, base_url = await _resolve_repo_full(owner, repo_slug, db)
     repo_id = repo.repo_id
@@ -673,7 +704,7 @@ async def repo_page(
         "repo_slug": repo_slug,
         "repo_id": repo_id,
         "base_url": base_url,
-        "current_page": "home",
+        "current_page": "code",
         "repo": repo,
         "repo_license": repo_license,
         "ref": ref,
@@ -689,10 +720,10 @@ async def repo_page(
             og_type="website",
         ),
         "clone_url_musehub": f"musehub://{owner}/{repo_slug}",
-        "clone_url_ssh": f"ssh://git@musehub.app/{owner}/{repo_slug}.git",
-        "clone_url_https": f"https://musehub.app/{owner}/{repo_slug}.git",
+        "clone_url_https": f"https://musehub.ai/{owner}/{repo_slug}",
         "domain": domain_ctx,
         "domain_meta_display": domain_meta_display,
+        "readme_content": await _fetch_readme(db, repo_id, ref, tree_response.entries),
     }
     ctx.update(nav_ctx)
     return await htmx_fragment_or_full(
