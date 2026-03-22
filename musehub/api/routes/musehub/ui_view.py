@@ -335,7 +335,16 @@ _CODE_EXTS = frozenset(_EXT_TO_LANG.keys()) - _DOC_EXTS - frozenset(["json", "ya
 
 
 async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, Any]:
-    """Compute code-domain insight metrics from stored objects + commits."""
+    """Compute code-domain insight metrics from stored objects + commits.
+
+    Returns both classic aggregate metrics (total_commits, languages, etc.) and
+    Muse-exclusive semantic intelligence only possible with symbol-level tracking:
+    - commit_timeline: per-commit SemVer bump, symbol velocity, and breaking flag
+    - sym_cumulative: running cumulative symbol growth for area-chart rendering
+    - symbol_kinds: aggregate symbol-kind distribution across all deltas
+    - file_churn: files ranked by appearance count in structured_delta ops
+    - type_bars, semver_counts, languages: structured for D3 consumption in JS
+    """
     objects_rows = (await db.execute(
         sa_select(musehub_db.MusehubObject.path, musehub_db.MusehubObject.size_bytes)
         .where(musehub_db.MusehubObject.repo_id == repo_id)
@@ -430,6 +439,14 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
     conventional_count = 0
     breaking_commits: list[dict[str, str]] = []
 
+    # Muse-exclusive per-commit timeseries (for D3 visualisations)
+    _raw_timeline: list[dict[str, Any]] = []
+    _file_churn_counts: dict[str, int] = defaultdict(int)
+    _file_churn_last_bump: dict[str, str] = {}
+    _sym_kinds: dict[str, int] = {
+        "function": 0, "class": 0, "method": 0, "variable": 0, "import": 0, "other": 0,
+    }
+
     for row in commits_rows:
         meta: dict[str, Any] = dict(row.commit_meta or {}) if row.commit_meta else {}
         msg = (row.message or "").strip()
@@ -466,15 +483,53 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
             bump = "none"
         semver_counts[bump] += 1
 
-        # Symbol velocity from structured_delta
+        # Per-commit symbol velocity + file churn (single pass over structured_delta)
         delta: dict[str, Any] = meta.get("structured_delta") or {}
+        tl_sym_added = 0
+        tl_sym_removed = 0
         for file_op in delta.get("ops", []):
+            fp = str(file_op.get("address", ""))
+            if fp:
+                _file_churn_counts[fp] += 1
+                if fp not in _file_churn_last_bump:
+                    _file_churn_last_bump[fp] = bump
+
             for child_op in (file_op.get("child_ops") or []):
                 op = child_op.get("op", "")
+                addr = str(child_op.get("address", ""))
+                summary = str(child_op.get("content_summary", "")).lower()
                 if op == "insert":
                     sym_added_total += 1
+                    tl_sym_added += 1
                 elif op == "delete":
                     sym_removed_total += 1
+                    tl_sym_removed += 1
+
+                # Symbol kind heuristic from content_summary
+                if "::" in addr:
+                    if "class" in summary:
+                        _sym_kinds["class"] += 1
+                    elif "method" in summary:
+                        _sym_kinds["method"] += 1
+                    elif "function" in summary or "def " in summary:
+                        _sym_kinds["function"] += 1
+                    elif "variable" in summary or "constant" in summary:
+                        _sym_kinds["variable"] += 1
+                    elif addr.split("::")[-1].lower().startswith("import"):
+                        _sym_kinds["import"] += 1
+                    else:
+                        _sym_kinds["other"] += 1
+
+        breaking_addrs: list[str] = list(meta.get("breaking_changes") or [])
+        _raw_timeline.append({
+            "date": row.timestamp.date().isoformat() if row.timestamp else "",
+            "sym_added": tl_sym_added,
+            "sym_removed": tl_sym_removed,
+            "bump": bump,
+            "is_breaking": is_breaking,
+            "breaking_addr_count": len(breaking_addrs),
+            "msg": msg[:60],
+        })
 
     total_c = len(commits_rows)
     conventional_pct = round(conventional_count / total_c * 100) if total_c else 0
@@ -501,6 +556,20 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
         1 for path, _ in objects_rows
         if Path(path).suffix.lstrip(".").lower() in _CODE_EXTS
     )
+
+    # Build commit timeline oldest-first with cumulative symbol growth
+    commit_timeline = list(reversed(_raw_timeline))
+    sym_cumulative: list[int] = []
+    running_sym = 0
+    for entry in commit_timeline:
+        running_sym += int(entry["sym_added"]) - int(entry["sym_removed"])
+        sym_cumulative.append(running_sym)
+
+    _churn_sorted = sorted(_file_churn_counts.items(), key=lambda kv: kv[1], reverse=True)[:15]
+    file_churn: list[dict[str, Any]] = [
+        {"path": p, "count": c, "last_bump": _file_churn_last_bump.get(p, "none")}
+        for p, c in _churn_sorted
+    ]
 
     return {
         "total_files": total_files,
@@ -531,6 +600,11 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
         "sym_removed_total": sym_removed_total,
         "sym_net": sym_net,
         "conventional_pct": conventional_pct,
+        # D3-ready timeseries (newest → oldest already reversed to oldest → newest)
+        "commit_timeline": commit_timeline,
+        "sym_cumulative": sym_cumulative,
+        "symbol_kinds": dict(_sym_kinds),
+        "file_churn": file_churn,
     }
 
 
@@ -566,8 +640,11 @@ async def insights_dashboard_page(
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
     metrics: dict[str, Any] = {}
+    slim_commits: list[dict[str, object]] = []
+    initial_delta: object = None
     if domain_ctx["viewer_type"] == "code":
         metrics = await _compute_code_insights(db, repo.repo_id)
+        slim_commits, initial_delta = await _get_symbol_graph_data(db, repo.repo_id)
 
     # Pre-compute all dimension data for the dashboard cards
     _DASHBOARD_DIMS = ["key", "tempo", "meter", "groove", "form", "dynamics", "emotion", "motifs", "contour"]
@@ -589,6 +666,8 @@ async def insights_dashboard_page(
         "domain": domain_ctx,
         "active_dimension": None,
         "metrics": metrics,
+        "slim_commits": slim_commits,
+        "initial_delta": initial_delta,
         "dim_map": dim_map,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
         **nav_ctx,
