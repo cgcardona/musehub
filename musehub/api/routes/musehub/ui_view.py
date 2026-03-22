@@ -108,6 +108,30 @@ async def redirect_analysis(owner: str, repo_slug: str, ref: str) -> RedirectRes
     )
 
 
+@redirect_router.get(
+    "/{owner}/{repo_slug}/view/{ref}/{path:path}",
+    include_in_schema=False,
+)
+async def redirect_view_file(owner: str, repo_slug: str, ref: str, path: str) -> RedirectResponse:
+    """Redirect old /view/{ref}/{path} URLs to /insights/{ref}."""
+    return RedirectResponse(
+        url=f"/{owner}/{repo_slug}/insights/{ref}",
+        status_code=301,
+    )
+
+
+@redirect_router.get(
+    "/{owner}/{repo_slug}/view/{ref}",
+    include_in_schema=False,
+)
+async def redirect_view(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
+    """Redirect old /view/{ref} URLs to /insights/{ref}."""
+    return RedirectResponse(
+        url=f"/{owner}/{repo_slug}/insights/{ref}",
+        status_code=301,
+    )
+
+
 # ── View route ────────────────────────────────────────────────────────────────
 
 
@@ -566,8 +590,12 @@ async def insights_dashboard_page(
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
     metrics: dict[str, Any] = {}
+    slim_commits: list[dict[str, object]] = []
+    initial_delta: object = None
+
     if domain_ctx["viewer_type"] == "code":
         metrics = await _compute_code_insights(db, repo.repo_id)
+        slim_commits, initial_delta = await _get_symbol_graph_data(db, repo.repo_id)
 
     # Pre-compute all dimension data for the dashboard cards
     _DASHBOARD_DIMS = ["key", "tempo", "meter", "groove", "form", "dynamics", "emotion", "motifs", "contour"]
@@ -590,6 +618,8 @@ async def insights_dashboard_page(
         "active_dimension": None,
         "metrics": metrics,
         "dim_map": dim_map,
+        "slim_commits": slim_commits,
+        "initial_delta": initial_delta,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
         **nav_ctx,
     }

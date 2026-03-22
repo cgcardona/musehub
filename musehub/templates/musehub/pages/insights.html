@@ -14,13 +14,18 @@
 
 {% block page_json %}
 {
+  "page": "view",
   "repoId": {{ repo.repo_id | tojson }},
   "owner": {{ owner | tojson }},
   "slug": {{ repo_slug | tojson }},
   "ref": {{ ref | tojson }},
   "activeDimension": {{ (active_dimension or "") | tojson }},
   "dimensions": {{ domain.dimensions | tojson }},
-  "viewerType": {{ domain.viewer_type | tojson }}
+  "viewerType": {{ domain.viewer_type | tojson }},
+  "domainScopedId": {{ (domain.scoped_id or "") | tojson }},
+  "domainDisplayName": {{ domain.display_name | tojson }},
+  "commits": {{ slim_commits | default([]) | tojson }},
+  "initialDelta": {{ initial_delta | default(none) | tojson }}
 }
 {% endblock %}
 
@@ -31,7 +36,7 @@
   <div class="ins-page-header">
     <div class="ins-page-header__left">
       <h1 class="ins-page-title">
-        {% if domain.viewer_type == 'symbol_graph' %}⬡{% elif domain.viewer_type == 'piano_roll' %}♪{% else %}◈{% endif %}
+        {% if domain.viewer_type == 'code' %}⬡{% elif domain.viewer_type == 'midi' %}♪{% else %}◈{% endif %}
         Insights
       </h1>
       {% if domain.scoped_id %}
@@ -40,15 +45,108 @@
       <span class="ins-ref-pill">{{ ref }}</span>
     </div>
     <div class="ins-page-header__actions">
-      <a href="/{{ owner }}/{{ repo_slug }}/view/{{ ref }}" class="btn btn-secondary btn-sm">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        Viewer
-      </a>
-      <a href="/{{ owner }}/{{ repo_slug }}/commits" class="btn btn-ghost btn-sm">History</a>
+      <a href="/{{ owner }}/{{ repo_slug }}/graph" class="btn btn-ghost btn-sm">Graph</a>
     </div>
   </div>
 
-  {% if domain.viewer_type == 'symbol_graph' and metrics %}
+  {% if domain.viewer_type == 'code' and metrics %}
+  {# ── Symbol graph visualization ───────────────────────────────────────── #}
+  <div class="sv-layout">
+
+    {# ── Left column: commit navigator + semantic changes ── #}
+    <div class="sv-left">
+
+      <div class="sv-panel sv-commit-nav" id="sv-commit-nav">
+        <div class="sv-panel-hd">
+          <span class="sv-panel-title">Commits</span>
+          <div class="sv-nav-btns">
+            <button class="sv-nav-btn" id="sv-prev" title="Previous commit" aria-label="Previous commit">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <polyline points="2,8 6,4 10,8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="sv-nav-btn" id="sv-next" title="Next commit" aria-label="Next commit">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <polyline points="2,4 6,8 10,4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <ul class="sv-commit-list" id="sv-commit-list" role="listbox" aria-label="Commit history">
+          <li class="sv-commit-placeholder">Loading commits…</li>
+        </ul>
+      </div>
+
+      <div class="sv-panel sv-analyze" id="sv-analyze">
+        <div class="sv-panel-hd">
+          <span class="sv-panel-title">Semantic Changes</span>
+          <span class="sv-sym-count" id="sv-sym-count"></span>
+        </div>
+        <div class="sv-analyze-body" id="sv-analyze-body">
+          <p class="sv-analyze-empty">Select a commit to inspect its semantic changes.</p>
+        </div>
+      </div>
+
+    </div>{# end sv-left #}
+
+    {# ── Right column: symbol graph + info panel ── #}
+    <div class="sv-right">
+
+      <div class="sv-graph-hd">
+        <div class="sv-stats" id="sv-stats"></div>
+        <div class="sv-controls-row">
+          <div class="sv-mode-btns" role="group" aria-label="Graph display mode">
+            <button class="sv-mode-btn sv-mode-active" id="sv-mode-graph" data-mode="default">Graph</button>
+            <button class="sv-mode-btn" id="sv-mode-dead" data-mode="dead">Dead Code</button>
+            <button class="sv-mode-btn" id="sv-mode-impact" data-mode="impact">Impact</button>
+          </div>
+          <div class="sv-search-row">
+            <input type="search" class="sv-search" id="sv-search"
+                   placeholder="Filter symbols…" autocomplete="off" aria-label="Filter symbols">
+            <select class="sv-kind-filter" id="sv-kind-filter" aria-label="Filter by kind">
+              <option value="">All kinds</option>
+              <option value="function">Functions</option>
+              <option value="class">Classes</option>
+              <option value="method">Methods</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="sv-graph-wrap" id="sv-graph-wrap">
+        <svg id="sv-sym-svg" class="sv-sym-svg"
+             aria-label="Symbol dependency graph"
+             role="img"></svg>
+        <div class="sv-empty" id="sv-empty" hidden>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p>No symbol data for this commit.</p>
+          <p class="sv-empty-sub">Commit only changed binary or non-code files.</p>
+        </div>
+      </div>
+
+      <div class="sv-info-panel" id="sv-info-panel" hidden>
+        <div class="sv-info-hd">
+          <span class="sv-info-name" id="sv-info-name"></span>
+          <span class="sv-info-kind-badge" id="sv-info-kind"></span>
+        </div>
+        <dl class="sv-info-dl" id="sv-info-dl"></dl>
+        <button class="sv-info-close" id="sv-info-close" aria-label="Close symbol info">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>{# end sv-right #}
+
+  </div>{# end sv-layout #}
+
+  <div class="ins-section-divider"><span>Semantic intelligence</span></div>
+
   {# ══════════════════════════════════════════════════════════════════════════
      MUSE-EXCLUSIVE SEMANTIC INTELLIGENCE — impossible with Git
   ══════════════════════════════════════════════════════════════════════════ #}
@@ -336,23 +434,28 @@
     </div>
   </div>
 
-  {% elif domain.viewer_type == 'piano_roll' %}
-  {# ══════════════════════════════════════════════════════════════════════════
-     MIDI DOMAIN INSIGHTS — placeholder until audio analysis is ready
-  ══════════════════════════════════════════════════════════════════════════ #}
-  <div class="ins-empty-domain">
-    <div class="ins-empty-icon">♪</div>
-    <h3>MIDI Insights</h3>
-    <p>Harmonic analysis, tempo mapping, and groove scores are computed when playback is processed. Open the piano roll to trigger analysis.</p>
-    <a href="/{{ owner }}/{{ repo_slug }}/view/{{ ref }}" class="btn btn-primary">Open Piano Roll</a>
+  {% elif domain.viewer_type == 'midi' %}
+  {# ── MIDI domain: piano roll viewer ──────────────────────────────────── #}
+  <div class="piano-roll-wrap" id="piano-roll-container">
+    <canvas id="piano-roll-canvas" class="piano-roll-canvas"
+            aria-label="Piano roll — MIDI state viewer"></canvas>
+    <div class="piano-roll-controls">
+      <button class="btn btn-ghost btn-sm" id="pr-zoom-in">＋</button>
+      <button class="btn btn-ghost btn-sm" id="pr-zoom-out">－</button>
+      <button class="btn btn-ghost btn-sm" id="pr-fit">Fit</button>
+    </div>
+  </div>
+  <div class="view-audio-strip" id="audio-strip">
+    <button class="btn btn-primary btn-sm" id="play-btn">Play</button>
+    <div class="waveform-container" id="waveform"></div>
   </div>
 
   {% else %}
-  {# No domain #}
+  {# No domain — generic fallback ─────────────────────────────────────── #}
   <div class="ins-empty-domain">
     <div class="ins-empty-icon">◈</div>
     <h3>No domain registered</h3>
-    <p>Assign a domain plugin to this repository to unlock insights, dimension analysis, and the specialised viewer.</p>
+    <p>Assign a domain plugin to this repository to unlock the visual viewer, dimension analysis, and semantic commit intelligence.</p>
     <a href="/domains" class="btn btn-primary">Browse domains</a>
   </div>
   {% endif %}
