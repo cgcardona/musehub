@@ -1659,3 +1659,67 @@ async def execute_musehub_publish_domain(
                 "musehub_list_domains or musehub_get_domain."
             ),
         })
+
+
+def execute_get_prompt(
+    name: str,
+    arguments: dict[str, str] | None = None,
+) -> MusehubToolResult:
+    """Return the fully assembled messages for a named MuseHub MCP prompt.
+
+    This is a tool-layer shim over ``prompts/get`` so that agents operating
+    through clients that only support the ``tools/call`` MCP primitive (e.g.
+    Cursor's agent API) can still access prompt content programmatically.
+    Clients that natively support ``prompts/get`` can call that method directly;
+    both paths produce identical output from the same underlying assembler.
+
+    Args:
+        name: Prompt name — one of the ten ``musehub/*`` prompts, e.g.
+            ``"musehub/orientation"``, ``"musehub/contribute"``.
+        arguments: Optional dict of argument name → value to interpolate into
+            the prompt body (e.g. ``{"caller_type": "agent"}`` for orientation,
+            ``{"repo_id": "..."}`` for contribute).
+
+    Returns:
+        ``MusehubToolResult`` with ``data.description`` (one-line summary) and
+        ``data.messages`` (list of ``{role, content: {type, text}}`` dicts
+        ready to inject into an agent's context window).
+        Returns ``error_code="not_found"`` for unknown prompt names.
+    """
+    from musehub.mcp.prompts import PROMPT_NAMES, get_prompt
+
+    if name not in PROMPT_NAMES:
+        available = sorted(PROMPT_NAMES)
+        return MusehubToolResult(
+            ok=False,
+            error_code="not_found",
+            error_message=(
+                f"Unknown prompt '{name}'. "
+                f"Available prompts: {', '.join(available)}"
+            ),
+        )
+
+    result = get_prompt(name, arguments)
+    if result is None:
+        return MusehubToolResult(
+            ok=False,
+            error_code="not_found",
+            error_message=f"Prompt '{name}' could not be assembled.",
+        )
+
+    messages: list[JSONValue] = [
+        {
+            "role": msg["role"],
+            "content": msg["content"]["text"],
+        }
+        for msg in result["messages"]
+    ]
+
+    return MusehubToolResult(
+        ok=True,
+        data={
+            "name": name,
+            "description": result["description"],
+            "messages": messages,
+        },
+    )
