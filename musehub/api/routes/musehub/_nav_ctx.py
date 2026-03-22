@@ -3,6 +3,7 @@
 Each UI page that includes ``repo_nav.html`` / ``repo_tabs.html`` requires:
   - repo_key, repo_bpm, repo_tags, repo_visibility  (displayed in the nav chips)
   - nav_open_pr_count, nav_open_issue_count          (tab count badges)
+  - nav_domain_viewer_type                           (controls conditional tabs)
 
 Centralising this lookup here avoids repeating it in every separate UI route
 file and keeps the nav_ctx contract in one place.
@@ -16,7 +17,19 @@ from sqlalchemy import func, select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from musehub.db import musehub_models as musehub_db
+from musehub.db import musehub_domain_models as domain_db
 from musehub.services import musehub_repository
+
+
+async def _resolve_domain_viewer_type(db: AsyncSession, domain_id: str | None) -> str:
+    """Return the viewer_type string for a domain_id, or '' if none registered."""
+    if not domain_id:
+        return ""
+    vtype = await db.scalar(
+        sa_select(domain_db.MusehubDomain.viewer_type)
+        .where(domain_db.MusehubDomain.domain_id == domain_id)
+    )
+    return vtype or ""
 
 
 async def build_repo_nav_ctx(
@@ -50,6 +63,10 @@ async def build_repo_nav_ctx(
         )
     ) or 0
 
+    domain_viewer_type = await _resolve_domain_viewer_type(
+        db, getattr(repo, "domain_id", None)
+    )
+
     return {
         "repo_key": getattr(repo, "key_signature", None) or "",
         "repo_bpm": getattr(repo, "tempo_bpm", None),
@@ -57,6 +74,7 @@ async def build_repo_nav_ctx(
         "repo_visibility": getattr(repo, "visibility", None) or "private",
         "nav_open_pr_count": pr_count,
         "nav_open_issue_count": issue_count,
+        "nav_domain_viewer_type": domain_viewer_type,
     }
 
 
@@ -76,6 +94,8 @@ async def resolve_repo_with_nav(
     - ``repo_visibility`` — "public" | "private" | "unlisted"
     - ``nav_open_pr_count`` — count of open pull requests
     - ``nav_open_issue_count`` — count of open issues
+    - ``nav_domain_viewer_type`` — domain viewer_type string ("midi", "code", "") used
+      by ``repo_tabs.html`` to show/hide domain-specific tabs
 
     Callers should merge nav_ctx into their template context with
     ``ctx.update(nav_ctx)`` before passing ``ctx`` to ``TemplateResponse`` or
@@ -107,6 +127,8 @@ async def resolve_repo_with_nav(
         )
     ) or 0
 
+    domain_viewer_type = await _resolve_domain_viewer_type(db, getattr(row, "domain_id", None))
+
     nav_ctx: dict[str, Any] = {
         "repo_key": row.key_signature or "",
         "repo_bpm": row.tempo_bpm,
@@ -114,5 +136,6 @@ async def resolve_repo_with_nav(
         "repo_visibility": row.visibility or "private",
         "nav_open_pr_count": pr_count,
         "nav_open_issue_count": issue_count,
+        "nav_domain_viewer_type": domain_viewer_type,
     }
     return repo_id, f"/{owner}/{repo_slug}", nav_ctx

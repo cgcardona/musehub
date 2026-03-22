@@ -108,6 +108,30 @@ async def redirect_analysis(owner: str, repo_slug: str, ref: str) -> RedirectRes
     )
 
 
+@redirect_router.get(
+    "/{owner}/{repo_slug}/view/{ref}/{path:path}",
+    include_in_schema=False,
+)
+async def redirect_view_file(owner: str, repo_slug: str, ref: str, path: str) -> RedirectResponse:
+    """Redirect old /view/{ref}/{path} URLs to /insights/{ref}."""
+    return RedirectResponse(
+        url=f"/{owner}/{repo_slug}/insights/{ref}",
+        status_code=301,
+    )
+
+
+@redirect_router.get(
+    "/{owner}/{repo_slug}/view/{ref}",
+    include_in_schema=False,
+)
+async def redirect_view(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
+    """Redirect old /view/{ref} URLs to /insights/{ref}."""
+    return RedirectResponse(
+        url=f"/{owner}/{repo_slug}/insights/{ref}",
+        status_code=301,
+    )
+
+
 # ── View route ────────────────────────────────────────────────────────────────
 
 
@@ -669,6 +693,8 @@ async def insights_dashboard_page(
         "slim_commits": slim_commits,
         "initial_delta": initial_delta,
         "dim_map": dim_map,
+        "slim_commits": slim_commits,
+        "initial_delta": initial_delta,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
         **nav_ctx,
     }
