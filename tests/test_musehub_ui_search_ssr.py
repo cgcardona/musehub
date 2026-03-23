@@ -10,7 +10,7 @@ Covers GET /search (global search):
 - test_global_search_short_query_shows_prompt
 - test_global_search_htmx_fragment_path
 - test_global_search_empty_query_shows_prompt
-
+"""
 
 from __future__ import annotations
 
@@ -182,7 +182,7 @@ async def test_global_search_htmx_fragment_path(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """HX-Request: true causes the handler to return only the fragment — no <html> shell."""
+    """HX-Request: true causes the handler to return only the fragment - no <html> shell."""
     repo_id = await _make_repo(db_session, owner="htmx_search_artist", slug="htmx-search-album")
     await _make_musehub_commit(
         db_session,

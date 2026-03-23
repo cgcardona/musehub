@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "scripts": {
     "build:js": "esbuild musehub/templates/musehub/static/js/app.ts --bundle --format=iife --minify --outfile=musehub/templates/musehub/static/app.js",
+    "build:embed-player": "esbuild musehub/templates/musehub/static/js/embed-player.ts --bundle --format=iife --minify --outfile=musehub/templates/musehub/static/embed-player.js",
     "build:css": "sass --style=compressed --no-source-map musehub/templates/musehub/static/scss/app.scss musehub/templates/musehub/static/app.css",
     "build:embed": "sass --style=compressed --no-source-map musehub/templates/musehub/static/scss/embed.scss musehub/templates/musehub/static/embed.css",
-    "build": "npm run build:js && npm run build:css && npm run build:embed && node -e \"require('fs').writeFileSync('musehub/templates/musehub/static/.cache-id', String(Date.now()))\"",
+    "build": "npm run build:js && npm run build:embed-player && npm run build:css && npm run build:embed && node -e \"require('fs').writeFileSync('musehub/templates/musehub/static/.cache-id', String(Date.now()))\"",
     "watch:js": "esbuild musehub/templates/musehub/static/js/app.ts --bundle --format=iife --outfile=musehub/templates/musehub/static/app.js --watch",
     "watch:css": "sass --watch musehub/templates/musehub/static/scss/app.scss musehub/templates/musehub/static/app.css",
     "type-check": "tsc --noEmit"

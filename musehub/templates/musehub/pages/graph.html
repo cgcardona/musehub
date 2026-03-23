@@ -6,7 +6,6 @@
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {% block page_json %}{"page": "graph", "repoId": {{ repo_id | tojson }}, "baseUrl": {{ base_url | tojson }}, "dagData": {{ dag_ssr | tojson }}}{% endblock %}
-{% block page_data %}{% endblock %}
 
 {% block content %}
 

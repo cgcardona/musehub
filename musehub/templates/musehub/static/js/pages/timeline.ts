@@ -12,7 +12,7 @@
  *   - Release markers (gold diamonds)
  *
  * Data flows:
- *   Server → window.__timelineCfg  { repoId, baseUrl, totalCommits }
+ *   Server → #page-data JSON  { page: "timeline", repoId, baseUrl, totalCommits }
  *   API    → apiFetch('/repos/{id}/timeline')  → tlData
  *   API    → sessions, mergedPRs, releases     → overlays
  */
@@ -753,9 +753,13 @@ async function loadOverlays(): Promise<void> {
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
-export function initTimeline(): void {
-  cfg = (window as unknown as { __timelineCfg: TimelineCfg }).__timelineCfg;
-  if (!cfg) return;
+export function initTimeline(data: Record<string, unknown> = {}): void {
+  cfg = {
+    repoId:       String(data['repoId'] ?? ''),
+    baseUrl:      String(data['baseUrl'] ?? ''),
+    totalCommits: Number(data['totalCommits'] ?? 0),
+  };
+  if (!cfg.repoId) return;
 
   initRepoNav(cfg.repoId);
   setupTooltip();
@@ -800,6 +804,5 @@ declare global {
     openAudioModal:  (commitId: string, sha: string) => void;
     toggleLayer:     (name: string, checked: boolean) => void;
     setZoom:         (z: string) => void;
-    __timelineCfg:   TimelineCfg;
   }
 }

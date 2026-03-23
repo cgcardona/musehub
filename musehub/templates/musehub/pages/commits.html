@@ -10,18 +10,8 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "commits"}{% endblock %}
 
-{% block page_data %}
-window.__commitsCfg = {
-  repoId:     {{ repo_id | tojson }},
-  base:       {{ base_url | tojson }},
-  page:       {{ page }},
-  perPage:    {{ per_page }},
-  totalPages: {{ total_pages }},
-  branch:     {{ (branch or '') | tojson }},
-};
-{% endblock %}
+{% block page_json %}{"page": "commits", "repoId": {{ repo_id | tojson }}, "base": {{ base_url | tojson }}, "page": {{ page }}, "perPage": {{ per_page }}, "totalPages": {{ total_pages }}, "branch": {{ (branch or "") | tojson }}}{% endblock %}
 
 {% block content %}
 <div style="margin-top:var(--space-4)">

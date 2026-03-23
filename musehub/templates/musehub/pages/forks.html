@@ -7,8 +7,8 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "forks"}{% endblock %}
-{% block page_data %}window.__forksCfg = { repoId: {{ repo_id | tojson }}, owner: {{ owner | tojson }}, repoSlug: {{ repo_slug | tojson }}, base: {{ base_url | tojson }}, forkNetwork: {{ fork_network_json | tojson }} };{% endblock %}
+
+{% block page_json %}{"page": "forks", "repoId": {{ repo_id | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "base": {{ base_url | tojson }}, "forkNetwork": {{ fork_network_json | tojson }}}{% endblock %}
 
 {% block content %}
 <div style="margin-bottom:12px"><a href="{{ base_url }}">&larr; Back to repo</a></div>

@@ -518,40 +518,6 @@ async def test_global_search_audio_preview_absent_when_no_audio_objects(
 
 
 # ---------------------------------------------------------------------------
-# In-repo search — UI page
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.anyio
-async def test_search_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{repo_id}/search returns 200 HTML with mode dropdown."""
-    repo_id = await _make_search_repo(db_session)
-    response = await client.get("/testuser/search-test-repo/search")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-    assert "sr-hero" in body
-    assert 'name="q"' in body
-    assert 'name="mode"' in body
-    assert "keyword" in body
-
-
-@pytest.mark.anyio
-async def test_search_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Search UI page is accessible without a JWT (HTML shell, JS handles auth)."""
-    repo_id = await _make_search_repo(db_session)
-    response = await client.get("/testuser/search-test-repo/search")
-    assert response.status_code == 200
-
-
-# ---------------------------------------------------------------------------
 # In-repo search — authentication
 # ---------------------------------------------------------------------------
 

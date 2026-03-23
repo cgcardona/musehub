@@ -1,7 +1,7 @@
 /**
  * score.ts — Musical score / notation viewer page module.
  *
- * Config is read from window.__scoreCfg (set by the page_data block).
+ * Config is read from the #page-data JSON element.
  * Registered as: window.MusePages['score']
  */
 
@@ -41,9 +41,6 @@ interface NotationData {
   tracks?: ScoreTrack[];
 }
 
-declare global {
-  interface Window { __scoreCfg?: ScoreCfg; }
-}
 
 // Globals injected from musehub.ts bundle
 declare const escHtml: (s: unknown) => string;
@@ -336,8 +333,15 @@ async function load(cfg: ScoreCfg): Promise<void> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initScore(): void {
-  const cfg = window.__scoreCfg;
-  if (!cfg) return;
+export function initScore(data: Record<string, unknown> = {}): void {
+  const cfg: ScoreCfg = {
+    repoId:    String(data['repoId']    ?? ''),
+    ref:       String(data['ref']       ?? ''),
+    owner:     String(data['owner']     ?? ''),
+    repoSlug:  String(data['repoSlug']  ?? ''),
+    base:      String(data['base']      ?? ''),
+    scorePath: data['scorePath'] != null ? String(data['scorePath']) : null,
+  };
+  if (!cfg.repoId) return;
   void load(cfg);
 }

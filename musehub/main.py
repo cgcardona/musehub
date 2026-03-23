@@ -64,11 +64,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        # Per-request nonces are incompatible with HTMX: the browser locks the
-        # first response's CSP nonce and blocks all subsequent HTMX-swapped
-        # scripts (which carry a fresh nonce). 'unsafe-inline' is safe here
-        # because Jinja2 autoescaping prevents XSS from template injection and
-        # all transmission is over HTTPS.
+        # No per-request nonces: HTMX swaps the <body>, making per-request
+        # nonces incompatible (the browser would block scripts whose nonce no
+        # longer matches the current navigation). All inline scripts have been
+        # removed; external scripts are served from 'self'. 'unsafe-eval' is
+        # still required by Alpine.js v3's expression evaluator.
         request.state.csp_nonce = ""
 
         response = await call_next(request)
@@ -83,11 +83,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "gyroscope=(), magnetometer=(), microphone=(), "
             "payment=(), usb=()"
         )
-        # 'unsafe-eval' required by Alpine.js v3; 'unsafe-inline' required by
-        # HTMX (per-request nonces cause CSP violations on HTMX navigation).
+        # 'unsafe-eval' is required by Alpine.js v3 (it uses new Function()
+        # for expression evaluation). 'unsafe-inline' has been removed from
+        # script-src: all JS is in external files served from 'self'.
+        # style-src keeps 'unsafe-inline' while server-rendered dynamic inline
+        # styles (avatar colours, label colours, etc.) are still present.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-eval' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-eval'; "
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
             "font-src 'self' https://fonts.bunny.net; "
             "img-src 'self' data: https:; "

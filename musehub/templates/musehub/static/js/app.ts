@@ -50,6 +50,20 @@ import { initTree }          from './pages/tree.ts';
 import { initContext }       from './pages/context.ts';
 import { initMcpDocs }      from './pages/mcp-docs.ts';
 import { initDomains }      from './pages/domains.ts';
+import { initTempo }        from './pages/tempo.ts';
+import { initEmotion }      from './pages/emotion.ts';
+import { initChordMap }     from './pages/chord-map.ts';
+import { initFormAnalysis } from './pages/form-analysis.ts';
+import { initMeter }        from './pages/meter.ts';
+import { initGroove }       from './pages/groove.ts';
+import { initDynamics }     from './pages/dynamics.ts';
+import { initKey }          from './pages/key.ts';
+import { initContour }      from './pages/contour.ts';
+import { initMotifs }       from './pages/motifs.ts';
+import { initDivergence }   from './pages/divergence.ts';
+import { initFormStructure } from './pages/form-structure.ts';
+import { initGrooveCheck }  from './pages/groove-check.ts';
+import { initTopics }       from './pages/topics.ts';
 
 // Register page modules — keyed by the "page" field in the #page-data JSON.
 type PageData = Record<string, unknown>;
@@ -63,35 +77,49 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'commit-detail': () => initCommitDetail(),
   'commit':        (d) => initCommit(d),
   'user-profile':  (d) => void initUserProfile(d),
-  'timeline':      () => initTimeline(),
-  'analysis':      () => initAnalysis(),
+  'timeline':      (d) => initTimeline(d),
+  'analysis':      (d) => initAnalysis(d),
   'insights':      (d) => initInsights(d),
   'global-search': () => {},
-  'arrange':       () => initArrange(),
+  'arrange':       (d) => initArrange(d),
   'activity':      () => initActivity(),
-  'pr-detail':     () => initPRDetail(),
-  'commits':       () => initCommits(),
-  'issue-detail':    () => initIssueDetail(),
-  'release-detail':  () => initReleaseDetail(),
+  'pr-detail':     (d) => initPRDetail(d),
+  'commits':       (d) => initCommits(d),
+  'issue-detail':    (d) => initIssueDetail(d),
+  'release-detail':  (d) => initReleaseDetail(d),
   'graph':           (d) => initGraph(d),
   'domain-detail':   (d) => initDomainDetail(d),
   'diff':            () => initDiff(),
-  'settings':        () => initSettings(),
+  'settings':        (d) => initSettings(d),
   'explore':         () => initExplore(),
   'branches':        () => initBranches(),
   'tags':            () => initTags(),
   'sessions':        () => initSessions(),
   'release-list':    () => initReleaseList(),
-  'blob':            () => initBlob(),
-  'score':           () => initScore(),
-  'forks':           () => initForks(),
+  'blob':            (d) => initBlob(d),
+  'score':           (d) => initScore(d),
+  'forks':           (d) => initForks(d),
   'notifications':   () => initNotifications(),
   'feed':            () => initFeed(),
-  'compare':         () => initCompare(),
+  'compare':         (d) => initCompare(d),
   'tree':            (d) => initTree(d),
   'context':         (d) => initContext(d),
   'mcp-docs':        () => initMcpDocs(),
   'domains':         () => initDomains(),
+  'tempo':           (d) => initTempo(d),
+  'emotion':         (d) => initEmotion(d),
+  'chord-map':       (d) => initChordMap(d),
+  'form-analysis':   (d) => initFormAnalysis(d),
+  'meter':           (d) => initMeter(d),
+  'groove':          (d) => initGroove(d),
+  'dynamics':        (d) => initDynamics(d),
+  'key':             (d) => initKey(d),
+  'contour':         (d) => initContour(d),
+  'motifs':          (d) => initMotifs(d),
+  'divergence':      (d) => initDivergence(d),
+  'form-structure':  (d) => initFormStructure(d),
+  'groove-check':    (d) => initGrooveCheck(d),
+  'topics':          (d) => initTopics(d),
 };
 
 // Attach to window so musehub.ts dispatchPageModule() can reach it.

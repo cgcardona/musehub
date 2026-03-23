@@ -385,5 +385,5 @@ async def test_blob_page_unknown_path_no_ssr(
     # No SSR blob content block when object is absent — the id="blob-ssr-content" div
     # must NOT appear (note: the string 'blob-ssr-content' may appear in JS code).
     assert 'id="blob-ssr-content"' not in response.text
-    # JS guard variable must be set to false so the JS fallback runs
-    assert "ssrBlobRendered: false" in response.text
+    # page_json must signal ssrBlobRendered: false so the JS fallback runs
+    assert '"ssrBlobRendered": false' in response.text

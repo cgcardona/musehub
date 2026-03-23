@@ -6,7 +6,7 @@
  *  2. Render radar SVG, piano roll, emotion diff bars, dimension panels.
  *  3. Handle audio A/B toggle and expandable dimension panels.
  *
- * Config is read from window.__compareCfg (set by the page_data block).
+ * Config is read from the #page-data JSON element.
  * Registered as: window.MusePages['compare']
  */
 
@@ -21,10 +21,9 @@ interface CompareCfg {
 
 declare global {
   interface Window {
-    __compareCfg?: CompareCfg;
-    escHtml:       (s: unknown) => string;
-    apiFetch:      (path: string, init?: RequestInit) => Promise<unknown>;
-    initRepoNav?:  (repoId: string) => void;
+    escHtml:      (s: unknown) => string;
+    apiFetch:     (path: string, init?: RequestInit) => Promise<unknown>;
+    initRepoNav?: (repoId: string) => void;
   }
 }
 
@@ -436,8 +435,13 @@ function bindActions(): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initCompare(): void {
-  _cfg = window.__compareCfg ?? { repoId: '', baseRef: '', headRef: '', uiBase: '' };
+export function initCompare(data: Record<string, unknown> = {}): void {
+  _cfg = {
+    repoId:  String(data['repoId']  ?? ''),
+    baseRef: String(data['baseRef'] ?? ''),
+    headRef: String(data['headRef'] ?? ''),
+    uiBase:  String(data['uiBase']  ?? ''),
+  };
   if (!_cfg.repoId) return;
   bindActions();
   void load();

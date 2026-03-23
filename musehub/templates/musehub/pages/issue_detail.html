@@ -16,16 +16,6 @@
 
 {% block page_json %}{"page": "issue-detail"}{% endblock %}
 
-{% block page_data %}
-window.__issueCfg = {
-  repoId:  {{ repo_id | tojson }},
-  issueId: {{ issue.issue_id | tojson }},
-  number:  {{ issue.number }},
-  base:    {{ base_url | tojson }},
-  state:   {{ issue.state | tojson }},
-};
-{% endblock %}
-
 {% block content %}
 <div class="content-wide" style="padding-top: var(--space-4)">
 

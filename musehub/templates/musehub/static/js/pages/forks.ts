@@ -1,7 +1,7 @@
 /**
  * forks.ts — Fork network SVG DAG renderer page module.
  *
- * Config is read from window.__forksCfg (set by the page_data block).
+ * Config is read from the #page-data JSON element.
  * Registered as: window.MusePages['forks']
  */
 
@@ -27,9 +27,6 @@ interface ForkNetwork {
   root?: ForkNode;
 }
 
-declare global {
-  interface Window { __forksCfg?: ForksCfg; }
-}
 
 // Globals injected from musehub.ts bundle
 declare const escHtml: (s: unknown) => string;
@@ -212,12 +209,18 @@ function renderDAG(cfg: ForksCfg, rootNode: ForkNode, forks: ForkNode[]): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initForks(): void {
-  const cfg = window.__forksCfg;
-  if (!cfg) return;
+export function initForks(data: Record<string, unknown> = {}): void {
+  const cfg: ForksCfg = {
+    repoId:      String(data['repoId']      ?? ''),
+    owner:       String(data['owner']       ?? ''),
+    repoSlug:    String(data['repoSlug']    ?? ''),
+    base:        String(data['base']        ?? ''),
+    forkNetwork: (data['forkNetwork'] ?? {}) as ForkNetwork,
+  };
+  if (!cfg.repoId) return;
   initRepoNav(cfg.repoId);
-  const data  = cfg.forkNetwork ?? {};
-  const root  = data.root ?? ({} as ForkNode);
-  const forks = root.children ?? [];
+  const network = cfg.forkNetwork;
+  const root    = network.root ?? ({} as ForkNode);
+  const forks   = root.children ?? [];
   renderDAG(cfg, root, forks);
 }

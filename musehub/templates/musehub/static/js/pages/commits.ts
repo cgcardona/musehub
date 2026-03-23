@@ -8,18 +8,16 @@
  *     Uses event delegation so it survives HTMX fragment swaps.
  */
 
-declare global {
-  interface Window {
-    __commitsCfg?: {
-      repoId: string;
-      base: string;
-      page: number;
-      perPage: number;
-      totalPages: number;
-      branch: string;
-    };
-  }
+interface CommitsCfg {
+  repoId:     string;
+  base:       string;
+  page:       number;
+  perPage:    number;
+  totalPages: number;
+  branch:     string;
 }
+
+let _commitsCfg: CommitsCfg | undefined;
 
 // ── URL helpers ───────────────────────────────────────────────────────────
 
@@ -54,7 +52,7 @@ function updateCompareStrip(): void {
   const strip       = document.getElementById("compare-strip");
   const countEl     = document.getElementById("compare-count");
   const link        = document.getElementById("compare-link") as HTMLAnchorElement | null;
-  const cfg         = window.__commitsCfg;
+  const cfg = _commitsCfg;
   if (!strip) return;
 
   const n = selected.size;
@@ -133,7 +131,15 @@ function bindHtmxSwap(): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────
 
-export function initCommits(): void {
+export function initCommits(data: Record<string, unknown> = {}): void {
+  _commitsCfg = {
+    repoId:     String(data['repoId']     ?? ''),
+    base:       String(data['base']       ?? ''),
+    page:       Number(data['page']       ?? 1),
+    perPage:    Number(data['perPage']    ?? 30),
+    totalPages: Number(data['totalPages'] ?? 1),
+    branch:     String(data['branch']     ?? ''),
+  };
   bindBranchSelector();
   bindCompareMode();
   bindHtmxSwap();

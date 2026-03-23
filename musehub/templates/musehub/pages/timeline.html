@@ -7,16 +7,7 @@
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {# page_json: read by musehub.ts dispatchPageModule → calls MusePages['timeline'] #}
-{% block page_json %}{"page": "timeline"}{% endblock %}
-
-{# Pass server config to the TypeScript module via window.__timelineCfg #}
-{% block page_data %}
-window.__timelineCfg = {
-  repoId:       {{ repo_id | tojson }},
-  baseUrl:      {{ base_url | tojson }},
-  totalCommits: {{ total_commits | tojson }},
-};
-{% endblock %}
+{% block page_json %}{"page": "timeline", "repoId": {{ repo_id | tojson }}, "baseUrl": {{ base_url | tojson }}, "totalCommits": {{ total_commits }}}{% endblock %}
 
 {% block content %}
 <div class="content-wide">

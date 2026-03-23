@@ -7,18 +7,6 @@
  *  3. Merge strategy selector — updates the HTMX button's hx-vals payload.
  */
 
-declare global {
-  interface Window {
-    __prCfg?: {
-      repoId: string;
-      prId: string;
-      base: string;
-      state: string;
-      diff: { overallScore: number; dimensions: Array<{ dimension: string; score: number; level: string }> };
-    };
-  }
-}
-
 // ── Dimension bar animations ──────────────────────────────────────────────
 
 function attachDimAnimations(): void {
@@ -97,7 +85,7 @@ function bindMergeStrategy(): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────
 
-export function initPRDetail(): void {
+export function initPRDetail(_data?: Record<string, unknown>): void {
   attachDimAnimations();
   bindShaCopy();
   bindMergeStrategy();

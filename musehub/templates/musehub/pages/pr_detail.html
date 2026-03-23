@@ -19,20 +19,8 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "pr-detail"}{% endblock %}
 
-{% block page_data %}
-window.__prCfg = {
-  repoId:  {{ repo_id | tojson }},
-  prId:    {{ pr_id | tojson }},
-  base:    {{ base_url | tojson }},
-  state:   {{ pr.state | tojson }},
-  diff: {
-    overallScore: {{ (diff.overall_score * 100) | round(1) }},
-    dimensions: {{ diff.dimensions | tojson }},
-  },
-};
-{% endblock %}
+{% block page_json %}{"page": "pr-detail"}{% endblock %}
 
 {% block content %}
 <div class="content-wide" style="padding-top: var(--space-4)">

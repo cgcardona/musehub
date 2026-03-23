@@ -7,5 +7,4 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "analysis"}{% endblock %}
-{% block page_data %}window.__analysisCfg = { repoId: {{ repo_id | tojson }}, baseUrl: {{ base_url | tojson }}, defaultBranch: {{ ref | tojson }} };{% endblock %}
+{% block page_json %}{"page": "analysis", "repoId": {{ repo_id | tojson }}, "baseUrl": {{ base_url | tojson }}, "defaultBranch": {{ ref | tojson }}}{% endblock %}
