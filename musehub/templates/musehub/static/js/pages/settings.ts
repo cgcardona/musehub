@@ -2,7 +2,7 @@
  * settings.ts — Repository settings page.
  *
  * Handles topic tag input, collaborator invite, and delete confirmation guard.
- * Config is read from window.__settingsCfg (set by the page_data block).
+ * Config is read from the #page-data JSON element.
  * Registered as: window.MusePages['settings']
  */
 
@@ -18,7 +18,6 @@ interface SettingsCfg {
 
 declare global {
   interface Window {
-    __settingsCfg?: SettingsCfg;
     getToken?: () => string | null;
     htmx?: { trigger(el: Element | string, event: string): void };
   }
@@ -138,9 +137,15 @@ function setupEventDelegation(cfg: SettingsCfg): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initSettings(): void {
-  const cfg = window.__settingsCfg;
-  if (!cfg) return;
+export function initSettings(data: Record<string, unknown> = {}): void {
+  const cfg: SettingsCfg = {
+    repoId:   String(data['repoId']   ?? ''),
+    owner:    String(data['owner']    ?? ''),
+    repoSlug: String(data['repoSlug'] ?? ''),
+    base:     String(data['base']     ?? ''),
+    fullName: String(data['fullName'] ?? ''),
+  };
+  if (!cfg.repoId) return;
   setupTopicInput();
   setupEventDelegation(cfg);
   setupDeleteGuard(cfg.fullName);

@@ -13,10 +13,6 @@
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
 {# Minimal JS context — only what initRepoNav and HTMX push-URL need. #}
-{% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const base   = {{ base_url | tojson }};
-{% endblock %}
 
 {% block content %}
 {# ── Page header ──────────────────────────────────────────────────────────── #}

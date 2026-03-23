@@ -11,15 +11,6 @@
 
 {% block page_json %}{"page": "arrange"}{% endblock %}
 
-{% block page_data %}
-window.__arrangeCfg = {
-  base:    {{ base_url | tojson }},
-  ref:     {{ ref | tojson }},
-  owner:   {{ owner | tojson }},
-  repoSlug:{{ repo_slug | tojson }},
-};
-{% endblock %}
-
 {%- set inst_icons = {
   "bass":    "🎸",
   "keys":    "🎹",

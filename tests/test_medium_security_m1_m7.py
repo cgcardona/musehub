@@ -2,7 +2,7 @@
 
 M1 – Exception messages no longer leak internals to MCP clients
 M2 – DB pool_size/max_overflow configured for Postgres (smoke test)
-M3 – CSP: 'unsafe-inline' removed from script-src; per-request nonce injected
+M3 – CSP: 'unsafe-inline' absent from script-src; all JS is in external files
 M4 – ACCESS_TOKEN_SECRET enforces minimum 32-byte entropy in production mode
 M5 – logging/setLevel requires authentication
 M6 – WireSnapshot.manifest capped at 10 000 entries
@@ -65,40 +65,37 @@ async def test_m1_tool_error_message_is_generic() -> None:
         assert "NoneType" not in msg
 
 
-# ── M3: CSP nonce — unsafe-inline removed from script-src ────────────────────
+# ── M3: CSP — unsafe-inline absent from script-src ───────────────────────────
 
 
 def test_m3_csp_header_removes_unsafe_inline_from_script_src() -> None:
-    """The CSP header must not contain 'unsafe-inline' in the script-src directive."""
+    """The CSP produced by SecurityHeadersMiddleware must not allow inline scripts.
+
+    All JS is served from external files under 'self'; no nonces are required.
+    Alpine.js v3 still needs 'unsafe-eval' for its expression evaluator.
+    """
     import re
-
-    # Parse the CSP string produced by SecurityHeadersMiddleware.
-    from musehub.main import SecurityHeadersMiddleware
-
-    # Build a fake middleware instance and a fake nonce.
-    mw = SecurityHeadersMiddleware(app=None)  # type: ignore[arg-type]
-    nonce = "test-nonce-abc123"
 
     csp = (
         "default-src 'self'; "
-        f"script-src 'self' 'unsafe-eval' 'nonce-{nonce}'; "
+        "script-src 'self' 'unsafe-eval'; "
         "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
         "font-src 'self' https://fonts.bunny.net; "
         "img-src 'self' data: https:; "
         "connect-src 'self'; "
         "frame-ancestors 'none'"
     )
-    # Verify script-src does NOT contain unsafe-inline.
     script_src_match = re.search(r"script-src([^;]+)", csp)
     assert script_src_match is not None
     script_src = script_src_match.group(1)
     assert "'unsafe-inline'" not in script_src
-    assert f"'nonce-{nonce}'" in script_src
+    assert "'unsafe-eval'" in script_src
 
 
 @pytest.mark.asyncio
-async def test_m3_csp_nonce_in_response_header() -> None:
-    """Integration: each HTTP response carries a unique CSP nonce in its header."""
+async def test_m3_csp_no_unsafe_inline_in_response_header() -> None:
+    """Integration: every HTTP response must have 'unsafe-inline' absent from script-src."""
+    import re
     from httpx import AsyncClient, ASGITransport
     from musehub.main import app
 
@@ -106,25 +103,14 @@ async def test_m3_csp_nonce_in_response_header() -> None:
         r1 = await client.get("/mcp/docs")
         r2 = await client.get("/mcp/docs")
 
-    # Both responses must have a CSP header without unsafe-inline in script-src.
     for resp in (r1, r2):
         csp = resp.headers.get("content-security-policy", "")
-        assert "nonce-" in csp, "CSP must contain a nonce"
-        import re
+        assert csp, "Response must include a Content-Security-Policy header"
         m = re.search(r"script-src([^;]+)", csp)
-        assert m is not None
-        assert "'unsafe-inline'" not in m.group(1)
-
-    # Each request gets a different nonce.
-    import re as _re
-    def _extract_nonce(h: str) -> str:
-        m = _re.search(r"nonce-([A-Za-z0-9_-]+)", h)
-        return m.group(1) if m else ""
-
-    n1 = _extract_nonce(r1.headers.get("content-security-policy", ""))
-    n2 = _extract_nonce(r2.headers.get("content-security-policy", ""))
-    assert n1 and n2, "Both responses must have a nonce"
-    assert n1 != n2, "Each request must receive a fresh nonce"
+        assert m is not None, "CSP must contain a script-src directive"
+        assert "'unsafe-inline'" not in m.group(1), (
+            "script-src must not allow inline scripts"
+        )
 
 
 # ── M4: ACCESS_TOKEN_SECRET entropy check ────────────────────────────────────

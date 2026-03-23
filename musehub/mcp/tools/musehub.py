@@ -583,7 +583,59 @@ MUSEHUB_READ_TOOLS: list[MCPToolDef] = [
                     "description": "Optional branch or tag to target (used in the clone command).",
                 },
             },
-            "required": ["owner", "slug"],
+                "required": ["owner", "slug"],
+        },
+    },
+    {
+        "name": "musehub_get_prompt",
+        "server_side": True,
+        "description": (
+            "Return the fully assembled content of a named MuseHub MCP prompt. "
+            "This is a tool-layer shim over the MCP prompts/get primitive, enabling "
+            "agents whose client only supports tools/call to access prompt content "
+            "programmatically — identical output to prompts/get, callable as a tool. "
+            "Use musehub_list_prompts() (prompts/list) to discover available prompt names. "
+            "The ten available prompts are: musehub/orientation, musehub/contribute, "
+            "musehub/create, musehub/review_pr, musehub/issue_triage, musehub/release_prep, "
+            "musehub/onboard, musehub/release_to_world, musehub/domain-discovery, "
+            "musehub/domain-authoring. "
+            "Pass caller_type='agent' to musehub/orientation for agent-specific guidance. "
+            "Example: musehub_get_prompt(name='musehub/orientation', "
+            "arguments={'caller_type': 'agent'})."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": (
+                        "Prompt name to fetch, e.g. 'musehub/orientation' or "
+                        "'musehub/contribute'. Must be one of the ten musehub/* prompts."
+                    ),
+                    "enum": [
+                        "musehub/orientation",
+                        "musehub/contribute",
+                        "musehub/create",
+                        "musehub/review_pr",
+                        "musehub/issue_triage",
+                        "musehub/release_prep",
+                        "musehub/onboard",
+                        "musehub/release_to_world",
+                        "musehub/domain-discovery",
+                        "musehub/domain-authoring",
+                    ],
+                },
+                "arguments": {
+                    "type": "object",
+                    "description": (
+                        "Optional prompt arguments as string key-value pairs. "
+                        "E.g. {'caller_type': 'agent'} for musehub/orientation, "
+                        "{'repo_id': '<uuid>'} for musehub/contribute, "
+                        "{'use_case': 'genomics'} for musehub/domain-discovery."
+                    ),
+                },
+            },
+            "required": ["name"],
         },
     },
 ]

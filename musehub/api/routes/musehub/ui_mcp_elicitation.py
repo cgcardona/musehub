@@ -125,7 +125,6 @@ async def platform_connect_start(
     # In production, the OAuth flow would redirect to this callback URL.
     # For now, show a confirmation page that completes the elicitation.
     context = {
-        "request": request,
         "platform": platform,
         "platform_slug": platform_slug,
         "elicitation_id": elicitation_id,
@@ -133,7 +132,7 @@ async def platform_connect_start(
         "callback_url": callback_url,
         "user_id": user_id,
     }
-    return templates.TemplateResponse("mcp/elicitation_connect.html", context)
+    return templates.TemplateResponse(request, "mcp/elicitation_connect.html", context)
 
 
 # ── Cloud DAW OAuth start page ────────────────────────────────────────────────
@@ -173,7 +172,6 @@ async def daw_connect_start(
     )) + "?status=accepted"
 
     context = {
-        "request": request,
         "service": service,
         "service_slug": service_slug,
         "elicitation_id": elicitation_id,
@@ -182,7 +180,7 @@ async def daw_connect_start(
         "user_id": user_id,
         "is_daw": True,
     }
-    return templates.TemplateResponse("mcp/elicitation_connect.html", context)
+    return templates.TemplateResponse(request, "mcp/elicitation_connect.html", context)
 
 
 # ── OAuth callback / elicitation completion ───────────────────────────────────
@@ -216,13 +214,12 @@ async def elicitation_callback(
     _signal_elicitation_complete(elicitation_id, action=action)
 
     context = {
-        "request": request,
         "elicitation_id": elicitation_id,
         "status": status,
         "action": action,
         "code_present": bool(code),
     }
-    return templates.TemplateResponse("mcp/elicitation_callback.html", context)
+    return templates.TemplateResponse(request, "mcp/elicitation_callback.html", context)
 
 
 # ── Signal helper ─────────────────────────────────────────────────────────────

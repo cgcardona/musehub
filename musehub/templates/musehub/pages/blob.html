@@ -14,8 +14,8 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "blob", "repoId": {{ repo_id | tojson }}, "ref": {{ ref | tojson }}, "filePath": {{ file_path | tojson }}, "objectId": {{ object_id | tojson }}}{% endblock %}
-{% block page_data %}window.__blobCfg = { repoId: {{ repo_id | tojson }}, ref: {{ ref | tojson }}, filePath: {{ file_path | tojson }}, filename: {{ filename | tojson }}, owner: {{ owner | tojson }}, repoSlug: {{ repo_slug | tojson }}, base: {{ base_url | tojson }}, ssrBlobRendered: {{ 'true' if blob_found else 'false' }} };{% endblock %}
+{# page_json: read by musehub.ts dispatchPageModule → calls MusePages['blob'] #}
+{% block page_json %}{"page": "blob", "repoId": {{ repo_id | tojson }}, "ref": {{ ref | tojson }}, "filePath": {{ file_path | tojson }}, "filename": {{ filename | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "base": {{ base_url | tojson }}, "ssrBlobRendered": {{ blob_found | lower }}}{% endblock %}
 
 {# ── File extension → language colour dot ─────────────────────────────────── #}
 {% macro lang_dot(lang) %}

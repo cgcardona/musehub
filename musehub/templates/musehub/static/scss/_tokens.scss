@@ -16,6 +16,12 @@
  * in _domain.scss.
  */
 
+/* Scale the entire UI to 125% — zoom applies to all units including px,
+   matching what the browser's Cmd++ zoom does at 125%. */
+body {
+  zoom: 1.25;
+}
+
 :root {
   /* -------------------------------------------------------------------------
    * Surface / background hierarchy (darkest → lightest)

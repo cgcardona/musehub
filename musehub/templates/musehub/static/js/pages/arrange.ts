@@ -16,11 +16,6 @@ interface ArrangeCfg {
   repoSlug: string;
 }
 
-declare global {
-  interface Window {
-    __arrangeCfg?: ArrangeCfg;
-  }
-}
 
 // ── Tooltip ──────────────────────────────────────────────────────────────────
 
@@ -150,7 +145,7 @@ function animateCellBars(): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initArrange(): void {
+export function initArrange(_data?: Record<string, unknown>): void {
   setupTooltip();
   setupRowHighlight();
   setupColHighlight();

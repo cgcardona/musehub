@@ -24,11 +24,7 @@ Endpoint summary (repo-scoped):
   GET /{owner}/{repo_slug}/pulls/{pr_id}             -- PR detail with musical diff (radar, piano roll, audio A/B)
   GET /{owner}/{repo_slug}/issues                    -- issue list
   GET /{owner}/{repo_slug}/issues/{number}           -- issue detail + close button
-  GET /{owner}/{repo_slug}/context/{ref}             -- AI context viewer
   GET /{owner}/{repo_slug}/credits                   -- dynamic credits (liner notes)
-  GET /{owner}/{repo_slug}/embed/{ref}               -- iframe-safe audio player
-  GET /{owner}/{repo_slug}/search                    -- in-repo search (4 modes)
-  GET /{owner}/{repo_slug}/compare/{base}...{head}   -- multi-dimensional musical diff between two refs
   GET /{owner}/{repo_slug}/divergence                -- branch divergence radar chart
   GET /{owner}/{repo_slug}/timeline                  -- chronological SVG timeline
   GET /{owner}/{repo_slug}/releases                  -- release list
@@ -38,22 +34,6 @@ Endpoint summary (repo-scoped):
   GET /{owner}/{repo_slug}/insights                  -- repo insights dashboard
   GET /{owner}/{repo_slug}/tree/{ref}                -- file tree browser (repo root)
   GET /{owner}/{repo_slug}/tree/{ref}/{path}         -- file tree browser (subdirectory)
-  GET /{owner}/{repo_slug}/analysis/{ref}            -- analysis dashboard (all 10 dimensions at a glance)
-  GET /{owner}/{repo_slug}/analysis/{ref}/contour    -- melodic contour analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/tempo      -- tempo analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/dynamics   -- dynamics analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/key        -- key detection analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/meter      -- metric analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/chord-map  -- chord map analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/groove     -- rhythmic groove analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/emotion    -- emotion analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/form       -- formal structure analysis
-  GET /{owner}/{repo_slug}/analysis/{ref}/motifs     -- motif browser (recurring patterns, transformations)
-  GET /{owner}/{repo_slug}/listen/{ref}              -- full-mix and per-track audio playback with track listing
-  GET /{owner}/{repo_slug}/listen/{ref}/{path}       -- single-stem playback page
-  GET /{owner}/{repo_slug}/listen/{ref}             -- Wavesurfer.js audio player (full mix)
-  GET /{owner}/{repo_slug}/listen/{ref}/{path}      -- Wavesurfer.js audio player (single track)
-  GET /{owner}/{repo_slug}/arrange/{ref}             -- arrangement matrix (instrument × section density grid)
   GET /{owner}/{repo_slug}/piano-roll/{ref}          -- interactive piano roll (all tracks)
   GET /{owner}/{repo_slug}/piano-roll/{ref}/{path}   -- interactive piano roll (single MIDI file)
   GET /{owner}/{repo_slug}/activity                  -- repo-level event stream (commits, PRs, issues, branches, tags, sessions)
@@ -61,8 +41,6 @@ Endpoint summary (repo-scoped):
 These routes require NO JWT auth -- they return HTML shells whose embedded
 JavaScript fetches data from the authed JSON API (``/api/v1/musehub/...``)
 using a token stored in ``localStorage``.
-
-The embed route sets ``X-Frame-Options: ALLOWALL`` for cross-origin iframe use.
 """
 
 import asyncio
@@ -83,8 +61,7 @@ from musehub.api.routes.musehub.json_alternate import json_or_html
 from musehub.api.routes.musehub.negotiate import negotiate_response
 from musehub.api.routes.musehub.ui_jsonld import jsonld_release, jsonld_repo, render_jsonld_script
 from musehub.db import get_db
-from musehub.models.musehub import CommitListResponse, CommitResponse, RepoResponse, TrackListingResponse
-from musehub.models.musehub_analysis import DimensionData
+from musehub.models.musehub import CommitListResponse, CommitResponse, RepoResponse
 from musehub.models.musehub import (
     BranchDetailListResponse,
     CommitListResponse,
@@ -98,7 +75,7 @@ from musehub.db import musehub_models as musehub_db
 from musehub.db import musehub_domain_models as domain_db
 from musehub.muse_cli.models import MuseCliTag
 from musehub.db import musehub_label_models as label_db
-from musehub.services import musehub_analysis, musehub_credits, musehub_divergence, musehub_events, musehub_issues, musehub_listen, musehub_pull_requests, musehub_releases
+from musehub.services import musehub_credits, musehub_divergence, musehub_events, musehub_issues, musehub_pull_requests, musehub_releases
 from musehub.services import musehub_discover, musehub_repository, musehub_search
 from musehub.storage.backends import get_backend as _get_storage_backend
 from musehub.api.routes.musehub._templates import templates
@@ -1047,7 +1024,7 @@ async def commit_page(
     # ── Audio — MIDI domain only ──────────────────────────────────────────
     audio_url: str | None = (
         f"{api_base}/objects/{commit.snapshot_id}/content"
-        if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "piano_roll"
+        if commit.snapshot_id is not None and domain_ctx_cd["viewer_type"] == "midi"
         else None
     )
 
@@ -1252,20 +1229,10 @@ async def graph_page(
     """
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
 
-    commits, _total = await musehub_repository.list_commits(db, repo_id, limit=100)
+    # Build the full DAG once server-side so graph.ts can render immediately
+    # without an extra round-trip to /repos/{id}/dag.
+    dag = await musehub_repository.list_commits_dag(db, repo_id)
     branches = await musehub_repository.list_branches(db, repo_id)
-
-    graph_data = [
-        {
-            "sha": c.commit_id,
-            "shortSha": c.commit_id[:8],
-            "message": c.message,
-            "author": c.author,
-            "timestamp": c.timestamp.isoformat(),
-            "parents": c.parent_ids,
-        }
-        for c in commits
-    ]
 
     ctx: dict[str, object] = {
         "owner": owner,
@@ -1273,8 +1240,8 @@ async def graph_page(
         "repo_id": repo_id,
         "base_url": base_url,
         "current_page": "graph",
-        "graph_data_json": graph_data,
-        "commit_count": len(commits),
+        "dag_ssr": dag.model_dump(mode="json"),
+        "commit_count": len(dag.nodes),
         "branch_count": len(branches),
     }
     ctx.update(nav_ctx)
@@ -1616,37 +1583,6 @@ async def issue_list_page(
     )
 
 
-@router.get(
-    "/{owner}/{repo_slug}/context/{ref}",
-    summary="MuseHub AI context viewer",
-)
-async def context_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the AI context viewer for a given commit ref — fully SSR.
-
-    Calls :func:`musehub_analysis.get_context` to fetch musical summary,
-    missing elements, and Muse suggestions server-side so the template
-    receives a populated ``context_data`` object with no client fetch required.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    context_data = await musehub_analysis.get_context(db, repo_id, ref=ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "context_data": context_data,
-    }
-    ctx.update(nav_ctx)
-    return templates.TemplateResponse(request, "musehub/pages/analysis/context.html", ctx)
-
 
 @router.get(
     "/{owner}/{repo_slug}/issues/{number}",
@@ -1824,209 +1760,6 @@ async def issue_detail_page(
 
 
 @router.get(
-    "/{owner}/{repo_slug}/embed/{ref}",
-    summary="Embeddable MuseHub audio player widget",
-)
-async def embed_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render a compact, iframe-safe audio player for a MuseHub repo commit.
-
-    Why this route exists: external sites embed MuseHub compositions via
-    ``<iframe src="/{owner}/{repo_slug}/embed/{ref}">``.
-
-    Contract:
-    - No JWT required -- public repos can be embedded without auth.
-    - Returns ``X-Frame-Options: ALLOWALL`` so browsers permit cross-origin framing.
-    - Audio fetched from ``/api/v1/repos/{repo_id}/objects`` at runtime.
-    """
-    repo_id, _base, _nav = await _resolve_repo(owner, repo_slug, db)
-    short_ref = ref[:8] if len(ref) >= 8 else ref
-    listen_url = _base_url(owner, repo_slug)
-
-    # Resolve first audio track for SSR — no auth check needed (public embed)
-    listing = await musehub_listen.build_track_listing(db, repo_id, ref)
-    first_track = listing.tracks[0] if listing.tracks else None
-
-    content = templates.TemplateResponse(
-        request,
-        "musehub/pages/embed.html",
-        {
-            "title": f"Player {short_ref}",
-            "repo_id": repo_id,
-            "ref": ref,
-            "listen_url": listen_url,
-            "owner": owner,
-            "repo_slug": repo_slug,
-            "track_url": first_track.audio_url if first_track else None,
-            "track_name": first_track.name if first_track else short_ref,
-        },
-    )
-    return Response(
-        content=content.body,
-        media_type="text/html",
-        headers={"X-Frame-Options": "ALLOWALL"},
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/listen/{ref}",
-    summary="MuseHub listen page — full-mix and per-track audio playback",
-)
-async def listen_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
-    db: AsyncSession = Depends(get_db),
-) -> StarletteResponse:
-    """Render the listen page with a full-mix player and per-track listing.
-
-    Why this route exists: musicians need a dedicated listening experience to
-    evaluate each stem's contribution to the mix without exporting files to a
-    DAW.  The page surfaces the full-mix audio at the top, then lists each
-    audio artifact with its own player, mute/solo controls, a mini waveform
-    visualisation, a download button, and a link to the piano-roll view.
-
-    Content negotiation:
-    - HTML (default): interactive listen page via Jinja2.
-    - JSON (``Accept: application/json`` or ``?format=json``):
-      returns ``TrackListingResponse`` with all audio URLs.
-
-    Graceful fallback: when no audio renders exist the page shows a call-to-
-    action rather than an empty list, so musicians know what to do next.
-    No JWT required — the HTML shell's JS handles auth for private repos.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    json_data = await musehub_listen.build_track_listing(db, repo_id, ref)
-
-    # Build playlist payload for WaveSurfer — passed as window.__playlist
-    playlist_data = [
-        {
-            "name": t.name,
-            "url": t.audio_url,
-            "size": t.size_bytes,
-        }
-        for t in json_data.tracks
-    ]
-    first_track = json_data.tracks[0] if json_data.tracks else None
-
-    listen_ctx: dict[str, Any] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "listen",
-        "tracks": json_data.tracks,
-        "playlist_json": playlist_data,
-        "first_track_url": first_track.audio_url if first_track else None,
-        "first_track_name": first_track.name if first_track else None,
-    }
-    listen_ctx.update(nav_ctx)
-    return await negotiate_response(
-        request=request,
-        template_name="musehub/pages/listen.html",
-        context=listen_ctx,
-        templates=templates,
-        json_data=json_data,
-        format_param=format,
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/listen/{ref}/{path:path}",
-    summary="MuseHub listen page — individual stem playback",
-)
-async def listen_track_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    path: str,
-    format: str | None = Query(None, description="Force response format: 'json' or omit for HTML"),
-    db: AsyncSession = Depends(get_db),
-) -> StarletteResponse:
-    """Render the per-track listen page for a single stem artifact.
-
-    Why this route exists: ``path`` identifies a specific stem (e.g.
-    ``tracks/bass.mp3``).  This page focuses the player on that one file
-    and provides a "Back to full mix" link, a download button, and the
-    piano-roll viewer if a matching image artifact exists.
-
-    Content negotiation mirrors ``listen_page``: JSON returns a single-track
-    ``TrackListingResponse`` with ``has_renders=True`` when the file exists.
-
-    No JWT required — HTML shell; JS handles auth for private repos.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    objects = await musehub_repository.list_objects(db, repo_id)
-
-    object_map: dict[str, str] = {obj.path: obj.object_id for obj in objects}
-    image_exts: frozenset[str] = frozenset({".webp", ".png", ".jpg", ".jpeg"})
-    api_base = f"/api/v1/repos/{repo_id}"
-
-    target_obj = next((obj for obj in objects if obj.path == path), None)
-    has_renders = target_obj is not None
-
-    from musehub.models.musehub import AudioTrackEntry
-
-    tracks: list[AudioTrackEntry] = []
-    full_mix_url: str | None = None
-
-    if target_obj:
-        stem = Path(target_obj.path).stem
-        piano_roll_url: str | None = None
-        for p, oid in object_map.items():
-            if Path(p).suffix.lower() in image_exts and Path(p).stem == stem:
-                piano_roll_url = f"{api_base}/objects/{oid}/content"
-                break
-        tracks = [
-            AudioTrackEntry(
-                name=stem,
-                path=target_obj.path,
-                object_id=target_obj.object_id,
-                audio_url=f"{api_base}/objects/{target_obj.object_id}/content",
-                piano_roll_url=piano_roll_url,
-                size_bytes=target_obj.size_bytes,
-            )
-        ]
-        full_mix_url = f"{api_base}/objects/{target_obj.object_id}/content"
-
-    json_data = TrackListingResponse(
-        repo_id=repo_id,
-        ref=ref,
-        full_mix_url=full_mix_url,
-        tracks=tracks,
-        has_renders=has_renders,
-    )
-
-    listen_track_ctx: dict[str, Any] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "track_path": path,
-        "base_url": base_url,
-        "current_page": "listen",
-    }
-    listen_track_ctx.update(nav_ctx)
-    return await negotiate_response(
-        request=request,
-        template_name="musehub/pages/listen.html",
-        context=listen_track_ctx,
-        templates=templates,
-        json_data=json_data,
-        format_param=format,
-    )
-
-
-@router.get(
     "/{owner}/{repo_slug}/credits",
     summary="MuseHub dynamic credits page",
 )
@@ -2065,6 +1798,13 @@ async def credits_page(
     longest_active = max(contributors, key=lambda c: (c.last_active - c.first_active).days,    default=None)
 
     # --- Per-author dimension + branch breakdown (one extra query) ------
+    import re as _re
+    _CONV_PREFIX = _re.compile(
+        r"^(feat|fix|refactor|docs|test|perf|chore|ci|build|style|revert)"
+        r"(\(.+?\))?!?:",
+        _re.IGNORECASE,
+    )
+
     commit_rows_r = await db.execute(
         sa_select(
             musehub_db.MusehubCommit.author,
@@ -2072,19 +1812,45 @@ async def credits_page(
             musehub_db.MusehubCommit.branch,
         ).where(musehub_db.MusehubCommit.repo_id == repo_id)
     )
+    # Collect into list so we can iterate once for all classifiers.
+    commit_rows: list[tuple[str, str, str]] = [
+        (str(r[0]), str(r[1]), str(r[2])) for r in commit_rows_r.all()
+    ]
+
     author_dim_counts: dict[str, dict[str, int]] = {}
     author_branches:   dict[str, set[str]]       = {}
-    for author, message, branch in commit_rows_r:
+    # Conventional-commit type counts per author (code-domain enrichment).
+    author_code_types: dict[str, dict[str, int]] = {}
+    project_code_counts: dict[str, int]          = {}
+
+    for author, message, branch in commit_rows:
         if author not in author_dim_counts:
-            author_dim_counts[author] = {}
-            author_branches[author]   = set()
+            author_dim_counts[author]  = {}
+            author_branches[author]    = set()
+            author_code_types[author]  = {}
         author_branches[author].add(branch)
+
+        # Music-domain dimension classification (used for MIDI repos).
         for dim in musehub_divergence.classify_message(message):
             author_dim_counts[author][dim] = author_dim_counts[author].get(dim, 0) + 1
+
+        # Code-domain: parse conventional commit prefix (feat:, fix:, …).
+        m = _CONV_PREFIX.match(message.strip())
+        if m:
+            ctype = m.group(1).lower()
+            # Normalise aliases.
+            ctype = {"build": "chore", "style": "chore", "ci": "chore"}.get(ctype, ctype)
+            author_code_types[author][ctype] = author_code_types[author].get(ctype, 0) + 1
+            project_code_counts[ctype] = project_code_counts.get(ctype, 0) + 1
 
     author_top_dims: dict[str, list[tuple[str, int]]] = {
         author: sorted(dims.items(), key=lambda x: -x[1])[:3]
         for author, dims in author_dim_counts.items()
+    }
+    # Top-3 code semantic types per author, sorted by count descending.
+    author_top_code_types: dict[str, list[tuple[str, int]]] = {
+        author: sorted(ctypes.items(), key=lambda x: -x[1])[:4]
+        for author, ctypes in author_code_types.items()
     }
     author_branch_counts: dict[str, int] = {
         a: len(brs) for a, brs in author_branches.items()
@@ -2094,6 +1860,9 @@ async def credits_page(
     all_roles: set[str] = set()
     for c in contributors:
         all_roles.update(c.contribution_types)
+
+    # Detect whether this is a code-domain repo (conventional commits present).
+    is_code_domain: bool = bool(project_code_counts)
 
     ctx: dict[str, object] = {
         "owner": owner,
@@ -2118,524 +1887,16 @@ async def credits_page(
         "longest_active": longest_active,
         # Per-author enrichment
         "author_top_dims": author_top_dims,
+        "author_top_code_types": author_top_code_types,
         "author_branch_counts": author_branch_counts,
+        # Code-domain project-level stats
+        "project_code_counts": project_code_counts,
+        "is_code_domain": is_code_domain,
     }
     ctx.update(nav_ctx)
     return templates.TemplateResponse(request, "musehub/pages/credits.html", ctx)
 
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}",
-    summary="MuseHub analysis dashboard -- all musical dimensions at a glance",
-)
-async def analysis_dashboard_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the analysis dashboard: summary cards for all musical dimensions.
 
-    All dimension data is computed server-side so agents and browsers receive
-    a fully-rendered page without issuing additional API calls.  The aggregate
-    response covers key, tempo, meter, dynamics, groove, emotion, form, motifs,
-    chord map, and contour.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    aggregate = musehub_analysis.compute_aggregate_analysis(repo_id=repo_id, ref=ref)
-    dim_map: dict[str, object] = {d.dimension: d.data for d in aggregate.dimensions}
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "dashboard",
-        "dim_map": dim_map,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/dashboard.html",
-        fragment_template="musehub/fragments/analysis/dashboard_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/search",
-    summary="MuseHub in-repo search page",
-)
-async def search_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    q: str = Query("", description="Search query"),
-    mode: str = Query("keyword", description="Search mode: keyword | pattern | ask"),
-    search_type: str = Query("all", description="Result type filter: all | commits | issues | prs | releases | sessions"),
-    limit: int = Query(20, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the in-repo multi-type search page with SSR results.
-
-    Searches commits, issues, pull requests, releases, and sessions in
-    parallel.  The ``type`` param filters which category is shown; the
-    ``mode`` param (keyword/pattern/ask) applies only to commit search.
-
-    HTMX live-search swaps only the ``#sr-results`` fragment on debounced
-    input, avoiding a full-page reload for subsequent queries.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    safe_mode = mode if mode in ("keyword", "pattern", "ask") else "keyword"
-    safe_type = search_type if search_type in ("all", "commits", "issues", "prs", "releases", "sessions") else "all"
-
-    commit_result = None
-    issue_hits: list[Any] = []
-    pr_hits: list[Any] = []
-    release_hits: list[Any] = []
-    session_hits: list[Any] = []
-
-    if q and len(q.strip()) >= 2:
-        q_lower = q.strip().lower()
-
-        async def _search_commits() -> Any:
-            if safe_mode == "keyword":
-                return await musehub_search.search_by_keyword(
-                    db, repo_id=repo_id, keyword=q, limit=limit
-                )
-            if safe_mode == "ask":
-                return await musehub_search.search_by_ask(
-                    db, repo_id=repo_id, question=q, limit=limit
-                )
-            return await musehub_search.search_by_pattern(
-                db, repo_id=repo_id, pattern=q, limit=limit
-            )
-
-        async def _search_issues() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubIssue.issue_id,
-                    musehub_db.MusehubIssue.number,
-                    musehub_db.MusehubIssue.title,
-                    musehub_db.MusehubIssue.state,
-                    musehub_db.MusehubIssue.author,
-                    musehub_db.MusehubIssue.labels,
-                    musehub_db.MusehubIssue.created_at,
-                ).where(
-                    musehub_db.MusehubIssue.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubIssue.title).contains(q_lower),
-                ).order_by(musehub_db.MusehubIssue.created_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        async def _search_prs() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubPullRequest.pr_id,
-                    musehub_db.MusehubPullRequest.title,
-                    musehub_db.MusehubPullRequest.state,
-                    musehub_db.MusehubPullRequest.author,
-                    musehub_db.MusehubPullRequest.from_branch,
-                    musehub_db.MusehubPullRequest.to_branch,
-                    musehub_db.MusehubPullRequest.created_at,
-                ).where(
-                    musehub_db.MusehubPullRequest.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubPullRequest.title).contains(q_lower),
-                ).order_by(musehub_db.MusehubPullRequest.created_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        async def _search_releases() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubRelease.release_id,
-                    musehub_db.MusehubRelease.tag,
-                    musehub_db.MusehubRelease.title,
-                    musehub_db.MusehubRelease.is_prerelease,
-                    musehub_db.MusehubRelease.is_draft,
-                    musehub_db.MusehubRelease.created_at,
-                ).where(
-                    musehub_db.MusehubRelease.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubRelease.title).contains(q_lower)
-                    | func.lower(musehub_db.MusehubRelease.tag).contains(q_lower),
-                ).order_by(musehub_db.MusehubRelease.created_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        async def _search_sessions() -> list[Any]:
-            rows = (await db.execute(
-                sa_select(
-                    musehub_db.MusehubSession.session_id,
-                    musehub_db.MusehubSession.intent,
-                    musehub_db.MusehubSession.location,
-                    musehub_db.MusehubSession.participants,
-                    musehub_db.MusehubSession.is_active,
-                    musehub_db.MusehubSession.started_at,
-                ).where(
-                    musehub_db.MusehubSession.repo_id == repo_id,
-                    func.lower(musehub_db.MusehubSession.intent).contains(q_lower)
-                    | func.lower(musehub_db.MusehubSession.location).contains(q_lower),
-                ).order_by(musehub_db.MusehubSession.started_at.desc())
-                .limit(limit)
-            )).all()
-            return list(rows)
-
-        (
-            commit_result,
-            issue_hits,
-            pr_hits,
-            release_hits,
-            session_hits,
-        ) = await asyncio.gather(
-            _search_commits(),
-            _search_issues(),
-            _search_prs(),
-            _search_releases(),
-            _search_sessions(),
-        )
-
-    commit_count  = len(commit_result.matches) if commit_result else 0
-    issue_count   = len(issue_hits)
-    pr_count      = len(pr_hits)
-    release_count = len(release_hits)
-    session_count = len(session_hits)
-    total_count   = commit_count + issue_count + pr_count + release_count + session_count
-
-    ctx: dict[str, Any] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "base_url": base_url,
-        "current_page": "search",
-        "query": q,
-        "mode": safe_mode,
-        "search_type": safe_type,
-        "limit": limit,
-        # Commit search result
-        "search_result": commit_result,
-        # Multi-type hits
-        "issue_hits": issue_hits,
-        "pr_hits": pr_hits,
-        "release_hits": release_hits,
-        "session_hits": session_hits,
-        # Counts (for type tabs)
-        "commit_count": commit_count,
-        "issue_count": issue_count,
-        "pr_count": pr_count,
-        "release_count": release_count,
-        "session_count": session_count,
-        "total_count": total_count,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/search.html",
-        fragment_template="musehub/fragments/search_results.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/motifs",
-    summary="MuseHub motif browser page",
-)
-async def motifs_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the motif browser for a given commit ref — SSR.
-
-    Fetches motif data server-side via :func:`~musehub.services.musehub_analysis.compute_dimension`
-    and passes it directly to the Jinja2 template so all motif patterns,
-    occurrences, and recurrence grids are rendered server-side without
-    a client-side fetch.
-
-    Auth is handled client-side via localStorage JWT, matching all other UI
-    pages.  No JWT is required to render the HTML shell.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    motifs_data = musehub_analysis.compute_dimension("motifs", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "motifs",
-        "motifs_data": motifs_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/motifs.html",
-        fragment_template="musehub/fragments/analysis/motifs_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/arrange/{ref}",
-    summary="MuseHub arrangement matrix page",
-)
-async def arrange_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the fully server-side-rendered arrangement matrix page.
-
-    Pre-computes the instrument × section matrix, fetches commit metadata,
-    render-job status, and recent branch commits for navigation — all passed
-    to the Jinja2 template.  No client-side API calls needed for initial render.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-
-    # ── Resolve commit for this ref ─────────────────────────────────────────
-    commit_row: Any = None
-    render_job_row: Any = None
-    branch_commits: list[Any] = []
-
-    if ref == "HEAD":
-        result = await db.execute(
-            sa_select(
-                musehub_db.MusehubCommit.commit_id,
-                musehub_db.MusehubCommit.message,
-                musehub_db.MusehubCommit.author,
-                musehub_db.MusehubCommit.timestamp,
-                musehub_db.MusehubCommit.branch,
-            ).where(musehub_db.MusehubCommit.repo_id == repo_id)
-            .order_by(musehub_db.MusehubCommit.timestamp.desc())
-            .limit(1)
-        )
-        commit_row = result.first()
-    else:
-        result = await db.execute(
-            sa_select(
-                musehub_db.MusehubCommit.commit_id,
-                musehub_db.MusehubCommit.message,
-                musehub_db.MusehubCommit.author,
-                musehub_db.MusehubCommit.timestamp,
-                musehub_db.MusehubCommit.branch,
-            ).where(
-                musehub_db.MusehubCommit.repo_id == repo_id,
-                musehub_db.MusehubCommit.commit_id == ref,
-            ).limit(1)
-        )
-        commit_row = result.first()
-
-    actual_commit_id = commit_row.commit_id if commit_row else ref
-    commit_branch    = commit_row.branch if commit_row else "main"
-
-    # ── Render job status ───────────────────────────────────────────────────
-    rj_result = await db.execute(
-        sa_select(
-            musehub_db.MusehubRenderJob.status,
-            musehub_db.MusehubRenderJob.artifact_count,
-            musehub_db.MusehubRenderJob.audio_object_ids,
-            musehub_db.MusehubRenderJob.preview_object_ids,
-        ).where(
-            musehub_db.MusehubRenderJob.repo_id == repo_id,
-            musehub_db.MusehubRenderJob.commit_id == actual_commit_id,
-        ).limit(1)
-    )
-    render_job_row = rj_result.first()
-
-    # ── Recent commits on the same branch for navigation ────────────────────
-    bc_result = await db.execute(
-        sa_select(
-            musehub_db.MusehubCommit.commit_id,
-            musehub_db.MusehubCommit.message,
-            musehub_db.MusehubCommit.timestamp,
-        ).where(
-            musehub_db.MusehubCommit.repo_id == repo_id,
-            musehub_db.MusehubCommit.branch == commit_branch,
-        ).order_by(musehub_db.MusehubCommit.timestamp.desc())
-        .limit(20)
-    )
-    branch_commits = list(bc_result.all())
-
-    # Determine prev/next commit in time order on this branch
-    commit_ids_asc = [c.commit_id for c in reversed(branch_commits)]
-    current_idx    = next((i for i, c in enumerate(commit_ids_asc) if c == actual_commit_id), None)
-    prev_commit_id = commit_ids_asc[current_idx - 1] if current_idx is not None and current_idx > 0 else None
-    next_commit_id = commit_ids_asc[current_idx + 1] if current_idx is not None and current_idx < len(commit_ids_asc) - 1 else None
-
-    # ── Arrangement matrix (computed server-side) ───────────────────────────
-    matrix = musehub_analysis.compute_arrangement_matrix(
-        repo_id=repo_id, ref=actual_commit_id
-    )
-
-    # Build cell_map[instrument][section] for easy template iteration
-    cell_map: dict[str, dict[str, Any]] = {}
-    for cell in matrix.cells:
-        cell_map.setdefault(cell.instrument, {})[cell.section] = cell
-
-    # Density → CSS level (0-4) for styling without inline CSS
-    def _density_level(d: float) -> int:
-        if d <= 0:
-            return 0
-        if d < 0.25:
-            return 1
-        if d < 0.5:
-            return 2
-        if d < 0.75:
-            return 3
-        return 4
-
-    # Flatten for template with precomputed level
-    cells_enriched: list[dict[str, Any]] = []
-    for cell in matrix.cells:
-        cells_enriched.append({
-            "instrument": cell.instrument,
-            "section": cell.section,
-            "note_count": cell.note_count,
-            "note_density": round(cell.note_density, 3),
-            "beat_start": cell.beat_start,
-            "beat_end": cell.beat_end,
-            "pitch_low": cell.pitch_low,
-            "pitch_high": cell.pitch_high,
-            "active": cell.active,
-            "level": _density_level(cell.note_density) if cell.active else 0,
-        })
-
-    # Rebuild cell_map with enriched data
-    cell_map_enriched: dict[str, dict[str, Any]] = {}
-    for c in cells_enriched:
-        cell_map_enriched.setdefault(c["instrument"], {})[c["section"]] = c
-
-    # Total beats across all sections
-    total_beats = matrix.total_beats
-
-    # Section beat widths as percentages (for the timeline bar)
-    section_pcts: list[dict[str, Any]] = []
-    for col in matrix.column_summaries:
-        beats_span = col.beat_end - col.beat_start
-        pct = round(beats_span / total_beats * 100, 1) if total_beats else 0
-        section_pcts.append({
-            "section": col.section,
-            "beat_start": col.beat_start,
-            "beat_end": col.beat_end,
-            "pct": pct,
-            "active_instruments": col.active_instruments,
-            "total_notes": col.total_notes,
-        })
-
-    ctx: dict[str, Any] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "arrange",
-        # Commit context
-        "commit_id": actual_commit_id,
-        "commit_message": commit_row.message if commit_row else None,
-        "commit_author": commit_row.author if commit_row else None,
-        "commit_timestamp": commit_row.timestamp if commit_row else None,
-        "commit_branch": commit_branch,
-        # Navigation
-        "prev_commit_id": prev_commit_id,
-        "next_commit_id": next_commit_id,
-        "branch_commits": [
-            {"id": c.commit_id, "msg": c.message[:60], "ts": c.timestamp}
-            for c in branch_commits[:10]
-        ],
-        # Render job
-        "render_status": render_job_row.status if render_job_row else None,
-        "midi_count": render_job_row.artifact_count if render_job_row else 0,
-        "mp3_count": len(render_job_row.audio_object_ids or []) if render_job_row else 0,
-        # Matrix
-        "instruments": matrix.instruments,
-        "sections": matrix.sections,
-        "cell_map": cell_map_enriched,
-        "row_summaries": matrix.row_summaries,
-        "column_summaries": matrix.column_summaries,
-        "section_pcts": section_pcts,
-        "total_beats": total_beats,
-        "total_notes": sum(rs.total_notes for rs in matrix.row_summaries),
-        "active_cells": sum(1 for c in cells_enriched if c["active"]),
-        "total_cells": len(cells_enriched),
-    }
-    ctx.update(nav_ctx)
-    return json_or_html(
-        request,
-        lambda: templates.TemplateResponse(request, "musehub/pages/arrange.html", ctx),
-        ctx,
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/compare/{refs}",
-    response_class=HTMLResponse,
-    summary="MuseHub compare view — multi-dimensional musical diff between two refs",
-)
-async def compare_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    refs: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the compare view for two refs — fully SSR.
-
-    The ``refs`` path segment encodes both refs separated by ``...``:
-    ``main...feature-branch`` compares ``main`` (base) against
-    ``feature-branch`` (head).
-
-    Calls :func:`musehub_analysis.compare_refs` server-side so the template
-    receives a populated ``compare_data`` object with no client fetch required.
-
-    Returns 404 when:
-    - The repo owner/slug is unknown.
-    - The ``refs`` value does not contain the ``...`` separator.
-    - Either ref has no commits in this repo (delegated to API response).
-    """
-    if "..." not in refs:
-        raise HTTPException(
-            status_code=http_status.HTTP_404_NOT_FOUND,
-            detail=f"Invalid compare spec '{refs}' — expected format: base...head",
-        )
-    base_ref, head_ref = refs.split("...", 1)
-    if not base_ref or not head_ref:
-        raise HTTPException(
-            status_code=http_status.HTTP_404_NOT_FOUND,
-            detail="Both base and head refs must be non-empty",
-        )
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    compare_data = await musehub_analysis.compare_refs(db, repo_id, base=base_ref, head=head_ref)
-
-    context: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "base_ref": base_ref,
-        "head_ref": head_ref,
-        "refs": refs,
-        "base_url": base_url,
-        "current_page": "compare",
-        "compare_data": compare_data,
-        "breadcrumb_data": _breadcrumbs(
-            (owner, f"/{owner}"),
-            (repo_slug, base_url),
-            ("compare", ""),
-            (f"{base_ref}...{head_ref}", ""),
-        ),
-    }
-    context.update(nav_ctx)
-    return templates.TemplateResponse(request, "musehub/pages/analysis/compare.html", context)
 
 
 @router.get(
@@ -3544,359 +2805,6 @@ async def insights_page(
     )
 
 
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/contour",
-    summary="MuseHub melodic contour analysis page",
-)
-async def contour_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the melodic contour analysis page for a Muse commit ref — SSR.
-
-    Fetches contour data server-side via :func:`~musehub.services.musehub_analysis.compute_dimension`
-    and passes the pitch curve directly to the Jinja2 template so the SVG
-    polyline is rendered server-side without a client-side fetch.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    contour_data = musehub_analysis.compute_dimension("contour", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "contour",
-        "contour_data": contour_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/contour.html",
-        fragment_template="musehub/fragments/analysis/contour_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/tempo",
-    summary="MuseHub tempo analysis page",
-)
-async def tempo_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the tempo analysis page for a Muse commit ref.
-
-    BPM, time feel, stability bar, and tempo-change timeline are all computed
-    server-side and passed to the Jinja2 template — no client-side API fetch required.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    tempo_data: DimensionData = musehub_analysis.compute_dimension("tempo", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "tempo",
-        "tempo_data": tempo_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/tempo.html",
-        fragment_template="musehub/fragments/analysis/tempo_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/dynamics",
-    summary="MuseHub dynamics analysis page",
-)
-async def dynamics_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the dynamics analysis page for a Muse commit ref — SSR.
-
-    Fetches per-track dynamics data server-side via
-    :func:`~musehub.services.musehub_analysis.compute_dynamics_page_data`
-    and passes it directly to the Jinja2 template so velocity bars and arc
-    badges are rendered server-side without a client-side fetch.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    dynamics_data = musehub_analysis.compute_dynamics_page_data(repo_id=repo_id, ref=ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "dynamics",
-        "dynamics_data": dynamics_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/dynamics.html",
-        fragment_template="musehub/fragments/analysis/dynamics_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/key",
-    summary="MuseHub key detection analysis page",
-)
-async def key_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the key detection analysis page for a Muse commit ref.
-
-    Tonic, mode, confidence bar, relative key, and alternate key candidates are
-    all computed server-side and injected into the Jinja2 template.  Agents use
-    this to confirm the tonal centre before generating harmonically compatible
-    material without needing an authenticated client-side API call.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    key_data: DimensionData = musehub_analysis.compute_dimension("key", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "key",
-        "key_data": key_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/key.html",
-        fragment_template="musehub/fragments/analysis/key_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/meter",
-    summary="MuseHub meter analysis page",
-)
-async def meter_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the metric analysis page for a Muse commit ref.
-
-    Time signature, compound/simple classification, beat-strength profile, and
-    irregular-meter sections are all computed server-side.  Agents use this to
-    generate rhythmically coherent material without an authenticated client call.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    meter_data: DimensionData = musehub_analysis.compute_dimension("meter", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "meter",
-        "meter_data": meter_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/meter.html",
-        fragment_template="musehub/fragments/analysis/meter_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/chord-map",
-    summary="MuseHub chord map analysis page",
-)
-async def chord_map_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the chord map analysis page for a Muse commit ref — SSR.
-
-    Fetches chord progression data server-side via
-    :func:`~musehub.services.musehub_analysis.compute_dimension` and passes it
-    directly to the Jinja2 template so the chord timeline bars are rendered
-    server-side without a client-side fetch.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    chord_map_data = musehub_analysis.compute_dimension("chord-map", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "chord-map",
-        "chord_map_data": chord_map_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/chord_map.html",
-        fragment_template="musehub/fragments/analysis/chord_map_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/groove",
-    summary="MuseHub groove analysis page",
-)
-async def groove_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the rhythmic groove analysis page for a Muse commit ref.
-
-    Style, BPM, grid resolution, onset deviation, groove score, and swing
-    factor are all computed server-side.  Agents use this to match rhythmic
-    feel when generating continuation material.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    groove_data: DimensionData = musehub_analysis.compute_dimension("groove", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "groove",
-        "groove_data": groove_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/groove.html",
-        fragment_template="musehub/fragments/analysis/groove_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/emotion",
-    summary="MuseHub emotion analysis page",
-)
-async def emotion_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the emotion analysis page for a Muse commit ref — SSR.
-
-    Fetches emotion map data server-side via
-    :func:`~musehub.services.musehub_analysis.compute_emotion_map` and passes it
-    directly to the Jinja2 template so the valence/arousal scatter plot and
-    trajectory are rendered server-side without a client-side fetch.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    emotion_data = musehub_analysis.compute_emotion_map(repo_id=repo_id, ref=ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "emotion",
-        "emotion_data": emotion_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/emotion.html",
-        fragment_template="musehub/fragments/analysis/emotion_content.html",
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/form",
-    summary="MuseHub form analysis page",
-)
-async def form_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the formal structure analysis page for a Muse commit ref.
-
-    Macro form label, colour-coded section timeline, and per-section beat/function
-    table are all computed server-side.  Agents use this to understand where they
-    are in the compositional arc without needing an authenticated client API call.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    form_data: DimensionData = musehub_analysis.compute_dimension("form", ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "form",
-        "form_data": form_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/form.html",
-        fragment_template="musehub/fragments/analysis/form_content.html",
-    )
-
 
 @router.get(
     "/{owner}/{repo_slug}/tree/{ref}",
@@ -3973,45 +2881,6 @@ async def tree_subdir_page(
     return json_or_html(
         request,
         lambda: templates.TemplateResponse(request, "musehub/pages/tree.html", ctx),
-        ctx,
-    )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/groove-check",
-    summary="MuseHub groove check page",
-)
-async def groove_check_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the rhythmic consistency dashboard for a repo.
-
-    Displays a summary of groove metrics, an SVG bar chart of groove scores
-    over the commit window, and a per-commit table with status badges.
-
-    The chart encodes status as bar colour: green = OK, orange = WARN,
-    red = FAIL.  Threshold and limit can be adjusted via controls that
-    re-fetch the underlying ``GET /api/v1/repos/{repo_id}/groove-check``
-    endpoint client-side.
-
-    Auth is handled client-side via localStorage JWT, consistent with all other
-    MuseHub UI pages.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "base_url": base_url,
-        "current_page": "groove-check",
-    }
-    ctx.update(nav_ctx)
-    return json_or_html(
-        request,
-        lambda: templates.TemplateResponse(request, "musehub/pages/groove_check.html", ctx),
         ctx,
     )
 
@@ -4275,47 +3144,6 @@ async def form_structure_page(
         lambda: templates.TemplateResponse(request, "musehub/pages/form_structure.html", ctx),
         ctx,
     )
-
-
-@router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/harmony",
-    summary="MuseHub harmony analysis page",
-)
-async def harmony_analysis_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the harmony analysis page for a Muse commit ref — SSR.
-
-    Fetches Roman-numeral harmonic analysis server-side via
-    :func:`~musehub.services.musehub_analysis.compute_harmony_analysis`
-    and passes it directly to the Jinja2 template so cadences, modulations,
-    and the harmonic rhythm are rendered without a client-side API fetch.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    harmony_data = musehub_analysis.compute_harmony_analysis(repo_id=repo_id, ref=ref)
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "current_page": "analysis",
-        "analysis_dimension": "harmony",
-        "harmony_data": harmony_data,
-    }
-    ctx.update(nav_ctx)
-    return await htmx_fragment_or_full(
-        request,
-        templates,
-        ctx,
-        full_template="musehub/pages/analysis/harmony.html",
-        fragment_template="musehub/fragments/analysis/harmony_content.html",
-    )
-
 
 
 @router.get(
@@ -4641,51 +3469,6 @@ async def blob_page(
 
 
 @router.get(
-    "/{owner}/{repo_slug}/score/{ref}",
-    summary="MuseHub score renderer — full score, all tracks",
-)
-async def score_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the sheet music score page for a given commit ref (all tracks).
-
-    Fetches score metadata server-side so the header (title, key, meter,
-    instrument count) renders without a client round-trip.  The SVG notation
-    renderer remains client-side — music layout requires DOM measurement.
-
-    No JWT is required to render the HTML shell.  Auth is handled client-side
-    via localStorage JWT, matching all other UI pages.
-
-    For a single-part view use the ``score/{ref}/{path}`` variant which filters
-    to one instrument track.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    score_meta = await musehub_repository.get_score_meta_for_repo(db, repo_id, "")
-    abc_url = f"/api/v1/repos/{repo_id}/abc?ref={ref}"
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "path": "",
-        "current_page": "score",
-        "score_meta": score_meta.model_dump(by_alias=True, mode="json"),
-        "abc_url": abc_url,
-    }
-    ctx.update(nav_ctx)
-    return json_or_html(
-        request,
-        lambda: templates.TemplateResponse(request, "musehub/pages/score.html", ctx),
-        ctx,
-    )
-
-
-@router.get(
     "/{owner}/{repo_slug}/activity",
     summary="MuseHub activity feed — repo-level event stream",
 )
@@ -4813,44 +3596,3 @@ async def activity_page(
         fragment_template="musehub/fragments/activity_rows.html",
     )
 
-
-@router.get(
-    "/{owner}/{repo_slug}/score/{ref}/{path:path}",
-    summary="MuseHub score renderer — single-track part view",
-)
-async def score_part_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    path: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the sheet music score page filtered to a single instrument part.
-
-    Fetches score metadata server-side using the ``path`` segment as the
-    track title source.  The client-side renderer pre-selects that track
-    in the part selector on load.
-
-    No JWT is required to render the HTML shell.
-    """
-    repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
-    score_meta = await musehub_repository.get_score_meta_for_repo(db, repo_id, path)
-    abc_url = f"/api/v1/repos/{repo_id}/abc?ref={ref}&path={path}"
-    ctx: dict[str, object] = {
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "repo_id": repo_id,
-        "ref": ref,
-        "base_url": base_url,
-        "path": path,
-        "current_page": "score",
-        "score_meta": score_meta.model_dump(by_alias=True, mode="json"),
-        "abc_url": abc_url,
-    }
-    ctx.update(nav_ctx)
-    return json_or_html(
-        request,
-        lambda: templates.TemplateResponse(request, "musehub/pages/score.html", ctx),
-        ctx,
-    )

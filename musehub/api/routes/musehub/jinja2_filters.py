@@ -126,13 +126,14 @@ def _filesizeformat(value: int | float | None) -> str:
 
 
 def _markdown(value: str | None) -> str:
-    """Render Markdown to safe HTML using mistune.
+    """Convert a Markdown string to safe HTML using mistune.
 
-    Post-processes the output to:
-    - Demote headings (h1→h2, h2→h3, h3→h4) to preserve page hierarchy.
-    - Replace badge images ``![alt](url)`` with ``<code class="md-badge">``
-      pills — avoids broken-image icons for shields.io / GitHub badges.
-    - Strip raw HTML block/inline passthrough.
+    Uses mistune's CommonMark-compliant parser with:
+    - Images rendered as <img> (badges, screenshots)
+    - Fenced code blocks with ``language-*`` class for highlight.js
+    - All links marked rel="noopener noreferrer"
+    - Headings shifted down one level (h1→h2) to preserve page hierarchy
+    - HTML sanitised via mistune's built-in escaping
 
     Returns an empty string for None.
     """
@@ -140,29 +141,46 @@ def _markdown(value: str | None) -> str:
         return ""
 
     import re as _re
+    import html as _html
     import mistune
 
-    # Pre-process: convert badge image syntax to a placeholder so mistune
-    # never sees them as images (which would emit <img> tags).
-    pre = _re.sub(
-        r"!\[([^\]]*)\]\([^)]*\)",
-        lambda m: f"`{m.group(1) or 'badge'}`",
-        value,
-    )
+    def _esc(s: str) -> str:
+        return _html.escape(s, quote=True)
 
-    rendered = mistune.html(pre)
-    raw: str = rendered if isinstance(rendered, str) else ""
+    def _esc_url(s: str) -> str:
+        # Allow only safe URL characters; strip everything else.
+        import urllib.parse
+        return urllib.parse.quote(s, safe=":/?#[]@!$&'()*+,;=%~.-_")
 
-    # Demote headings: h1→h2, h2→h3, h3→h4 (work largest first to avoid double-bump).
-    def _demote(lvl: int, text: str) -> str:
-        def _repl(m: "_re.Match[str]") -> str:
-            return f"<{m.group(1)}h{lvl + 1}{m.group(2)}>"
-        return _re.sub(rf"<(/?)\s*h{lvl}(\b[^>]*)?>", _repl, text)
+    class _MuseRenderer(mistune.HTMLRenderer):
+        """HTMLRenderer subclass that customises output for MuseHub."""
 
-    for level in (3, 2, 1):
-        raw = _demote(level, raw)
+        def heading(self, text: str, level: int, **attrs: str) -> str:
+            # Shift h1→h2, h2→h3, etc. so READMEs don't stomp the page <h1>.
+            shifted = min(level + 1, 6)
+            return f"<h{shifted}>{text}</h{shifted}>\n"
 
-    return raw
+        def link(self, text: str, url: str, title: str | None = None) -> str:
+            safe_url = _esc_url(url)
+            title_attr = f' title="{_esc(title)}"' if title else ""
+            return f'<a href="{safe_url}" rel="noopener noreferrer"{title_attr}>{text}</a>'
+
+        def image(self, text: str, url: str, title: str | None = None) -> str:
+            safe_url = _esc_url(url)
+            title_attr = f' title="{_esc(title)}"' if title else ""
+            return f'<img src="{safe_url}" alt="{_esc(text)}"{title_attr} loading="lazy">'
+
+        def codespan(self, text: str) -> str:
+            return f"<code>{_esc(text)}</code>"
+
+        def block_code(self, code: str, info: str | None = None, **attrs: str) -> str:
+            lang_str = (info or "").strip()
+            lang = _re.split(r"\s+", lang_str)[0] if lang_str else ""
+            lang_class = f' class="language-{_esc(lang)}"' if lang else ""
+            return f'<pre class="code-block"><code{lang_class}>{_esc(code)}</code></pre>\n'
+
+    _md = mistune.create_markdown(renderer=_MuseRenderer(), plugins=["strikethrough", "table", "task_lists"])
+    return str(_md(value))
 
 
 def _auto_code(text: str) -> str:

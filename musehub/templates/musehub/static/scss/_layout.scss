@@ -16,6 +16,21 @@
  */
 
 /* -------------------------------------------------------------------------
+ * Base scaling
+ *
+ * FOUC prevention is handled by setting background:#0d1117 directly on the
+ * <html> element as an inline style in base.html — no opacity tricks needed.
+ * -------------------------------------------------------------------------*/
+
+body {
+  zoom: 1.25;
+}
+
+@media (max-width: 768px) {
+  body { zoom: 1; }
+}
+
+/* -------------------------------------------------------------------------
  * Global navigation bar  (.musehub-navbar)
  *
  * Replaces the plain <header> element with a structured nav bar that includes
@@ -722,6 +737,11 @@ body.player-open .container-wide {
   letter-spacing: 0.06em;
   white-space: nowrap;
 }
+
+// Color modifiers for ph-stat-value — used by insights page
+.ins-val--add   { color: var(--color-success); }
+.ins-val--del   { color: var(--color-danger); }
+.ins-val--agent { color: #bc8cff; }
 
 /* ── Page body: sidebar + main content ───────────────────────────────────── */
 .ph-body {

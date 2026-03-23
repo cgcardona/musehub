@@ -1,109 +1,147 @@
 {% extends "musehub/base.html" %}
 
 {% block title %}Credits · {{ owner }}/{{ repo_slug }}{% endblock %}
-
 {% block breadcrumb %}
   <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / credits
 {% endblock %}
-
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block content %}
-<div class="content-wide">
-
 {# ── Helpers ──────────────────────────────────────────────────────────────── #}
-{% macro avatar_color(name) -%}
-  hsl({{ (name | length * 37) % 360 }}, 50%, 28%)
+{% macro avatar_hue(name) %}{{ (name | length * 37) % 360 }}{% endmacro %}
+
+{% macro span_label(first, last) %}
+  {%- set days = (last - first).days -%}
+  {%- if days < 2 %}1d
+  {%- elif days < 60 %}{{ days }}d
+  {%- elif days < 365 %}{{ (days / 30) | round | int }}mo
+  {%- else %}{{ (days / 365) | round(1) }}y{% endif %}
 {%- endmacro %}
 
-{% macro role_class(role) -%}
-  cr-role-{{ role | lower | replace(' ', '-') }}
+{# Derive a human role label from top code type #}
+{% macro primary_role(top_code_types) %}
+  {%- if top_code_types -%}
+    {%- set top = top_code_types[0][0] -%}
+    {%- if top == "feat" %}Feature Developer
+    {%- elif top == "fix" %}Bug Fixer
+    {%- elif top == "refactor" %}Refactorer
+    {%- elif top == "docs" %}Documenter
+    {%- elif top == "test" %}Test Engineer
+    {%- elif top == "perf" %}Performance Eng.
+    {%- elif top == "chore" %}Maintainer
+    {%- else %}Contributor{% endif %}
+  {%- else %}Contributor{%- endif %}
 {%- endmacro %}
 
-{% macro dim_color(dim) -%}
-  {% if dim == 'melodic' %}#58a6ff
-  {% elif dim == 'harmonic' %}#a371f7
-  {% elif dim == 'rhythmic' %}#3fb950
-  {% elif dim == 'structural' %}#e3b341
-  {% elif dim == 'dynamic' %}#f85149
-  {% else %}#6e7681{% endif %}
+{# Semantic type color (inline, for bg) #}
+{% macro type_color(t) %}
+  {%- if t == "feat" %}#3fb950
+  {%- elif t == "fix" %}#f85149
+  {%- elif t == "refactor" %}#a371f7
+  {%- elif t == "docs" %}#58a6ff
+  {%- elif t == "test" %}#2dd4bf
+  {%- elif t == "perf" %}#e3b341
+  {%- else %}#6e7681{% endif %}
 {%- endmacro %}
 
-{% macro span_label(c) -%}
-  {% set days = (c.last_active - c.first_active).days %}
-  {% if days < 7 %}{{ days }}d
-  {% elif days < 60 %}{{ (days / 7) | round | int }}w
-  {% else %}{{ (days / 30) | round | int }}mo{% endif %}
-{%- endmacro %}
+{% block content %}
+<div class="crd-page">
 
-{# ── Stats bar ─────────────────────────────────────────────────────────────── #}
-<div class="cr-stats-bar">
-  <div class="cr-stat-card">
-    <div class="cr-stat-icon cr-stat-icon-people">👥</div>
-    <div class="cr-stat-body">
-      <span class="cr-stat-val">{{ total_contributors }}</span>
-      <span class="cr-stat-lbl">Contributors</span>
-    </div>
+{# ── Stat strip ───────────────────────────────────────────────────────────── #}
+<div class="crd-stat-strip">
+  <div class="crd-stat">
+    <div class="crd-stat-num">{{ total_contributors }}</div>
+    <div class="crd-stat-lbl">Contributors</div>
   </div>
-  <div class="cr-stat-card">
-    <div class="cr-stat-icon cr-stat-icon-commits">♪</div>
-    <div class="cr-stat-body">
-      <span class="cr-stat-val">{{ total_all_commits }}</span>
-      <span class="cr-stat-lbl">Total commits</span>
-    </div>
+  <div class="crd-stat-divider"></div>
+  <div class="crd-stat">
+    <div class="crd-stat-num crd-stat-num--commits">{{ total_all_commits }}</div>
+    <div class="crd-stat-lbl">Total Commits</div>
   </div>
-  <div class="cr-stat-card">
-    <div class="cr-stat-icon cr-stat-icon-span">📅</div>
-    <div class="cr-stat-body">
+  <div class="crd-stat-divider"></div>
+  <div class="crd-stat">
+    <div class="crd-stat-num crd-stat-num--span">
       {% if project_span_days > 0 %}
-      <span class="cr-stat-val">
         {% if project_span_days < 60 %}{{ project_span_days }}d
-        {% else %}{{ (project_span_days / 30) | round | int }}mo{% endif %}
-      </span>
-      {% else %}
-      <span class="cr-stat-val">—</span>
-      {% endif %}
-      <span class="cr-stat-lbl">Active span</span>
+        {% elif project_span_days < 365 %}{{ (project_span_days / 30) | round | int }}mo
+        {% else %}{{ (project_span_days / 365) | round(1) }}y{% endif %}
+      {% else %}—{% endif %}
     </div>
+    <div class="crd-stat-lbl">Active Span</div>
   </div>
-  <div class="cr-stat-card">
-    <div class="cr-stat-icon cr-stat-icon-roles">🎭</div>
-    <div class="cr-stat-body">
-      <span class="cr-stat-val">{{ all_roles | length }}</span>
-      <span class="cr-stat-lbl">Unique roles</span>
-    </div>
+  {% if is_code_domain and project_code_counts %}
+  <div class="crd-stat-divider"></div>
+  <div class="crd-stat">
+    <div class="crd-stat-num crd-stat-num--types">{{ project_code_counts | length }}</div>
+    <div class="crd-stat-lbl">Commit Types</div>
   </div>
+  {% endif %}
 </div>
 
-{# ── Spotlight row ─────────────────────────────────────────────────────────── #}
+{# ── Commit type breakdown bar — code repos only ──────────────────────────── #}
+{% if is_code_domain and project_code_counts %}
+{% set type_order = ["feat", "fix", "refactor", "docs", "test", "perf", "chore", "revert"] %}
+{% set total_typed = project_code_counts.values() | sum %}
+{% if total_typed > 0 %}
+<div class="crd-type-bar-wrap">
+  <div class="crd-type-bar-label">Commit Composition</div>
+  <div class="crd-type-bar" title="Breakdown of all {{ total_typed }} typed commits">
+    {% for t in type_order %}
+      {% set ct = project_code_counts.get(t, 0) %}
+      {% if ct > 0 %}
+        {% set pct = ((ct / total_typed) * 100) | round | int %}
+        <div class="crd-type-seg" style="width:{{ pct }}%;background:{{ type_color(t) | trim }}" title="{{ t }}: {{ ct }}"></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="crd-type-legend">
+    {% for t in type_order %}
+      {% set ct = project_code_counts.get(t, 0) %}
+      {% if ct > 0 %}
+      <div class="crd-type-legend-item">
+        <span class="crd-type-legend-dot" style="background:{{ type_color(t) | trim }}"></span>
+        {{ t }}
+        <span class="crd-type-legend-ct">{{ ct }}</span>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+{# ── Spotlights ───────────────────────────────────────────────────────────── #}
 {% if contributors %}
-<div class="cr-spotlights">
+<div class="crd-spotlights">
 
   {% if most_prolific %}
-  <div class="cr-spotlight-card">
-    <div class="cr-spotlight-label">🏆 Most prolific</div>
-    <div class="cr-spotlight-body">
-      <div class="cr-avatar" style="width:36px;height:36px;font-size:15px;background:{{ avatar_color(most_prolific.author) }}">
-        {{ most_prolific.author[0] | upper }}
-      </div>
+  <div class="crd-spotlight crd-spotlight--gold">
+    <div class="crd-spotlight-eyebrow">
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Most Prolific
+    </div>
+    <div class="crd-spotlight-body">
+      {% set hue = avatar_hue(most_prolific.author) | trim %}
+      <div class="crd-avatar" style="background:hsl({{ hue }},50%,28%);width:36px;height:36px;font-size:14px">{{ most_prolific.author[0] | upper }}</div>
       <div>
-        <div class="cr-spotlight-name">{{ most_prolific.author }}</div>
-        <div class="cr-spotlight-meta">{{ most_prolific.session_count }} commits</div>
+        <div class="crd-spotlight-name">{{ most_prolific.author }}</div>
+        <div class="crd-spotlight-meta">{{ most_prolific.session_count }} commits</div>
       </div>
     </div>
   </div>
   {% endif %}
 
   {% if most_recent %}
-  <div class="cr-spotlight-card">
-    <div class="cr-spotlight-label">🕐 Most recent</div>
-    <div class="cr-spotlight-body">
-      <div class="cr-avatar" style="width:36px;height:36px;font-size:15px;background:{{ avatar_color(most_recent.author) }}">
-        {{ most_recent.author[0] | upper }}
-      </div>
+  <div class="crd-spotlight crd-spotlight--blue">
+    <div class="crd-spotlight-eyebrow">
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Most Recent
+    </div>
+    <div class="crd-spotlight-body">
+      {% set hue = avatar_hue(most_recent.author) | trim %}
+      <div class="crd-avatar" style="background:hsl({{ hue }},50%,28%);width:36px;height:36px;font-size:14px">{{ most_recent.author[0] | upper }}</div>
       <div>
-        <div class="cr-spotlight-name">{{ most_recent.author }}</div>
-        <div class="cr-spotlight-meta">Last active {{ most_recent.last_active | fmtrelative }}</div>
+        <div class="crd-spotlight-name">{{ most_recent.author }}</div>
+        <div class="crd-spotlight-meta">{{ most_recent.last_active | fmtrelative }}</div>
       </div>
     </div>
   </div>
@@ -111,16 +149,20 @@
 
   {% if longest_active %}
   {% set la_days = (longest_active.last_active - longest_active.first_active).days %}
-  <div class="cr-spotlight-card">
-    <div class="cr-spotlight-label">📆 Longest active</div>
-    <div class="cr-spotlight-body">
-      <div class="cr-avatar" style="width:36px;height:36px;font-size:15px;background:{{ avatar_color(longest_active.author) }}">
-        {{ longest_active.author[0] | upper }}
-      </div>
+  <div class="crd-spotlight crd-spotlight--purple">
+    <div class="crd-spotlight-eyebrow">
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      Longest Active
+    </div>
+    <div class="crd-spotlight-body">
+      {% set hue = avatar_hue(longest_active.author) | trim %}
+      <div class="crd-avatar" style="background:hsl({{ hue }},50%,28%);width:36px;height:36px;font-size:14px">{{ longest_active.author[0] | upper }}</div>
       <div>
-        <div class="cr-spotlight-name">{{ longest_active.author }}</div>
-        <div class="cr-spotlight-meta">
-          {% if la_days < 60 %}{{ la_days }} days{% else %}{{ (la_days / 30) | round | int }} months{% endif %}
+        <div class="crd-spotlight-name">{{ longest_active.author }}</div>
+        <div class="crd-spotlight-meta">
+          {% if la_days < 60 %}{{ la_days }} days
+          {% elif la_days < 365 %}{{ (la_days / 30) | round | int }} months
+          {% else %}{{ (la_days / 365) | round(1) }} years{% endif %}
         </div>
       </div>
     </div>
@@ -130,147 +172,130 @@
 </div>
 {% endif %}
 
-{# ── Controls ──────────────────────────────────────────────────────────────── #}
-<div class="cr-controls">
-  <span class="cr-controls-label">Sort by</span>
+{# ── Sort toolbar ─────────────────────────────────────────────────────────── #}
+{% if contributors %}
+<div class="crd-toolbar">
+  <span class="crd-toolbar-label">Sort by</span>
   <form method="get" style="display:contents">
-    <select name="sort" class="cr-sort-select" onchange="this.form.submit()">
+    <select name="sort" class="crd-sort-select" onchange="this.form.submit()">
       <option value="count"   {% if sort == 'count'   %}selected{% endif %}>Most prolific</option>
       <option value="recency" {% if sort == 'recency' %}selected{% endif %}>Most recent</option>
       <option value="alpha"   {% if sort == 'alpha'   %}selected{% endif %}>A – Z</option>
     </select>
   </form>
-  <span class="cr-total-badge">{{ total_contributors }} contributor{{ 's' if total_contributors != 1 else '' }}</span>
+  <span class="crd-count-badge">{{ total_contributors }} contributor{{ 's' if total_contributors != 1 else '' }}</span>
 </div>
 
-{# ── Contributor cards ─────────────────────────────────────────────────────── #}
-{% if contributors %}
-<div class="cr-card-list">
+{# ── Contributor cards ────────────────────────────────────────────────────── #}
+<div class="crd-list">
   {% for contrib in contributors %}
-  {% set activity_pct = ((contrib.session_count / max_commits) * 100) | round | int %}
-  {% set span_days = (contrib.last_active - contrib.first_active).days %}
-  {% set top_dims = author_top_dims.get(contrib.author, []) %}
-  {% set branch_count = author_branch_counts.get(contrib.author, 0) %}
-  {# Accent colour for card left-border = hue of avatar #}
-  {% set hue = (contrib.author | length * 37) % 360 %}
+    {% set hue = (contrib.author | length * 37) % 360 %}
+    {% set activity_pct = ((contrib.session_count / max_commits) * 100) | round | int %}
+    {% set span_days = (contrib.last_active - contrib.first_active).days %}
+    {% set top_code = author_top_code_types.get(contrib.author, []) %}
+    {% set branch_count = author_branch_counts.get(contrib.author, 0) %}
+    {% set role = primary_role(top_code) | trim %}
 
-  <div class="cr-card">
-    <div class="cr-card-accent" style="background:hsl({{ hue }}, 50%, 45%)"></div>
-    <div class="cr-card-body">
+  <div class="crd-contributor">
 
-      {# Top row: avatar + name + meta #}
-      <div class="cr-card-top">
-        <div class="cr-avatar" style="background:hsl({{ hue }}, 50%, 28%)">
-          {{ contrib.author[0] | upper }}
-        </div>
-        <div class="cr-card-info">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px">
-            <a href="/{{ contrib.author | urlencode }}" class="cr-author-name">{{ contrib.author }}</a>
-            <span class="cr-sessions-badge">
-              ♪ {{ contrib.session_count }} commit{{ 's' if contrib.session_count != 1 else '' }}
-            </span>
-            {% if branch_count > 0 %}
-            <span class="cr-branch-pill">⑂ {{ branch_count }} branch{{ 'es' if branch_count != 1 else '' }}</span>
-            {% endif %}
-          </div>
-          {# Roles #}
-          <div class="cr-roles-row">
-            {% for role in contrib.contribution_types %}
-            <span class="cr-role-chip {{ role_class(role) }}">{{ role }}</span>
-            {% endfor %}
-          </div>
-        </div>
+    {# Avatar #}
+    <div class="crd-avatar" style="background:hsl({{ hue }},50%,28%)">
+      {{ contrib.author[0] | upper }}
+    </div>
+
+    {# Body #}
+    <div class="crd-body">
+      <div class="crd-name-row">
+        <a href="/{{ contrib.author | urlencode }}" class="crd-author-name">{{ contrib.author }}</a>
+        <span class="crd-role-badge">{{ role }}</span>
       </div>
 
-      {# Activity bar #}
-      <div class="cr-activity-row">
-        <div class="cr-activity-track">
-          <div class="cr-activity-fill"
-               style="width:{{ activity_pct }}%;background:hsl({{ hue }},55%,45%)"></div>
-        </div>
-        <span class="cr-activity-pct">{{ activity_pct }}%</span>
-      </div>
-
-      {# Date range + span #}
-      <div class="cr-date-row">
-        <span>{{ contrib.first_active | fmtdate }}</span>
-        <span class="cr-date-arrow">→</span>
-        <span>{{ contrib.last_active | fmtdate }}</span>
-        <span style="opacity:0.5">·</span>
-        <span>
-          {% if span_days < 2 %}1 day
-          {% elif span_days < 60 %}{{ span_days }} days
-          {% else %}{{ (span_days / 30) | round | int }} months
-          {% endif %}
-          active
+      {# Semantic commit type chips — code domain #}
+      {% if top_code %}
+      <div class="crd-type-chips">
+        {% for ctype, ct in top_code %}
+        <span class="crd-type-chip crd-chip--{{ ctype }}">
+          <span class="crd-chip-dot"></span>
+          {{ ctype }}
+          <span class="crd-chip-ct">×{{ ct }}</span>
         </span>
+        {% endfor %}
       </div>
-
-      {# Top musical dimensions #}
-      {% if top_dims %}
-      <div class="cr-dims-row">
-        <span class="cr-dims-label">Focus:</span>
-        {% for dim, count in top_dims %}
-        {% set dc = dim_color(dim) %}
-        <span class="cr-dim-chip cr-dim-chip-{{ dim }}">
-          <span class="cr-dim-dot" style="background:{{ dc }}"></span>
-          {{ dim }}
-        </span>
+      {% elif contrib.contribution_types and 'contributor' not in contrib.contribution_types %}
+      {# Fallback: show backend-inferred roles if non-trivial #}
+      <div class="crd-type-chips">
+        {% for role_name in contrib.contribution_types %}
+        <span class="crd-type-chip crd-chip--chore">{{ role_name }}</span>
         {% endfor %}
       </div>
       {% endif %}
 
+      {# Activity bar #}
+      <div class="crd-activity">
+        <div class="crd-activity-track">
+          <div class="crd-activity-fill"
+               style="width:{{ activity_pct }}%;background:hsl({{ hue }},55%,45%)"></div>
+        </div>
+        <span class="crd-activity-pct">{{ activity_pct }}%</span>
+      </div>
+
+      {# Date range #}
+      <div class="crd-date-range">
+        <span>{{ contrib.first_active | fmtdate }}</span>
+        <span class="crd-date-arrow">→</span>
+        <span>{{ contrib.last_active | fmtdate }}</span>
+        <span class="crd-date-span">{{ span_label(contrib.first_active, contrib.last_active) | trim }}</span>
+      </div>
     </div>
+
+    {# Right: commit count + branch pill #}
+    <div class="crd-stats-col">
+      <div>
+        <div class="crd-commit-count">{{ contrib.session_count }}</div>
+        <div class="crd-commit-lbl">commit{{ 's' if contrib.session_count != 1 else '' }}</div>
+      </div>
+      {% if branch_count > 0 %}
+      <div class="crd-branch-pill">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        {{ branch_count }} branch{{ 'es' if branch_count != 1 else '' }}
+      </div>
+      {% endif %}
+    </div>
+
   </div>
   {% endfor %}
 </div>
 
-{# ── Roles legend ──────────────────────────────────────────────────────────── #}
-{% if all_roles %}
-<div class="cr-roles-legend">
-  <span style="font-size:11px;color:var(--text-muted);font-weight:600;margin-right:4px">Roles in this project:</span>
-  {% set role_colors = {
-    'composer': '#a371f7',
-    'arranger': '#58a6ff',
-    'producer': '#e3b341',
-    'performer': '#3fb950',
-    'mixer': '#2dd4bf',
-    'editor': '#8b949e',
-    'lyricist': '#f778ba',
-    'sound designer': '#f0883e',
-    'contributor': '#6e7681',
-  } %}
-  {% for role in all_roles %}
-  <div class="cr-legend-item">
-    <span class="cr-legend-dot" style="background:{{ role_colors.get(role, '#6e7681') }}"></span>
-    {{ role }}
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
 
 {% else %}
-<div class="cr-empty">
-  <div class="cr-empty-icon">🎵</div>
-  <div class="cr-empty-title">No credits yet</div>
-  <p style="font-size:13px">Contributor credits appear here after the first commit is pushed.</p>
+{# Empty state #}
+<div class="crd-empty">
+  <div class="crd-empty-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  </div>
+  <div class="crd-empty-title">No contributors yet</div>
+  <div class="crd-empty-desc">Attribution appears here after the first commit is pushed to this repository.</div>
 </div>
 {% endif %}
 
-</div>{# /.content-wide #}
+</div>
+{% endblock %}
 
-{# ── JSON-LD (schema.org/MusicComposition) — fixed camelCase bug ──────────── #}
+{# ── JSON-LD structured data ──────────────────────────────────────────────── #}
+{% block jsonld %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "MusicComposition",
+  "@type": "SoftwareSourceCode",
   "name": {{ repo_slug | tojson }},
   "contributor": [
     {% for contrib in contributors %}
     {
       "@type": "Person",
-      "name": {{ contrib.author | tojson }},
-      "roleName": {{ contrib.contribution_types | join(', ') | tojson }}
+      "name": {{ contrib.author | tojson }}
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   ]

@@ -1,5 +1,7 @@
 /**
  * tags.ts — MuseHub tags page module.
+ *
+ * Client-side search filtering across tag rows.
  */
 
 export function initTags(): void {
@@ -9,9 +11,9 @@ export function initTags(): void {
 
   input.addEventListener('input', () => {
     const q = input.value.toLowerCase();
-    tagList.querySelectorAll<HTMLElement>('.tag-card').forEach(card => {
-      const name = (card.dataset.tagName || '').toLowerCase();
-      card.style.display = !q || name.includes(q) ? '' : 'none';
+    tagList.querySelectorAll<HTMLElement>('.tg-row').forEach(row => {
+      const name = (row.dataset['tagName'] || '').toLowerCase();
+      row.style.display = !q || name.includes(q) ? '' : 'none';
     });
   });
 }

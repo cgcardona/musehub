@@ -10,10 +10,7 @@ exposes a ``router = APIRouter(...)`` attribute. It will be picked up
 automatically on the next server start. No changes to this file are needed.
 
 Registration order:
-- ``analysis.harmony_router`` is registered before ``analysis.router`` so
-  the specific ``/analysis/{ref}/harmony`` path takes priority over the
-  generic ``/{dimension}`` catch-all declared in ``analysis.router``.
-- All other modules are registered alphabetically.
+- All modules are registered alphabetically.
 - ``repos`` is always last because it declares the ``/{owner}/{repo_slug}``
   wildcard route, which must not shadow any fixed-path routes.
 
@@ -30,16 +27,10 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
-from musehub.api.routes.musehub import analysis
-
 router = APIRouter(prefix="")
 
 _PACKAGE = "musehub.api.routes.musehub"
 _HERE = [str(Path(__file__).parent)]
-
-# harmony_router first: specific /analysis/{ref}/harmony must beat the
-# generic /{dimension} catch-all declared in analysis.router.
-router.include_router(analysis.harmony_router, tags=["Analysis"])
 
 # Modules registered directly in main.py (with their own prefix/placement)
 # must be excluded here to prevent double-registration and duplicate operationIds.
@@ -50,13 +41,11 @@ _DIRECT_REGISTERED = {
     "ui",              # registered in main.py at root (router + fixed_router)
     "ui_blame",        # registered in main.py at root
     "ui_collaborators",# registered in main.py at root
-    "ui_emotion_diff", # registered in main.py at root
     "ui_forks",        # registered in main.py at root
     "ui_labels",       # registered in main.py at root
     "ui_milestones",   # registered in main.py at root
     "ui_notifications",# registered in main.py at root
     "ui_settings",     # registered in main.py at root
-    "ui_similarity",   # registered in main.py at root
     "ui_stash",        # registered in main.py at root
     "ui_topics",       # registered in main.py at root
     "ui_mcp_elicitation", # registered in main.py at root (MCP elicitation UI pages)

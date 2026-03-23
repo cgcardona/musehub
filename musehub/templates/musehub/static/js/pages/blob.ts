@@ -76,10 +76,6 @@ interface BlobData {
   contentText?: string;
 }
 
-declare global {
-  interface Window { __blobCfg?: BlobCfg; }
-}
-
 declare const escHtml: (s: unknown) => string;
 declare const getToken: () => string;
 
@@ -369,8 +365,17 @@ async function loadBlob(cfg: BlobCfg): Promise<void> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initBlob(): void {
-  const cfg = window.__blobCfg;
-  if (!cfg) return;
+export function initBlob(data: Record<string, unknown> = {}): void {
+  const cfg: BlobCfg = {
+    repoId:          String(data['repoId']          ?? ''),
+    ref:             String(data['ref']             ?? ''),
+    filePath:        String(data['filePath']        ?? ''),
+    filename:        String(data['filename']        ?? ''),
+    owner:           String(data['owner']           ?? ''),
+    repoSlug:        String(data['repoSlug']        ?? ''),
+    base:            String(data['base']            ?? ''),
+    ssrBlobRendered: data['ssrBlobRendered'] === true || data['ssrBlobRendered'] === 'true',
+  };
+  if (!cfg.repoId) return;
   void loadBlob(cfg);
 }

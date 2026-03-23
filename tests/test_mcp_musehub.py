@@ -31,6 +31,7 @@ from musehub.db.musehub_models import (
     MusehubCommit,
     MusehubObject,
     MusehubRepo,
+    MusehubSnapshot,
 )
 from musehub.mcp.server import MuseMCPServer, ToolCallResult
 from musehub.mcp.tools import MCP_TOOLS, MUSEHUB_TOOL_NAMES, TOOL_CATEGORIES
@@ -80,6 +81,13 @@ async def _seed_repo(session: AsyncSession) -> MusehubRepo:
         snapshot_id="snap-001",
     )
     session.add(commit)
+
+    snapshot = MusehubSnapshot(
+        snapshot_id="snap-001",
+        repo_id="repo-test-001",
+        manifest={"tracks/bass.mid": "sha256:abc123"},
+    )
+    session.add(snapshot)
 
     obj = MusehubObject(
         object_id="sha256:abc123",
@@ -175,6 +183,8 @@ class TestMusehubToolsRegistered:
             "musehub_whoami",
             "muse_pull",
             "muse_remote",
+            # Prompt access shim
+            "musehub_get_prompt",
         }
         expected_write = {
             "musehub_create_repo",

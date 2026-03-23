@@ -120,7 +120,6 @@ _MIGRATED_ROUTES: list[tuple[str, str]] = [
     ("issue_list", "/{O}/{S}/issues"),
     ("releases", "/{O}/{S}/releases"),
     ("sessions", "/{O}/{S}/sessions"),
-    ("in_repo_search", "/{O}/{S}/search"),
     ("activity", "/{O}/{S}/activity"),
     ("credits", "/{O}/{S}/credits"),
     ("branches", "/{O}/{S}/branches"),
@@ -139,7 +138,6 @@ _HTMX_FRAGMENT_ROUTES: list[tuple[str, str]] = [
     ("issue_list", "/{O}/{S}/issues"),
     ("releases", "/{O}/{S}/releases"),
     ("sessions", "/{O}/{S}/sessions"),
-    ("in_repo_search", "/{O}/{S}/search"),
     ("activity", "/{O}/{S}/activity"),
     ("branches", "/{O}/{S}/branches"),
 ]

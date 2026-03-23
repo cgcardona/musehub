@@ -33,6 +33,8 @@ from musehub.models.wire import (
     WireFetchRequest,
     WireFetchResponse,
     WireObject,
+    WireObjectsRequest,
+    WireObjectsResponse,
     WirePushRequest,
     WirePushResponse,
     WireRefsResponse,
@@ -190,6 +192,13 @@ async def wire_push(
     bundle: WireBundle = req.bundle
     branch_name: str = req.branch or "main"
 
+    # Resolve the pusher's public username to use as the author fallback when
+    # commits arrive without an --author flag from the CLI.
+    _pusher_profile = await session.get(db.MusehubProfile, pusher_id)
+    _pusher_username: str = (
+        _pusher_profile.username if _pusher_profile is not None else pusher_id or ""
+    )
+
     # ── 1. Objects ────────────────────────────────────────────────────────────
     for wire_obj in bundle.objects:
         if not wire_obj.object_id or not wire_obj.content_b64:
@@ -264,13 +273,15 @@ async def wire_push(
             "test_runs": wire_commit.test_runs,
         }
 
+        # Fall back to the pusher's username when the CLI didn't supply --author.
+        author = wire_commit.author or _pusher_username
         commit_row = db.MusehubCommit(
             commit_id=wire_commit.commit_id,
             repo_id=repo_id,
             branch=branch_name,
             parent_ids=parent_ids,
             message=wire_commit.message,
-            author=wire_commit.author,
+            author=author,
             timestamp=_parse_iso(wire_commit.committed_at) if wire_commit.committed_at else _utc_now(),
             snapshot_id=wire_commit.snapshot_id,
             commit_meta=commit_meta,
@@ -344,6 +355,72 @@ async def wire_push(
         branch_heads=branch_heads,
         remote_head=new_head or "",
     )
+
+
+async def wire_push_objects(
+    session: AsyncSession,
+    repo_id: str,
+    req: WireObjectsRequest,
+    pusher_id: str | None = None,
+) -> WireObjectsResponse:
+    """Pre-upload a chunk of objects for a large push.
+
+    This is Phase 1 of a chunked push.  The client splits its object list
+    into batches of ≤ MAX_OBJECTS_PER_PUSH and calls this endpoint once per
+    batch.  Phase 2 is ``wire_push`` with an empty ``bundle.objects`` list;
+    the final push only carries commits and snapshots (which are small).
+
+    Objects are content-addressed, so uploading the same object twice is
+    harmless — existing objects are skipped and counted as ``skipped``.
+    Authorization mirrors ``wire_push``: only the repo owner may upload.
+    """
+    repo_row = await session.get(db.MusehubRepo, repo_id)
+    if repo_row is None or repo_row.deleted_at is not None:
+        raise ValueError("repo not found")
+
+    if not pusher_id or pusher_id != repo_row.owner_user_id:
+        logger.warning(
+            "⚠️ push/objects rejected: pusher=%s is not owner of repo=%s",
+            pusher_id,
+            repo_id,
+        )
+        raise PermissionError("push rejected: not authorized")
+
+    backend = get_backend()
+    stored = 0
+    skipped = 0
+
+    for wire_obj in req.objects:
+        if not wire_obj.object_id or not wire_obj.content_b64:
+            continue
+        existing = await session.get(db.MusehubObject, wire_obj.object_id)
+        if existing is not None:
+            skipped += 1
+            continue
+
+        try:
+            raw = base64.b64decode(wire_obj.content_b64 + "==")
+        except Exception as exc:
+            logger.warning("Failed to decode object %s: %s", wire_obj.object_id, exc)
+            continue
+
+        storage_uri = await backend.put(repo_id, wire_obj.object_id, raw)
+        obj_row = db.MusehubObject(
+            object_id=wire_obj.object_id,
+            repo_id=repo_id,
+            path=wire_obj.path or "",
+            size_bytes=len(raw),
+            disk_path=storage_uri.replace("local://", ""),
+            storage_uri=storage_uri,
+        )
+        session.add(obj_row)
+        stored += 1
+
+    await session.commit()
+    logger.info(
+        "✅ push/objects repo=%s stored=%d skipped=%d", repo_id, stored, skipped
+    )
+    return WireObjectsResponse(stored=stored, skipped=skipped)
 
 
 async def _fetch_commit(

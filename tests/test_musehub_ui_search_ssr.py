@@ -1,7 +1,7 @@
-"""SSR tests for MuseHub search pages — issue #577.
+"""SSR tests for MuseHub global search page.
 
-Verifies that global_search_page() and search_page() render results
-server-side in Jinja2 templates without requiring JavaScript execution.
+Verifies that global_search_page() renders results server-side in Jinja2
+templates without requiring JavaScript execution.
 Tests assert on HTML content directly returned by the server.
 
 Covers GET /search (global search):
@@ -10,14 +10,8 @@ Covers GET /search (global search):
 - test_global_search_short_query_shows_prompt
 - test_global_search_htmx_fragment_path
 - test_global_search_empty_query_shows_prompt
-
-Covers GET /{owner}/{repo_slug}/search (repo-scoped search):
-- test_repo_search_form_populated_server_side
-- test_repo_search_short_query_shows_prompt
-- test_repo_search_htmx_fragment_returns_no_html
-- test_repo_search_no_results_shows_empty_state
-- test_repo_search_results_rendered_server_side
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -188,7 +182,7 @@ async def test_global_search_htmx_fragment_path(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """HX-Request: true causes the handler to return only the fragment — no <html> shell."""
+    """HX-Request: true causes the handler to return only the fragment - no <html> shell."""
     repo_id = await _make_repo(db_session, owner="htmx_search_artist", slug="htmx-search-album")
     await _make_musehub_commit(
         db_session,
@@ -205,95 +199,3 @@ async def test_global_search_htmx_fragment_path(
     assert "funky" in response.text
 
 
-# ---------------------------------------------------------------------------
-# Repo-scoped search — GET /{owner}/{repo_slug}/search
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.anyio
-async def test_repo_search_form_populated_server_side(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """The query value is rendered server-side into the search form input (not by JS)."""
-    await _make_repo(db_session, owner="repo_search_artist", slug="repo-search-album")
-    response = await client.get(
-        "/repo_search_artist/repo-search-album/search?q=jazzcore"
-    )
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    # query value is SSR-populated into the input element
-    assert "jazzcore" in response.text
-
-
-@pytest.mark.anyio
-async def test_repo_search_short_query_shows_prompt(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """A single-character query renders the repo search page (no results run)."""
-    await _make_repo(
-        db_session, owner="repo_search_short", slug="repo-search-short-album"
-    )
-    response = await client.get(
-        "/repo_search_short/repo-search-short-album/search?q=x"
-    )
-    assert response.status_code == 200
-    assert '"page": "search"' in response.text
-
-
-@pytest.mark.anyio
-async def test_repo_search_htmx_fragment_returns_no_html(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """HX-Request: true causes the handler to return only the fragment — no <html> shell."""
-    await _make_repo(
-        db_session, owner="htmx_repo_search", slug="htmx-repo-search-album"
-    )
-    response = await client.get(
-        "/htmx_repo_search/htmx-repo-search-album/search?q=zzznomatch",
-        headers={"HX-Request": "true"},
-    )
-    assert response.status_code == 200
-    assert "<html" not in response.text
-    # The fragment contains the SSR-rendered empty state (no JS needed)
-    assert "No results" in response.text
-
-
-@pytest.mark.anyio
-async def test_repo_search_no_results_shows_empty_state(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """A query with no matches renders the empty-state block server-side."""
-    await _make_repo(
-        db_session, owner="repo_search_empty", slug="repo-search-empty-album"
-    )
-    response = await client.get(
-        "/repo_search_empty/repo-search-empty-album/search?q=zzznomatch"
-    )
-    assert response.status_code == 200
-    assert "No results" in response.text
-
-
-@pytest.mark.anyio
-async def test_repo_search_results_rendered_server_side(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Commit message appears in the HTML for in-repo keyword search (SSR via MuseCliCommit)."""
-    repo_id = await _make_repo(
-        db_session, owner="repo_search_ssr", slug="repo-search-ssr-album"
-    )
-    await _make_cli_commit(
-        db_session,
-        repo_id,
-        message="soulful groove rhythm section unique term",
-    )
-    response = await client.get(
-        "/repo_search_ssr/repo-search-ssr-album/search?q=soulful+groove"
-    )
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "soulful" in response.text

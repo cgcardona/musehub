@@ -155,12 +155,12 @@ async def test_forks_page_has_compare_button_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Fork network page dispatches forks.ts; Compare button rendered SSR when forks exist."""
+    """Fork network page dispatches forks.ts; config passed via page_json data block."""
     await _make_repo(db_session)
     response = await client.get("/upstream/bass-project/forks")
     assert response.status_code == 200
     assert '"page": "forks"' in response.text
-    assert "__forksCfg" in response.text
+    assert '"repoId"' in response.text
 
 
 @pytest.mark.anyio

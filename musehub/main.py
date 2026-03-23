@@ -6,7 +6,6 @@ GitHub for music — push commits, open pull requests, track issues, publish rel
 """
 
 import logging
-import secrets
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from typing import Awaitable, Callable
@@ -33,10 +32,8 @@ from musehub.api.routes.musehub import (
     ui_collaborators as musehub_ui_collab_routes,
     ui_labels as musehub_ui_labels_routes,
     ui_settings as musehub_ui_settings_routes,
-    ui_similarity as musehub_ui_similarity_routes,
     ui_topics as musehub_ui_topics_routes,
     ui_forks as musehub_ui_forks_routes,
-    ui_emotion_diff as musehub_ui_emotion_diff_routes,
     ui_user_profile as musehub_ui_profile_routes,
     ui_mcp_elicitation as musehub_ui_mcp_elicitation_routes,
     ui_new_repo as musehub_ui_new_repo_routes,
@@ -50,7 +47,7 @@ from musehub.api.routes.musehub import (
 )
 from musehub.api.routes import musehub as musehub_router_pkg
 from musehub.api.routes.mcp import router as mcp_router
-from musehub.api.routes.musehub.ui_view import view_router as musehub_ui_view_router
+from musehub.api.routes.musehub.ui_view import insights_router as musehub_ui_insights_router
 from musehub.api.routes.musehub.ui_view import redirect_router as musehub_ui_redirect_router
 from musehub.api.routes.wire import router as wire_router
 from musehub.api.routes.api.repos import router as api_repos_router
@@ -65,11 +62,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        # Generate a per-request nonce before rendering so templates can use
-        # request.state.csp_nonce in <script nonce="..."> attributes, replacing
-        # the blanket 'unsafe-inline' allowance.
-        nonce = secrets.token_urlsafe(16)
-        request.state.csp_nonce = nonce
+        # No per-request nonces: HTMX swaps the <body>, making per-request
+        # nonces incompatible (the browser would block scripts whose nonce no
+        # longer matches the current navigation). All inline scripts have been
+        # removed; external scripts are served from 'self'. 'unsafe-eval' is
+        # still required by Alpine.js v3's expression evaluator.
+        request.state.csp_nonce = ""
 
         response = await call_next(request)
 
@@ -83,12 +81,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "gyroscope=(), magnetometer=(), microphone=(), "
             "payment=(), usb=()"
         )
-        # 'unsafe-eval' kept for Alpine.js expression evaluation (required by
-        # Alpine v3).  'unsafe-inline' removed in favour of per-request nonces;
-        # any inline <script> must carry nonce="{{ request.state.csp_nonce }}".
+        # 'unsafe-eval' is required by Alpine.js v3 (it uses new Function()
+        # for expression evaluation). 'unsafe-inline' has been removed from
+        # script-src: all JS is in external files served from 'self'.
+        # style-src keeps 'unsafe-inline' while server-rendered dynamic inline
+        # styles (avatar colours, label colours, etc.) are still present.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"script-src 'self' 'unsafe-eval' 'nonce-{nonce}'; "
+            "script-src 'self' 'unsafe-eval'; "
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
             "font-src 'self' https://fonts.bunny.net; "
             "img-src 'self' data: https:; "
@@ -264,15 +264,13 @@ app.include_router(mcp_router)
 
 # Wildcard UI routes — /{owner}/{repo_slug} and deeper paths.
 # Must come after all fixed-path routers above.
-# Redirect router must come before view_router so /piano-roll, /listen, /arrange
+# Redirect router must come before insights_router so /piano-roll, /listen, /arrange
 # are caught and 301'd before they'd match as owner names.
 app.include_router(musehub_ui_redirect_router, tags=["musehub-ui-redirects"])
-app.include_router(musehub_ui_view_router, tags=["musehub-ui-view"])
+app.include_router(musehub_ui_insights_router, tags=["musehub-ui-insights"])
 app.include_router(musehub_ui_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_blame_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_settings_routes.router, tags=["musehub-ui-settings"])
-app.include_router(musehub_ui_similarity_routes.router, tags=["musehub-ui"])
-app.include_router(musehub_ui_emotion_diff_routes.router, tags=["musehub-ui"])
 
 # Profile catch-all MUST be last — /{username} is a single-segment wildcard and
 # would shadow fixed routes (e.g. /explore, /feed, /topics, /mcp) if registered earlier.

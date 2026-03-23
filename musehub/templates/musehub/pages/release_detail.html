@@ -12,17 +12,8 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "release-detail"}{% endblock %}
 
-{% block page_data %}
-window.__releaseCfg = {
-  repoId:   {{ repo_id | tojson }},
-  tag:      {{ tag | tojson }},
-  base:     {{ base_url | tojson }},
-  owner:    {{ owner | tojson }},
-  audioUrl: {{ release.download_urls.get("mp3") | tojson }},
-};
-{% endblock %}
+{% block page_json %}{"page": "release-detail", "repoId": {{ repo_id | tojson }}, "tag": {{ tag | tojson }}, "base": {{ base_url | tojson }}, "owner": {{ owner | tojson }}, "audioUrl": {{ release.download_urls.get("mp3") | tojson }}}{% endblock %}
 
 {% block content %}
 <div class="content-wide" style="padding-top: var(--space-4)">

@@ -29,9 +29,21 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 # ── Per-request DoS limits (enforced via Pydantic max_length) ───────────────
-MAX_COMMITS_PER_PUSH: int = 1_000
+#
+# Objects are the large-payload risk: each blob can be up to ~38 MB decoded
+# (MAX_B64_SIZE).  Keeping MAX_OBJECTS_PER_PUSH at 1 000 bounds a single
+# push to ≤ 38 GB in the worst case; the client chunks large pushes and
+# pre-uploads blobs via POST /push/objects before the final commit push.
+#
+# Commits and snapshots are inherently small (< 2 KB each after JSON
+# serialisation). A full 10 000-commit history is typically < 20 MB total —
+# well within a single request.  Setting a 1 000-item cap here would block
+# legitimate large initial pushes without any real security benefit, so we
+# allow up to 10 000 items and rely on the HTTP body-size cap (uvicorn's
+# max_request_body_size, default 1 GiB) for DoS protection.
+MAX_COMMITS_PER_PUSH: int = 10_000
 MAX_OBJECTS_PER_PUSH: int = 1_000
-MAX_SNAPSHOTS_PER_PUSH: int = 1_000
+MAX_SNAPSHOTS_PER_PUSH: int = 10_000
 MAX_WANT_PER_FETCH: int = 1_000
 # Base64 string length limit — base64 expands by ~1.37×, so 52 MB b64 ≈ 38 MB raw.
 MAX_B64_SIZE: int = 52_000_000
@@ -187,3 +199,22 @@ class WireFetchResponse(BaseModel):
     snapshots: list[WireSnapshot] = Field(default_factory=list)
     objects: list[WireObject] = Field(default_factory=list)
     branch_heads: dict[str, str] = Field(default_factory=dict)
+
+
+class WireObjectsRequest(BaseModel):
+    """Body for ``POST /{owner}/{slug}/push/objects`` — chunked object pre-upload.
+
+    Clients split large pushes into multiple calls to this endpoint before
+    calling ``POST /{owner}/{slug}/push`` with an empty objects list.
+    Objects are content-addressed (SHA-256) so uploading the same object
+    twice is always safe — the server skips objects it already holds.
+    """
+
+    objects: list[WireObject] = Field(default_factory=list, max_length=MAX_OBJECTS_PER_PUSH)
+
+
+class WireObjectsResponse(BaseModel):
+    """Response for ``POST /{owner}/{slug}/push/objects``."""
+
+    stored: int   # objects written to storage this call
+    skipped: int  # objects already present (idempotent no-op)

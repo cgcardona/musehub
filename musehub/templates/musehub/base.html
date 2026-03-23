@@ -1,13 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background:#0d1117">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  {# FOUC prevention: keep the document invisible until app.css has been parsed.
-     The inline script immediately after <link app.css> adds the 'css-ready' class
-     which transitions to opacity:1. On HTMX navigation, musehub.ts removes/re-adds
-     the class around the body swap so there is no flash of unstyled content. #}
-  <style>html{opacity:0}html.css-ready{opacity:1;transition:opacity .12s ease}</style>
   <link rel="preconnect" href="https://fonts.bunny.net">
   <link rel="stylesheet" href="https://fonts.bunny.net/css?family=jetbrains-mono:400,500,600,700&display=swap">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -15,7 +10,6 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
   <link rel="shortcut icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/app.css?v={{ static_version }}">
-  <script nonce="{{ request.state.csp_nonce }}">document.documentElement.classList.add('css-ready')</script>
   <title>{% block title %}MuseHub{% endblock %} — MuseHub</title>
   <link rel="alternate" type="application/json" href="{{ request.url }}">
   {% block oembed_link %}<link rel="alternate" type="application/json+oembed"
@@ -25,26 +19,6 @@
   {% if muse_resource_uri is defined %}<link rel="muse-resource" href="{{ muse_resource_uri }}">{% endif %}
   <link rel="muse-mcp" href="/mcp">
   <link rel="muse-docs" href="/mcp/docs">
-  <style>
-    /* ── Repo tab strip — full-width on desktop, scroll on mobile ──────────── */
-    @media (min-width: 768px) {
-      .repo-tabs { overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
-      .repo-tabs-inner { justify-content: space-evenly; padding: 0; }
-      .repo-tab { flex: 1; justify-content: center; flex-shrink: 1; padding-left: var(--space-2); padding-right: var(--space-2); }
-    }
-    @media (max-width: 767px) {
-      .repo-tabs-inner { width: max-content; }
-      .repo-tab { flex-shrink: 0; }
-    }
-    /* ── Branch picker ──────────────────────────────────────────────────────── */
-    .rh-branch-picker { display: inline-flex; align-items: center; gap: 5px; }
-    .rh-branch-select {
-      background: transparent; border: none; border-bottom: 1px solid var(--color-accent);
-      color: var(--text-primary); font-size: 12px; font-weight: 500; font-family: inherit;
-      padding: 2px 0; cursor: pointer; outline: none;
-    }
-    .rh-branch-select:focus { border-bottom-color: var(--color-accent); }
-  </style>
   {% block extra_css %}{% endblock %}
   {% block jsonld %}{% endblock %}
   <script src="/static/alpinejs.min.js" defer></script>
@@ -74,41 +48,8 @@
 
   {% block body_extra %}{% endblock %}
 
-  {# Persistent floating audio player #}
-  <div class="audio-player" id="audio-player" style="display:none">
-    <button class="player-btn" id="player-toggle" onclick="togglePlay()" aria-label="Play/pause">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,3 19,12 5,21"/></svg>
-    </button>
-    <div class="player-info">
-      <span class="player-title" id="player-title">Now Playing</span>
-      <span class="player-repo" id="player-repo"></span>
-    </div>
-    <div class="player-progress">
-      <span class="player-time" id="player-current">0:00</span>
-      <input type="range" class="player-seek" id="player-seek" value="0" min="0" max="100" step="0.1"
-             oninput="seekAudio(this.value)" />
-      <span class="player-time" id="player-duration">0:00</span>
-    </div>
-    <audio id="player-audio" onended="onAudioEnded()" ontimeupdate="onTimeUpdate()"
-           onloadedmetadata="onMetadata()"></audio>
-    <button class="player-btn" onclick="closePlayer()" aria-label="Close player">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-  </div>
-
   <script src="/static/app.js?v={{ static_version }}"></script>
-  {# page_json: JSON data bridge for new TypeScript page modules (read by musehub.ts dispatchPageModule) #}
+  {# page_json: JSON data bridge for TypeScript page modules (read by musehub.ts dispatchPageModule) #}
   <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>
-  {#
-    page_data + page_script are combined in a single IIFE so that `const`/`let`
-    declarations are scoped to each navigation and cannot cause
-    "Identifier X has already been declared" SyntaxErrors on HTMX re-navigation.
-    Functions that must be reachable from HTML onclick="" handlers must be
-    explicitly assigned to window (e.g. window.myFn = function() {...}).
-  #}
-  <script nonce="{{ request.state.csp_nonce }}">(function () {
-{% block page_data %}{% endblock %}
-{% block page_script %}{% endblock %}
-  })();</script>
 </body>
 </html>

@@ -1,7 +1,9 @@
 """SSR tests for the graph (DAG) page and blob viewer — issue #584.
 
 Verifies that:
-- graph_page() injects ``window.__graphData`` and renders commit/branch counts server-side.
+- graph_page() injects DAG data via the ``page_json`` block (``<script
+  type="application/json" id="page-data">``) so HTMX navigation re-reads it on
+  every swap without relying on ``window.*`` globals that are only set once.
 - blob_page() renders text file content (line-numbered table) server-side.
 - blob_page() renders MIDI player shell with data-midi-url.
 - blob_page() renders binary download link when file is binary.
@@ -123,10 +125,12 @@ async def test_graph_page_sets_graph_data_js_global(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """window.__graphCfg is injected into the graph page HTML server-side.
+    """DAG config and data are injected into the page_json block server-side.
 
-    The DAG renderer reads this global on load to skip an extra API round-trip.
-    Its presence in the initial HTML is the SSR contract for this page.
+    The graph renderer reads ``<script type="application/json" id="page-data">``
+    on every load — including HTMX partial swaps — so no ``window.*`` globals
+    are needed.  The SSR contract is that ``"page": "graph"`` and ``"repoId"``
+    appear inside that JSON block.
     """
     repo_id = await _seed_repo(db_session)
     cid = await _seed_commit(db_session, repo_id)
@@ -134,7 +138,8 @@ async def test_graph_page_sets_graph_data_js_global(
 
     response = await client.get(f"/{_OWNER}/{_SLUG}/graph")
     assert response.status_code == 200
-    assert "window.__graphCfg" in response.text
+    assert '"page": "graph"' in response.text
+    assert '"repoId"' in response.text
 
 
 @pytest.mark.anyio
@@ -380,5 +385,5 @@ async def test_blob_page_unknown_path_no_ssr(
     # No SSR blob content block when object is absent — the id="blob-ssr-content" div
     # must NOT appear (note: the string 'blob-ssr-content' may appear in JS code).
     assert 'id="blob-ssr-content"' not in response.text
-    # JS guard variable must be set to false so the JS fallback runs
-    assert "ssrBlobRendered: false" in response.text
+    # page_json must signal ssrBlobRendered: false so the JS fallback runs
+    assert '"ssrBlobRendered": false' in response.text

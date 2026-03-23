@@ -12,10 +12,6 @@
 {% include "musehub/partials/repo_nav.html" %}
 {% endblock %}
 
-{% block page_json %}{"page": "commit"}{% endblock %}
-
-{% block page_data %}window.__commitPageCfg = { repoId: {{ repo_id | tojson }}, commitId: {{ commit_id | tojson }}, base: {{ base_url | tojson }}, listenUrl: {{ listen_url | tojson }}, embedUrl: {{ embed_url | tojson }}, shortId: {{ short_id | tojson }} };{% endblock %}
-
 {% block body_extra %}
 <script src="/static/vendor/wavesurfer.min.js"></script>
 <!-- Compose Variation Modal -->

@@ -240,6 +240,11 @@ async def mcp_post(request: Request) -> Response:
             session = get_session(session_id_header)
             if session is None:
                 # Session expired or unknown → client must re-initialize.
+                # NOTE: multi-worker deployments using in-process session storage
+                # require sticky sessions at the load-balancer level so that all
+                # requests for a given Mcp-Session-Id land on the same worker.
+                # See nginx upstream hash $http_mcp_session_id consistent for
+                # a production-ready solution.
                 return JSONResponse(
                     status_code=404,
                     content={

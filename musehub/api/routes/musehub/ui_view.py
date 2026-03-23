@@ -1,25 +1,17 @@
-"""Generic domain viewer and insights UI routes.
+"""Domain insights UI routes.
 
-Routes:
-  GET /{owner}/{repo}/view/{ref}               — universal domain viewer
-  GET /{owner}/{repo}/view/{ref}/{path:path}   — domain viewer for a specific file
-  GET /{owner}/{repo}/insights/{ref}            — domain insights dashboard
-  GET /{owner}/{repo}/insights/{ref}/{dim}      — single insight dimension
+Canonical routes:
+  GET /{owner}/{repo}/insights/{ref}       — domain insights (symbol graph + analytics)
+  GET /{owner}/{repo}/insights/{ref}/{dim} — single insight dimension
+
+Legacy aliases (same handler, no redirect — preserved for backward compat):
+  GET /{owner}/{repo}/view/{ref}           → same as insights/{ref}
+  GET /{owner}/{repo}/view/{ref}/{path}    → same as insights/{ref}
 
 Redirect routes (301):
-  GET /{owner}/{repo}/piano-roll/{ref}          → view/{ref}
-  GET /{owner}/{repo}/listen/{ref}              → view/{ref}
-  GET /{owner}/{repo}/arrange/{ref}             → view/{ref}
-  GET /{owner}/{repo}/analysis/{ref}            → insights/{ref}
-  GET /{owner}/{repo}/analysis/{ref}/{dim}      → insights/{ref}/{dim}
-
-The ``view`` route delegates rendering to the domain's ``viewer_type``:
-  - piano_roll   (MIDI)     → renders piano roll canvas via the TypeScript module
-  - symbol_graph (Code)     → renders symbol dependency graph
-  - generic      (fallback) → renders file tree
-
-The ``insights`` route populates dimension tabs from ``domain.capabilities.dimensions``.
-MIDI repos show harmony/rhythm/groove/etc; code repos show hotspots/coupling/symbols/etc.
+  GET /{owner}/{repo}/piano-roll/{ref}     → insights/{ref}
+  GET /{owner}/{repo}/listen/{ref}         → insights/{ref}
+  GET /{owner}/{repo}/arrange/{ref}        → insights/{ref}
 """
 from __future__ import annotations
 
@@ -40,75 +32,34 @@ from musehub.api.routes.musehub._nav_ctx import build_repo_nav_ctx
 from musehub.api.routes.musehub.htmx_helpers import htmx_fragment_or_full
 from musehub.db import get_db
 from musehub.db import musehub_models as musehub_db
-from musehub.services import musehub_repository, musehub_domains, musehub_analysis
+from musehub.services import musehub_repository, musehub_domains
 
 logger = logging.getLogger(__name__)
 
-# Two separate routers: fixed_router for redirect paths, wildcard_router for the new paths.
-# Both are exported and registered in main.py.
-view_router = APIRouter(prefix="", tags=["musehub-ui-view"])
+insights_router = APIRouter(prefix="", tags=["musehub-ui-insights"])
 redirect_router = APIRouter(prefix="", tags=["musehub-ui-redirects"])
 
 
 # ── Redirect routes (301) ─────────────────────────────────────────────────────
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/piano-roll/{ref:path}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/piano-roll/{ref:path}", include_in_schema=False)
 async def redirect_piano_roll(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/view/{ref}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/listen/{ref:path}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/listen/{ref:path}", include_in_schema=False)
 async def redirect_listen(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/view/{ref}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/arrange/{ref:path}",
-    include_in_schema=False,
-)
+@redirect_router.get("/{owner}/{repo_slug}/arrange/{ref:path}", include_in_schema=False)
 async def redirect_arrange(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/view/{ref}",
-        status_code=301,
-    )
+    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
-@redirect_router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}/{dim}",
-    include_in_schema=False,
-)
-async def redirect_analysis_dim(owner: str, repo_slug: str, ref: str, dim: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/insights/{ref}/{dim}",
-        status_code=301,
-    )
 
-
-@redirect_router.get(
-    "/{owner}/{repo_slug}/analysis/{ref}",
-    include_in_schema=False,
-)
-async def redirect_analysis(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(
-        url=f"/{owner}/{repo_slug}/insights/{ref}",
-        status_code=301,
-    )
-
-
-# ── View route ────────────────────────────────────────────────────────────────
+# ── Insights route ─────────────────────────────────────────────────────────────
 
 
 async def _get_domain_for_repo(
@@ -140,118 +91,46 @@ async def _get_domain_for_repo(
     }
 
 
-@view_router.get(
-    "/{owner}/{repo_slug}/view/{ref}",
-    response_class=HTMLResponse,
-    summary="Universal domain viewer",
-    operation_id="domainViewerPage",
-)
-async def domain_viewer_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    format: str = "html",
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the universal domain viewer for a repository at a given ref.
+def _slim_commit(row: musehub_db.MusehubCommit) -> dict[str, object]:
+    """Return a minimal commit dict for the symbol-graph commit navigator."""
+    meta: dict[str, object] = row.commit_meta if isinstance(row.commit_meta, dict) else {}
+    return {
+        "id": row.commit_id,
+        "message": row.message,
+        "author": row.author,
+        "branch": row.branch,
+        "ts": row.timestamp.isoformat() if row.timestamp else "",
+        "agentId": str(meta.get("agent_id", "")),
+    }
 
-    The viewer adapts to the repo's domain plugin:
-    - MIDI domain → piano roll canvas (21-dimensional state)
-    - Code domain → symbol dependency graph
-    - Generic      → file tree fallback
+
+async def _get_symbol_graph_data(
+    db: AsyncSession,
+    repo_id: str,
+    limit: int = 20,
+) -> tuple[list[dict[str, object]], object]:
+    """Fetch the last ``limit`` commits and the most-recent structured_delta.
+
+    Returns (slim_commits, initial_delta) where initial_delta may be None
+    if no commit carries symbol data.
     """
-    repo = await musehub_repository.get_repo_by_owner_slug(db, owner, repo_slug)
-    if repo is None:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Repository not found.")
+    from sqlalchemy import select, desc as sa_desc
 
-    nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
-    domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
-
-    # Determine page_json for the TypeScript view module
-    page_json: dict[str, object] = {
-        "repoId": repo.repo_id,
-        "owner": owner,
-        "slug": repo_slug,
-        "ref": ref,
-        "viewerType": domain_ctx["viewer_type"],
-        "domainScopedId": domain_ctx["scoped_id"],
-        "domainDisplayName": domain_ctx["display_name"],
-    }
-
-    if format == "json":
-        from fastapi.responses import JSONResponse
-        return JSONResponse(content=page_json)
-
-    ctx: dict[str, object] = {
-        "title": f"View · {owner}/{repo_slug}@{ref}",
-        "current_page": "view",
-        "repo": repo,
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "ref": ref,
-        "domain": domain_ctx,
-        "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
-        **nav_ctx,
-    }
-    return _templates.TemplateResponse(
-        request, "musehub/pages/view.html", ctx,
-        headers={"X-Page-Json": str(page_json)},
+    stmt = (
+        select(musehub_db.MusehubCommit)
+        .where(musehub_db.MusehubCommit.repo_id == repo_id)
+        .order_by(sa_desc(musehub_db.MusehubCommit.timestamp))
+        .limit(limit)
     )
-
-
-@view_router.get(
-    "/{owner}/{repo_slug}/view/{ref}/{path:path}",
-    response_class=HTMLResponse,
-    summary="Universal domain viewer — specific file",
-    operation_id="domainViewerFilePage",
-    include_in_schema=False,
-)
-async def domain_viewer_file_page(
-    request: Request,
-    owner: str,
-    repo_slug: str,
-    ref: str,
-    path: str,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Render the viewer for a specific file within the snapshot."""
-    repo = await musehub_repository.get_repo_by_owner_slug(db, owner, repo_slug)
-    if repo is None:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Repository not found.")
-
-    nav_ctx = await build_repo_nav_ctx(db, repo, owner, repo_slug)
-    domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
-
-    page_json: dict[str, object] = {
-        "repoId": repo.repo_id,
-        "owner": owner,
-        "slug": repo_slug,
-        "ref": ref,
-        "path": path,
-        "viewerType": domain_ctx["viewer_type"],
-        "domainScopedId": domain_ctx["scoped_id"],
-        "domainDisplayName": domain_ctx["display_name"],
-    }
-
-    ctx: dict[str, object] = {
-        "title": f"View · {owner}/{repo_slug}@{ref}/{path}",
-        "current_page": "view",
-        "repo": repo,
-        "owner": owner,
-        "repo_slug": repo_slug,
-        "ref": ref,
-        "path": path,
-        "domain": domain_ctx,
-        "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
-        **nav_ctx,
-    }
-    return _templates.TemplateResponse(
-        request, "musehub/pages/view.html", ctx,
-        headers={"X-Page-Json": str(page_json)},
-    )
+    rows = list((await db.execute(stmt)).scalars().all())
+    slim = [_slim_commit(r) for r in rows]
+    initial_delta: object = None
+    for r in rows:
+        meta: dict[str, object] = r.commit_meta if isinstance(r.commit_meta, dict) else {}
+        if meta.get("structured_delta"):
+            initial_delta = meta["structured_delta"]
+            break
+    return slim, initial_delta
 
 
 # ── Insights data helpers ─────────────────────────────────────────────────────
@@ -284,7 +163,16 @@ _CODE_EXTS = frozenset(_EXT_TO_LANG.keys()) - _DOC_EXTS - frozenset(["json", "ya
 
 
 async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, Any]:
-    """Compute code-domain insight metrics from stored objects + commits."""
+    """Compute code-domain insight metrics from stored objects + commits.
+
+    Returns both classic aggregate metrics (total_commits, languages, etc.) and
+    Muse-exclusive semantic intelligence only possible with symbol-level tracking:
+    - commit_timeline: per-commit SemVer bump, symbol velocity, and breaking flag
+    - sym_cumulative: running cumulative symbol growth for area-chart rendering
+    - symbol_kinds: aggregate symbol-kind distribution across all deltas
+    - file_churn: files ranked by appearance count in structured_delta ops
+    - type_bars, semver_counts, languages: structured for D3 consumption in JS
+    """
     objects_rows = (await db.execute(
         sa_select(musehub_db.MusehubObject.path, musehub_db.MusehubObject.size_bytes)
         .where(musehub_db.MusehubObject.repo_id == repo_id)
@@ -379,6 +267,14 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
     conventional_count = 0
     breaking_commits: list[dict[str, str]] = []
 
+    # Muse-exclusive per-commit timeseries (for D3 visualisations)
+    _raw_timeline: list[dict[str, Any]] = []
+    _file_churn_counts: dict[str, int] = defaultdict(int)
+    _file_churn_last_bump: dict[str, str] = {}
+    _sym_kinds: dict[str, int] = {
+        "function": 0, "class": 0, "method": 0, "variable": 0, "import": 0, "other": 0,
+    }
+
     for row in commits_rows:
         meta: dict[str, Any] = dict(row.commit_meta or {}) if row.commit_meta else {}
         msg = (row.message or "").strip()
@@ -415,15 +311,53 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
             bump = "none"
         semver_counts[bump] += 1
 
-        # Symbol velocity from structured_delta
+        # Per-commit symbol velocity + file churn (single pass over structured_delta)
         delta: dict[str, Any] = meta.get("structured_delta") or {}
+        tl_sym_added = 0
+        tl_sym_removed = 0
         for file_op in delta.get("ops", []):
+            fp = str(file_op.get("address", ""))
+            if fp:
+                _file_churn_counts[fp] += 1
+                if fp not in _file_churn_last_bump:
+                    _file_churn_last_bump[fp] = bump
+
             for child_op in (file_op.get("child_ops") or []):
                 op = child_op.get("op", "")
+                addr = str(child_op.get("address", ""))
+                summary = str(child_op.get("content_summary", "")).lower()
                 if op == "insert":
                     sym_added_total += 1
+                    tl_sym_added += 1
                 elif op == "delete":
                     sym_removed_total += 1
+                    tl_sym_removed += 1
+
+                # Symbol kind heuristic from content_summary
+                if "::" in addr:
+                    if "class" in summary:
+                        _sym_kinds["class"] += 1
+                    elif "method" in summary:
+                        _sym_kinds["method"] += 1
+                    elif "function" in summary or "def " in summary:
+                        _sym_kinds["function"] += 1
+                    elif "variable" in summary or "constant" in summary:
+                        _sym_kinds["variable"] += 1
+                    elif addr.split("::")[-1].lower().startswith("import"):
+                        _sym_kinds["import"] += 1
+                    else:
+                        _sym_kinds["other"] += 1
+
+        breaking_addrs: list[str] = list(meta.get("breaking_changes") or [])
+        _raw_timeline.append({
+            "date": row.timestamp.date().isoformat() if row.timestamp else "",
+            "sym_added": tl_sym_added,
+            "sym_removed": tl_sym_removed,
+            "bump": bump,
+            "is_breaking": is_breaking,
+            "breaking_addr_count": len(breaking_addrs),
+            "msg": msg[:60],
+        })
 
     total_c = len(commits_rows)
     conventional_pct = round(conventional_count / total_c * 100) if total_c else 0
@@ -450,6 +384,20 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
         1 for path, _ in objects_rows
         if Path(path).suffix.lstrip(".").lower() in _CODE_EXTS
     )
+
+    # Build commit timeline oldest-first with cumulative symbol growth
+    commit_timeline = list(reversed(_raw_timeline))
+    sym_cumulative: list[int] = []
+    running_sym = 0
+    for entry in commit_timeline:
+        running_sym += int(entry["sym_added"]) - int(entry["sym_removed"])
+        sym_cumulative.append(running_sym)
+
+    _churn_sorted = sorted(_file_churn_counts.items(), key=lambda kv: kv[1], reverse=True)[:15]
+    file_churn: list[dict[str, Any]] = [
+        {"path": p, "count": c, "last_bump": _file_churn_last_bump.get(p, "none")}
+        for p, c in _churn_sorted
+    ]
 
     return {
         "total_files": total_files,
@@ -480,23 +428,39 @@ async def _compute_code_insights(db: AsyncSession, repo_id: str) -> dict[str, An
         "sym_removed_total": sym_removed_total,
         "sym_net": sym_net,
         "conventional_pct": conventional_pct,
+        # D3-ready timeseries (newest → oldest already reversed to oldest → newest)
+        "commit_timeline": commit_timeline,
+        "sym_cumulative": sym_cumulative,
+        "symbol_kinds": dict(_sym_kinds),
+        "file_churn": file_churn,
     }
 
 
 # ── Insights route ────────────────────────────────────────────────────────────
 
 
-@view_router.get(
+@insights_router.get(
     "/{owner}/{repo_slug}/insights/{ref}",
     response_class=HTMLResponse,
     summary="Domain insights dashboard",
     operation_id="insightsDashboardPage",
+)
+@insights_router.get(
+    "/{owner}/{repo_slug}/view/{ref}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+@insights_router.get(
+    "/{owner}/{repo_slug}/view/{ref}/{path:path}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
 )
 async def insights_dashboard_page(
     request: Request,
     owner: str,
     repo_slug: str,
     ref: str,
+    path: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Render the domain insights dashboard for a repository at a given ref.
@@ -515,15 +479,11 @@ async def insights_dashboard_page(
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
     metrics: dict[str, Any] = {}
-    if domain_ctx["viewer_type"] == "symbol_graph":
+    slim_commits: list[dict[str, object]] = []
+    initial_delta: object = None
+    if domain_ctx["viewer_type"] == "code":
         metrics = await _compute_code_insights(db, repo.repo_id)
-
-    # Pre-compute all dimension data for the dashboard cards
-    _DASHBOARD_DIMS = ["key", "tempo", "meter", "groove", "form", "dynamics", "emotion", "motifs", "contour"]
-    dim_map: dict[str, object] = {
-        dim: musehub_analysis.compute_dimension(dim, ref)
-        for dim in _DASHBOARD_DIMS
-    }
+        slim_commits, initial_delta = await _get_symbol_graph_data(db, repo.repo_id)
 
     base_url = f"/{owner}/{repo_slug}"
     ctx: dict[str, object] = {
@@ -538,18 +498,19 @@ async def insights_dashboard_page(
         "domain": domain_ctx,
         "active_dimension": None,
         "metrics": metrics,
-        "dim_map": dim_map,
+        "slim_commits": slim_commits,
+        "initial_delta": initial_delta,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
         **nav_ctx,
     }
     return await htmx_fragment_or_full(
         request, _templates, ctx,
         full_template="musehub/pages/insights.html",
-        fragment_template="musehub/fragments/analysis/dashboard_content.html",
+        fragment_template=None,
     )
 
 
-@view_router.get(
+@insights_router.get(
     "/{owner}/{repo_slug}/insights/{ref}/{dim}",
     response_class=HTMLResponse,
     summary="Single domain insight dimension",
@@ -573,20 +534,10 @@ async def insights_dimension_page(
     domain_ctx = await _get_domain_for_repo(db, repo.repo_id, repo.domain_id)
 
     metrics: dict[str, Any] = {}
-    if domain_ctx["viewer_type"] == "symbol_graph":
+    if domain_ctx["viewer_type"] == "code":
         metrics = await _compute_code_insights(db, repo.repo_id)
 
     base_url = f"/{owner}/{repo_slug}"
-    # Compute dimension-specific data using the correct function per dimension
-    _dim_key = dim.replace("-", "_")
-    if dim == "harmony":
-        dim_data: object = musehub_analysis.compute_harmony_analysis(repo_id=repo.repo_id, ref=ref)
-    elif dim == "emotion":
-        dim_data = musehub_analysis.compute_emotion_map(repo_id=repo.repo_id, ref=ref)
-    elif dim == "dynamics":
-        dim_data = musehub_analysis.compute_dynamics_page_data(repo_id=repo.repo_id, ref=ref)
-    else:
-        dim_data = musehub_analysis.compute_dimension(dim, ref)
     ctx: dict[str, object] = {
         "title": f"{dim.replace('-', ' ').title()} Insight · {owner}/{repo_slug}@{ref}",
         "current_page": "insights",
@@ -600,46 +551,10 @@ async def insights_dimension_page(
         "active_dimension": dim,
         "metrics": metrics,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
-        # Dimension-specific data keys expected by the dimension templates
-        f"{_dim_key}_data": dim_data,
         **nav_ctx,
     }
-    # Use dimension-specific template if it exists, otherwise fall back to insights.html
-    _DIM_TEMPLATES: dict[str, str] = {
-        "key": "musehub/pages/analysis/key.html",
-        "tempo": "musehub/pages/analysis/tempo.html",
-        "meter": "musehub/pages/analysis/meter.html",
-        "groove": "musehub/pages/analysis/groove.html",
-        "form": "musehub/pages/analysis/form.html",
-        "harmony": "musehub/pages/analysis/harmony.html",
-        "contour": "musehub/pages/analysis/contour.html",
-        "dynamics": "musehub/pages/analysis/dynamics.html",
-        "motifs": "musehub/pages/analysis/motifs.html",
-        "chord_map": "musehub/pages/analysis/chord_map.html",
-        "chord-map": "musehub/pages/analysis/chord_map.html",
-        "context": "musehub/pages/analysis/context.html",
-        "emotion": "musehub/pages/analysis/emotion.html",
-        "compare": "musehub/pages/analysis/compare.html",
-        "divergence": "musehub/pages/analysis/divergence.html",
-    }
-    _DIM_FRAGMENTS: dict[str, str] = {
-        "key": "musehub/fragments/analysis/key_content.html",
-        "tempo": "musehub/fragments/analysis/tempo_content.html",
-        "meter": "musehub/fragments/analysis/meter_content.html",
-        "groove": "musehub/fragments/analysis/groove_content.html",
-        "form": "musehub/fragments/analysis/form_content.html",
-        "harmony": "musehub/fragments/analysis/harmony_content.html",
-        "contour": "musehub/fragments/analysis/contour_content.html",
-        "dynamics": "musehub/fragments/analysis/dynamics_content.html",
-        "motifs": "musehub/fragments/analysis/motifs_content.html",
-        "chord_map": "musehub/fragments/analysis/chord_map_content.html",
-        "chord-map": "musehub/fragments/analysis/chord_map_content.html",
-        "emotion": "musehub/fragments/analysis/emotion_content.html",
-    }
-    full_template = _DIM_TEMPLATES.get(dim, "musehub/pages/insights.html")
-    fragment_template = _DIM_FRAGMENTS.get(dim)
     return await htmx_fragment_or_full(
         request, _templates, ctx,
-        full_template=full_template,
-        fragment_template=fragment_template,
+        full_template="musehub/pages/insights.html",
+        fragment_template=None,
     )

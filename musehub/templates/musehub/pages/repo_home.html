@@ -182,10 +182,10 @@
         <svg class="rh-branch-form-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
         <select class="rh-branch-select"
                 hx-get="{{ base_url }}"
+                hx-trigger="change"
                 hx-target="#file-tree"
                 hx-push-url="true"
-                name="ref"
-                onchange="this.dispatchEvent(new Event('change', {bubbles:true})); htmx.trigger(this, 'change')">
+                name="ref">
           {% for branch in branches %}
           <option value="{{ branch.name }}" {% if branch.name == ref %}selected{% endif %}>{{ branch.name }}</option>
           {% endfor %}
@@ -330,20 +330,20 @@
     <div class="rh-sidebar-section">
       <div class="ph-sidebar-heading">Explore</div>
       {% set viewer_type = domain.viewer_type if domain else 'generic' %}
-      {% if viewer_type == 'piano_roll' %}
-      <a href="{{ base_url }}/view/HEAD" class="ph-sidebar-link">
+      {% if viewer_type == 'midi' %}
+      <a href="{{ base_url }}/insights/HEAD" class="ph-sidebar-link">
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color:var(--color-accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         Piano Roll
       </a>
-      {% elif viewer_type == 'symbol_graph' %}
-      <a href="{{ base_url }}/view/HEAD" class="ph-sidebar-link">
+      {% elif viewer_type == 'code' %}
+      <a href="{{ base_url }}/insights/HEAD" class="ph-sidebar-link">
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-accent)"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Symbol Graph
       </a>
       {% else %}
-      <a href="{{ base_url }}/view/HEAD" class="ph-sidebar-link">
+      <a href="{{ base_url }}/insights/HEAD" class="ph-sidebar-link">
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-accent)"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        View
+        Insights
       </a>
       {% endif %}
       <a href="{{ base_url }}/commits" class="ph-sidebar-link">
