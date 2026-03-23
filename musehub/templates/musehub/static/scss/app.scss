@@ -11,7 +11,16 @@
 @use "layout";
 @use "icons";
 @use "domain";   // supersedes "music" — domain-agnostic styles + [data-domain] scoping
-@use "pages";
+@use "arrange";         // arrange page (.ar-*)
+@use "blob";            // blob / blame / search (.blob-*, .blob2-*, .blame-*, .sr-*)
+@use "new-repo";        // new repository wizard (.nr-*)
+@use "piano-roll";      // piano roll, transport, sessions, and related music pages
+@use "user-profile";    // user profile (.prof-*, .collab-*, .rank-*)
+@use "diff";            // diff pages (.diff-*, .df3-*)
+@use "insights";        // insights, explore, analytics (.ins-*, .in-*, .rh-*, .an-*)
+@use "commit-detail";   // commit detail (.cd-*, .cd2-*, .cd3-*, .graph-*)
+@use "mcp-docs";        // MCP docs page (.mcp-*)
+@use "symbol-view";     // symbol dependency graph (.sv-*)
 @use "prs";        // pull request list page
 @use "issues";     // issue list + detail pages
 @use "branches";   // branches page

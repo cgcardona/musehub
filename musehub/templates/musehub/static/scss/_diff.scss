@@ -1,0 +1,538 @@
+// _diff.scss — Diff page (.diff-*, .df3-* prefixes)
+
+// ── Diff page ─────────────────────────────────────────────────────────────────
+
+.diff-page { padding-top: var(--space-4); }
+
+.diff-commit-header-card {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.diff-commit-meta {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap; margin-bottom: var(--space-2);
+}
+
+.diff-commit-sha {
+  font-family: var(--font-mono); font-size: 12px; color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border-radius: 4px; padding: 1px 6px;
+}
+
+.diff-commit-branch {
+  font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);
+  background: var(--bg-overlay); border-radius: 4px; padding: 1px 6px;
+}
+
+.diff-commit-author { font-size: 12px; color: var(--text-secondary); }
+
+.diff-commit-msg {
+  font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: var(--space-1);
+}
+
+.diff-commit-parent { display: flex; align-items: center; gap: 6px; }
+
+.diff-root-pill {
+  display: inline-block; font-size: 11px; color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  border-radius: 4px; padding: 2px 8px;
+}
+
+.diff-root-badge {
+  font-size: 11px; color: var(--color-success);
+}
+
+.diff-parent-badge {
+  font-size: 11px; color: var(--text-muted);
+}
+
+.diff-parent-sha {
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-accent);
+}
+
+// Two-panel layout: sidebar + viewer
+.diff-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  min-height: 70vh;
+}
+
+@media (max-width: 768px) {
+  .diff-layout { grid-template-columns: 1fr; }
+  .diff-file-tree { max-height: 200px; overflow-y: auto; }
+}
+
+// File tree sidebar
+.diff-file-tree {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: sticky;
+  top: 64px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.diff-tree-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-overlay);
+  position: sticky; top: 0; z-index: 1;
+}
+
+.diff-file-list {
+  list-style: none; margin: 0; padding: 4px 0;
+}
+
+.diff-file-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; cursor: pointer;
+  font-size: 12px; color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+  border-left: 2px solid transparent;
+  overflow: hidden;
+
+  &:hover { background: var(--bg-overlay); color: var(--text-primary); }
+  &.active {
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    color: var(--color-accent);
+    border-left-color: var(--color-accent);
+  }
+}
+
+.diff-file-sign { flex-shrink: 0; width: 12px; font-family: var(--font-mono); color: var(--color-success); }
+.diff-file-icon { flex-shrink: 0; font-size: 13px; }
+.diff-file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+.diff-file-size { flex-shrink: 0; font-size: 10px; color: var(--text-muted); }
+
+// Viewer panel
+.diff-viewer {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  min-height: 300px;
+}
+
+.diff-viewer-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky; top: 64px; z-index: 1;
+}
+
+.diff-file-path-bar {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.diff-file-path-label {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-primary);
+}
+
+.diff-hunk-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px; color: var(--text-muted);
+}
+
+.diff-hunk-info { display: flex; align-items: center; gap: 8px; }
+
+.diff-lang-badge {
+  font-family: var(--font-mono); font-size: 10px;
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+  border-radius: 4px; padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.diff-code-panel { overflow-x: auto; }
+.diff-code-scroll { overflow-x: auto; }
+
+// Unified diff table
+.diff-table {
+  width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5;
+
+  td { padding: 0; border: none; vertical-align: top; white-space: pre; }
+}
+
+.diff-ln-sign {
+  width: 14px; min-width: 14px; text-align: center;
+  user-select: none; color: var(--color-success); opacity: 0.7;
+  padding: 0 3px;
+}
+
+.diff-ln-num {
+  width: 48px; min-width: 48px; text-align: right;
+  user-select: none; color: var(--text-muted); opacity: 0.5;
+  padding: 0 8px 0 0;
+}
+
+.diff-ln-code {
+  padding-left: 4px; color: var(--text-primary);
+  white-space: pre; overflow: visible;
+  // Allow hljs spans to render inline
+  span { display: inline; white-space: pre; }
+}
+
+.diff-line-add {
+  background: color-mix(in srgb, var(--color-success) 6%, transparent);
+  &:hover { background: color-mix(in srgb, var(--color-success) 12%, transparent); }
+}
+
+.diff-line-ctx { background: transparent; }
+
+// Loading / error states
+.diff-loading { padding: var(--space-5); color: var(--text-muted); font-size: 13px; }
+.diff-empty   { padding: var(--space-5); color: var(--text-muted); font-size: 13px; text-align: center; }
+.diff-error   { padding: var(--space-5); color: var(--color-danger); font-size: 13px; }
+
+.spinner {
+  display: inline-block; width: 14px; height: 14px; margin-right: 6px;
+  border: 2px solid var(--border-default); border-top-color: var(--color-accent);
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+// highlight.js theme — dark, matching our tokens
+.hljs { background: transparent; }
+.hljs-keyword, .hljs-selector-tag, .hljs-title { color: var(--color-accent); font-weight: 600; }
+.hljs-string, .hljs-attr { color: var(--color-success); }
+.hljs-comment, .hljs-quote { color: var(--text-muted); font-style: italic; }
+.hljs-number, .hljs-literal, .hljs-built_in { color: #f0883e; }
+.hljs-name, .hljs-tag { color: #7ee787; }
+.hljs-variable, .hljs-template-variable { color: #ffa657; }
+.hljs-type, .hljs-class { color: #79c0ff; font-style: italic; }
+.hljs-function, .hljs-subst { color: #d2a8ff; }
+.hljs-params { color: var(--text-secondary); }
+.hljs-section, .hljs-meta { color: #79c0ff; }
+.hljs-addition { background: color-mix(in srgb, var(--color-success) 15%, transparent); }
+.hljs-deletion  { background: color-mix(in srgb, var(--color-danger)  15%, transparent); }
+
+
+
+// Diff page v3 — df3-*
+// ══════════════════════════════════════════════════════════════════════════════
+
+.df3-page { max-width: 100%; }
+
+// ── Header ─────────────────────────────────────────────────────────────────
+.df3-header {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) 0 var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.df3-back {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text-muted); text-decoration: none;
+  background: var(--surface-2); border: 1px solid var(--border-default);
+  padding: 3px 8px; border-radius: var(--radius-sm);
+  &:hover { color: var(--color-accent-link); border-color: var(--color-accent); }
+}
+
+.df3-sha {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-secondary); background: var(--surface-2);
+  padding: 2px 7px; border-radius: 4px;
+}
+
+.df3-branch {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-muted);
+  background: var(--surface-2); padding: 2px 7px; border-radius: 10px;
+}
+
+.df3-msg {
+  font-size: 13px; color: var(--text-primary); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 600px;
+}
+
+// ── Stats bar ──────────────────────────────────────────────────────────────
+.df3-stats-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.df3-stats-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+.df3-stat {
+  display: flex; flex-direction: column; gap: 2px; min-width: 80px;
+  background: var(--surface-2); border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); padding: var(--space-2) var(--space-3);
+  &.df3-stat-add  { border-top: 2px solid #34d399; .df3-stat-n { color: #34d399; } }
+  &.df3-stat-mod  { border-top: 2px solid #fbbf24; .df3-stat-n { color: #fbbf24; } }
+  &.df3-stat-del  { border-top: 2px solid #f87171; .df3-stat-n { color: #f87171; } }
+  &.df3-stat-files{ border-top: 2px solid #8b5cf6; .df3-stat-n { color: #c084fc; } }
+  &.df3-stat-snap { border-top: 2px solid #475569; .df3-stat-n { color: var(--text-secondary); } }
+  &.df3-stat-clean{ border-top: 2px solid #34d399; .df3-stat-n { color: #34d399; } }
+}
+
+.df3-stat-n {
+  font-size: 20px; font-weight: 800; line-height: 1.1;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+
+.df3-stat-l {
+  font-size: 9px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
+}
+
+.df3-stats-meta { font-size: 12px; color: var(--text-muted); }
+
+.df3-vs { display: flex; align-items: center; gap: var(--space-2); }
+
+.df3-parent-sha {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--color-accent-link); text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
+.df3-root-pill {
+  font-size: 10px; color: var(--text-muted);
+  background: var(--surface-3); padding: 2px 7px; border-radius: 10px;
+}
+
+// ── Files ──────────────────────────────────────────────────────────────────
+.df3-content { display: flex; flex-direction: column; }
+.df3-files   { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.df3-file-card {
+  background: var(--surface-2); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); overflow: hidden;
+
+  &.df3-file-added   { border-left: 3px solid #22c55e; }
+  &.df3-file-removed { border-left: 3px solid #ef4444; }
+  &.df3-file-modified{ border-left: 3px solid #f59e0b; }
+}
+
+.df3-file-hd {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.df3-file-hd-right {
+  display: flex; align-items: center; gap: var(--space-3); margin-left: auto;
+}
+
+.df3-file-path {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  color: var(--color-accent-link); text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
+.df3-ext {
+  font-size: 9px; font-family: var(--font-mono);
+  color: var(--text-muted); background: var(--surface-2);
+  padding: 1px 4px; border-radius: 3px;
+}
+
+.df3-raw-link {
+  font-size: 10px; color: var(--text-muted); text-decoration: none;
+  &:hover { color: var(--color-accent-link); }
+}
+
+.df3-line-stat {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+}
+
+.df3-stat-add { color: #34d399; }
+.df3-stat-del { color: #f87171; }
+
+// Op dot
+.df3-op-dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 3px;
+  font-size: 10px; font-weight: 800; flex-shrink: 0;
+  &.df3-op-add { background: rgba(52,211,153,0.12);  color: #34d399; }
+  &.df3-op-del { background: rgba(248,113,113,0.12); color: #f87171; }
+  &.df3-op-mod { background: rgba(251,191,36,0.12);  color: #fbbf24; }
+}
+
+// ── Symbol panel ───────────────────────────────────────────────────────────
+.df3-sym-panel {
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+}
+
+.df3-sym-hd {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.df3-sym-title {
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+
+.df3-sym-count {
+  font-size: 10px; color: var(--color-accent);
+  background: var(--surface-3); padding: 1px 6px; border-radius: 10px;
+  border: 1px solid var(--color-accent)40;
+}
+
+.df3-sym-body { padding: var(--space-1) 0; }
+
+.df3-sym-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 3px var(--space-4);
+  &:hover { background: var(--surface-3); }
+}
+
+.df3-sym-top { font-weight: 500; }
+.df3-sym-child { padding-left: var(--space-8); }
+
+.df3-sym-indent {
+  color: var(--border-default); flex-shrink: 0;
+  display: flex; align-items: center;
+}
+
+.df3-sym-name {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-primary);
+}
+
+.df3-sym-desc {
+  font-size: 11px; color: var(--text-muted);
+  margin-left: auto; text-align: right;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;
+}
+
+// Kind chips
+.df3-kind {
+  font-size: 9px; font-family: var(--font-mono);
+  padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
+  &.df3-k-class  { background: #7c3aed20; color: #c084fc; }
+  &.df3-k-method { background: #0369a120; color: #38bdf8; }
+  &.df3-k-func   { background: #065f4620; color: #34d399; }
+  &.df3-k-var    { background: #78350f20; color: #fbbf24; }
+  &.df3-k-import { background: #71717a20; color: #a1a1aa; }
+}
+
+// ── Code diff table ────────────────────────────────────────────────────────
+.df3-code-wrap { overflow-x: auto; }
+
+.df3-table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.5;
+  background: var(--surface-1);
+
+  td { padding: 0 var(--space-2); white-space: pre; }
+}
+
+.df3-ln-sign {
+  width: 16px; text-align: center; user-select: none;
+  color: var(--text-muted); font-size: 11px;
+}
+
+.df3-table .df3-ln-num {
+  width: 44px; text-align: right; padding-right: var(--space-3);
+  color: var(--text-muted); user-select: none; border-right: 1px solid var(--border-subtle);
+}
+
+.df3-table .df3-ln-code { padding-left: var(--space-3); }
+
+.df3-dl-add {
+  background: #14532d18;
+  .df3-ln-sign { color: #4ade80; }
+  .df3-ln-num  { background: #14532d12; }
+}
+
+.df3-dl-del {
+  background: #7f1d1d18;
+  .df3-ln-sign { color: #f87171; }
+  .df3-ln-num  { background: #7f1d1d12; }
+}
+
+.df3-dl-ctx { .df3-ln-sign { color: var(--border-default); } }
+
+// Collapsed context separator
+.df3-dl-ctx td { color: var(--text-muted); font-style: italic; }
+
+// ── Misc ───────────────────────────────────────────────────────────────────
+.df3-loading { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-8); color: var(--text-muted); font-size: 13px; }
+.df3-empty   { padding: var(--space-6); color: var(--text-muted); font-size: 13px; text-align: center; }
+.df3-no-content { padding: var(--space-4); color: var(--text-muted); font-size: 12px; text-align: center; }
+
+
+// ════════════════════════════════════════════════════════════════════════════
+
+
+// ── Responsive ────────────────────────────────────────────────────────────────
+
+@media (max-width: 768px) {
+  .diff-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .diff-file-tree {
+    display: none;
+  }
+
+  .diff-hunk-header {
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .df3-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .df3-file-tree {
+    display: none;
+  }
+
+  .diff-split-view {
+    display: block;
+  }
+
+  .diff-split-view .diff-col:first-child {
+    display: none;
+  }
+
+  .df3-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 480px) {
+  .diff-page {
+    padding-top: var(--space-2);
+  }
+
+  .diff-commit-header-card {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .diff-filename {
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+  }
+
+  .df3-stat-added,
+  .df3-stat-removed {
+    font-size: 11px;
+  }
+}

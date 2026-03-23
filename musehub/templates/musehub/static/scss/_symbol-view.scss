@@ -1,0 +1,601 @@
+// _symbol-view.scss — Symbol dependency graph view (.sv-* prefix)
+
+// ── Code domain symbol-graph view (view.html + view.ts) ─────────────────────
+//
+// Two-column layout: left = commit navigator + semantic changes panel,
+// right = D3 symbol graph SVG + info panel.
+//
+// BEM-ish class prefix: .sv- (symbol-view)
+
+.sv-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--space-4, 16px);
+  min-height: 560px;
+  align-items: start;
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ── Left column ──────────────────────────────────────────────────────────────
+
+.sv-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  min-width: 0;
+}
+
+.sv-panel {
+  background: var(--bg-secondary, #161b22);
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.sv-panel-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color, #30363d);
+  background: var(--bg-tertiary, #0d1117);
+}
+
+.sv-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #e6edf3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.sv-sym-count {
+  font-size: 11px;
+  color: var(--text-muted, #7d8590);
+  font-family: var(--font-mono);
+}
+
+// Commit navigator
+
+.sv-nav-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.sv-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted, #7d8590);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+
+  &:hover {
+    border-color: var(--color-accent, #4493f8);
+    color: var(--color-accent, #4493f8);
+  }
+
+  &:active { opacity: .7; }
+}
+
+.sv-commit-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.sv-commit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background .12s, border-color .12s;
+
+  &:hover {
+    background: var(--bg-hover, rgba(177,186,196,.08));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent, #4493f8);
+    outline-offset: -2px;
+  }
+}
+
+.sv-commit-active {
+  border-left-color: var(--color-accent, #4493f8);
+  background: var(--bg-hover, rgba(177,186,196,.06));
+}
+
+.sv-commit-sha {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-accent, #4493f8);
+}
+
+.sv-commit-msg {
+  font-size: 12px;
+  color: var(--text-primary, #e6edf3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv-commit-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.sv-commit-branch {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted, #7d8590);
+  background: var(--bg-hover, rgba(177,186,196,.08));
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.sv-commit-ts {
+  font-size: 10px;
+  color: var(--text-muted, #7d8590);
+}
+
+.sv-commit-placeholder,
+.sv-commit-empty {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--text-muted, #7d8590);
+}
+
+// Semantic Changes panel
+
+.sv-analyze {
+  flex: 1;
+}
+
+.sv-analyze-body {
+  padding: 10px 14px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.sv-analyze-msg {
+  font-size: 12px;
+  color: var(--text-secondary, #8b949e);
+  margin: 0 0 10px;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.sv-analyze-empty {
+  font-size: 12px;
+  color: var(--text-muted, #7d8590);
+  margin: 0;
+}
+
+.sv-file-card {
+  margin-bottom: 12px;
+}
+
+.sv-file-hd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.sv-file-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary, #e6edf3);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv-ext {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted, #7d8590);
+  background: var(--bg-hover, rgba(177,186,196,.08));
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.sv-file-sym-count {
+  font-size: 10px;
+  color: var(--text-muted, #7d8590);
+  white-space: nowrap;
+}
+
+.sv-sym-tree {
+  padding-left: 8px;
+  border-left: 1px solid var(--border-color, #30363d);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sv-sym-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+
+.sv-sym-indent {
+  font-size: 10px;
+  color: var(--text-muted, #7d8590);
+  margin-left: 8px;
+}
+
+.sv-sym-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary, #e6edf3);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv-kind-chip {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+// Op indicator dots
+
+.sv-op-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sv-op-dot-sm {
+  width: 5px;
+  height: 5px;
+}
+
+.sv-op-add  { background: #34d399; }
+.sv-op-del  { background: #f87171; }
+.sv-op-mod  { background: #fbbf24; }
+
+// ── Right column ─────────────────────────────────────────────────────────────
+
+.sv-right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  min-width: 0;
+}
+
+.sv-graph-hd {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv-stats {
+  font-size: 12px;
+  color: var(--text-muted, #7d8590);
+  font-family: var(--font-mono);
+  min-height: 18px;
+}
+
+.sv-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sv-mode-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.sv-mode-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #7d8590);
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+
+  &:first-child { border-radius: 6px 0 0 6px; }
+  &:last-child  { border-radius: 0 6px 6px 0; }
+  &:not(:first-child):not(:last-child) { border-radius: 0; margin-left: -1px; }
+
+  &:hover {
+    background: var(--bg-hover, rgba(177,186,196,.08));
+    color: var(--text-primary, #e6edf3);
+  }
+}
+
+.sv-mode-active {
+  background: rgba(68, 147, 248, .12) !important;
+  border-color: var(--color-accent, #4493f8) !important;
+  color: var(--color-accent, #4493f8) !important;
+}
+
+.sv-mode-active-red {
+  background: rgba(248, 113, 113, .12) !important;
+  border-color: #f87171 !important;
+  color: #f87171 !important;
+}
+
+.sv-search-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sv-search {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 6px;
+  background: var(--bg-secondary, #161b22);
+  color: var(--text-primary, #e6edf3);
+  font-family: var(--font-mono);
+
+  &::placeholder { color: var(--text-muted, #7d8590); }
+  &:focus { outline: 2px solid var(--color-accent, #4493f8); outline-offset: -1px; border-color: transparent; }
+}
+
+.sv-kind-filter {
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 6px;
+  background: var(--bg-secondary, #161b22);
+  color: var(--text-primary, #e6edf3);
+  cursor: pointer;
+}
+
+// Graph SVG wrapper
+
+.sv-graph-wrap {
+  position: relative;
+  background: var(--bg-secondary, #161b22);
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 320px;
+}
+
+.sv-sym-svg {
+  display: block;
+  width: 100%;
+}
+
+// D3 graph node states
+
+.sg-node { cursor: pointer; }
+
+.sg-node.sg-inactive {
+  opacity: .07;
+  pointer-events: none;
+}
+
+.sg-node.sg-filtered {
+  opacity: .08;
+  pointer-events: none;
+}
+
+.sg-node.sg-selected .sg-ring {
+  stroke-opacity: 1 !important;
+  stroke-width: 2.5 !important;
+}
+
+.sg-edge.inactive { opacity: .04; }
+
+.sv-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted, #7d8590);
+  pointer-events: none;
+}
+
+.sv-empty p { margin: 0; font-size: 13px; }
+.sv-empty-sub { font-size: 11px !important; opacity: .7; }
+
+// Symbol info panel
+
+.sv-info-panel {
+  position: relative;
+  background: var(--bg-secondary, #161b22);
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.sv-info-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-right: 24px;
+}
+
+.sv-info-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-accent, #4493f8);
+  flex: 1;
+  word-break: break-all;
+}
+
+.sv-info-kind-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--kind-color, #78909c) 30%, transparent);
+  color: var(--kind-color, #78909c);
+  background: color-mix(in srgb, var(--kind-color, #78909c) 10%, transparent);
+  white-space: nowrap;
+}
+
+.sv-info-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #7d8590);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+
+  &:hover { color: var(--text-primary, #e6edf3); background: var(--bg-hover, rgba(177,186,196,.08)); }
+}
+
+.sv-info-dl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.sv-info-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 11px;
+
+  dt {
+    color: var(--text-muted, #7d8590);
+    white-space: nowrap;
+    min-width: 48px;
+    padding-top: 2px;
+  }
+
+  dd { margin: 0; }
+}
+
+.sv-info-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+  word-break: break-all;
+}
+
+.sv-info-summary {
+  color: var(--text-muted, #7d8590);
+  line-height: 1.5;
+}
+
+.sv-info-dead {
+  color: #f87171;
+}
+
+.sv-info-no-edges {
+  color: var(--text-muted, #7d8590);
+}
+
+.sv-info-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.sv-info-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+
+// ── Responsive ────────────────────────────────────────────────────────────────
+
+@media (max-width: 768px) {
+  .sv-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sv-left-panel {
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .sv-graph-panel {
+    min-height: 320px;
+  }
+
+  .sv-commit-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: var(--space-2);
+  }
+
+  .sv-info-panel {
+    display: none;
+  }
+
+  .sv-controls {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+}
+
+@media (max-width: 480px) {
+  .sv-layout {
+    min-height: 480px;
+  }
+
+  .sv-node-label {
+    font-size: 10px;
+  }
+
+  .sv-legend {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    font-size: 11px;
+  }
+
+  .sv-btn {
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+}
