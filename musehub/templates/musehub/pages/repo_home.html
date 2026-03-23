@@ -97,10 +97,10 @@
         <svg class="rh-branch-form-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
         <select class="rh-branch-select"
                 hx-get="{{ base_url }}"
+                hx-trigger="change"
                 hx-target="#file-tree"
                 hx-push-url="true"
-                name="ref"
-                onchange="this.dispatchEvent(new Event('change', {bubbles:true})); htmx.trigger(this, 'change')">
+                name="ref">
           {% for branch in branches %}
           <option value="{{ branch.name }}" {% if branch.name == ref %}selected{% endif %}>{{ branch.name }}</option>
           {% endfor %}
