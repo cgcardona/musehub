@@ -42,11 +42,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from musehub.auth.dependencies import optional_token, require_valid_token, TokenClaims
 from musehub.db import musehub_models as db
 from musehub.db.database import get_db as get_session
-from musehub.models.wire import WireFetchRequest, WirePushRequest
+from musehub.models.wire import WireFetchRequest, WireObjectsRequest, WirePushRequest
 from musehub.rate_limits import limiter, WIRE_PUSH_LIMIT, WIRE_FETCH_LIMIT
 from musehub.services import musehub_qdrant as qdrant_svc
-from musehub.services.musehub_repository import get_repo_by_owner_slug, get_repo_row_by_owner_slug
-from musehub.services.musehub_wire import wire_fetch, wire_push, wire_refs
+from musehub.services.musehub_repository import get_repo_row_by_owner_slug
+from musehub.services.musehub_wire import wire_fetch, wire_push, wire_push_objects, wire_refs
 from musehub.storage import get_backend
 
 logger = logging.getLogger(__name__)
@@ -138,6 +138,49 @@ async def get_refs(
     result = await wire_refs(session, repo.repo_id)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="repo not found")
+    return Response(content=result.model_dump_json(), media_type="application/json")
+
+
+@router.post(
+    "/{owner}/{slug}/push/objects",
+    summary="Pre-upload an object chunk for a large push (Phase 1 of chunked push)",
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit(WIRE_PUSH_LIMIT)
+async def push_objects(
+    request: Request,
+    owner: str,
+    slug: str,
+    body: WireObjectsRequest,
+    claims: TokenClaims = Depends(require_valid_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Accept a batch of content-addressed objects before the final push.
+
+    Large pushes are split into two phases:
+
+    **Phase 1 — upload objects** (this endpoint, called N times):
+        Client batches objects into chunks of ≤ 1 000 and POSTs each chunk
+        here.  Objects are idempotent — the server skips any it already holds.
+
+    **Phase 2 — push commits** (``POST /{owner}/{slug}/push``):
+        Client sends commits + snapshots with an empty ``bundle.objects``
+        list.  Because objects were already uploaded in Phase 1, the final
+        push is small and fast.
+
+    Response:
+    ```json
+    {"stored": 42, "skipped": 8}
+    ```
+    """
+    repo_id = await _resolve_repo_id(session, owner, slug)
+    pusher_id: str | None = claims.get("sub")
+    try:
+        result = await wire_push_objects(session, repo_id, body, pusher_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     return Response(content=result.model_dump_json(), media_type="application/json")
 
 

@@ -26,6 +26,7 @@ boto3>=1.42.71
 
 mido>=1.3.3            # MIDI file parsing
 pyyaml>=6.0.2          # YAML parsing (repo metadata, config files)
+mistune>=3.0.0         # Markdown → HTML for README rendering
 
 # CLI
 typer>=0.15.4
