@@ -1,9 +1,0 @@
-{% extends "musehub/base.html" %}
-
-{% block title %}Groove Check — {{ owner }}/{{ repo_slug }}{% endblock %}
-{% block breadcrumb %}
-  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / groove-check
-{% endblock %}
-{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block page_json %}{"page": "groove-check", "repoId": {{ repo_id | tojson }}, "base": {{ base_url | tojson }}}{% endblock %}

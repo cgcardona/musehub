@@ -32,10 +32,8 @@ from musehub.api.routes.musehub import (
     ui_collaborators as musehub_ui_collab_routes,
     ui_labels as musehub_ui_labels_routes,
     ui_settings as musehub_ui_settings_routes,
-    ui_similarity as musehub_ui_similarity_routes,
     ui_topics as musehub_ui_topics_routes,
     ui_forks as musehub_ui_forks_routes,
-    ui_emotion_diff as musehub_ui_emotion_diff_routes,
     ui_user_profile as musehub_ui_profile_routes,
     ui_mcp_elicitation as musehub_ui_mcp_elicitation_routes,
     ui_new_repo as musehub_ui_new_repo_routes,
@@ -273,8 +271,6 @@ app.include_router(musehub_ui_insights_router, tags=["musehub-ui-insights"])
 app.include_router(musehub_ui_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_blame_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_settings_routes.router, tags=["musehub-ui-settings"])
-app.include_router(musehub_ui_similarity_routes.router, tags=["musehub-ui"])
-app.include_router(musehub_ui_emotion_diff_routes.router, tags=["musehub-ui"])
 
 # Profile catch-all MUST be last — /{username} is a single-segment wildcard and
 # would shadow fixed routes (e.g. /explore, /feed, /topics, /mcp) if registered earlier.

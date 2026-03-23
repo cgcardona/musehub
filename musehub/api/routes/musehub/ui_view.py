@@ -12,8 +12,6 @@ Redirect routes (301):
   GET /{owner}/{repo}/piano-roll/{ref}     → insights/{ref}
   GET /{owner}/{repo}/listen/{ref}         → insights/{ref}
   GET /{owner}/{repo}/arrange/{ref}        → insights/{ref}
-  GET /{owner}/{repo}/analysis/{ref}       → insights/{ref}
-  GET /{owner}/{repo}/analysis/{ref}/{dim} → insights/{ref}/{dim}
 """
 from __future__ import annotations
 
@@ -34,7 +32,7 @@ from musehub.api.routes.musehub._nav_ctx import build_repo_nav_ctx
 from musehub.api.routes.musehub.htmx_helpers import htmx_fragment_or_full
 from musehub.db import get_db
 from musehub.db import musehub_models as musehub_db
-from musehub.services import musehub_repository, musehub_domains, musehub_analysis
+from musehub.services import musehub_repository, musehub_domains
 
 logger = logging.getLogger(__name__)
 
@@ -59,15 +57,6 @@ async def redirect_listen(owner: str, repo_slug: str, ref: str) -> RedirectRespo
 async def redirect_arrange(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
     return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
-
-@redirect_router.get("/{owner}/{repo_slug}/analysis/{ref}/{dim}", include_in_schema=False)
-async def redirect_analysis_dim(owner: str, repo_slug: str, ref: str, dim: str) -> RedirectResponse:
-    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}/{dim}", status_code=301)
-
-
-@redirect_router.get("/{owner}/{repo_slug}/analysis/{ref}", include_in_schema=False)
-async def redirect_analysis(owner: str, repo_slug: str, ref: str) -> RedirectResponse:
-    return RedirectResponse(url=f"/{owner}/{repo_slug}/insights/{ref}", status_code=301)
 
 
 # ── Insights route ─────────────────────────────────────────────────────────────
@@ -496,13 +485,6 @@ async def insights_dashboard_page(
         metrics = await _compute_code_insights(db, repo.repo_id)
         slim_commits, initial_delta = await _get_symbol_graph_data(db, repo.repo_id)
 
-    # Pre-compute all dimension data for the dashboard cards
-    _DASHBOARD_DIMS = ["key", "tempo", "meter", "groove", "form", "dynamics", "emotion", "motifs", "contour"]
-    dim_map: dict[str, object] = {
-        dim: musehub_analysis.compute_dimension(dim, ref)
-        for dim in _DASHBOARD_DIMS
-    }
-
     base_url = f"/{owner}/{repo_slug}"
     ctx: dict[str, object] = {
         "title": f"Insights · {owner}/{repo_slug}@{ref}",
@@ -518,14 +500,13 @@ async def insights_dashboard_page(
         "metrics": metrics,
         "slim_commits": slim_commits,
         "initial_delta": initial_delta,
-        "dim_map": dim_map,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
         **nav_ctx,
     }
     return await htmx_fragment_or_full(
         request, _templates, ctx,
         full_template="musehub/pages/insights.html",
-        fragment_template="musehub/fragments/analysis/dashboard_content.html",
+        fragment_template=None,
     )
 
 
@@ -557,16 +538,6 @@ async def insights_dimension_page(
         metrics = await _compute_code_insights(db, repo.repo_id)
 
     base_url = f"/{owner}/{repo_slug}"
-    # Compute dimension-specific data using the correct function per dimension
-    _dim_key = dim.replace("-", "_")
-    if dim == "harmony":
-        dim_data: object = musehub_analysis.compute_harmony_analysis(repo_id=repo.repo_id, ref=ref)
-    elif dim == "emotion":
-        dim_data = musehub_analysis.compute_emotion_map(repo_id=repo.repo_id, ref=ref)
-    elif dim == "dynamics":
-        dim_data = musehub_analysis.compute_dynamics_page_data(repo_id=repo.repo_id, ref=ref)
-    else:
-        dim_data = musehub_analysis.compute_dimension(dim, ref)
     ctx: dict[str, object] = {
         "title": f"{dim.replace('-', ' ').title()} Insight · {owner}/{repo_slug}@{ref}",
         "current_page": "insights",
@@ -580,46 +551,10 @@ async def insights_dimension_page(
         "active_dimension": dim,
         "metrics": metrics,
         "muse_resource_uri": f"muse://repos/{owner}/{repo_slug}",
-        # Dimension-specific data keys expected by the dimension templates
-        f"{_dim_key}_data": dim_data,
         **nav_ctx,
     }
-    # Use dimension-specific template if it exists, otherwise fall back to insights.html
-    _DIM_TEMPLATES: dict[str, str] = {
-        "key": "musehub/pages/analysis/key.html",
-        "tempo": "musehub/pages/analysis/tempo.html",
-        "meter": "musehub/pages/analysis/meter.html",
-        "groove": "musehub/pages/analysis/groove.html",
-        "form": "musehub/pages/analysis/form.html",
-        "harmony": "musehub/pages/analysis/harmony.html",
-        "contour": "musehub/pages/analysis/contour.html",
-        "dynamics": "musehub/pages/analysis/dynamics.html",
-        "motifs": "musehub/pages/analysis/motifs.html",
-        "chord_map": "musehub/pages/analysis/chord_map.html",
-        "chord-map": "musehub/pages/analysis/chord_map.html",
-        "context": "musehub/pages/analysis/context.html",
-        "emotion": "musehub/pages/analysis/emotion.html",
-        "compare": "musehub/pages/analysis/compare.html",
-        "divergence": "musehub/pages/analysis/divergence.html",
-    }
-    _DIM_FRAGMENTS: dict[str, str] = {
-        "key": "musehub/fragments/analysis/key_content.html",
-        "tempo": "musehub/fragments/analysis/tempo_content.html",
-        "meter": "musehub/fragments/analysis/meter_content.html",
-        "groove": "musehub/fragments/analysis/groove_content.html",
-        "form": "musehub/fragments/analysis/form_content.html",
-        "harmony": "musehub/fragments/analysis/harmony_content.html",
-        "contour": "musehub/fragments/analysis/contour_content.html",
-        "dynamics": "musehub/fragments/analysis/dynamics_content.html",
-        "motifs": "musehub/fragments/analysis/motifs_content.html",
-        "chord_map": "musehub/fragments/analysis/chord_map_content.html",
-        "chord-map": "musehub/fragments/analysis/chord_map_content.html",
-        "emotion": "musehub/fragments/analysis/emotion_content.html",
-    }
-    full_template = _DIM_TEMPLATES.get(dim, "musehub/pages/insights.html")
-    fragment_template = _DIM_FRAGMENTS.get(dim)
     return await htmx_fragment_or_full(
         request, _templates, ctx,
-        full_template=full_template,
-        fragment_template=fragment_template,
+        full_template="musehub/pages/insights.html",
+        fragment_template=None,
     )
