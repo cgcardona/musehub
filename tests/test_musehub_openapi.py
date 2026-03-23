@@ -139,8 +139,6 @@ async def test_key_musehub_operation_ids_exist(openapi_spec: dict) -> None: # ty
         "listPullRequests",
         "getPullRequest",
         "mergePullRequest",
-        "getAnalysis",
-        "getAnalysisDimension",
         "globalSearch",
         "searchRepo",
         "pushCommits",

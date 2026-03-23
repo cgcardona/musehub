@@ -1696,21 +1696,6 @@ async def _make_repo_with_commit(db_session: AsyncSession) -> tuple[str, str]:
     return repo_id, _FIXED_COMMIT_ID
 
 
-@pytest.mark.anyio
-async def test_context_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{repo_id}/context/{ref} returns 200 HTML without auth."""
-    repo_id, commit_id = await _make_repo_with_commit(db_session)
-    response = await client.get(f"/testuser/jazz-context-test/context/{commit_id}")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-    assert "context" in body.lower()
-    assert repo_id[:8] in body
-
 
 @pytest.mark.anyio
 async def test_credits_json_response(
@@ -1845,40 +1830,11 @@ async def test_context_requires_auth(
     assert response.status_code == 401
 
 
-@pytest.mark.anyio
-async def test_context_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """The context UI page must be accessible without a JWT (HTML shell handles auth)."""
-    repo_id, commit_id = await _make_repo_with_commit(db_session)
-    response = await client.get(f"/testuser/jazz-context-test/context/{commit_id}")
-    assert response.status_code != 401
-    assert response.status_code == 200
-
 
 # ---------------------------------------------------------------------------
 # Context page additional tests
 # ---------------------------------------------------------------------------
 
-
-@pytest.mark.anyio
-async def test_context_page_contains_agent_explainer(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Context viewer page SSR: ref prefix and Musical Context heading appear in HTML.
-
-    The context page is now fully SSR — data is server-rendered rather than
-    fetched client-side.  The ref prefix must appear in the breadcrumb/badge
-    and the Musical Context heading must be present.
-    """
-    repo_id, commit_id = await _make_repo_with_commit(db_session)
-    response = await client.get(f"/testuser/jazz-context-test/context/{commit_id}")
-    assert response.status_code == 200
-    body = response.text
-    assert "Musical Context" in body
-    assert commit_id[:8] in body
 
 
 # ---------------------------------------------------------------------------
@@ -1886,81 +1842,14 @@ async def test_context_page_contains_agent_explainer(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
-async def test_embed_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{repo_id}/embed/{ref} returns 200 HTML."""
-    repo_id = await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/embed/{ref}")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
 
 
-@pytest.mark.anyio
-async def test_embed_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Embed page must be accessible without an Authorization header (public embedding)."""
-    repo_id = await _make_repo(db_session)
-    ref = "deadbeef1234"
-    response = await client.get(f"/testuser/test-beats/embed/{ref}")
-    assert response.status_code != 401
-    assert response.status_code == 200
-
-
-@pytest.mark.anyio
-async def test_embed_page_x_frame_options(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Embed page must set X-Frame-Options: ALLOWALL to permit cross-origin framing."""
-    repo_id = await _make_repo(db_session)
-    ref = "cafebabe1234"
-    response = await client.get(f"/testuser/test-beats/embed/{ref}")
-    assert response.status_code == 200
-    assert response.headers.get("x-frame-options") == "ALLOWALL"
-
-
-@pytest.mark.anyio
-async def test_embed_page_contains_player_ui(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Embed page HTML must contain player elements: play button, progress bar, and MuseHub link."""
-    repo_id = await _make_repo(db_session)
-    ref = "feedface0123456789ab"
-    response = await client.get(f"/testuser/test-beats/embed/{ref}")
-    assert response.status_code == 200
-    body = response.text
-    assert "play-btn" in body
-    assert "progress-bar" in body
-    assert "View on MuseHub" in body
-    assert "audio" in body
-    assert repo_id in body
 
 # ---------------------------------------------------------------------------
 # Groove check page and endpoint tests
 
 # ---------------------------------------------------------------------------
 
-
-@pytest.mark.anyio
-async def test_groove_check_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{repo_id}/groove-check returns 200 HTML without requiring a JWT."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/groove-check")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-    assert "Groove Check" in body
 
 
 @pytest.mark.anyio
@@ -2059,65 +1948,13 @@ async def test_credits_page_contains_profile_link_pattern(
     assert "schema.org" in body
 
 
-@pytest.mark.anyio
-async def test_groove_check_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Groove check UI page must be accessible without an Authorization header (HTML shell)."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/groove-check")
-    assert response.status_code != 401
-    assert response.status_code == 200
-
 
 # ---------------------------------------------------------------------------
 # Object listing endpoint tests (JSON, authed)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
-async def test_groove_check_page_contains_chart_js(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Groove check page dispatches groove-check TypeScript module with server config."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/groove-check")
-    assert response.status_code == 200
-    body = response.text
-    # Chart rendering is in groove-check.ts (compiled bundle); check page_json dispatch
-    assert '"page": "groove-check"' in body
-    assert '"repoId"' in body
 
-
-@pytest.mark.anyio
-async def test_groove_check_page_contains_status_badges(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Groove check page links to the groove-check TypeScript module entry point."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/groove-check")
-    assert response.status_code == 200
-    body = response.text
-    # Status badge logic is in groove-check.ts (compiled bundle); verify page loads
-    assert "Groove Check" in body
-    assert '"page": "groove-check"' in body
-
-
-@pytest.mark.anyio
-async def test_groove_check_page_includes_token_form(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Groove check page embeds the JWT token input form so visitors can authenticate."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/groove-check")
-    assert response.status_code == 200
-    body = response.text
-    assert "token-form" in body
-    assert "token-input" in body
 
 
 @pytest.mark.anyio
@@ -3595,164 +3432,12 @@ async def test_session_list_page_contains_location_tag_markup(
     assert "Studio A" in body
 
 
-async def test_contour_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{repo_id}/insights/{ref}/contour returns 200 HTML."""
-    repo_id = await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/contour")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
 
 
-@pytest.mark.anyio
-async def test_contour_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Contour analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    repo_id = await _make_repo(db_session)
-    ref = "deadbeef1234"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/contour")
-    assert response.status_code != 401
-    assert response.status_code == 200
 
 
-@pytest.mark.anyio
-async def test_contour_page_contains_graph_ui(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Contour page SSR: must contain pitch-curve polyline, shape summary, and direction data."""
-    repo_id = await _make_repo(db_session)
-    ref = "cafebabe12345678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/contour")
-    assert response.status_code == 200
-    body = response.text
-    assert "Melodic Contour" in body
-    assert "<polyline" in body or "PITCH CURVE" in body
-    assert "Shape" in body
-    assert "Overall Direction" in body
-    assert repo_id in body
 
 
-@pytest.mark.anyio
-async def test_contour_json_response(
-    client: AsyncClient,
-    auth_headers: dict[str, str],
-    db_session: AsyncSession,
-) -> None:
-    """GET /api/v1/repos/{repo_id}/analysis/{ref}/contour returns ContourData.
-
-    Verifies that the JSON response includes shape classification labels and
-    the pitch_curve array that the contour page visualises.
-    """
-    resp = await client.post(
-        "/api/v1/repos",
-        json={"name": "contour-test-repo", "owner": "testuser", "visibility": "private"},
-        headers=auth_headers,
-    )
-    assert resp.status_code == 201
-    repo_id = resp.json()["repoId"]
-
-    resp = await client.get(
-        f"/api/v1/repos/{repo_id}/analysis/main/contour",
-        headers=auth_headers,
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["dimension"] == "contour"
-    assert body["ref"] == "main"
-    data = body["data"]
-    assert "shape" in data
-    assert "pitchCurve" in data
-    assert "overallDirection" in data
-    assert "directionChanges" in data
-    assert len(data["pitchCurve"]) > 0
-    assert data["shape"] in ("arch", "ascending", "descending", "flat", "wave")
-
-
-@pytest.mark.anyio
-async def test_tempo_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{repo_id}/insights/{ref}/tempo returns 200 HTML."""
-    repo_id = await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/tempo")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
-
-@pytest.mark.anyio
-async def test_tempo_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Tempo analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    repo_id = await _make_repo(db_session)
-    ref = "deadbeef5678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/tempo")
-    assert response.status_code != 401
-    assert response.status_code == 200
-
-
-@pytest.mark.anyio
-async def test_tempo_page_contains_bpm_ui(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Tempo page must contain BPM display, stability bar, and tempo-change timeline."""
-    repo_id = await _make_repo(db_session)
-    ref = "feedface5678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/tempo")
-    assert response.status_code == 200
-    body = response.text
-    assert "Tempo Analysis" in body
-    assert "BPM" in body
-    assert "Stability" in body
-    assert "tempoChangeSvg" in body or "tempoChanges" in body or "Tempo Changes" in body
-    assert repo_id in body
-
-
-@pytest.mark.anyio
-async def test_tempo_json_response(
-    client: AsyncClient,
-    auth_headers: dict[str, str],
-    db_session: AsyncSession,
-) -> None:
-    """GET /api/v1/repos/{repo_id}/analysis/{ref}/tempo returns TempoData.
-
-    Verifies that the JSON response includes BPM, stability, time feel, and
-    tempo_changes history that the tempo page visualises.
-    """
-    resp = await client.post(
-        "/api/v1/repos",
-        json={"name": "tempo-test-repo", "owner": "testuser", "visibility": "private"},
-        headers=auth_headers,
-    )
-    assert resp.status_code == 201
-    repo_id = resp.json()["repoId"]
-
-    resp = await client.get(
-        f"/api/v1/repos/{repo_id}/analysis/main/tempo",
-        headers=auth_headers,
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["dimension"] == "tempo"
-    assert body["ref"] == "main"
-    data = body["data"]
-    assert "bpm" in data
-    assert "stability" in data
-    assert "timeFeel" in data
-    assert "tempoChanges" in data
-    assert data["bpm"] > 0
-    assert 0.0 <= data["stability"] <= 1.0
-    assert isinstance(data["tempoChanges"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -3849,89 +3534,7 @@ async def test_form_structure_page_includes_token_form(
     assert "token-form" in body
 
 
-@pytest.mark.anyio
-async def test_form_structure_json_response(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-) -> None:
-    """GET /api/v1/repos/{repo_id}/form-structure/{ref} returns JSON with required fields."""
-    repo_id = await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(
-        f"/api/v1/repos/{repo_id}/form-structure/{ref}",
-        headers=auth_headers,
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert "repoId" in body
-    assert "ref" in body
-    assert "formLabel" in body
-    assert "timeSignature" in body
-    assert "beatsPerBar" in body
-    assert "totalBars" in body
-    assert "sectionMap" in body
-    assert "repetitionStructure" in body
-    assert "sectionComparison" in body
-    assert body["repoId"] == repo_id
-    assert body["ref"] == ref
 
-
-@pytest.mark.anyio
-async def test_form_structure_json_section_map_fields(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-) -> None:
-    """Each sectionMap entry has label, startBar, endBar, barCount, and colorHint."""
-    repo_id = await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(
-        f"/api/v1/repos/{repo_id}/form-structure/{ref}",
-        headers=auth_headers,
-    )
-    assert response.status_code == 200
-    body = response.json()
-    sections = body["sectionMap"]
-    assert len(sections) > 0
-    for sec in sections:
-        assert "label" in sec
-        assert "function" in sec
-        assert "startBar" in sec
-        assert "endBar" in sec
-        assert "barCount" in sec
-        assert "colorHint" in sec
-        assert sec["startBar"] >= 1
-        assert sec["endBar"] >= sec["startBar"]
-        assert sec["barCount"] >= 1
-
-
-@pytest.mark.anyio
-async def test_form_structure_json_heatmap_is_symmetric(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-) -> None:
-    """Section comparison heatmap matrix must be square and symmetric with diagonal 1.0."""
-    repo_id = await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(
-        f"/api/v1/repos/{repo_id}/form-structure/{ref}",
-        headers=auth_headers,
-    )
-    assert response.status_code == 200
-    body = response.json()
-    heatmap = body["sectionComparison"]
-    labels = heatmap["labels"]
-    matrix = heatmap["matrix"]
-    n = len(labels)
-    assert len(matrix) == n
-    for i in range(n):
-        assert len(matrix[i]) == n
-        assert matrix[i][i] == 1.0
-    for i in range(n):
-        for j in range(n):
-            assert 0.0 <= matrix[i][j] <= 1.0
 
 
 @pytest.mark.anyio
@@ -3948,18 +3551,6 @@ async def test_form_structure_json_404_unknown_repo(
     assert response.status_code == 404
 
 
-@pytest.mark.anyio
-async def test_form_structure_json_requires_auth(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /api/v1/repos/{repo_id}/form-structure/{ref} returns 401 without auth."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get(
-        f"/api/v1/repos/{repo_id}/form-structure/abc123",
-    )
-    assert response.status_code == 401
-
 
 # ---------------------------------------------------------------------------
 # Emotion map page tests (migrated to owner/slug routing)
@@ -3968,144 +3559,11 @@ async def test_form_structure_json_requires_auth(
 _EMOTION_REF = "deadbeef12345678"
 
 
-@pytest.mark.anyio
-async def test_emotion_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/emotion returns 200 HTML without auth."""
-    await _make_repo(db_session)
-    response = await client.get(f"/testuser/test-beats/insights/{_EMOTION_REF}/emotion")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-    assert "Emotion" in body
 
 
-@pytest.mark.anyio
-async def test_emotion_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Emotion UI page must be accessible without an Authorization header (HTML shell)."""
-    await _make_repo(db_session)
-    response = await client.get(f"/testuser/test-beats/insights/{_EMOTION_REF}/emotion")
-    assert response.status_code != 401
-    assert response.status_code == 200
 
 
-@pytest.mark.anyio
-async def test_emotion_page_includes_charts(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Emotion page SSR: must contain SVG scatter plot and axis dimension labels."""
-    await _make_repo(db_session)
-    response = await client.get(f"/testuser/test-beats/insights/{_EMOTION_REF}/emotion")
-    assert response.status_code == 200
-    body = response.text
-    assert "<circle" in body or "<svg" in body
-    assert "Valence" in body
-    assert "Tension" in body
-    assert "Energy" in body
 
-
-@pytest.mark.anyio
-async def test_emotion_page_includes_filters(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Emotion page SSR: must contain summary vector bars and trajectory section."""
-    await _make_repo(db_session)
-    response = await client.get(f"/testuser/test-beats/insights/{_EMOTION_REF}/emotion")
-    assert response.status_code == 200
-    body = response.text
-    assert "SUMMARY VECTOR" in body
-    assert "TRAJECTORY" in body
-
-
-@pytest.mark.anyio
-async def test_emotion_json_response(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-) -> None:
-    """GET /api/v1/repos/{repo_id}/analysis/{ref}/emotion-map returns required fields."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get(
-        f"/api/v1/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
-        headers=auth_headers,
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["repoId"] == repo_id
-    assert body["ref"] == _EMOTION_REF
-    assert "computedAt" in body
-    assert "summaryVector" in body
-    sv = body["summaryVector"]
-    for axis in ("energy", "valence", "tension", "darkness"):
-        assert axis in sv
-        assert 0.0 <= sv[axis] <= 1.0
-    assert "evolution" in body
-    assert isinstance(body["evolution"], list)
-    assert len(body["evolution"]) > 0
-    assert "narrative" in body
-    assert len(body["narrative"]) > 0
-    assert "source" in body
-
-
-@pytest.mark.anyio
-async def test_emotion_trajectory(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-) -> None:
-    """Cross-commit trajectory must be a list of commit snapshots with emotion vectors."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get(
-        f"/api/v1/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
-        headers=auth_headers,
-    )
-    assert response.status_code == 200
-    trajectory = response.json()["trajectory"]
-    assert isinstance(trajectory, list)
-    assert len(trajectory) >= 2
-    for snapshot in trajectory:
-        assert "commitId" in snapshot
-        assert "message" in snapshot
-        assert "primaryEmotion" in snapshot
-        vector = snapshot["vector"]
-        for axis in ("energy", "valence", "tension", "darkness"):
-            assert axis in vector
-            assert 0.0 <= vector[axis] <= 1.0
-
-
-@pytest.mark.anyio
-async def test_emotion_drift_distances(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-) -> None:
-    """Drift list must have exactly len(trajectory) - 1 entries."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get(
-        f"/api/v1/repos/{repo_id}/analysis/{_EMOTION_REF}/emotion-map",
-        headers=auth_headers,
-    )
-    assert response.status_code == 200
-    body = response.json()
-    trajectory = body["trajectory"]
-    drift = body["drift"]
-    assert isinstance(drift, list)
-    assert len(drift) == len(trajectory) - 1
-    for entry in drift:
-        assert "fromCommit" in entry
-        assert "toCommit" in entry
-        assert "drift" in entry
-        assert entry["drift"] >= 0.0
-        assert "dominantChange" in entry
-        assert entry["dominantChange"] in ("energy", "valence", "tension", "darkness")
 
 
 # ---------------------------------------------------------------------------
@@ -4510,85 +3968,10 @@ async def test_analysis_dashboard_card_links_to_dimensions(
 # Motifs browser page — # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
-async def test_motifs_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/motifs returns 200 HTML."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/insights/main/motifs")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
 
 
-@pytest.mark.anyio
-async def test_motifs_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Motifs UI page must be accessible without an Authorization header."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/insights/main/motifs")
-    assert response.status_code == 200
-    assert response.status_code != 401
 
 
-@pytest.mark.anyio
-async def test_motifs_page_contains_filter_ui(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Motifs page SSR: must contain interval pattern section and occurrence markers."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/insights/main/motifs")
-    assert response.status_code == 200
-    body = response.text
-    assert "INTERVAL PATTERN" in body
-    assert "OCCURRENCES" in body
-
-
-@pytest.mark.anyio
-async def test_motifs_page_contains_piano_roll_renderer(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Motifs page SSR: must contain motif browser heading and interval data."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/insights/main/motifs")
-    assert response.status_code == 200
-    body = response.text
-    assert "Motif Browser" in body
-    assert "INTERVAL PATTERN" in body
-
-
-@pytest.mark.anyio
-async def test_motifs_page_contains_recurrence_grid(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Motifs page SSR: must contain recurrence grid section rendered server-side."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/insights/main/motifs")
-    assert response.status_code == 200
-    body = response.text
-    assert "RECURRENCE GRID" in body or "occurrence" in body.lower()
-
-
-@pytest.mark.anyio
-async def test_motifs_page_shows_transformation_badges(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Motifs page SSR: must contain TRANSFORMATIONS section with inversion type labels."""
-    repo_id = await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/insights/main/motifs")
-    assert response.status_code == 200
-    body = response.text
-    assert "TRANSFORMATIONS" in body
-    assert "inversion" in body
 
 
 # ---------------------------------------------------------------------------
@@ -4639,19 +4022,6 @@ async def test_repo_home_recent_commits(
     assert "History" in body
     assert "Commits" in body
 
-
-@pytest.mark.anyio
-async def test_repo_home_audio_player(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Repo home page includes the persistent floating audio player from base.html."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats")
-    assert response.status_code == 200
-    body = response.text
-    assert 'id="audio-player"' in body
-    assert "class=\"audio-player\"" in body
 
 
 @pytest.mark.anyio
@@ -4886,193 +4256,15 @@ async def test_tree_unknown_ref_404(
 # Harmony analysis page tests — # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
-async def test_harmony_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/harmony returns 200 SSR HTML."""
-    await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-    assert "Harmony Analysis" in body
 
 
-@pytest.mark.anyio
-async def test_harmony_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony analysis SSR page must be accessible without a JWT (not 401)."""
-    await _make_repo(db_session)
-    ref = "deadbeef00001234"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code != 401
-    assert response.status_code == 200
 
 
-@pytest.mark.anyio
-async def test_harmony_page_contains_key_display(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page must render key and mode summary from HarmonyAnalysisResponse."""
-    await _make_repo(db_session)
-    ref = "cafe0000000000000001"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    body = response.text
-    # SSR template renders key summary card with harmony_data.key (full key label e.g. "F major"),
-    # harmony_data.mode (e.g. "major"), and harmonic_rhythm_bpm as "chords/min"
-    assert "Harmony Analysis" in body
-    assert "CHORD EVENTS" in body
-    assert "chords/min" in body
 
 
-@pytest.mark.anyio
-async def test_harmony_page_contains_chord_timeline(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page must render the Roman-numeral chord events section."""
-    await _make_repo(db_session)
-    ref = "babe0000000000000002"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    body = response.text
-    # SSR template renders a CHORD EVENTS card with Roman numeral symbols
-    assert "CHORD EVENTS" in body
 
 
-@pytest.mark.anyio
-async def test_harmony_page_contains_tension_curve(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page must render the cadences section (replaces the old tension-curve card)."""
-    await _make_repo(db_session)
-    ref = "face0000000000000003"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    body = response.text
-    # SSR template renders a CADENCES card (server-side, no JS SVG renderer needed)
-    assert "CADENCES" in body
 
-
-@pytest.mark.anyio
-async def test_harmony_page_contains_modulation_section(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page must render the MODULATIONS card server-side."""
-    await _make_repo(db_session)
-    ref = "feed0000000000000004"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    body = response.text
-    # SSR template renders a MODULATIONS card from harmony_data.modulations
-    assert "MODULATIONS" in body
-
-
-@pytest.mark.anyio
-async def test_harmony_page_contains_filter_controls(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page must include HTMX fragment support (HX-Request returns partial HTML)."""
-    await _make_repo(db_session)
-    ref = "beef0000000000000005"
-    # Full page response
-    full = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert full.status_code == 200
-    assert "<html" in full.text
-    # HTMX fragment response (no outer HTML wrapper)
-    fragment = await client.get(
-        f"/testuser/test-beats/insights/{ref}/harmony",
-        headers={"HX-Request": "true"},
-    )
-    assert fragment.status_code == 200
-    assert "<html" not in fragment.text
-    assert "Harmony Analysis" in fragment.text
-
-
-@pytest.mark.anyio
-async def test_harmony_page_contains_key_history(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page must render breadcrumb with owner/repo_slug/analysis path."""
-    await _make_repo(db_session)
-    ref = "0000000000000000dead"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    body = response.text
-    # SSR template breadcrumb shows owner, repo_slug, and analysis path
-    assert "testuser" in body
-    assert "test-beats" in body
-    assert "analysis" in body
-
-
-@pytest.mark.anyio
-async def test_harmony_page_contains_voice_leading(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page must render harmonic rhythm (replaces the old voice-leading JS card)."""
-    await _make_repo(db_session)
-    ref = "1111111111111111beef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    body = response.text
-    # SSR template renders harmonic_rhythm_bpm as "chords/min" in the key summary card
-    assert "chords/min" in body
-
-
-@pytest.mark.anyio
-async def test_harmony_page_has_token_form(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Harmony SSR page includes JWT token form and app.js via base.html layout."""
-    await _make_repo(db_session)
-    ref = "2222222222222222cafe"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/harmony")
-    assert response.status_code == 200
-    body = response.text
-    assert 'id="token-form"' in body
-    assert "app.js" in body
-
-
-@pytest.mark.anyio
-async def test_harmony_json_response(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-) -> None:
-    """GET /api/v1/repos/{repo_id}/analysis/{ref}/harmony returns HarmonyAnalysisResponse."""
-    repo_id = await _make_repo(db_session)
-    resp = await client.get(
-        f"/api/v1/repos/{repo_id}/analysis/main/harmony",
-        headers=auth_headers,
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    # Dedicated harmony endpoint returns HarmonyAnalysisResponse (not the generic AnalysisResponse
-    # envelope). Fields are camelCase from CamelModel.
-    assert "key" in body
-    assert "mode" in body
-    assert "romanNumerals" in body
-    assert "cadences" in body
-    assert "modulations" in body
-    assert "harmonicRhythmBpm" in body
-    assert isinstance(body["romanNumerals"], list)
-    assert isinstance(body["cadences"], list)
-    assert isinstance(body["modulations"], list)
-    assert isinstance(body["harmonicRhythmBpm"], float | int)
 
 # Listen page tests
 # ---------------------------------------------------------------------------
@@ -5190,135 +4382,7 @@ async def test_listen_page_json_response(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
-async def test_build_track_listing_returns_full_mix_and_tracks(
-    db_session: AsyncSession,
-) -> None:
-    """build_track_listing() returns a populated TrackListingResponse with mix + stems."""
-    from musehub.services.musehub_listen import build_track_listing
 
-    repo = MusehubRepo(
-        name="svc-listen-test",
-        owner="svcuser",
-        slug="svc-listen-test",
-        visibility="public",
-        owner_user_id="svc-owner",
-    )
-    db_session.add(repo)
-    await db_session.commit()
-    await db_session.refresh(repo)
-    repo_id = str(repo.repo_id)
-
-    for path, size in [
-        ("mix/full_mix.mp3", 204800),
-        ("tracks/bass.mp3", 51200),
-        ("tracks/keys.mp3", 61440),
-        ("tracks/bass.webp", 8192),
-    ]:
-        obj = MusehubObject(
-            object_id=f"sha256:svc_{path.replace('/', '_')}",
-            repo_id=repo_id,
-            path=path,
-            size_bytes=size,
-            disk_path=f"/tmp/svc_{path.replace('/', '_')}",
-        )
-        db_session.add(obj)
-    await db_session.commit()
-
-    result = await build_track_listing(db_session, repo_id, "main")
-
-    assert result.has_renders is True
-    assert result.repo_id == repo_id
-    assert result.ref == "main"
-    # full-mix URL points to the mix file (contains "mix" keyword)
-    assert result.full_mix_url is not None
-    assert "full_mix" in result.full_mix_url or "mix" in result.full_mix_url
-    # Two audio tracks (bass.mp3 + keys.mp3); bass.webp is not audio
-    assert len(result.tracks) == 3 # mix/full_mix.mp3, tracks/bass.mp3, tracks/keys.mp3
-    track_paths = {t.path for t in result.tracks}
-    assert "tracks/bass.mp3" in track_paths
-    assert "tracks/keys.mp3" in track_paths
-    # Piano-roll URL attached to bass.mp3 (matching bass.webp exists)
-    bass_track = next(t for t in result.tracks if t.path == "tracks/bass.mp3")
-    assert bass_track.piano_roll_url is not None
-
-
-@pytest.mark.anyio
-async def test_build_track_listing_no_audio_returns_empty(
-    db_session: AsyncSession,
-) -> None:
-    """build_track_listing() returns has_renders=False when no audio objects exist."""
-    from musehub.services.musehub_listen import build_track_listing
-
-    repo = MusehubRepo(
-        name="svc-silent-test",
-        owner="svcuser",
-        slug="svc-silent-test",
-        visibility="public",
-        owner_user_id="svc-owner",
-    )
-    db_session.add(repo)
-    await db_session.commit()
-    await db_session.refresh(repo)
-    repo_id = str(repo.repo_id)
-
-    # Only a non-audio object
-    obj = MusehubObject(
-        object_id="sha256:svc_midi",
-        repo_id=repo_id,
-        path="tracks/bass.mid",
-        size_bytes=1024,
-        disk_path="/tmp/svc_bass.mid",
-    )
-    db_session.add(obj)
-    await db_session.commit()
-
-    result = await build_track_listing(db_session, repo_id, "dev")
-
-    assert result.has_renders is False
-    assert result.full_mix_url is None
-    assert result.tracks == []
-
-
-@pytest.mark.anyio
-async def test_build_track_listing_no_mix_keyword_uses_first_alphabetically(
-    db_session: AsyncSession,
-) -> None:
-    """When no file matches _FULL_MIX_KEYWORDS, the first audio file (by path) is used."""
-    from musehub.services.musehub_listen import build_track_listing
-
-    repo = MusehubRepo(
-        name="svc-nomix-test",
-        owner="svcuser",
-        slug="svc-nomix-test",
-        visibility="public",
-        owner_user_id="svc-owner",
-    )
-    db_session.add(repo)
-    await db_session.commit()
-    await db_session.refresh(repo)
-    repo_id = str(repo.repo_id)
-
-    for path, size in [
-        ("tracks/bass.mp3", 51200),
-        ("tracks/drums.mp3", 61440),
-    ]:
-        obj = MusehubObject(
-            object_id=f"sha256:svc_nomix_{path.replace('/', '_')}",
-            repo_id=repo_id,
-            path=path,
-            size_bytes=size,
-            disk_path=f"/tmp/svc_nomix_{path.replace('/', '_')}",
-        )
-        db_session.add(obj)
-    await db_session.commit()
-
-    result = await build_track_listing(db_session, repo_id, "main")
-
-    assert result.has_renders is True
-    # 'tracks/bass.mp3' sorts before 'tracks/drums.mp3'
-    assert result.full_mix_url is not None
-    assert "bass" in result.full_mix_url
 
 
 # ---------------------------------------------------------------------------
@@ -6316,31 +5380,6 @@ async def test_listen_page_keyboard_shortcuts_documented(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
-async def test_compare_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{slug}/compare/{base}...{head} returns 200 HTML."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-    assert "main" in body
-    assert "feature" in body
-
-
-@pytest.mark.anyio
-async def test_compare_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Compare page is accessible without a JWT token."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
 
 
 @pytest.mark.anyio
@@ -6363,114 +5402,10 @@ async def test_compare_page_unknown_owner_404(
     assert response.status_code == 404
 
 
-@pytest.mark.anyio
-async def test_compare_page_includes_radar(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Compare page SSR HTML contains all five musical dimension names (replaces JS radar).
-
-    The compare page now renders data server-side via a dimension table.
-    Musical dimensions (Melodic, Harmonic, etc.) must appear in the HTML body
-    before any client-side JavaScript runs.
-    """
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
-    body = response.text
-    assert "Melodic" in body
-    assert "Harmonic" in body
 
 
-@pytest.mark.anyio
-async def test_compare_page_includes_piano_roll(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Compare page SSR HTML contains the dimension table (replaces piano roll JS panel).
-
-    The compare page now renders a dimension comparison table server-side.
-    Both ref names must appear as column headers in the HTML.
-    """
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
-    body = response.text
-    assert "main" in body
-    assert "feature" in body
-    assert "Dimension" in body
 
 
-@pytest.mark.anyio
-async def test_compare_page_includes_emotion_diff(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Compare page SSR HTML contains change delta column (replaces emotion diff JS).
-
-    The dimension table includes a Change column showing delta values server-side.
-    """
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
-    body = response.text
-    assert "Change" in body
-    assert "%" in body
-
-
-@pytest.mark.anyio
-async def test_compare_page_includes_commit_list(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Compare page SSR HTML contains dimension rows (replaces client-side commit list JS).
-
-    All five musical dimensions must appear as data rows in the server-rendered table.
-    """
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
-    body = response.text
-    assert "Rhythmic" in body
-    assert "Structural" in body
-    assert "Dynamic" in body
-
-
-@pytest.mark.anyio
-async def test_compare_page_includes_create_pr_button(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Compare page SSR HTML contains both ref names in the heading (replaces PR button CTA).
-
-    The SSR compare page shows the base and head refs in the page header.
-    """
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
-    body = response.text
-    assert "Compare" in body
-    assert "main" in body
-    assert "feature" in body
-
-
-@pytest.mark.anyio
-async def test_compare_json_response(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{slug}/compare/{refs} returns HTML with SSR dimension data.
-
-    The compare page is now fully SSR — no JSON format negotiation.
-    The response is always text/html containing the dimension table.
-    """
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/compare/main...feature")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "Melodic" in body
-    assert "main" in body
 
 
 # ---------------------------------------------------------------------------
@@ -7144,20 +6079,6 @@ async def test_blob_midi_shows_piano_roll_link(
     assert "bass.mid" in body
 
 
-@pytest.mark.anyio
-async def test_blob_mp3_shows_audio_player(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Blob page for .mp3 file includes <audio> rendering logic in the template JS."""
-    await _seed_blob_fixtures(db_session)
-    response = await client.get("/testuser/blob-test/blob/main/tracks/keys.mp3")
-    assert response.status_code == 200
-    body = response.text
-    # JS template emits <audio> element for audio file type
-    assert "<audio" in body or "blob-audio" in body
-    assert "keys.mp3" in body
-
 
 @pytest.mark.anyio
 async def test_blob_raw_button(
@@ -7173,110 +6094,12 @@ async def test_blob_raw_button(
     assert "/raw/" in body
 
 
-@pytest.mark.anyio
-async def test_score_page_contains_legend(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Score page includes a legend for note symbols."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main")
-    assert response.status_code == 200
-    body = response.text
-    assert "legend" in body or "Note" in body
 
 
-@pytest.mark.anyio
-async def test_score_page_contains_score_meta(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Score page embeds a score metadata panel (key/tempo/time signature)."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main")
-    assert response.status_code == 200
-    body = response.text
-    assert "score-meta" in body
 
 
-@pytest.mark.anyio
-async def test_score_page_contains_staff_container(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Score page embeds the SVG staff container markup."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main")
-    assert response.status_code == 200
-    body = response.text
-    assert "staff-container" in body or "staves" in body
 
 
-@pytest.mark.anyio
-async def test_score_page_contains_track_selector(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Score page embeds a track selector element."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main")
-    assert response.status_code == 200
-    body = response.text
-    assert "track-selector" in body
-
-
-@pytest.mark.anyio
-async def test_score_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Score UI page must be accessible without an Authorization header."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main")
-    assert response.status_code == 200
-    assert response.status_code != 401
-
-
-@pytest.mark.anyio
-async def test_score_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{slug}/score/{ref} returns 200 HTML."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
-
-
-@pytest.mark.anyio
-async def test_score_part_page_includes_path(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Single-part score page injects the path segment into page data."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main/piano")
-    assert response.status_code == 200
-    body = response.text
-    # scorePath JS variable should be set to the path segment
-    assert "piano" in body
-
-
-@pytest.mark.anyio
-async def test_score_part_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{slug}/score/{ref}/{path} returns 200 HTML."""
-    await _make_repo(db_session)
-    response = await client.get("/testuser/test-beats/score/main/piano")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    body = response.text
-    assert "MuseHub" in body
 
 
 @pytest.mark.anyio
@@ -7773,266 +6596,22 @@ async def test_feed_page_mark_read_updates_nav_badge(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.anyio
-async def test_key_analysis_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/key returns 200 HTML."""
-    await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/key")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
 
 
-@pytest.mark.anyio
-async def test_key_analysis_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Key analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    await _make_repo(db_session)
-    ref = "deadbeef1234"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/key")
-    assert response.status_code != 401
-    assert response.status_code == 200
 
 
-@pytest.mark.anyio
-async def test_key_analysis_page_contains_key_data_labels(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Key page must contain tonic, mode, relative key, and confidence UI elements."""
-    await _make_repo(db_session)
-    ref = "cafebabe12345678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/key")
-    assert response.status_code == 200
-    body = response.text
-    assert "Key Detection" in body
-    assert "Relative Key" in body
-    assert "Detection Confidence" in body
-    assert "Alternate Key" in body
 
 
-@pytest.mark.anyio
-async def test_meter_analysis_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/meter returns 200 HTML."""
-    await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/meter")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
 
 
-@pytest.mark.anyio
-async def test_meter_analysis_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Meter analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    await _make_repo(db_session)
-    ref = "deadbeef5678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/meter")
-    assert response.status_code != 401
-    assert response.status_code == 200
 
 
-@pytest.mark.anyio
-async def test_meter_analysis_page_contains_meter_data_labels(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Meter page must contain time signature, compound/simple badge, and beat strength UI."""
-    await _make_repo(db_session)
-    ref = "feedface5678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/meter")
-    assert response.status_code == 200
-    body = response.text
-    assert "Meter Analysis" in body
-    assert "Time Signature" in body
-    assert "Beat Strength Profile" in body
-    # SSR migration (issue #578): beat strength is now rendered as inline CSS bars,
-    # not as a JS function call. Verify the label is present and CSS bars are rendered.
-    assert "border-radius" in body or "%" in body
 
 
-@pytest.mark.anyio
-async def test_chord_map_analysis_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/chord-map returns 200 HTML."""
-    await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/chord-map")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
 
 
-@pytest.mark.anyio
-async def test_chord_map_analysis_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Chord-map analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    await _make_repo(db_session)
-    ref = "deadbeef9999"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/chord-map")
-    assert response.status_code != 401
-    assert response.status_code == 200
 
 
-@pytest.mark.anyio
-async def test_chord_map_analysis_page_contains_chord_data_labels(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Chord-map page SSR: must contain progression timeline, chord table, and tension data."""
-    await _make_repo(db_session)
-    ref = "beefdead1234"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/chord-map")
-    assert response.status_code == 200
-    body = response.text
-    assert "Chord Map" in body
-    assert "PROGRESSION TIMELINE" in body
-    assert "CHORD TABLE" in body
-    assert "tension" in body.lower()
-
-
-@pytest.mark.anyio
-async def test_groove_analysis_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/groove returns 200 HTML."""
-    await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/groove")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
-
-@pytest.mark.anyio
-async def test_groove_analysis_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Groove analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    await _make_repo(db_session)
-    ref = "deadbeef4321"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/groove")
-    assert response.status_code != 401
-    assert response.status_code == 200
-
-
-@pytest.mark.anyio
-async def test_groove_analysis_page_contains_groove_data_labels(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Groove page must contain style badge, BPM, swing factor, and groove score UI."""
-    await _make_repo(db_session)
-    ref = "cafefeed5678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/groove")
-    assert response.status_code == 200
-    body = response.text
-    assert "Groove Analysis" in body
-    assert "Style" in body
-    assert "BPM" in body
-    assert "Groove Score" in body
-    assert "Swing Factor" in body
-
-
-@pytest.mark.anyio
-async def test_emotion_analysis_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/emotion returns 200 HTML."""
-    await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/emotion")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
-
-@pytest.mark.anyio
-async def test_emotion_analysis_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Emotion analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    await _make_repo(db_session)
-    ref = "deadbeef0001"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/emotion")
-    assert response.status_code != 401
-    assert response.status_code == 200
-
-
-@pytest.mark.anyio
-async def test_emotion_analysis_page_contains_emotion_data_labels(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Emotion page SSR: must contain SVG scatter plot and summary vector dimension bars."""
-    await _make_repo(db_session)
-    ref = "aabbccdd5678"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/emotion")
-    assert response.status_code == 200
-    body = response.text
-    assert "Emotion Analysis" in body
-    assert "SUMMARY VECTOR" in body
-    assert "Valence" in body or "valence" in body
-    assert "Tension" in body or "tension" in body
-    assert "<circle" in body or "<svg" in body
-
-
-@pytest.mark.anyio
-async def test_form_analysis_page_renders(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """GET /{owner}/{repo_slug}/insights/{ref}/form returns 200 HTML."""
-    await _make_repo(db_session)
-    ref = "abc1234567890abcdef"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/form")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
-
-@pytest.mark.anyio
-async def test_form_analysis_page_no_auth_required(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Form analysis page must be accessible without a JWT (HTML shell handles auth)."""
-    await _make_repo(db_session)
-    ref = "deadbeef0002"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/form")
-    assert response.status_code != 401
-    assert response.status_code == 200
-
-
-@pytest.mark.anyio
-async def test_form_analysis_page_contains_form_data_labels(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    """Form page must contain form label, section timeline, and sections table."""
-    await _make_repo(db_session)
-    ref = "11223344abcd"
-    response = await client.get(f"/testuser/test-beats/insights/{ref}/form")
-    assert response.status_code == 200
-    body = response.text
-    assert "Form Analysis" in body
-    assert "Form Timeline" in body or "formLabel" in body
-    assert "Sections" in body
-    assert "Total Beats" in body
 
 
 # ---------------------------------------------------------------------------

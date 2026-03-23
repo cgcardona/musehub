@@ -17,7 +17,6 @@ Endpoint summary:
   GET /repos/{repo_id}/sessions — list recording sessions
   GET /repos/{repo_id}/sessions/{session_id} — get a single session
   GET /repos/{repo_id}/arrange/{ref} — arrangement matrix (instrument × section grid)
-
 All endpoints require a valid JWT Bearer token.
 No business logic lives here — all persistence is delegated to
 musehub.services.musehub_repository, musehub.services.musehub_credits,
@@ -39,7 +38,6 @@ from musehub.db import musehub_collaborator_models as collab_models
 from musehub.db import musehub_models as db_models
 from musehub.models.musehub import (
     ActivityFeedResponse,
-    ArrangementMatrixResponse,
     BranchDetailListResponse,
     BranchListResponse,
     CollaboratorAccessResponse,
@@ -70,15 +68,13 @@ from musehub.models.musehub import (
     SessionListResponse,
     SessionResponse,
     SessionStop,
-    TrackListingResponse,
     TransferOwnershipRequest,
 )
-from musehub.models.musehub_analysis import FormStructureResponse
 from musehub.models.musehub_context import (
     ContextDepth,
     ContextFormat,
 )
-from musehub.services import musehub_analysis, musehub_context, musehub_credits, musehub_divergence, musehub_events, musehub_listen, musehub_releases, musehub_repository, musehub_sessions
+from musehub.services import musehub_context, musehub_credits, musehub_divergence, musehub_events, musehub_releases, musehub_repository, musehub_sessions
 # TODO(muse-extraction): restore groove-check via cgcardona/muse service API
 
 logger = logging.getLogger(__name__)
@@ -790,39 +786,6 @@ async def get_commit_dag(
     return await musehub_repository.list_commits_dag(db, repo_id)
 
 
-@router.get(
-    "/repos/{repo_id}/form-structure/{ref}",
-    response_model=FormStructureResponse,
-    summary="Get form and structure analysis for a commit ref",
-)
-async def get_form_structure(
-    repo_id: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-    _: TokenClaims = Depends(require_valid_token),
-) -> FormStructureResponse:
-    """Return combined form and structure analysis for the given commit ref.
-
-    Combines three complementary structural views of the piece's formal
-    architecture in a single response, optimised for the MuseHub
-    form-structure UI page:
-
-    - ``sectionMap``: timeline of sections with bar ranges and colour hints
-    - ``repetitionStructure``: which sections repeat and how often
-    - ``sectionComparison``: pairwise similarity heatmap for all sections
-
-    Agents use this as the structural context document before generating
-    a new section — it answers "where am I in the form?" and "what sounds
-    like what?" without requiring multiple analysis requests.
-
-    Returns 404 if the repo does not exist.
-    """
-    repo = await musehub_repository.get_repo(db, repo_id)
-    if repo is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repo not found")
-
-    return musehub_analysis.compute_form_structure(repo_id=repo_id, ref=ref)
-
 
 @router.post(
     "/repos/{repo_id}/sessions",
@@ -1011,34 +974,6 @@ async def get_groove_check(
     )
 
 
-@router.get(
-    "/repos/{repo_id}/listen/{ref}/tracks",
-    response_model=TrackListingResponse,
-    operation_id="listListenTracks",
-    summary="List audio tracks and full-mix URL for the listen page",
-    tags=["Listen"],
-)
-async def list_listen_tracks(
-    repo_id: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-    claims: TokenClaims | None = Depends(optional_token),
-) -> TrackListingResponse:
-    """Return the full-mix and per-stem track listing for the listen page.
-
-    Thin wrapper around ``musehub_listen.build_track_listing``. Auth/visibility
-    is enforced here before delegating scanning logic to the service.
-
-    Returns 404 if the repo does not exist or is not accessible.
-    The ``has_renders`` flag distinguishes repos with no audio from repos that
-    have audio but no recognised full-mix file.
-    """
-    repo = await musehub_repository.get_repo(db, repo_id)
-    _guard_visibility(repo, claims)
-
-    return await musehub_listen.build_track_listing(db, repo_id, ref)
-
-
 def _derive_emotion_vector(commit_id: str) -> tuple[float, float, float, float]:
     """Derive a deterministic (valence, energy, tension, darkness) vector from a commit SHA.
 
@@ -1189,37 +1124,6 @@ async def compare_refs(
         create_pr_url=create_pr_url,
     )
 
-
-@router.get(
-    "/repos/{repo_id}/arrange/{ref}",
-    response_model=ArrangementMatrixResponse,
-    operation_id="getArrangementMatrix",
-    summary="Get the instrument × section arrangement matrix for a Muse commit ref",
-    tags=["Repos"],
-)
-async def get_arrangement_matrix(
-    repo_id: str,
-    ref: str,
-    db: AsyncSession = Depends(get_db),
-    claims: TokenClaims | None = Depends(optional_token),
-) -> ArrangementMatrixResponse:
-    """Return the arrangement matrix for a MuseHub commit ref.
-
-    The matrix encodes note density for every (instrument, section) pair so
-    the arrangement page can render a colour-coded grid. Row and column
-    summaries are pre-computed to avoid redundant aggregation in the client.
-
-    Deterministic stub data is seeded by ``ref`` so agents receive consistent
-    responses across retries. Full MIDI content analysis will be wired in
-    once Storpheus exposes per-section introspection.
-
-    Returns 404 if the repo does not exist.
-    Returns 401 if the repo is private and the caller is unauthenticated.
-    """
-    repo = await musehub_repository.get_repo(db, repo_id)
-    _guard_visibility(repo, claims)
-    result = musehub_analysis.compute_arrangement_matrix(repo_id=repo_id, ref=ref)
-    return result
 
 
 # ── Stargazers endpoint — complements discover.py star/unstar ─────────────────

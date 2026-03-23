@@ -48,28 +48,6 @@
 
   {% block body_extra %}{% endblock %}
 
-  {# Persistent floating audio player #}
-  <div class="audio-player" id="audio-player" style="display:none">
-    <button class="player-btn" id="player-toggle" onclick="togglePlay()" aria-label="Play/pause">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,3 19,12 5,21"/></svg>
-    </button>
-    <div class="player-info">
-      <span class="player-title" id="player-title">Now Playing</span>
-      <span class="player-repo" id="player-repo"></span>
-    </div>
-    <div class="player-progress">
-      <span class="player-time" id="player-current">0:00</span>
-      <input type="range" class="player-seek" id="player-seek" value="0" min="0" max="100" step="0.1"
-             oninput="seekAudio(this.value)" />
-      <span class="player-time" id="player-duration">0:00</span>
-    </div>
-    <audio id="player-audio" onended="onAudioEnded()" ontimeupdate="onTimeUpdate()"
-           onloadedmetadata="onMetadata()"></audio>
-    <button class="player-btn" onclick="closePlayer()" aria-label="Close player">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-  </div>
-
   <script src="/static/app.js?v={{ static_version }}"></script>
   {# page_json: JSON data bridge for TypeScript page modules (read by musehub.ts dispatchPageModule) #}
   <script id="page-data" type="application/json">{% block page_json %}{}{% endblock %}</script>
