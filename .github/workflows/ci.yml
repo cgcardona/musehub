@@ -107,6 +107,11 @@ jobs:
             -e "ssh -o StrictHostKeyChecking=no" \
             . ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/musehub/
 
+      - name: Reload nginx config
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "sudo cp /opt/musehub/deploy/nginx-ssl.conf /etc/nginx/sites-available/musehub && sudo nginx -t && sudo nginx -s reload"
+
       - name: Rebuild and restart container
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
