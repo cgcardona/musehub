@@ -16,22 +16,11 @@
  */
 
 /* -------------------------------------------------------------------------
- * FOUC prevention & base scaling
+ * Base scaling
  *
- * html starts invisible; the 'css-ready' class (added by app.js after
- * DOMContentLoaded) triggers the fade-in. This avoids a flash of unstyled
- * content on initial load and HTMX navigations without requiring any
- * inline scripts or 'unsafe-inline' in the Content-Security-Policy.
+ * FOUC prevention is handled by setting background:#0d1117 directly on the
+ * <html> element as an inline style in base.html — no opacity tricks needed.
  * -------------------------------------------------------------------------*/
-
-html {
-  opacity: 0;
-}
-
-html.css-ready {
-  opacity: 1;
-  transition: opacity 0.12s ease;
-}
 
 body {
   zoom: 1.25;
