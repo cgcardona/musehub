@@ -8,18 +8,6 @@
  *  4. Progress bar click-to-seek.
  */
 
-declare global {
-  interface Window {
-    __releaseCfg?: {
-      repoId:   string;
-      tag:      string;
-      base:     string;
-      owner:    string;
-      audioUrl: string | null;
-    };
-  }
-}
-
 // ── Time formatter ────────────────────────────────────────────────────────────
 
 function fmtTime(s: number): string {
@@ -114,7 +102,7 @@ function animateAssets(): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initReleaseDetail(): void {
+export function initReleaseDetail(_data?: Record<string, unknown>): void {
   initAudioPlayer();
   animateAssets();
 }

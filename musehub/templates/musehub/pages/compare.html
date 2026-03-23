@@ -9,6 +9,3 @@
 {% endblock %}
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-{% block page_json %}{"page": "compare"}{% endblock %}
-{% block page_data %}window.__compareCfg = { repoId: {{ repo_id | tojson }}, baseRef: {{ base_ref | tojson }}, headRef: {{ head_ref | tojson }}, uiBase: {{ base_url | tojson }} };{% endblock %}

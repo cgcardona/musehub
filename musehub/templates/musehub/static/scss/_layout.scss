@@ -16,6 +16,28 @@
  */
 
 /* -------------------------------------------------------------------------
+ * FOUC prevention & base scaling
+ *
+ * html starts invisible; the 'css-ready' class (added by app.js after
+ * DOMContentLoaded) triggers the fade-in. This avoids a flash of unstyled
+ * content on initial load and HTMX navigations without requiring any
+ * inline scripts or 'unsafe-inline' in the Content-Security-Policy.
+ * -------------------------------------------------------------------------*/
+
+html {
+  opacity: 0;
+}
+
+html.css-ready {
+  opacity: 1;
+  transition: opacity 0.12s ease;
+}
+
+body {
+  zoom: 1.25;
+}
+
+/* -------------------------------------------------------------------------
  * Global navigation bar  (.musehub-navbar)
  *
  * Replaces the plain <header> element with a structured nav bar that includes

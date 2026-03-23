@@ -9,14 +9,6 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_data %}
-const repoId    = {{ repo_id | tojson }};
-const sessionId = {{ session_id | tojson }};
-const base      = {{ base_url | tojson }};
-const owner     = {{ owner | tojson }};
-const repoSlug  = {{ repo_slug | tojson }};
-{% endblock %}
-
 {% block content %}
 <div class="session-detail-grid">
   <main>

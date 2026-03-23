@@ -489,6 +489,10 @@ async function loadNotifBadge(): Promise<void> {
 }
 
 function initPageGlobals(): void {
+  // Reveal the page (FOUC prevention: html starts at opacity:0, css-ready triggers fade-in).
+  // This replaces the inline <script> that previously added css-ready on initial load.
+  document.documentElement.classList.add('css-ready');
+
   // Show sign-out button when JWT is present
   if (getToken()) {
     const btn = document.getElementById('signout-btn');

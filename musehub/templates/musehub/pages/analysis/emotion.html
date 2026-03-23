@@ -24,12 +24,6 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const ref    = {{ ref | tojson }};
-const base   = {{ base_url | tojson }};
-{% endblock %}
-
 {% block content %}
 <div class="card" style="margin-bottom:var(--space-4)">
   <h1 style="margin:0 0 var(--space-2) 0">💫 Emotion Analysis</h1>

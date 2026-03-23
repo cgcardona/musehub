@@ -11,14 +11,6 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_data %}
-const repoId  = {{ repo_id | tojson }};
-const baseRef = {{ base_ref | tojson }};
-const headRef = {{ head_ref | tojson }};
-const uiBase  = {{ base_url | tojson }};
-const apiBase = '/api/v1/repos/' + repoId;
-{% endblock %}
-
 {% block content %}
 <div style="max-width:900px;margin:0 auto;padding:var(--space-4)">
 

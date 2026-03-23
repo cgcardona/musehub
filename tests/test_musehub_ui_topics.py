@@ -110,11 +110,11 @@ async def test_topics_index_html_has_page_mode(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """HTML response must embed PAGE_MODE = 'index' as a JS variable."""
+    """HTML response must embed mode = 'index' in the page_json data block."""
     response = await client.get(_INDEX_URL)
     assert response.status_code == 200
     body = response.text
-    assert "PAGE_MODE" in body
+    assert '"mode"' in body
     assert '"index"' in body
 
 
@@ -279,11 +279,11 @@ async def test_topic_detail_tag_injected_in_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Tag slug must be passed as the TOPIC_TAG JS variable."""
+    """Tag slug must be passed in the page_json data block."""
     response = await client.get(_DETAIL_URL)
     assert response.status_code == 200
     body = response.text
-    assert "TOPIC_TAG" in body
+    assert '"tag"' in body
     assert '"jazz"' in body
 
 
@@ -292,11 +292,11 @@ async def test_topic_detail_sort_injected_in_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Sort param must be passed as the TOPIC_SORT JS variable."""
+    """Sort param must be passed in the page_json data block."""
     response = await client.get(_DETAIL_URL + "?sort=updated")
     assert response.status_code == 200
     body = response.text
-    assert "TOPIC_SORT" in body
+    assert '"sort"' in body
     assert '"updated"' in body
 
 

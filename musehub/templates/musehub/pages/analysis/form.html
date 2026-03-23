@@ -9,11 +9,6 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_data %}
-const repoId = {{ repo_id | tojson }};
-const base   = {{ base_url | tojson }};
-{% endblock %}
-
 {% block content %}
 {% include "musehub/fragments/analysis/form_content.html" %}
 {% endblock %}

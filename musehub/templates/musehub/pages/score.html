@@ -7,8 +7,8 @@
 {% endblock %}
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{% block page_json %}{"page": "score"}{% endblock %}
-{% block page_data %}window.__scoreCfg = { repoId: {{ repo_id | tojson }}, ref: {{ ref | tojson }}, owner: {{ owner | tojson }}, repoSlug: {{ repo_slug | tojson }}, base: {{ base_url | tojson }}, scorePath: {{ path | tojson }} };{% endblock %}
+
+{% block page_json %}{"page": "score", "repoId": {{ repo_id | tojson }}, "ref": {{ ref | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "base": {{ base_url | tojson }}, "scorePath": {{ path | tojson }}}{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top:0">

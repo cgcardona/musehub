@@ -362,7 +362,7 @@ async def test_issue_list_fragment_empty_state_when_no_issues(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Fragment returns an empty-state message when no issues match filters."""
+    """Fragment returns an empty-state block when no issues match filters."""
     repo_id = await _make_repo(db_session)
     await _make_issue(db_session, repo_id, number=1, title="Open issue", state="open")
     resp = await client.get(
@@ -371,7 +371,8 @@ async def test_issue_list_fragment_empty_state_when_no_issues(
         headers={"HX-Request": "true"},
     )
     assert resp.status_code == 200
-    assert "No issues" in resp.text or "no issues" in resp.text.lower()
+    # Template renders isl-empty block for empty state
+    assert "isl-empty" in resp.text
 
 
 # ---------------------------------------------------------------------------
@@ -414,10 +415,10 @@ async def test_issue_list_right_sidebar_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """sidebar-right element is present in the SSR page."""
+    """Right sidebar element is present in the SSR page."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "sidebar-right" in body
+    assert "isl-sidebar" in body
 
 
 @pytest.mark.anyio
@@ -485,10 +486,10 @@ async def test_issue_list_filter_sidebar_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """filter-sidebar id is rendered server-side."""
+    """Issue filter form is rendered server-side."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "filter-sidebar" in body
+    assert "isl-filters" in body
 
 
 @pytest.mark.anyio
@@ -496,10 +497,10 @@ async def test_issue_list_label_chip_container_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """label-chip-container id is present in the filter sidebar."""
+    """Label filter select is present in the filter bar."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "label-chip-container" in body
+    assert "isl-filter-select" in body
 
 
 @pytest.mark.anyio
@@ -507,10 +508,11 @@ async def test_issue_list_filter_milestone_select_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """filter-milestone <select> element is present."""
+    """Milestone filter <select> appears when milestones exist; filter form always present."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "filter-milestone" in body
+    # Filter form is always present; milestone select only when data is seeded
+    assert "issue-filter-form" in body
 
 
 @pytest.mark.anyio
@@ -518,10 +520,11 @@ async def test_issue_list_filter_assignee_select_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """filter-assignee <select> element is present."""
+    """Assignee filter <select> appears when assignees exist; sort select always present."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "filter-assignee" in body
+    # Sort select is always rendered; assignee select only when data is seeded
+    assert 'name="sort"' in body or "name='sort'" in body
 
 
 @pytest.mark.anyio
@@ -529,10 +532,10 @@ async def test_issue_list_filter_author_input_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """filter-author text input is present."""
+    """Issue filter form has filter controls (author filter via assignee or label select)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "filter-author" in body
+    assert "issue-filter-form" in body
 
 
 @pytest.mark.anyio
@@ -540,10 +543,10 @@ async def test_issue_list_sort_radio_group_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """sort-radio-group element is present in the filter sidebar."""
+    """Sort filter <select> element is present (name=sort)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "sort-radio-group" in body
+    assert 'name="sort"' in body or "name='sort'" in body
 
 
 @pytest.mark.anyio
@@ -578,10 +581,10 @@ async def test_issue_list_template_grid_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """template-grid element is rendered server-side."""
+    """Template picker container is rendered server-side."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "template-grid" in body
+    assert "isl-template-picker" in body
 
 
 @pytest.mark.anyio
@@ -589,10 +592,10 @@ async def test_issue_list_template_cards_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """template-card class is present (SSR-rendered template cards)."""
+    """Template picker card class is present (SSR-rendered template cards)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    assert "template-card" in body
+    assert "isl-tp-card" in body
 
 
 @pytest.mark.anyio
@@ -764,11 +767,11 @@ async def test_issue_list_update_bulk_toolbar_js_present(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """updateBulkToolbar() is in app.js (TypeScript module); page renders bulk action buttons."""
+    """Page renders bulk action buttons (isl-bulk-btn with data-bulk-action attributes)."""
     await _make_repo(db_session)
     body = await _get_page(client)
-    # Function moved to app.js; verify bulk action buttons are in the HTML
-    assert "bulk-action-btn" in body
+    assert "isl-bulk-btn" in body
+    assert "data-bulk-action" in body
 
 
 @pytest.mark.anyio

@@ -200,7 +200,7 @@ async def test_embed_page_sets_embed_track_url_js_global(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """window.__embedTrackUrl must be set when the server resolved an audio track."""
+    """embed-data JSON must include trackUrl when the server resolved an audio track."""
     await _make_repo_with_tracks(
         db_session,
         slug="embed-url-repo",
@@ -209,7 +209,9 @@ async def test_embed_page_sets_embed_track_url_js_global(
     response = await client.get("/testuser/embed-url-repo/embed/main")
     assert response.status_code == 200
     body = response.text
-    assert "window.__embedTrackUrl" in body
+    # Config is now in embed-data JSON block instead of window.__embedTrackUrl
+    assert '"trackUrl"' in body
+    assert "lead.mp3" in body
 
 
 @pytest.mark.anyio
@@ -217,10 +219,10 @@ async def test_embed_page_no_audio_url_hides_player(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Embed page for a repo with no audio tracks must NOT set window.__embedTrackUrl."""
+    """Embed page for a repo with no audio tracks must not include a trackUrl."""
     await _make_repo_with_tracks(db_session, slug="embed-empty", tracks=[])
     response = await client.get("/testuser/embed-empty/embed/main")
     assert response.status_code == 200
     body = response.text
-    # No audio resolved → no __embedTrackUrl global injected
+    # No audio resolved → trackUrl should be null or empty in the JSON
     assert "window.__embedTrackUrl" not in body

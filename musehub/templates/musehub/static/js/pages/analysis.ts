@@ -35,12 +35,6 @@ interface DivergenceData {
   overallScore: number;
 }
 
-// ---------------------------------------------------------------------------
-// Globals from musehub.ts bundle
-// ---------------------------------------------------------------------------
-declare const apiFetch: (path: string) => Promise<unknown>;
-declare const escHtml: (s: string) => string;
-declare const initRepoNav: (id: string) => void;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -222,9 +216,13 @@ async function loadDivergence(branchA: string, branchB: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
-export function initAnalysis(): void {
-  cfg = (window as unknown as { __analysisCfg: AnalysisCfg }).__analysisCfg;
-  if (!cfg) return;
+export function initAnalysis(data: Record<string, unknown>): void {
+  cfg = {
+    repoId:        String(data['repoId'] ?? ''),
+    baseUrl:       String(data['baseUrl'] ?? ''),
+    defaultBranch: String(data['defaultBranch'] ?? 'main'),
+  };
+  if (!cfg.repoId) return;
 
   initRepoNav(cfg.repoId);
 
@@ -275,6 +273,5 @@ export function initAnalysis(): void {
 declare global {
   interface Window {
     onBranchChange: () => void;
-    __analysisCfg: AnalysisCfg;
   }
 }

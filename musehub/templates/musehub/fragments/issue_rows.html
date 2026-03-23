@@ -1,146 +1,125 @@
-{#  fragments/issue_rows.html — HTMX fragment: supercharged issue cards.
-    Rendered inline by issue_list.html and as a bare fragment for HTMX swaps.
+{#  fragments/issue_rows.html — HTMX swap target for issue list rows.
+    Required context: issues, labels_data, base_url, state
 #}
-{% from "musehub/macros/empty_state.html" import empty_state %}
 
-{# ── Jinja2 macros ──────────────────────────────────────────────────────────── #}
-
-{# Deterministic author avatar color from name hash #}
-{%- macro author_bg(name) -%}
-{%- set colors = ['#e85d04','#f77f00','#3a86ff','#8338ec','#06d6a0','#ef233c','#023e8a','#2dd4bf'] -%}
-{%- set idx = (name | length) % (colors | length) -%}{{ colors[idx] }}
+{%- macro avatar_color(name) -%}
+{%- set p = ['#e85d04','#f77f00','#3a86ff','#8338ec','#06d6a0','#ef233c','#023e8a','#2dd4bf'] -%}
+{{ p[(name | length) % (p | length)] }}
 {%- endmacro -%}
 
-{# Map first label to a category type for the type badge — domain-agnostic #}
-{%- macro get_type(labels) -%}
-{%- if labels -%}
-  {%- set f = labels[0].lower() -%}
-  {%- if f in ['bug', 'error', 'wontfix', 'blocked', 'crash'] -%}bug
-  {%- elif f in ['enhancement', 'feature', 'improvement'] -%}feature
-  {%- elif f in ['documentation', 'docs', 'question', 'good first issue', 'help wanted', 'in progress'] -%}meta
-  {%- elif f in ['performance', 'optimization', 'refactor'] -%}refactor
-  {%- else -%}other
-  {%- endif -%}
-{%- else -%}other{%- endif -%}
-{%- endmacro -%}
-
-{# First meaningful non-markdown line from body #}
-{%- macro body_preview(body) -%}
+{%- macro body_snippet(body) -%}
 {%- if body -%}
-  {%- set ns = namespace(found=false, text='') -%}
+  {%- set ns = namespace(out='') -%}
   {%- for line in body.split('\n') -%}
-    {%- if not ns.found -%}
-      {%- set stripped = line.lstrip('#- *>`\t').strip() -%}
-      {%- if stripped -%}
-        {%- set ns.found = true -%}
-        {%- set ns.text = stripped | truncate(150, True, '…') -%}
-      {%- endif -%}
+    {%- if not ns.out -%}
+      {%- set s = line.lstrip('#- *>`\t').strip() -%}
+      {%- if s -%}{%- set ns.out = s -%}{%- endif -%}
     {%- endif -%}
   {%- endfor -%}
-  {{ ns.text }}
+  {{ ns.out | truncate(160, True, '…') }}
 {%- endif -%}
 {%- endmacro -%}
 
-{# ── Issue cards ──────────────────────────────────────────────────────────── #}
 {% if issues %}
-  {% for issue in issues %}
-    {%- set type_key = get_type(issue.labels) | trim -%}
-    {%- set preview = body_preview(issue.body) | trim -%}
-    {%- set label_map = {} -%}
-    {%- for lbl in labels_data -%}
-      {%- set _ = label_map.update({lbl.name: lbl.color}) -%}
-    {%- endfor -%}
-    <div class="issue-card issue-card-{{ issue.state }}" data-issue-id="{{ issue.issue_id }}">
+  {# Build label-color lookup #}
+  {%- set lmap = {} -%}
+  {%- for l in labels_data -%}{%- set _ = lmap.update({l.name: l.color}) -%}{%- endfor -%}
 
-      {# Checkbox #}
-      <input type="checkbox" class="issue-row-check" name="selected" value="{{ issue.issue_id }}"
-             data-issue-toggle="{{ issue.issue_id }}"/>
+  <div class="isl-list">
+    {% for issue in issues %}
+      {%- set snippet = body_snippet(issue.body) | trim -%}
+      <a href="{{ base_url }}/issues/{{ issue.number }}" class="isl-row isl-row--{{ issue.state }}" data-issue-id="{{ issue.issue_id }}">
 
-      {# State icon #}
-      <div class="issue-state-circle issue-state-circle-{{ issue.state }}">
-        {% if issue.state == 'closed' %}
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        {% else %}
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        {% endif %}
-      </div>
+        {# Checkbox (stop link navigation) #}
+        <input type="checkbox" class="isl-check issue-row-check" name="selected" value="{{ issue.issue_id }}"
+               data-issue-toggle="{{ issue.issue_id }}"
+               onclick="event.stopPropagation(); event.preventDefault();"/>
 
-      {# Content #}
-      <div class="issue-card-content">
-
-        {# Title row: type badge + title + number #}
-        <div class="issue-card-title-row">
-          {%- if type_key and type_key != 'other' -%}
-          <span class="issue-type-badge issue-type-{{ type_key }}">{{ type_key }}</span>
-          {%- endif -%}
-          <a class="issue-title-link" href="{{ base_url }}/issues/{{ issue.number }}">{{ issue.title }}</a>
-          <span class="issue-number-badge">#{{ issue.number }}</span>
+        {# State icon #}
+        <div class="isl-row-icon">
+          {% if issue.state == 'closed' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="isl-icon isl-icon--closed"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          {% else %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="isl-icon isl-icon--open"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {% endif %}
         </div>
 
-        {# Body preview #}
-        {%- if preview -%}
-        <p class="issue-body-preview">{{ preview }}</p>
-        {%- endif -%}
+        {# Body #}
+        <div class="isl-row-body">
 
+          {# Title + number + labels #}
+          <div class="isl-row-title-line">
+            <span class="isl-row-title">{{ issue.title }}</span>
+            <span class="isl-row-num">#{{ issue.number }}</span>
+            {%- if issue.labels -%}
+              {%- for lbl in issue.labels -%}
+                {%- set col = lmap.get(lbl, '#8b949e') -%}
+                <span class="isl-label-chip"
+                      style="color:{{ col }};border-color:{{ col }};background:color-mix(in srgb,{{ col }} 12%,transparent)">{{ lbl }}</span>
+              {%- endfor -%}
+            {%- endif -%}
+          </div>
 
-        {# Labels #}
-        {%- if issue.labels -%}
-        <div class="issue-label-row">
-          {%- for lbl_name in issue.labels -%}
-            {%- set col = label_map.get(lbl_name, '#8b949e') -%}
-            <span class="issue-label-pill"
-                  style="color:{{ col }};border-color:{{ col }};background:color-mix(in srgb,{{ col }} 12%,transparent)">{{ lbl_name }}</span>
-          {%- endfor -%}
+          {# Snippet #}
+          {%- if snippet %}
+          <div class="isl-row-snippet">{{ snippet }}</div>
+          {%- endif %}
+
+          {# Meta: author · date · milestone · comments #}
+          <div class="isl-row-meta">
+            {%- if issue.author -%}
+            <span class="isl-meta-author">
+              <span class="isl-mini-avatar" style="background:{{ avatar_color(issue.author) }}">{{ issue.author[0] | upper }}</span>
+              {{ issue.author }}
+            </span>
+            <span class="isl-meta-dot">·</span>
+            {%- endif -%}
+            <span>{{ issue.created_at | fmtrelative }}</span>
+            {%- if issue.milestone_title -%}
+            <span class="isl-meta-dot">·</span>
+            <span class="isl-meta-milestone">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
+              {{ issue.milestone_title }}
+            </span>
+            {%- endif -%}
+          </div>
+
         </div>
-        {%- endif -%}
 
-        {# Meta row: author · date · milestone · comments #}
-        <div class="issue-meta-row">
-          {%- if issue.author -%}
-          <span class="issue-author-chip">
-            <span class="issue-author-avatar" style="background:{{ author_bg(issue.author) }}">{{ issue.author[0] | upper }}</span>
-            {{ issue.author }}
-          </span>
-          {%- endif -%}
-          <span class="issue-date-chip">
-            {{ issue.created_at | fmtrelative }}
-          </span>
-          {%- if issue.milestone_title -%}
-          <a class="issue-milestone-chip" href="{{ base_url }}/issues?state={{ issue.state }}&milestone_id={{ issue.milestone_id }}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
-            {{ issue.milestone_title }}
-          </a>
-          {%- endif -%}
+        {# Right: comment count + assignee + chevron #}
+        <div class="isl-row-right">
           {%- if issue.comment_count > 0 -%}
-          <span class="issue-comment-count">
-            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="isl-comment-ct">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             {{ issue.comment_count }}
           </span>
           {%- endif -%}
+          {%- if issue.assignee -%}
+          <span class="isl-assignee-avatar" style="background:{{ avatar_color(issue.assignee) }}" title="{{ issue.assignee }}">{{ issue.assignee[0] | upper }}</span>
+          {%- endif -%}
+          <span class="isl-row-chevron">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </span>
         </div>
 
-      </div>{# /issue-card-content #}
+      </a>
+    {% endfor %}
+  </div>
 
-      {# Right column: assignee + view link #}
-      <div class="issue-card-right">
-        {%- if issue.assignee -%}
-          {%- set acolors = ['#e85d04','#f77f00','#3a86ff','#8338ec','#06d6a0','#ef233c','#023e8a','#2dd4bf'] -%}
-          {%- set aidx = (issue.assignee | length) % (acolors | length) -%}
-          <span class="issue-assignee-chip" title="Assigned to {{ issue.assignee }}">
-            <span class="issue-assignee-avatar" style="background:{{ acolors[aidx] }}">{{ issue.assignee[0] | upper }}</span>
-            <span style="font-size:11px;color:var(--text-muted)">{{ issue.assignee }}</span>
-          </span>
-        {%- endif -%}
-        <a href="{{ base_url }}/issues/{{ issue.number }}" class="btn btn-secondary btn-sm"
-           style="font-size:11px;padding:3px 10px;white-space:nowrap">View</a>
-      </div>
-
-    </div>
-  {% endfor %}
 {% else %}
-  <div class="issue-list-empty">
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;opacity:0.4"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-    <p style="margin:0 0 4px;font-weight:600;color:var(--text-primary)">No issues</p>
-    <p style="margin:0;font-size:13px">No issues match the current filters. Try adjusting the state, label, or milestone.</p>
+  <div class="isl-empty">
+    <div class="isl-empty-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div class="isl-empty-title">
+      {% if state == 'closed' %}No closed issues{% else %}No open issues{% endif %}
+    </div>
+    <div class="isl-empty-desc">
+      {% if state == 'closed' %}
+        Issues that are resolved or won't-fixed appear here.
+      {% else %}
+        Use issues to track bugs, features, and discussions. Click <strong>New Issue</strong> to get started.
+      {% endif %}
+    </div>
   </div>
 {% endif %}

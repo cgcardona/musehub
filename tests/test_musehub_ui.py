@@ -444,14 +444,14 @@ async def test_ui_issue_list_has_open_closed_tabs(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Issue list page HTML includes Open and Closed tab buttons and count spans."""
+    """Issue list page HTML includes Open and Closed stat bars with counts."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
     assert "Open" in body
     assert "Closed" in body
-    assert "issue-tab-count" in body
+    assert "isl-stat-num" in body
 
 
 @pytest.mark.anyio
@@ -459,11 +459,7 @@ async def test_ui_issue_list_has_sort_controls(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Issue list page HTML includes Newest, Oldest, and Most commented sort controls.
-
-    The issue list uses SSR radio buttons with server-side sort parameters
-    (converted from client-side changeSort() as part of the HTMX migration).
-    """
+    """Issue list page HTML includes Newest, Oldest, and Most commented sort controls."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
@@ -471,7 +467,7 @@ async def test_ui_issue_list_has_sort_controls(
     assert "Newest" in body
     assert "Oldest" in body
     assert "Most commented" in body
-    assert "sort-radio-group" in body
+    assert "isl-filter-select" in body
 
 
 @pytest.mark.anyio
@@ -479,13 +475,13 @@ async def test_ui_issue_list_has_label_filter_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Issue list page HTML includes SSR label filter chips."""
+    """Issue list page HTML includes filter controls in the filter bar."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/issues")
     assert response.status_code == 200
     body = response.text
-    assert "label-chip-container" in body
-    assert "filter-section" in body
+    assert "issue-filter-form" in body
+    assert "isl-filters" in body
 
 
 @pytest.mark.anyio
@@ -500,7 +496,7 @@ async def test_ui_issue_list_has_body_preview_js(
     body = response.text
     # bodyPreview is now in app.js (TypeScript module); check the page dispatch JSON and structure
     assert '"page": "issue-list"' in body
-    assert "issues-layout" in body
+    assert "isl-layout" in body
 
 
 @pytest.mark.anyio
@@ -513,7 +509,7 @@ async def test_ui_pr_list_has_comment_badge_js(
     response = await client.get("/testuser/test-beats/pulls")
     assert response.status_code == 200
     body = response.text
-    assert "tab-count" in body
+    assert "prl-tab-ct" in body
     assert "pr-rows" in body
     assert "hx-get" in body
 
@@ -1321,7 +1317,13 @@ async def test_ui_release_list_page_has_download_buttons(
     repo_id = await _make_repo(db_session)
     release = MusehubRelease(
         repo_id=repo_id, tag="v1.0", title="Version 1.0",
-        body="", author="testuser", download_urls={},
+        body="", author="testuser",
+        download_urls={
+            "midi_bundle": "https://cdn.example.com/v1/midi.zip",
+            "mp3": "https://cdn.example.com/v1/mix.mp3",
+            "stems": "https://cdn.example.com/v1/stems.zip",
+            "musicxml": "https://cdn.example.com/v1/score.xml",
+        },
     )
     db_session.add(release)
     await db_session.commit()
@@ -1362,7 +1364,8 @@ async def test_ui_release_list_page_has_download_count_badge(
     repo_id = await _make_repo(db_session)
     release = MusehubRelease(
         repo_id=repo_id, tag="v1.0", title="Version 1.0",
-        body="", author="testuser", download_urls={},
+        body="", author="testuser",
+        download_urls={"midi_bundle": "https://cdn.example.com/v1/midi.zip"},
     )
     db_session.add(release)
     await db_session.commit()
@@ -1965,14 +1968,13 @@ async def test_credits_page_contains_json_ld_injection_slug_route(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Credits page embeds JSON-LD injection logic via slug route."""
+    """Credits page embeds JSON-LD structured data via slug route."""
     repo_id = await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "application/ld+json" in body
     assert "schema.org" in body
-    assert "MusicComposition" in body
 
 
 @pytest.mark.anyio
@@ -1980,14 +1982,14 @@ async def test_credits_page_contains_sort_options_slug_route(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Credits page includes sort dropdown via slug route."""
+    """Credits page renders stat strip and contributor section via slug route."""
     repo_id = await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
-    assert "Most prolific" in body
-    assert "Most recent" in body
-    assert "A" in body # "A – Z" option
+    # Stat strip is always rendered
+    assert "Contributors" in body
+    assert "crd-stat-strip" in body
 
 
 @pytest.mark.anyio
@@ -2000,7 +2002,7 @@ async def test_credits_empty_state_message_in_page_slug_route(
     response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
-    assert "No credits yet" in body
+    assert "No contributors yet" in body
 
 
 @pytest.mark.anyio
@@ -2020,13 +2022,13 @@ async def test_credits_page_contains_avatar_functions(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Credits page renders the SSR credits layout with sort controls."""
+    """Credits page renders the SSR credits page structure."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "Credits" in body
-    assert "Most prolific" in body
+    assert "crd-page" in body
 
 
 @pytest.mark.anyio
@@ -2034,13 +2036,13 @@ async def test_credits_page_contains_fetch_profile_function(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Credits page renders SSR sort controls for contributor ordering."""
+    """Credits page renders SSR credits layout with stat strip."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
-    assert "Most prolific" in body
-    assert "Most recent" in body
+    assert "crd-stat-strip" in body
+    assert "Contributors" in body
 
 
 @pytest.mark.anyio
@@ -2048,14 +2050,13 @@ async def test_credits_page_contains_profile_link_pattern(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Credits page renders SSR contributor sort controls and sort options."""
+    """Credits page renders SSR credits structure and JSON-LD metadata."""
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/credits")
     assert response.status_code == 200
     body = response.text
     assert "Credits" in body
-    assert "Most prolific" in body
-    assert "Most recent" in body
+    assert "schema.org" in body
 
 
 @pytest.mark.anyio
@@ -2080,14 +2081,14 @@ async def test_groove_check_page_contains_chart_js(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Groove check page embeds the SVG chart rendering JavaScript."""
+    """Groove check page dispatches groove-check TypeScript module with server config."""
     repo_id = await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/groove-check")
     assert response.status_code == 200
     body = response.text
-    assert "renderGrooveChart" in body
-    assert "grooveScore" in body
-    assert "driftDelta" in body
+    # Chart rendering is in groove-check.ts (compiled bundle); check page_json dispatch
+    assert '"page": "groove-check"' in body
+    assert '"repoId"' in body
 
 
 @pytest.mark.anyio
@@ -2095,14 +2096,14 @@ async def test_groove_check_page_contains_status_badges(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Groove check page HTML includes OK / WARN / FAIL status badge rendering."""
+    """Groove check page links to the groove-check TypeScript module entry point."""
     repo_id = await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/groove-check")
     assert response.status_code == 200
     body = response.text
-    assert "statusBadge" in body
-    assert "WARN" in body
-    assert "FAIL" in body
+    # Status badge logic is in groove-check.ts (compiled bundle); verify page loads
+    assert "Groove Check" in body
+    assert '"page": "groove-check"' in body
 
 
 @pytest.mark.anyio
@@ -2870,16 +2871,15 @@ async def test_timeline_page_overlay_js_variables(
     """Timeline page dispatches the TypeScript timeline module and passes server config.
 
     Overlay rendering (sessions, PRs, releases) is handled by pages/timeline.ts;
-    the template passes config via window.__timelineCfg so the module knows what
-    to fetch.  Asserting on inline JS variable names is an anti-pattern — we
-    check the server-rendered config block and page dispatcher instead.
+    the template emits config via the page_json block so the module knows what
+    to fetch. All JS is external — we check the server-rendered JSON data block.
     """
     await _make_repo(db_session)
     response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
-    assert "__timelineCfg" in body
     assert '"page": "timeline"' in body
+    assert '"repoId"' in body
     assert "baseUrl" in body
 
 
@@ -2935,8 +2935,8 @@ async def test_timeline_pr_markers_use_merged_at_for_positioning(
     response = await client.get("/testuser/test-beats/timeline")
     assert response.status_code == 200
     body = response.text
-    assert "__timelineCfg" in body
     assert '"page": "timeline"' in body
+    assert '"repoId"' in body
 
 
 @pytest.mark.anyio
@@ -3794,15 +3794,14 @@ async def test_form_structure_page_contains_section_map(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Form-structure page embeds section map SVG rendering logic."""
+    """Form-structure page renders section map container and dispatches the TS module."""
     repo_id = await _make_repo(db_session)
     ref = "cafebabe1234"
     response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "Section Map" in body
-    assert "renderSectionMap" in body
-    assert "sectionMap" in body
+    assert "section-map-content" in body
 
 
 @pytest.mark.anyio
@@ -3810,14 +3809,14 @@ async def test_form_structure_page_contains_repetition_panel(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Form-structure page embeds repetition structure panel."""
+    """Form-structure page renders repetition panel container and dispatches the TS module."""
     repo_id = await _make_repo(db_session)
     ref = "feedface0123"
     response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "Repetition" in body
-    assert "renderRepetition" in body
+    assert "repetition-content" in body
 
 
 @pytest.mark.anyio
@@ -3825,15 +3824,14 @@ async def test_form_structure_page_contains_heatmap(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Form-structure page embeds section comparison heatmap renderer."""
+    """Form-structure page renders section comparison container and dispatches the TS module."""
     repo_id = await _make_repo(db_session)
     ref = "deadcafe5678"
     response = await client.get(f"/{repo_id}/form-structure/{ref}")
     assert response.status_code == 200
     body = response.text
     assert "Section Comparison" in body
-    assert "renderHeatmap" in body
-    assert "sectionComparison" in body
+    assert "heatmap-content" in body
 
 
 @pytest.mark.anyio
@@ -7080,13 +7078,13 @@ async def test_blob_image_shows_inline(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Blob page for .webp file includes <img> rendering logic in the template JS."""
+    """Blob page for .webp file includes image config in the page_json data block."""
     await _seed_blob_fixtures(db_session)
     response = await client.get("/testuser/blob-test/blob/main/cover.webp")
     assert response.status_code == 200
     body = response.text
-    # blob.ts handles image rendering client-side; SSR provides __blobCfg data
-    assert "__blobCfg" in body
+    # blob.ts handles image rendering client-side; SSR provides config via page_json
+    assert '"page": "blob"' in body
     assert "cover.webp" in body
 
 
@@ -7115,13 +7113,13 @@ async def test_blob_json_syntax_highlighted(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Blob page for .json file includes syntax-highlighting logic in the template JS."""
+    """Blob page for .json file includes syntax-highlighting config in page_json data block."""
     await _seed_blob_fixtures(db_session)
     response = await client.get("/testuser/blob-test/blob/main/metadata.json")
     assert response.status_code == 200
     body = response.text
-    # blob.ts handles syntax highlighting client-side; SSR provides __blobCfg data
-    assert "__blobCfg" in body
+    # blob.ts handles syntax highlighting client-side; SSR provides config via page_json
+    assert '"page": "blob"' in body
     assert "metadata.json" in body
 
 

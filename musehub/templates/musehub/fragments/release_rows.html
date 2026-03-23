@@ -1,15 +1,15 @@
-{#  fragments/release_rows.html — HTMX fragment: supercharged release cards.
+{#  fragments/release_rows.html — HTMX fragment: release rows.
     Context:
       releases     : list[ReleaseResponse]   — previous releases (all except latest)
       base_url     : str
+      total        : int   — total release count (all releases)
       page         : int
       total_pages  : int
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
-{% from "musehub/macros/empty_state.html" import empty_state %}
 
-{# ── Body-preview macro ───────────────────────────────────────────────────── #}
-{% macro body_preview(body, length=140) %}
+{# ── Body preview ─────────────────────────────────────────────────────────── #}
+{% macro body_preview(body, length=120) %}
   {%- set ns = namespace(found="") -%}
   {%- for line in body.split("\n") -%}
     {%- if ns.found == "" and line.strip() and not line.strip().startswith("#") and not line.strip().startswith("-") and not line.strip().startswith("*") -%}
@@ -21,113 +21,115 @@
   {%- endif -%}
 {% endmacro %}
 
-{# ── Author avatar bg ─────────────────────────────────────────────────────── #}
 {% macro author_bg(name) -%}
   {%- set colors = ["#58a6ff","#3fb950","#a371f7","#fb8500","#2dd4bf","#d29922","#f85149"] -%}
   {{ colors[(name|length) % (colors|length)] }}
 {%- endmacro %}
 
 {% if releases %}
-<div class="rel-card-list">
   {% for rel in releases %}
     {% set status = "prerelease" if rel.is_prerelease else ("draft" if rel.is_draft else "stable") %}
     {% set urls = rel.download_urls %}
+    {% set has_dl = urls.midi_bundle or urls.mp3 or urls.stems or urls.musicxml %}
 
-    <div class="rel-card rel-card-{{ status }}"
+    <div class="rl-row"
          data-status="{{ status }}"
          data-title="{{ (rel.title or rel.tag) | lower }}"
          id="release-{{ rel.release_id }}">
 
-      {# Left: version badge column #}
-      <div class="rel-card-left">
-        <span class="rel-version-badge rel-badge-{{ status }}">{{ rel.tag }}</span>
-      </div>
+      {# Left: version tag #}
+      <div class="rl-row-tag rl-tag--{{ status }}">{{ rel.tag }}</div>
 
       {# Body #}
-      <div class="rel-card-body">
-        <div class="rel-card-title-row">
-          <a href="{{ base_url }}/releases/{{ rel.tag | urlencode }}" class="rel-card-title">
+      <div class="rl-row-body">
+        <div class="rl-row-title-line">
+          <a href="{{ base_url }}/releases/{{ rel.tag | urlencode }}" class="rl-row-title">
             {{ rel.title or rel.tag }}
           </a>
-          {% if rel.is_prerelease %}
-            <span class="rel-card-status-pill rel-pill-prerelease">Pre-release</span>
-          {% elif rel.is_draft %}
-            <span class="rel-card-status-pill rel-pill-draft">Draft</span>
-          {% else %}
-            <span class="rel-card-status-pill rel-pill-stable">
+          {% if status == "stable" %}
+            <span class="rl-pill rl-pill--stable">
               <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               Stable
             </span>
+          {% elif status == "prerelease" %}
+            <span class="rl-pill rl-pill--prerelease">Pre-release</span>
+          {% else %}
+            <span class="rl-pill rl-pill--draft">Draft</span>
           {% endif %}
         </div>
 
-        <div class="rel-card-meta">
+        <div class="rl-row-meta">
           {% if rel.author %}
-            <span class="rel-card-author-chip">
-              <span class="rel-card-avatar" style="background:{{ author_bg(rel.author) }}">{{ rel.author[0] | upper }}</span>
+            <span class="rl-row-author">
+              <span class="rl-avatar" style="background:{{ author_bg(rel.author) }};width:14px;height:14px;font-size:7px">{{ rel.author[0] | upper }}</span>
               {{ rel.author }}
             </span>
-            <span>·</span>
+            <span class="rl-meta-dot">·</span>
           {% endif %}
           <span>{{ rel.created_at | fmtrelative }}</span>
           {% if rel.commit_id %}
-            <span>·</span>
-            <a href="{{ base_url }}/commits/{{ rel.commit_id }}" class="rel-card-sha">{{ rel.commit_id | shortsha }}</a>
+            <span class="rl-meta-dot">·</span>
+            <a href="{{ base_url }}/commits/{{ rel.commit_id }}" class="rl-row-sha">{{ rel.commit_id | shortsha }}</a>
           {% endif %}
           {% if rel.gpg_signature %}
-            <span>·</span>
-            <span style="font-size:10px;color:#3fb950">✓ GPG signed</span>
+            <span class="rl-meta-dot">·</span>
+            <span class="rl-gpg">
+              <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              GPG signed
+            </span>
           {% endif %}
         </div>
 
         {% if rel.body %}
-        <div class="rel-card-body-preview">{{ body_preview(rel.body) }}</div>
+          <div class="rl-row-preview">{{ body_preview(rel.body) }}</div>
         {% endif %}
 
-        {# Download chips #}
-        <div class="rel-card-dl-chips">
-          <a {% if urls.midi_bundle %}href="{{ urls.midi_bundle }}" class="rel-card-dl-chip rc-dl-midi avail"{% else %}class="rel-card-dl-chip rc-dl-midi"{% endif %}>
+        {# Downloads — available formats only #}
+        {% if has_dl %}
+        <div class="rl-row-dl-row">
+          {% if urls.midi_bundle %}<a href="{{ urls.midi_bundle }}" class="rl-row-dl-chip">
             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             MIDI
-          </a>
-          <a {% if urls.mp3 %}href="{{ urls.mp3 }}" class="rel-card-dl-chip rc-dl-mp3 avail"{% else %}class="rel-card-dl-chip rc-dl-mp3"{% endif %}>
+          </a>{% endif %}
+          {% if urls.mp3 %}<a href="{{ urls.mp3 }}" class="rl-row-dl-chip">
             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             MP3
-          </a>
-          <a {% if urls.stems %}href="{{ urls.stems }}" class="rel-card-dl-chip rc-dl-stems avail"{% else %}class="rel-card-dl-chip rc-dl-stems"{% endif %}>
+          </a>{% endif %}
+          {% if urls.stems %}<a href="{{ urls.stems }}" class="rl-row-dl-chip">
             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Stems
-          </a>
-          <a {% if urls.musicxml %}href="{{ urls.musicxml }}" class="rel-card-dl-chip rc-dl-xml avail"{% else %}class="rel-card-dl-chip rc-dl-xml"{% endif %}>
+          </a>{% endif %}
+          {% if urls.musicxml %}<a href="{{ urls.musicxml }}" class="rl-row-dl-chip">
             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             MusicXML
-          </a>
+          </a>{% endif %}
         </div>
-      </div>
-
-      {# Right: action buttons #}
-      <div class="rel-card-actions">
-        <a href="{{ base_url }}/releases/{{ rel.tag | urlencode }}" class="btn btn-secondary btn-sm">
-          View
-        </a>
-        {% if rel.download_urls.midi_bundle or rel.download_urls.mp3 %}
-        <a href="{{ rel.download_urls.midi_bundle or rel.download_urls.mp3 }}" class="btn btn-primary btn-sm">
-          Download
-        </a>
         {% endif %}
       </div>
+
+      {# Action #}
+      <div class="rl-row-action">
+        <a href="{{ base_url }}/releases/{{ rel.tag | urlencode }}" class="btn btn-secondary btn-sm">View</a>
+      </div>
+
     </div>
   {% endfor %}
-</div>
-{{ pagination(page, total_pages, base_url ~ '/releases') }}
+
+  {{ pagination(page, total_pages, base_url ~ '/releases') }}
 
 {% elif total is defined and total == 0 %}
-  {# No releases at all (hero would also be absent) #}
-  {{ empty_state("🎵", "No releases yet", "Package your music by creating a release to share MIDI, MP3, stems, and notation files.", base_url ~ "/releases/new", "+ Create first release") }}
+  <div class="rl-empty">
+    <div class="rl-empty-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+        <line x1="7" y1="7" x2="7.01" y2="7"/>
+      </svg>
+    </div>
+    <div class="rl-empty-title">No releases yet</div>
+    <div class="rl-empty-desc">Create a release to share packaged snapshots of your work.</div>
+    <a href="{{ base_url }}/releases/new" class="btn btn-primary btn-sm" style="margin-top:var(--space-2)">+ Create first release</a>
+  </div>
 
 {% else %}
-  {# All releases are shown in the hero — no previous releases #}
-  <div style="text-align:center;padding:var(--space-5);color:var(--text-muted);font-size:13px">
-    No previous releases — this is the only release so far.
-  </div>
+  <div class="rl-sole-note">All releases are shown above — this is the only release so far.</div>
 {% endif %}

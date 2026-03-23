@@ -2,7 +2,7 @@
  * commit.ts — Commit liner-notes page.
  *
  * All page behaviour previously in commit.html's page_script block is here.
- * Config is read from window.__commitPageCfg (set by the page_data block).
+ * Config is read from the #page-data JSON element.
  *
  * Registered as: window.MusePages['commit']
  */
@@ -54,7 +54,6 @@ interface WaveSurferInstance {
 
 declare global {
   interface Window {
-    __commitPageCfg?: CommitPageCfg;
     WaveSurfer?: { create(opts: Record<string, unknown>): WaveSurferInstance };
     ABCJS?: { renderAbc(el: Element, text: string, opts: Record<string, unknown>): void };
     queueAudio?: (url: string, name: string, repo: string) => void;
@@ -1301,9 +1300,16 @@ async function load(): Promise<void> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initCommit(_data: CommitPageData): void {
-  _cfg = window.__commitPageCfg!;
-  if (!_cfg) return;
+export function initCommit(data: CommitPageData): void {
+  _cfg = {
+    repoId:    String(data['repoId']    ?? ''),
+    commitId:  String(data['commitId']  ?? ''),
+    base:      String(data['base']      ?? ''),
+    listenUrl: String(data['listenUrl'] ?? ''),
+    embedUrl:  String(data['embedUrl']  ?? ''),
+    shortId:   String(data['shortId']   ?? ''),
+  };
+  if (!_cfg.repoId) return;
   initRepoPage({ repo_id: _cfg.repoId });
   setupEventDelegation();
   void load();

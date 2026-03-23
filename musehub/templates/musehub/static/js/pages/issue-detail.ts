@@ -8,17 +8,6 @@
  *  4. Copy issue URL to clipboard (keyboard shortcut + button if present).
  */
 
-declare global {
-  interface Window {
-    __issueCfg?: {
-      repoId: string;
-      issueId: string;
-      number: number;
-      base: string;
-      state: string;
-    };
-  }
-}
 
 // ── Comment entrance animations ───────────────────────────────────────────────
 
@@ -79,7 +68,7 @@ function bindCopyUrl(): void {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function initIssueDetail(): void {
+export function initIssueDetail(_data?: Record<string, unknown>): void {
   animateComments();
   animateMilestone();
   bindHtmxSwap();

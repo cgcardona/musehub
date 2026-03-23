@@ -6,6 +6,8 @@
 {% endblock %}
 {% block breadcrumb %}<a href="/musehub">MuseHub</a> / <span>Agent Connection</span>{% endblock %}
 
+{% if status == "accepted" %}{% block page_json %}{"page": "elicitation-callback"}{% endblock %}{% endif %}
+
 {% block content %}
 <div style="max-width:480px;margin:4rem auto;text-align:center">
 
@@ -36,20 +38,11 @@
       Elicitation: {{ elicitation_id }}
     </p>
 
-    {# ── Auto-close script ─────────────────────────────────────────────── #}
+    {# ── Auto-close countdown ──────────────────────────────────────────── #}
     {% if status == "accepted" %}
     <p style="font-size:0.82rem;color:var(--color-muted,#9ca3af);margin:0 0 1rem">
       This tab will close automatically in <span id="countdown">5</span>s.
     </p>
-    <script nonce="{{ request.state.csp_nonce }}">
-      let n = 5;
-      const el = document.getElementById("countdown");
-      const t = setInterval(() => {
-        n--;
-        if (el) el.textContent = n;
-        if (n <= 0) { clearInterval(t); window.close(); }
-      }, 1000);
-    </script>
     {% endif %}
 
     <div style="display:flex;gap:0.75rem;justify-content:center">

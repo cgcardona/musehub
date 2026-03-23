@@ -1,22 +1,13 @@
-{% extends "musehub/base.html" %}
+/**
+ * contour.ts — Melodic contour page module.
+ *
+ * Reads config from the #page-data JSON element:
+ *   { page: "contour", repoId, ref, base }
+ */
 
-{% block title %}Contour {{ ref[:8] }}{% endblock %}
-{% block breadcrumb %}
-  <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> /
-  analysis / {{ ref[:8] }} / contour
-{% endblock %}
-{% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
+type PageData = Record<string, unknown>;
 
-{% block page_data %}
-const repoId  = {{ repo_id | tojson }};
-const ref     = {{ ref | tojson }};
-const base    = {{ base_url | tojson }};
-const apiBase = '/api/v1/repos/' + repoId;
-{% endblock %}
-
-{% block page_script %}
-{% raw %}
-function pitchCurveSvg(pitchCurve) {
+function pitchCurveSvg(pitchCurve: number[]): string {
   if (!pitchCurve || pitchCurve.length === 0) return '<p class="loading">No pitch data.</p>';
   const W = 700, H = 120, pad = 24;
   const min = Math.min(...pitchCurve);
@@ -38,19 +29,20 @@ function pitchCurveSvg(pitchCurve) {
     </svg>`;
 }
 
-const SHAPE_COLORS = {
-  ascending: '#3fb950',  descending: '#f85149',  arch: '#58a6ff',
-  'inverted-arch': '#f0883e',  wave: '#bc8cff',  static: '#8b949e', flat: '#8b949e',
+const SHAPE_COLORS: Record<string, string> = {
+  ascending: '#3fb950', descending: '#f85149', arch: '#58a6ff',
+  'inverted-arch': '#f0883e', wave: '#bc8cff', static: '#8b949e', flat: '#8b949e',
 };
-function shapeColor(s) { return SHAPE_COLORS[s] || '#8b949e'; }
 
-function midiNoteName(midi) {
+function shapeColor(s: string): string { return SHAPE_COLORS[s] ?? '#8b949e'; }
+
+function midiNoteName(midi: number): string {
   const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const oct = Math.floor(midi / 12) - 1;
   return names[midi % 12] + oct;
 }
 
-function tessituraBar(pitchCurve) {
+function tessituraBar(pitchCurve: number[]): string {
   if (!pitchCurve || pitchCurve.length === 0) return '';
   const lo = Math.min(...pitchCurve);
   const hi = Math.max(...pitchCurve);
@@ -72,53 +64,66 @@ function tessituraBar(pitchCurve) {
     </div>`;
 }
 
-window.load = async function load(track) {
-  initRepoNav(repoId);
-  try {
-    let url = '/repos/' + repoId + '/analysis/' + encodeURIComponent(ref) + '/contour';
-    if (track) url += '?track=' + encodeURIComponent(track);
-    const data = await apiFetch(url);
-    const d = data.data;
+let _repoId = '';
+let _ref = '';
+let _base = '';
 
+interface ContourData {
+  shape: string;
+  overallDirection: string;
+  directionChanges: number;
+  peakBeat: number;
+  valleyBeat: number;
+  pitchCurve: number[];
+}
+
+async function loadContour(track: string | null): Promise<void> {
+  try {
+    let url = '/repos/' + _repoId + '/analysis/' + encodeURIComponent(_ref) + '/contour';
+    if (track) url += '?track=' + encodeURIComponent(track);
+
+    interface ContourResp { data: ContourData }
+    const resp = (await window.apiFetch(url)) as ContourResp;
+    const d = resp.data;
     const shapeCol = shapeColor(d.shape);
     const svg = pitchCurveSvg(d.pitchCurve);
     const tess = tessituraBar(d.pitchCurve);
 
-    document.getElementById('content').innerHTML = `
+    const el = document.getElementById('content');
+    if (!el) return;
+    el.innerHTML = `
       <div style="margin-bottom:12px">
-        <a href="${base}">&larr; Back to repo</a>
+        <a href="${_base}">&larr; Back to repo</a>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
           <h1 style="margin:0">&#9835; Melodic Contour</h1>
           <span class="meta-value" style="font-family:monospace;color:#8b949e;font-size:13px">
-            ref: ${escHtml(ref.substring(0,8))}
+            ref: ${window.escHtml(_ref.substring(0, 8))}
           </span>
         </div>
-
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
           <label style="font-size:13px;color:#8b949e">Track filter:</label>
           <input id="track-inp" type="text" placeholder="bass, keys, lead&#8230;"
-                 value="${escHtml(track || '')}"
+                 value="${window.escHtml(track ?? '')}"
                  style="background:#0d1117;color:#c9d1d9;border:1px solid #30363d;
                         border-radius:6px;padding:6px 10px;font-size:13px;width:180px" />
           <button class="btn btn-secondary" style="font-size:13px"
-                  onclick="load(document.getElementById('track-inp').value.trim() || null)">
+                  onclick="window._contourLoad((document.getElementById('track-inp')).value.trim() || null)">
             Apply
           </button>
         </div>
-
         <div class="meta-row" style="margin-bottom:16px">
           <div class="meta-item">
             <span class="meta-label">Shape</span>
             <span class="meta-value">
               <span class="badge" style="background:${shapeCol}22;color:${shapeCol};
-                    border:1px solid ${shapeCol}44;font-size:14px">${escHtml(d.shape)}</span>
+                    border:1px solid ${shapeCol}44;font-size:14px">${window.escHtml(d.shape)}</span>
             </span>
           </div>
           <div class="meta-item">
             <span class="meta-label">Overall Direction</span>
-            <span class="meta-value">${escHtml(d.overallDirection)}</span>
+            <span class="meta-value">${window.escHtml(d.overallDirection)}</span>
           </div>
           <div class="meta-item">
             <span class="meta-label">Direction Changes</span>
@@ -133,23 +138,34 @@ window.load = async function load(track) {
             <span class="meta-value">${d.valleyBeat}</span>
           </div>
         </div>
-
         <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:12px;margin-bottom:12px">
           <span class="meta-label" style="display:block;margin-bottom:8px">
             Pitch Curve (MIDI, per quarter-note)
           </span>
           ${svg}
         </div>
-
         ${tess}
       </div>`;
-  } catch(e) {
-    if (e.message !== 'auth')
-      document.getElementById('content').innerHTML =
-        '<p class="error">&#10005; ' + escHtml(e.message) + '</p>';
+  } catch (e: unknown) {
+    const err = e as { message?: string };
+    if (err.message !== 'auth') {
+      const el = document.getElementById('content');
+      if (el) el.innerHTML = '<p class="error">&#10005; ' + window.escHtml(String(err.message ?? e)) + '</p>';
+    }
   }
 }
 
-load(null);
-{% endraw %}
-{% endblock %}
+export function initContour(data: PageData): void {
+  _repoId = String(data['repoId'] ?? '');
+  _ref    = String(data['ref'] ?? '');
+  _base   = String(data['base'] ?? '');
+
+  if (window.initRepoNav) void window.initRepoNav(_repoId);
+
+  // Expose load function for button onclick
+  (window as unknown as Record<string, unknown>)['_contourLoad'] = (track: string | null) => {
+    void loadContour(track);
+  };
+
+  void loadContour(null);
+}

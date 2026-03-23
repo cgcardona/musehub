@@ -11,9 +11,8 @@
 {% include "musehub/partials/repo_nav.html" %}
 {% endblock %}
 
-{% block page_json %}{"page": "settings"}{% endblock %}
 
-{% block page_data %}window.__settingsCfg = { repoId: {{ repo_id | tojson }}, owner: {{ owner | tojson }}, repoSlug: {{ repo_slug | tojson }}, base: {{ base_url | tojson }}, fullName: {{ (owner ~ "/" ~ repo_slug) | tojson }} };{% endblock %}
+{% block page_json %}{"page": "settings", "repoId": {{ repo_id | tojson }}, "owner": {{ owner | tojson }}, "repoSlug": {{ repo_slug | tojson }}, "base": {{ base_url | tojson }}, "fullName": {{ (owner ~ "/" ~ repo_slug) | tojson }}}{% endblock %}
 
 {% block content %}
 {% set s = settings %}

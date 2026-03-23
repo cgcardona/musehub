@@ -8,16 +8,7 @@
 
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
 
-{# page_json: triggers MusePages['analysis'] → initAnalysis() in analysis.ts #}
-{% block page_json %}{"page": "analysis"}{% endblock %}
-
-{% block page_data %}
-window.__analysisCfg = {
-  repoId:        {{ repo_id | tojson }},
-  baseUrl:       {{ base_url | tojson }},
-  defaultBranch: {{ default_branch | tojson }},
-};
-{% endblock %}
+{% block page_json %}{"page": "analysis", "repoId": {{ repo_id | tojson }}, "baseUrl": {{ base_url | tojson }}, "defaultBranch": {{ default_branch | tojson }}}{% endblock %}
 
 {% block content %}
 <div class="content-wide">
