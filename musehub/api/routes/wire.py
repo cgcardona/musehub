@@ -36,7 +36,7 @@ import asyncio
 import json
 import logging
 
-import msgpack  # type: ignore[import]
+import msgpack  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,16 +136,18 @@ def _pack_response(data: dict[str, object], request: Request) -> Response:
 def _decode_request_body(raw: bytes, content_type: str) -> dict[str, object]:
     """Decode an HTTP request body from msgpack or JSON.
 
-    MWP/2 clients send ``Content-Type: application/x-msgpack``; older clients
-    send ``application/json``.  Both are accepted so the server is backward
-    compatible during the client rollout.
+    MWP clients send ``Content-Type: application/x-msgpack``; JSON is also
+    accepted as a fallback for compatibility.
     """
     if "application/x-msgpack" in content_type:
-        result: object = msgpack.unpackb(raw, raw=False)
-        if not isinstance(result, dict):
+        decoded: object = msgpack.unpackb(raw, raw=False)
+        if not isinstance(decoded, dict):
             raise ValueError("msgpack body must be a mapping")
-        return result  # type: ignore[return-value]
-    return json.loads(raw)
+        return dict(decoded)
+    parsed: object = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError("JSON body must be a mapping")
+    return dict(parsed)
 
 
 # ── wire endpoints ─────────────────────────────────────────────────────────────
