@@ -36,7 +36,7 @@ import asyncio
 import json
 import logging
 
-import msgpack  # type: ignore[import-untyped]
+import msgpack
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
