@@ -19,7 +19,6 @@ Design decisions:
 """
 from __future__ import annotations
 
-import base64
 import logging
 from datetime import datetime, timezone
 
@@ -32,9 +31,15 @@ from musehub.models.wire import (
     WireBundle,
     WireFetchRequest,
     WireFetchResponse,
+    WireFilterRequest,
+    WireFilterResponse,
+    WireNegotiateRequest,
+    WireNegotiateResponse,
     WireObject,
     WireObjectsRequest,
     WireObjectsResponse,
+    WirePresignRequest,
+    WirePresignResponse,
     WirePushRequest,
     WirePushResponse,
     WireRefsResponse,
@@ -201,18 +206,13 @@ async def wire_push(
 
     # ── 1. Objects ────────────────────────────────────────────────────────────
     for wire_obj in bundle.objects:
-        if not wire_obj.object_id or not wire_obj.content_b64:
+        if not wire_obj.object_id or not wire_obj.content:
             continue
         existing = await session.get(db.MusehubObject, wire_obj.object_id)
         if existing is not None:
             continue  # already stored — idempotent
 
-        try:
-            raw = base64.b64decode(wire_obj.content_b64 + "==")
-        except Exception as exc:
-            logger.warning("Failed to decode object %s: %s", wire_obj.object_id, exc)
-            continue
-
+        raw = wire_obj.content
         storage_uri = await backend.put(repo_id, wire_obj.object_id, raw)
         obj_row = db.MusehubObject(
             object_id=wire_obj.object_id,
@@ -391,19 +391,14 @@ async def wire_push_objects(
     skipped = 0
 
     for wire_obj in req.objects:
-        if not wire_obj.object_id or not wire_obj.content_b64:
+        if not wire_obj.object_id or not wire_obj.content:
             continue
         existing = await session.get(db.MusehubObject, wire_obj.object_id)
         if existing is not None:
             skipped += 1
             continue
 
-        try:
-            raw = base64.b64decode(wire_obj.content_b64 + "==")
-        except Exception as exc:
-            logger.warning("Failed to decode object %s: %s", wire_obj.object_id, exc)
-            continue
-
+        raw = wire_obj.content
         storage_uri = await backend.put(repo_id, wire_obj.object_id, raw)
         obj_row = db.MusehubObject(
             object_id=wire_obj.object_id,
@@ -515,7 +510,7 @@ async def wire_fetch(
                 continue
             wire_objects.append(WireObject(
                 object_id=obj_row.object_id,
-                content_b64=base64.b64encode(raw).decode(),
+                content=raw,
                 path=obj_row.path or "",
             ))
 
@@ -535,6 +530,156 @@ async def wire_fetch(
         objects=wire_objects,
         branch_heads=branch_heads,
     )
+
+
+# ── MWP/2 service functions ────────────────────────────────────────────────────
+
+
+async def wire_filter_objects(
+    session: AsyncSession,
+    repo_id: str,
+    req: WireFilterRequest,
+) -> WireFilterResponse:
+    """Return the subset of *req.object_ids* the remote does NOT already hold.
+
+    A single SQL ``WHERE object_id IN (…)`` query determines which IDs are
+    present.  The complement is returned so the client uploads only the delta.
+    This is the highest-impact MWP/2 change: incremental pushes become
+    proportional to the *change*, not the full history.
+    """
+    if not req.object_ids:
+        return WireFilterResponse(missing=[])
+
+    present_q = await session.execute(
+        select(db.MusehubObject.object_id).where(
+            db.MusehubObject.repo_id == repo_id,
+            db.MusehubObject.object_id.in_(req.object_ids),
+        )
+    )
+    present: set[str] = {row[0] for row in present_q}
+    missing = [oid for oid in req.object_ids if oid not in present]
+    logger.info(
+        "filter-objects repo=%s total=%d missing=%d",
+        repo_id,
+        len(req.object_ids),
+        len(missing),
+    )
+    return WireFilterResponse(missing=missing)
+
+
+async def wire_presign(
+    session: AsyncSession,
+    repo_id: str,
+    req: WirePresignRequest,
+    pusher_id: str | None = None,
+) -> WirePresignResponse:
+    """Return presigned S3/R2 PUT or GET URLs for large objects.
+
+    Objects are uploaded/downloaded directly to object storage, bypassing
+    the API server entirely.  When the active backend is ``local://`` it does
+    not support presigned URLs, so all IDs are returned in ``inline`` and the
+    client falls back to the normal pack upload path.
+    """
+    repo_row = await session.get(db.MusehubRepo, repo_id)
+    if repo_row is None or repo_row.deleted_at is not None:
+        raise ValueError("repo not found")
+
+    if req.direction == "put" and (not pusher_id or pusher_id != repo_row.owner_user_id):
+        raise PermissionError("presign rejected: not authorized")
+
+    backend = get_backend()
+    # Local backends do not support presigned URLs — return all as inline.
+    if not hasattr(backend, "presign_put") or not hasattr(backend, "presign_get"):
+        return WirePresignResponse(presigned={}, inline=list(req.object_ids))
+
+    presigned: dict[str, str] = {}
+    for oid in req.object_ids:
+        if req.direction == "put":
+            url: str = await backend.presign_put(
+                repo_id, oid, ttl_seconds=req.ttl_seconds
+            )
+        else:
+            url = await backend.presign_get(
+                repo_id, oid, ttl_seconds=req.ttl_seconds
+            )
+        presigned[oid] = url
+
+    return WirePresignResponse(presigned=presigned, inline=[])
+
+
+async def wire_negotiate(
+    session: AsyncSession,
+    repo_id: str,
+    req: WireNegotiateRequest,
+) -> WireNegotiateResponse:
+    """Multi-round commit negotiation (MWP/2 Phase 5).
+
+    The client sends a depth-limited list of ``have`` commit IDs it already
+    holds and the branch tips it ``want``s.  The server responds with which
+    ``have`` IDs it recognises (``ack``), the deepest shared ancestor found
+    (``common_base``), and whether the common base is sufficient to compute
+    the delta without another round (``ready``).
+
+    A single round is almost always sufficient for incremental pulls.  Full
+    clones of large repos may require 2-3 rounds with increasing depth.
+    """
+    repo_row = await session.get(db.MusehubRepo, repo_id)
+    if repo_row is None or repo_row.deleted_at is not None:
+        raise ValueError("repo not found")
+
+    have_set = set(req.have)
+    want_set = set(req.want)
+
+    # Which of the client's have-IDs does the server recognise?
+    if have_set:
+        ack_q = await session.execute(
+            select(db.MusehubCommit.commit_id).where(
+                db.MusehubCommit.repo_id == repo_id,
+                db.MusehubCommit.commit_id.in_(have_set),
+            )
+        )
+        ack = [row[0] for row in ack_q]
+    else:
+        ack = []
+
+    # Find the deepest acknowledged ancestor reachable from want.
+    # BFS from want, stop when we hit an acked have-ID.
+    ack_set = set(ack)
+    common_base: str | None = None
+
+    if ack_set and want_set:
+        frontier: set[str] = want_set - ack_set
+        visited: set[str] = set()
+        found = False
+        while frontier and not found:
+            batch = frontier - visited
+            if not batch:
+                break
+            visited.update(batch)
+            rows_q = await session.execute(
+                select(db.MusehubCommit).where(
+                    db.MusehubCommit.commit_id.in_(batch),
+                    db.MusehubCommit.repo_id == repo_id,
+                )
+            )
+            next_frontier: set[str] = set()
+            for row in rows_q.scalars().all():
+                for pid in (row.parent_ids or []):
+                    if pid in ack_set:
+                        common_base = pid
+                        found = True
+                        break
+                    if pid not in visited:
+                        next_frontier.add(pid)
+                if found:
+                    break
+            frontier = next_frontier
+
+    # ready = True when we know the common base or the client has no have-IDs
+    # (full clone — server just sends everything from want).
+    ready = common_base is not None or not have_set
+
+    return WireNegotiateResponse(ack=ack, common_base=common_base, ready=ready)
 
 
 # ── private helpers ────────────────────────────────────────────────────────────
