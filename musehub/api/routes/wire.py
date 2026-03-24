@@ -33,8 +33,10 @@ paths first.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
+import msgpack
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,11 +44,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from musehub.auth.dependencies import optional_token, require_valid_token, TokenClaims
 from musehub.db import musehub_models as db
 from musehub.db.database import get_db as get_session
-from musehub.models.wire import WireFetchRequest, WireObjectsRequest, WirePushRequest
+from musehub.models.wire import (
+    WireFilterRequest,
+    WireFetchRequest,
+    WireNegotiateRequest,
+    WireObjectsRequest,
+    WirePresignRequest,
+    WirePushRequest,
+)
 from musehub.rate_limits import limiter, WIRE_PUSH_LIMIT, WIRE_FETCH_LIMIT
 from musehub.services import musehub_qdrant as qdrant_svc
 from musehub.services.musehub_repository import get_repo_row_by_owner_slug
-from musehub.services.musehub_wire import wire_fetch, wire_push, wire_push_objects, wire_refs
+from musehub.services.musehub_wire import (
+    wire_fetch,
+    wire_filter_objects,
+    wire_negotiate,
+    wire_presign,
+    wire_push,
+    wire_push_objects,
+    wire_refs,
+)
 from musehub.storage import get_backend
 
 logger = logging.getLogger(__name__)
@@ -98,6 +115,41 @@ def _assert_readable(repo: db.MusehubRepo, claims: TokenClaims | None) -> None:
         )
 
 
+# ── MWP/2 helpers ──────────────────────────────────────────────────────────────
+
+def _pack_response(data: dict[str, object], request: Request) -> Response:
+    """Encode *data* as msgpack based on the client's Accept header.
+
+    MWP clients send ``Accept: application/x-msgpack`` and always receive
+    binary msgpack.  The dict may contain ``bytes`` values (e.g. object
+    content) which msgpack handles natively.
+    """
+    accept = request.headers.get("accept", "")
+    if "application/x-msgpack" in accept:
+        return Response(
+            content=msgpack.packb(data, use_bin_type=True),
+            media_type="application/x-msgpack",
+        )
+    return Response(content=json.dumps(data), media_type="application/json")
+
+
+def _decode_request_body(raw: bytes, content_type: str) -> dict[str, object]:
+    """Decode an HTTP request body from msgpack or JSON.
+
+    MWP clients send ``Content-Type: application/x-msgpack``; JSON is also
+    accepted as a fallback for compatibility.
+    """
+    if "application/x-msgpack" in content_type:
+        decoded: object = msgpack.unpackb(raw, raw=False)
+        if not isinstance(decoded, dict):
+            raise ValueError("msgpack body must be a mapping")
+        return dict(decoded)
+    parsed: object = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError("JSON body must be a mapping")
+    return dict(parsed)
+
+
 # ── wire endpoints ─────────────────────────────────────────────────────────────
 
 @router.get(
@@ -142,6 +194,113 @@ async def get_refs(
 
 
 @router.post(
+    "/{owner}/{slug}/filter-objects",
+    summary="Object dedup negotiation — return missing object IDs (MWP/2 Phase 1)",
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit(WIRE_PUSH_LIMIT)
+async def filter_objects(
+    request: Request,
+    owner: str,
+    slug: str,
+    claims: TokenClaims = Depends(require_valid_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Return the subset of the supplied object IDs the remote does NOT hold.
+
+    Before uploading any objects, MWP/2 clients call this endpoint with their
+    full list of object IDs.  The server queries its object table in a single
+    ``IN`` clause and returns only the missing subset.  The client then uploads
+    only those — making incremental pushes proportional to the *change* rather
+    than the full history.
+
+    Accepts ``Content-Type: application/x-msgpack`` (MWP/2) or
+    ``application/json`` (legacy).  Responds in the same format as requested
+    via the ``Accept`` header.
+    """
+    repo = await _resolve_repo(session, owner, slug)
+    raw = await request.body()
+    ct = request.headers.get("content-type", "")
+    data = _decode_request_body(raw, ct)
+    body = WireFilterRequest.model_validate(data)
+    result = await wire_filter_objects(session, repo.repo_id, body)
+    return _pack_response(result.model_dump(), request)
+
+
+@router.post(
+    "/{owner}/{slug}/presign",
+    summary="Get presigned S3/R2 URLs for large-object direct upload/download (MWP/2 Phase 3)",
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit(WIRE_PUSH_LIMIT)
+async def presign_objects(
+    request: Request,
+    owner: str,
+    slug: str,
+    claims: TokenClaims = Depends(require_valid_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Return presigned PUT or GET URLs for direct object storage access.
+
+    For objects above the large-object threshold (64 KB), MWP/2 clients
+    request presigned URLs and upload/download directly to S3/R2, bypassing
+    the API server.  When the backend is ``local://``, all IDs are returned
+    in ``inline`` and the client falls back to the normal pack path.
+
+    ``direction`` — ``"put"`` for push, ``"get"`` for pull.
+    """
+    repo = await _resolve_repo(session, owner, slug)
+    pusher_id: str | None = claims.get("sub")
+    raw = await request.body()
+    ct = request.headers.get("content-type", "")
+    data = _decode_request_body(raw, ct)
+    body = WirePresignRequest.model_validate(data)
+    try:
+        result = await wire_presign(session, repo.repo_id, body, pusher_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return _pack_response(result.model_dump(), request)
+
+
+@router.post(
+    "/{owner}/{slug}/negotiate",
+    summary="Multi-round commit negotiation (MWP/2 Phase 5)",
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit(WIRE_FETCH_LIMIT)
+async def negotiate(
+    request: Request,
+    owner: str,
+    slug: str,
+    _claims: TokenClaims | None = Depends(optional_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Depth-limited ACK/NAK commit negotiation for push/pull.
+
+    Replaces the current approach of sending every local commit ID as
+    ``have``.  The client sends ≤ 256 recent commits per round; the server
+    responds with which it recognises and whether the common base is found.
+    The client repeats with deeper ancestors until ``ready=True``.
+
+    This caps the negotiation payload at ≤ 256 SHA-256 hashes regardless of
+    repo size — O(depth) rather than O(history).
+    """
+    repo = await _resolve_repo(session, owner, slug)
+    _assert_readable(repo, _claims)
+    raw = await request.body()
+    ct = request.headers.get("content-type", "")
+    data = _decode_request_body(raw, ct)
+    body = WireNegotiateRequest.model_validate(data)
+    try:
+        result = await wire_negotiate(session, repo.repo_id, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return _pack_response(result.model_dump(), request)
+
+
+@router.post(
     "/{owner}/{slug}/push/objects",
     summary="Pre-upload an object chunk for a large push (Phase 1 of chunked push)",
     status_code=status.HTTP_200_OK,
@@ -151,28 +310,14 @@ async def push_objects(
     request: Request,
     owner: str,
     slug: str,
-    body: WireObjectsRequest,
     claims: TokenClaims = Depends(require_valid_token),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    """Accept a batch of content-addressed objects before the final push.
-
-    Large pushes are split into two phases:
-
-    **Phase 1 — upload objects** (this endpoint, called N times):
-        Client batches objects into chunks of ≤ 1 000 and POSTs each chunk
-        here.  Objects are idempotent — the server skips any it already holds.
-
-    **Phase 2 — push commits** (``POST /{owner}/{slug}/push``):
-        Client sends commits + snapshots with an empty ``bundle.objects``
-        list.  Because objects were already uploaded in Phase 1, the final
-        push is small and fast.
-
-    Response:
-    ```json
-    {"stored": 42, "skipped": 8}
-    ```
-    """
+    """Accept a batch of content-addressed objects before the final push (MWP msgpack)."""
+    raw = await request.body()
+    ct = request.headers.get("Content-Type", "")
+    data = _decode_request_body(raw, ct)
+    body = WireObjectsRequest.model_validate(data)
     repo_id = await _resolve_repo_id(session, owner, slug)
     pusher_id: str | None = claims.get("sub")
     try:
@@ -181,7 +326,7 @@ async def push_objects(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    return Response(content=result.model_dump_json(), media_type="application/json")
+    return _pack_response(result.model_dump(), request)
 
 
 @router.post(
@@ -194,37 +339,19 @@ async def push(
     request: Request,
     owner: str,
     slug: str,
-    body: WirePushRequest,
     claims: TokenClaims = Depends(require_valid_token),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    """Ingest commits, snapshots, and objects from a ``muse push`` command.
-
-    Requires a valid Bearer token.  Equivalent to Git's:
-    ``POST /owner/repo/git-receive-pack``
-
-    Request body:
-    ```json
-    {
-      "bundle": {"commits": [...], "snapshots": [...], "objects": [...]},
-      "branch": "main",
-      "force": false
-    }
-    ```
-
-    Response:
-    ```json
-    {"ok": true, "message": "pushed 3 commit(s) to 'main'",
-     "branch_heads": {...}, "remote_head": "sha..."}
-    ```
-    """
+    """Ingest commits, snapshots, and objects from a ``muse push`` command (MWP msgpack)."""
+    raw = await request.body()
+    ct = request.headers.get("Content-Type", "")
+    data = _decode_request_body(raw, ct)
+    body = WirePushRequest.model_validate(data)
     repo_id = await _resolve_repo_id(session, owner, slug)
     pusher_id: str | None = claims.get("sub")
     result = await wire_push(session, repo_id, body, pusher_id)
 
     if not result.ok:
-        # 409 Conflict for non-fast-forward (diverged history, use --force).
-        # 422 would imply a malformed request body; this is a semantic conflict.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=result.message,
@@ -232,7 +359,7 @@ async def push(
 
     asyncio.create_task(_embed_push_async(repo_id, result.remote_head))
 
-    return Response(content=result.model_dump_json(), media_type="application/json")
+    return _pack_response(result.model_dump(), request)
 
 
 @router.post(
@@ -245,28 +372,20 @@ async def fetch(
     request: Request,
     owner: str,
     slug: str,
-    body: WireFetchRequest,
     _claims: TokenClaims | None = Depends(optional_token),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    """Return the minimal pack bundle to satisfy a ``muse pull`` or ``muse clone``.
-
-    Equivalent to Git's:
-    ``POST /owner/repo/git-upload-pack``
-
-    Private repos require a valid Bearer token belonging to the repo owner.
-    Unauthenticated callers receive a 404 (not 403) to avoid confirming the
-    repo's existence.
-
-    ``want`` — commit SHAs the client wants.
-    ``have`` — commit SHAs the client already has (exclusion list).
-    """
+    """Return the minimal pack bundle to satisfy a ``muse pull`` or ``muse clone`` (MWP msgpack)."""
+    raw = await request.body()
+    ct = request.headers.get("Content-Type", "")
+    data = _decode_request_body(raw, ct)
+    body = WireFetchRequest.model_validate(data)
     repo = await _resolve_repo(session, owner, slug)
     _assert_readable(repo, _claims)
     result = await wire_fetch(session, repo.repo_id, body)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="repo not found")
-    return Response(content=result.model_dump_json(), media_type="application/json")
+    return _pack_response(result.model_dump(), request)
 
 
 # ── content-addressed CDN ──────────────────────────────────────────────────────

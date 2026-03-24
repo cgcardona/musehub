@@ -13,11 +13,11 @@ Remote URL format (same pattern as Git):
 """
 from __future__ import annotations
 
-import base64
 import os
 import uuid
 from datetime import datetime, timezone
 
+import msgpack
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,7 +51,7 @@ def _make_object(content: bytes = b"hello world") -> dict:
     oid = uuid.uuid4().hex
     return {
         "object_id": oid,
-        "content_b64": base64.b64encode(content).decode(),
+        "content": content,
         "path": "README.md",
     }
 
@@ -87,8 +87,14 @@ def auth_wire_token() -> str:
 def wire_headers(auth_wire_token: str) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {auth_wire_token}",
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-msgpack",
+        "Accept": "application/x-msgpack",
     }
+
+
+def _mp(data: object) -> bytes:
+    """Encode data as msgpack for test request bodies."""
+    return msgpack.packb(data, use_bin_type=True)
 
 
 # ── refs endpoint ──────────────────────────────────────────────────────────────
@@ -159,7 +165,8 @@ async def test_push_requires_auth(client: AsyncClient, db_session: AsyncSession)
     repo = await factory_create_repo(db_session, slug="push-auth-test", owner_user_id="test-user-wire")
     resp = await client.post(
         f"/{repo.owner}/{repo.slug}/push",
-        json={"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"},
+        content=_mp({"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"}),
+        headers={"Content-Type": "application/x-msgpack"},
     )
     assert resp.status_code in (401, 403)
 
@@ -171,7 +178,7 @@ async def test_push_404_for_unknown_repo(
 ) -> None:
     resp = await client.post(
         "/nobody/no-such-repo/push",
-        json={"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"},
+        content=_mp({"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"}),
         headers=wire_headers,
     )
     assert resp.status_code == 404
@@ -191,7 +198,7 @@ async def test_push_rejected_for_non_owner(
     )
     resp = await client.post(
         f"/{repo.owner}/{repo.slug}/push",
-        json={"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"},
+        content=_mp({"bundle": {"commits": [], "snapshots": [], "objects": []}, "branch": "main"}),
         headers=wire_headers,
     )
     assert resp.status_code == 409
@@ -224,11 +231,11 @@ async def test_push_ingests_commit_and_branch(
     }
     resp = await client.post(
         f"/{repo.owner}/{repo.slug}/push",
-        json=payload,
+        content=_mp(payload),
         headers=wire_headers,
     )
     assert resp.status_code == 200, resp.text
-    data = resp.json()
+    data = msgpack.unpackb(resp.content, raw=False)
     assert data["ok"] is True
     assert "main" in data["branch_heads"]
     assert data["remote_head"] == commit_id
@@ -248,9 +255,9 @@ async def test_push_is_idempotent(
         "branch": "main",
     }
     url = f"/{repo.owner}/{repo.slug}/push"
-    resp1 = await client.post(url, json=payload, headers=wire_headers)
+    resp1 = await client.post(url, content=_mp(payload), headers=wire_headers)
     assert resp1.status_code == 200
-    resp2 = await client.post(url, json=payload, headers=wire_headers)
+    resp2 = await client.post(url, content=_mp(payload), headers=wire_headers)
     assert resp2.status_code == 200
 
 
@@ -277,7 +284,7 @@ async def test_push_non_fast_forward_rejected(
         "branch": "main",
         "force": False,
     }
-    resp = await client.post(f"/{repo.owner}/{repo.slug}/push", json=payload, headers=wire_headers)
+    resp = await client.post(f"/{repo.owner}/{repo.slug}/push", content=_mp(payload), headers=wire_headers)
     assert resp.status_code == 409  # 409 Conflict for non-fast-forward
     assert "non-fast-forward" in resp.json()["detail"]
 
@@ -304,9 +311,9 @@ async def test_push_force_overwrites_branch(
         "branch": "main",
         "force": True,
     }
-    resp = await client.post(f"/{repo.owner}/{repo.slug}/push", json=payload, headers=wire_headers)
+    resp = await client.post(f"/{repo.owner}/{repo.slug}/push", content=_mp(payload), headers=wire_headers)
     assert resp.status_code == 200
-    data = resp.json()
+    data = msgpack.unpackb(resp.content, raw=False)
     assert data["ok"] is True
     assert data["branch_heads"]["main"] != old_head
 
@@ -317,7 +324,8 @@ async def test_push_force_overwrites_branch(
 async def test_fetch_404_for_unknown_repo(client: AsyncClient) -> None:
     resp = await client.post(
         "/nobody/no-such-repo/fetch",
-        json={"want": [], "have": []},
+        content=_mp({"want": [], "have": []}),
+        headers={"Content-Type": "application/x-msgpack"},
     )
     assert resp.status_code == 404
 
@@ -330,10 +338,11 @@ async def test_fetch_empty_want_returns_empty_bundle(
     repo = await factory_create_repo(db_session, slug="fetch-empty-test")
     resp = await client.post(
         f"/{repo.owner}/{repo.slug}/fetch",
-        json={"want": [], "have": []},
+        content=_mp({"want": [], "have": []}),
+        headers={"Content-Type": "application/x-msgpack", "Accept": "application/x-msgpack"},
     )
     assert resp.status_code == 200
-    data = resp.json()
+    data = msgpack.unpackb(resp.content, raw=False)
     assert data["commits"] == []
     assert data["snapshots"] == []
     assert data["objects"] == []
@@ -368,10 +377,11 @@ async def test_fetch_returns_missing_commits(
 
     resp = await client.post(
         f"/{repo.owner}/{repo.slug}/fetch",
-        json={"want": [commit_id], "have": []},
+        content=_mp({"want": [commit_id], "have": []}),
+        headers={"Content-Type": "application/x-msgpack", "Accept": "application/x-msgpack"},
     )
     assert resp.status_code == 200
-    data = resp.json()
+    data = msgpack.unpackb(resp.content, raw=False)
     assert len(data["commits"]) == 1
     assert data["commits"][0]["commit_id"] == commit_id
     assert data["branch_heads"]["main"] == commit_id

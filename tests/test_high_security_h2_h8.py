@@ -5,7 +5,7 @@ H1 (private repo visibility) is already covered by test_wire_protocol.py.
 Tests grouped by finding:
   H2 — Namespace squatting in musehub_publish_domain
   H3 — Unbounded push bundle (Pydantic max_length enforcement)
-  H4 — content_b64 pre-decode size check
+  H4 — object content size check (MAX_OBJECT_BYTES)
   H5 — Batched BFS fetch (was N sequential queries)
   H6 — MCP session store cap → 503
   H7 — muse_push per-user storage quota
@@ -13,7 +13,6 @@ Tests grouped by finding:
 """
 from __future__ import annotations
 
-import base64
 import uuid
 from datetime import datetime, timezone
 
@@ -31,7 +30,7 @@ from musehub.mcp.session import (
     delete_session,
 )
 from musehub.models.wire import (
-    MAX_B64_SIZE,
+    MAX_OBJECT_BYTES,
     MAX_COMMITS_PER_PUSH,
     MAX_OBJECTS_PER_PUSH,
     MAX_WANT_PER_FETCH,
@@ -149,8 +148,7 @@ def test_wire_bundle_commits_capped() -> None:
 def test_wire_bundle_objects_capped() -> None:
     """WireBundle rejects more than MAX_OBJECTS_PER_PUSH objects."""
     from pydantic import ValidationError
-    b64 = base64.b64encode(b"x").decode()
-    objects = [{"object_id": f"o{i}", "content_b64": b64} for i in range(MAX_OBJECTS_PER_PUSH + 1)]
+    objects = [{"object_id": f"o{i}", "content": b"x"} for i in range(MAX_OBJECTS_PER_PUSH + 1)]
     with pytest.raises(ValidationError, match="List should have at most"):
         WireBundle(objects=objects)  # type: ignore[arg-type]
 
@@ -164,31 +162,27 @@ def test_wire_fetch_request_want_capped() -> None:
 
 def test_wire_bundle_at_limit_is_accepted() -> None:
     """Exactly MAX items is valid — the cap is inclusive."""
-    b64 = base64.b64encode(b"x").decode()
     bundle = WireBundle(
         commits=[{"commit_id": f"c{i}", "repo_id": "r"} for i in range(MAX_COMMITS_PER_PUSH)],  # type: ignore[arg-type]
-        objects=[{"object_id": f"o{i}", "content_b64": b64} for i in range(MAX_OBJECTS_PER_PUSH)],  # type: ignore[arg-type]
+        objects=[{"object_id": f"o{i}", "content": b"x"} for i in range(MAX_OBJECTS_PER_PUSH)],  # type: ignore[arg-type]
     )
     assert len(bundle.commits) == MAX_COMMITS_PER_PUSH
     assert len(bundle.objects) == MAX_OBJECTS_PER_PUSH
 
 
-# ── H4: content_b64 pre-decode size check ─────────────────────────────────────
+# ── H4: object content size check ────────────────────────────────────────────
 
-def test_wire_object_rejects_oversized_b64() -> None:
-    """WireObject rejects content_b64 longer than MAX_B64_SIZE."""
+def test_wire_object_rejects_oversized_content() -> None:
+    """WireObject rejects content larger than MAX_OBJECT_BYTES."""
     from pydantic import ValidationError
-    # Create a string just over the limit (no need to base64-encode — the
-    # validator checks string length, not decoded bytes).
-    oversized = "A" * (MAX_B64_SIZE + 1)
+    oversized = b"x" * (MAX_OBJECT_BYTES + 1)
     with pytest.raises(ValidationError, match="exceeds maximum size|at most"):
-        WireObject(object_id="too-big", content_b64=oversized)
+        WireObject(object_id="too-big", content=oversized)
 
 
 def test_wire_object_accepts_at_limit() -> None:
-    """WireObject accepts content_b64 exactly at MAX_B64_SIZE chars."""
-    at_limit = base64.b64encode(b"x" * 1000).decode()  # well under limit
-    obj = WireObject(object_id="ok", content_b64=at_limit)
+    """WireObject accepts content well under MAX_OBJECT_BYTES."""
+    obj = WireObject(object_id="ok", content=b"x" * 1000)
     assert obj.object_id == "ok"
 
 
