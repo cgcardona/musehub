@@ -37,7 +37,7 @@ import json
 import logging
 
 import msgpack
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -386,6 +386,170 @@ async def fetch(
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="repo not found")
     return _pack_response(result.model_dump(), request)
+
+
+# ── release wire endpoints ─────────────────────────────────────────────────────
+
+
+@router.post(
+    "/{owner}/{slug}/releases",
+    summary="Push a release from muse CLI",
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit(WIRE_PUSH_LIMIT)
+async def wire_create_release(
+    request: Request,
+    owner: str,
+    slug: str,
+    background_tasks: BackgroundTasks,
+    claims: TokenClaims = Depends(require_valid_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Accept a ``ReleaseDict`` payload from ``muse release push``.
+
+    The body must be a JSON object matching the CLI ``ReleaseRecord.to_dict()``
+    shape (application/json).  Returns immediately with the server-assigned
+    ``release_id``; semantic analysis runs as a background task so the push
+    is never blocked by analysis time.
+
+    Only the repo owner may push releases — the endpoint mirrors the auth
+    model of ``POST /{owner}/{slug}/push``.
+    """
+    from musehub.services import musehub_releases as rel_svc
+    from musehub.services.release_analysis import analyse_release_background
+
+    raw = await request.body()
+    ct = request.headers.get("Content-Type", "")
+    data = _decode_request_body(raw, ct)
+
+    repo_id = await _resolve_repo_id(session, owner, slug)
+
+    try:
+        response = await rel_svc.create_release_from_dict(session, repo_id, data)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        )
+
+    await session.commit()
+    logger.info("✅ wire: release %s pushed for %s/%s", response.tag, owner, slug)
+
+    # Fire semantic analysis after the response is sent.  Opens its own
+    # session so it is independent of the request lifecycle.
+    background_tasks.add_task(
+        analyse_release_background, repo_id, response.release_id
+    )
+
+    return _pack_response({"release_id": response.release_id}, request)
+
+
+@router.delete(
+    "/{owner}/{slug}/releases/{tag:path}",
+    summary="Retract a release from MuseHub",
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit(WIRE_PUSH_LIMIT)
+async def wire_delete_release(
+    request: Request,
+    owner: str,
+    slug: str,
+    tag: str,
+    claims: TokenClaims = Depends(require_valid_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Retract a release pushed by ``muse release push``.
+
+    Removes the named release label from MuseHub.  The underlying commits and
+    snapshots are not affected — they remain in the content-addressed object
+    store and are still reachable by their SHA-256.
+
+    Only the repo owner may retract releases.
+    """
+    from musehub.services import musehub_releases as rel_svc
+
+    repo = await _resolve_repo(session, owner, slug)
+
+    caller_id: str | None = claims.get("sub")
+    if caller_id != repo.owner_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only the repo owner may retract releases",
+        )
+
+    deleted = await rel_svc.delete_release_by_tag(session, repo.repo_id, tag)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"release '{tag}' not found",
+        )
+
+    await session.commit()
+    logger.info("✅ wire: release %s retracted from %s/%s", tag, owner, slug)
+    return _pack_response({"retracted": tag}, request)
+
+
+# ── wire-tag endpoints ─────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/{owner}/{slug}/tags",
+    summary="Push lightweight wire tags from muse CLI",
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit(WIRE_PUSH_LIMIT)
+async def wire_push_tags(
+    request: Request,
+    owner: str,
+    slug: str,
+    claims: TokenClaims = Depends(require_valid_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Upsert a batch of lightweight semantic tags pushed from the Muse CLI.
+
+    The body must be a msgpack object with a ``tags`` key holding a list of
+    ``WireTag`` dicts.  The server upserts them — pushing the same tag label
+    twice for the same repo is a no-op (``commit_id`` is refreshed).
+
+    Returns ``{"stored": <count>}`` as msgpack or JSON.
+    """
+    from musehub.models.musehub import WireTagInput
+    from musehub.services import musehub_wire_tags as tag_svc
+
+    raw = await request.body()
+    ct = request.headers.get("Content-Type", "")
+    data = _decode_request_body(raw, ct)
+
+    repo_id = await _resolve_repo_id(session, owner, slug)
+
+    tags_raw = data.get("tags", [])
+    if not isinstance(tags_raw, list):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="'tags' must be a list",
+        )
+
+    tags: list[WireTagInput] = []
+    for item in tags_raw:
+        if not isinstance(item, dict):
+            continue
+        tag_id_raw = item.get("tag_id", "")
+        commit_id_raw = item.get("commit_id", "")
+        tag_label_raw = item.get("tag", "")
+        created_at_raw = item.get("created_at", "")
+        tags.append(
+            WireTagInput(
+                tag_id=str(tag_id_raw) if isinstance(tag_id_raw, str) else "",
+                commit_id=str(commit_id_raw) if isinstance(commit_id_raw, str) else "",
+                tag=str(tag_label_raw) if isinstance(tag_label_raw, str) else "",
+                created_at=str(created_at_raw) if isinstance(created_at_raw, str) else "",
+            )
+        )
+
+    stored = await tag_svc.store_wire_tags(session, repo_id, tags)
+    await session.commit()
+    logger.info("✅ wire: %d tag(s) pushed for %s/%s", stored, owner, slug)
+    return _pack_response({"stored": stored}, request)
 
 
 # ── content-addressed CDN ──────────────────────────────────────────────────────

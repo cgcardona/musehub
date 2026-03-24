@@ -56,6 +56,7 @@ from sqlalchemy import func, select as sa_select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response as StarletteResponse
 
+from musehub.auth.dependencies import TokenClaims, optional_token
 from musehub.api.routes.musehub.htmx_helpers import htmx_fragment_or_full, htmx_trigger, is_htmx
 from musehub.api.routes.musehub.json_alternate import json_or_html
 from musehub.api.routes.musehub.negotiate import negotiate_response
@@ -2180,17 +2181,66 @@ async def release_list_page(
     request: Request,
     owner: str,
     repo_slug: str,
+    channel: str | None = None,
+    include_drafts: int = 0,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    _claims: TokenClaims | None = Depends(optional_token),
 ) -> Response:
-    """Render the supercharged release list page (SSR).
+    """Render the release list page (SSR HTML) or return a wire-format response.
 
-    The latest stable release is highlighted as a hero card in the page shell.
-    The HTMX-swappable fragment renders remaining (previous) releases as rich
-    cards below the hero.  All data is SSR'd — no client-side fetches needed.
+    When the caller sends ``Accept: application/x-msgpack`` (the Muse CLI wire
+    protocol), the handler returns a msgpack-encoded list of ``ReleaseDict``
+    objects instead of an HTML page.  This avoids URL conflicts between the
+    wire protocol and the UI — the same endpoint serves both audiences based on
+    content negotiation.
+
+    For browser clients (HTML Accept), the latest stable release is highlighted
+    as a hero card; remaining releases are paginated below.  All data is
+    SSR'd — no client-side fetches needed.
     """
+    import msgpack as _msgpack
+
+    accept = request.headers.get("accept", "")
+    is_wire = "application/x-msgpack" in accept or "application/x-msgpack" in request.headers.get("content-type", "")
+
     repo_id, base_url, nav_ctx = await _resolve_repo(owner, repo_slug, db)
+
+    if is_wire:
+        # Wire-protocol path: return msgpack releases list for muse CLI.
+        show_drafts = bool(include_drafts) and _claims is not None
+        releases_wire = await musehub_releases.list_releases(
+            db, repo_id, channel=channel, include_drafts=show_drafts
+        )
+        releases_payload: list[dict[str, object]] = [
+            {
+                "release_id": r.release_id,
+                "tag": r.tag,
+                "title": r.title,
+                "body": r.body,
+                "commit_id": r.commit_id,
+                "snapshot_id": r.snapshot_id,
+                "channel": r.channel,
+                "semver": {
+                    "major": r.semver_major,
+                    "minor": r.semver_minor,
+                    "patch": r.semver_patch,
+                    "pre": r.semver_pre,
+                    "build": r.semver_build,
+                },
+                "agent_id": r.agent_id,
+                "model_id": r.model_id,
+                "changelog": [e.model_dump() for e in r.changelog],
+                "is_draft": r.is_draft,
+                "gpg_signature": r.gpg_signature,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in releases_wire
+        ]
+        packed: bytes = _msgpack.packb({"releases": releases_payload}, use_bin_type=True)
+        return Response(content=packed, media_type="application/x-msgpack")
+
     all_releases = await musehub_releases.list_releases(db, repo_id)
 
     # Split: hero = latest stable/prerelease (first in newest-first list),
@@ -2206,9 +2256,9 @@ async def release_list_page(
 
     # Stats for the bar.
     stable_count = sum(
-        1 for r in all_releases if not r.is_prerelease and not r.is_draft
+        1 for r in all_releases if r.channel == "stable" and not r.is_draft
     )
-    prerelease_count = sum(1 for r in all_releases if r.is_prerelease)
+    prerelease_count = sum(1 for r in all_releases if r.channel != "stable" and not r.is_draft)
     draft_count = sum(1 for r in all_releases if r.is_draft)
     # Count distinct download format types available across all releases.
     formats_available: list[str] = []
@@ -2523,7 +2573,7 @@ async def insights_page(
             sa_select(
                 musehub_db.MusehubRelease.tag,
                 musehub_db.MusehubRelease.title,
-                musehub_db.MusehubRelease.is_prerelease,
+                musehub_db.MusehubRelease.channel,
                 musehub_db.MusehubRelease.is_draft,
                 musehub_db.MusehubRelease.created_at,
             ).where(musehub_db.MusehubRelease.repo_id == repo_id)
@@ -2707,14 +2757,14 @@ async def insights_page(
                 all_participants.add(p)
 
     # ── Release cadence ─────────────────────────────────────────────────────
-    stable_releases = sum(1 for r in releases_raw if not r.is_prerelease and not r.is_draft)
-    prerelease_count = sum(1 for r in releases_raw if r.is_prerelease)
+    stable_releases = sum(1 for r in releases_raw if r.channel == "stable" and not r.is_draft)
+    prerelease_count = sum(1 for r in releases_raw if r.channel != "stable" and not r.is_draft)
     draft_count = sum(1 for r in releases_raw if r.is_draft)
     recent_releases: list[dict[str, Any]] = [
         {
             "tag": r.tag,
             "title": r.title or r.tag,
-            "is_prerelease": r.is_prerelease,
+            "channel": r.channel,
             "is_draft": r.is_draft,
             "date": r.created_at.date().isoformat() if r.created_at else "",
         }
@@ -3074,9 +3124,9 @@ async def tags_page(
 
     # Stats.
     stable_count = sum(
-        1 for r in releases if not r.is_prerelease and not r.is_draft
+        1 for r in releases if r.channel == "stable" and not r.is_draft
     )
-    prerelease_count = sum(1 for r in releases if r.is_prerelease)
+    prerelease_count = sum(1 for r in releases if r.channel != "stable" and not r.is_draft)
     draft_count = sum(1 for r in releases if r.is_draft)
 
     if format == "json" or "application/json" in request.headers.get("accept", ""):

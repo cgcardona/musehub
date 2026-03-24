@@ -12,10 +12,10 @@ Tables:
 - musehub_pr_reviews: Formal reviews (approval / changes requested / dismissed) on PRs
 - musehub_pr_comments: Inline review comments on dimensional diffs within PRs
 - musehub_objects: Content-addressed binary artifact storage
-- musehub_releases: Tagged releases
+- musehub_releases: Tagged version releases (semver + channel + changelog)
+- musehub_wire_tags: Lightweight semantic tags pushed via the wire protocol
 - musehub_stars: Per-user repo starring (one row per user×repo pair)
 - musehub_profiles: Public user profiles (bio, avatar, pinned repos)
-- musehub_releases: Published version releases with download packages
 - musehub_webhooks: Registered webhook subscriptions per repo
 - musehub_webhook_deliveries: Delivery log for each webhook dispatch attempt
 - musehub_render_jobs: Render status tracking for auto-generated preview artifacts
@@ -152,6 +152,9 @@ class MusehubRepo(Base):
     )
     events: Mapped[list[MusehubEvent]] = relationship(
         "MusehubEvent", back_populates="repo", cascade="all, delete-orphan"
+    )
+    wire_tags: Mapped[list[MusehubWireTag]] = relationship(
+        "MusehubWireTag", back_populates="repo", cascade="all, delete-orphan"
     )
 
 
@@ -623,10 +626,19 @@ class MusehubPRComment(Base):
 class MusehubRelease(Base):
     """A published version release for a MuseHub repo.
 
-    Releases tie a human-readable ``tag`` (e.g. "v1.0") to a specific commit
-    and carry markdown release notes plus a JSON map of download package URLs.
-    The ``download_urls`` field is a JSON object keyed by package type:
-    "midi_bundle", "stems", "mp3", "musicxml", "metadata".
+    Releases tie a semver ``tag`` (e.g. "v1.2.3") to a specific commit snapshot
+    and carry structured metadata:
+
+    - Semver components (major/minor/patch/pre/build) for queryable version ordering.
+    - Named distribution channel (stable | beta | alpha | nightly) replacing the
+      boolean ``is_prerelease`` — richer than a flag and machine-filterable.
+    - ``snapshot_id`` pins the release to the content-addressed object store for
+      guaranteed reproducibility forever.
+    - ``agent_id`` / ``model_id`` surface AI provenance from the tip commit.
+    - ``changelog_json`` is a JSON array of ``ChangelogEntry`` objects auto-generated
+      from typed ``sem_ver_bump`` / ``breaking_changes`` fields on commits since the
+      previous release.
+    - ``download_urls`` is a JSON object keyed by package type for generated artifacts.
 
     ``tag`` is unique per repo — enforced by the DB constraint
     ``uq_musehub_releases_repo_tag`` and guarded at the service layer to
@@ -643,23 +655,41 @@ class MusehubRelease(Base):
         nullable=False,
         index=True,
     )
-    # Semantic version tag, e.g. "v1.0", "v2.3.1" — unique per repo.
+    # Semantic version tag, e.g. "v1.2.3" or "v2.0.0-beta.1" — unique per repo.
     tag: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
-    # Markdown release notes authored by the musician.
+    title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    # Markdown release notes.
     body: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    # Optional commit this release is pinned to.
+    # Commit this release is pinned to.
     commit_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Content-addressed snapshot ID — guarantees reproducible builds.
+    snapshot_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Parsed semver components for efficient range queries and ordering.
+    semver_major: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    semver_minor: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    semver_patch: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Pre-release label, e.g. "beta.1", "rc.2"; empty string for stable releases.
+    semver_pre: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # Build metadata, e.g. "20250101"; empty string when absent.
+    semver_build: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # Distribution channel — replaces the boolean is_prerelease flag.
+    channel: Mapped[str] = mapped_column(String(20), nullable=False, default="stable", index=True)
     # JSON map of download package URLs, keyed by package type.
     download_urls: Mapped[dict[str, str]] = mapped_column(JSON, nullable=False, default=dict)
-    # Display name or identifier of the user who published this release
+    # Display name or identifier of the user who published this release.
     author: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    # True when this release is not yet stable (e.g. "v2.0-beta").
-    is_prerelease: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # AI provenance — agent and model that produced the tip commit.
+    agent_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    model_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # JSON array of ChangelogEntry objects auto-generated from commit metadata.
+    changelog_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     # True when the release is saved but not yet publicly visible.
     is_draft: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Optional ASCII-armoured GPG signature for the tag object.
     gpg_signature: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # SemanticReleaseReport JSON blob computed by the Muse CLI at push time.
+    # Empty string ("") means no analysis was attached (e.g. --no-analysis was used).
+    semantic_report_json: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utc_now
     )
@@ -710,6 +740,39 @@ class MusehubReleaseAsset(Base):
     )
 
     release: Mapped[MusehubRelease] = relationship("MusehubRelease", back_populates="assets")
+
+
+class MusehubWireTag(Base):
+    """A lightweight tag pushed from a Muse CLI client via the wire protocol.
+
+    Wire tags are distinct from version releases: they carry semantic labels
+    such as ``emotion:joyful`` or ``section:verse`` that annotate commits
+    without implying a versioned release.  The ``tag`` field is the raw
+    string pushed by the client (e.g. ``emotion:joyful``).
+
+    The ``(repo_id, tag)`` pair is unique — a second push of the same tag
+    for the same commit is a no-op (upsert at the service layer).
+    """
+
+    __tablename__ = "musehub_wire_tags"
+    __table_args__ = (UniqueConstraint("repo_id", "tag", name="uq_musehub_wire_tags_repo_tag"),)
+
+    tag_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_uuid)
+    repo_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("musehub_repos.repo_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # The commit this tag points to.
+    commit_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Raw tag label, e.g. "emotion:joyful", "section:verse", "v1.0-wip".
+    tag: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utc_now
+    )
+
+    repo: Mapped[MusehubRepo] = relationship("MusehubRepo", back_populates="wire_tags")
 
 
 class MusehubProfile(Base):

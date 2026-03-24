@@ -77,8 +77,17 @@ async def create_release(
             title=body.title,
             body=body.body,
             commit_id=body.commit_id,
+            snapshot_id=body.snapshot_id,
+            channel=body.channel,
+            semver_major=body.semver_major,
+            semver_minor=body.semver_minor,
+            semver_patch=body.semver_patch,
+            semver_pre=body.semver_pre,
+            semver_build=body.semver_build,
             author=token.get("sub", ""),
-            is_prerelease=body.is_prerelease,
+            agent_id=body.agent_id,
+            model_id=body.model_id,
+            changelog=list(body.changelog),
             is_draft=body.is_draft,
             gpg_signature=body.gpg_signature,
         )
@@ -97,10 +106,16 @@ async def create_release(
 )
 async def list_releases(
     repo_id: str,
+    channel: str | None = None,
+    include_drafts: bool = False,
     db: AsyncSession = Depends(get_db),
     claims: TokenClaims | None = Depends(optional_token),
 ) -> ReleaseListResponse:
-    """Return all releases for the repo ordered newest first.
+    """Return releases for the repo ordered newest first.
+
+    Query parameters:
+    - ``channel``: filter by distribution channel (stable | beta | alpha | nightly)
+    - ``include_drafts``: when true, include draft releases (owner auth required)
 
     Returns 404 if the repo does not exist.
     """
@@ -113,7 +128,10 @@ async def list_releases(
             detail="Authentication required to access private repos.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return await musehub_releases.get_release_list_response(db, repo_id)
+    releases = await musehub_releases.list_releases(
+        db, repo_id, channel=channel, include_drafts=include_drafts
+    )
+    return ReleaseListResponse(releases=releases)
 
 
 @router.get(
@@ -151,7 +169,7 @@ async def list_tags(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    releases = await musehub_releases.list_releases(db, repo_id)
+    releases = await musehub_releases.list_releases(db, repo_id, include_drafts=False)
 
     all_tags: list[TagResponse] = []
     for release in releases:

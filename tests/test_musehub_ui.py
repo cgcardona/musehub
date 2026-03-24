@@ -1309,31 +1309,25 @@ async def test_ui_release_list_page_returns_200(
 
 
 @pytest.mark.anyio
-async def test_ui_release_list_page_has_download_buttons(
+async def test_ui_release_list_page_shows_release_row(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Release list page renders SSR download buttons for all package types."""
+    """Release list page renders a row for each release with tag and channel."""
     repo_id = await _make_repo(db_session)
     release = MusehubRelease(
-        repo_id=repo_id, tag="v1.0", title="Version 1.0",
+        repo_id=repo_id, tag="v1.0.0", title="Version 1.0",
         body="", author="testuser",
-        download_urls={
-            "midi_bundle": "https://cdn.example.com/v1/midi.zip",
-            "mp3": "https://cdn.example.com/v1/mix.mp3",
-            "stems": "https://cdn.example.com/v1/stems.zip",
-            "musicxml": "https://cdn.example.com/v1/score.xml",
-        },
+        channel="stable",
+        download_urls={},
     )
     db_session.add(release)
     await db_session.commit()
     response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
-    assert "MIDI" in body
-    assert "Stems" in body
-    assert "MP3" in body
-    assert "MusicXML" in body
+    assert "v1.0.0" in body
+    assert "Version 1.0" in body
 
 
 @pytest.mark.anyio
@@ -1356,23 +1350,23 @@ async def test_ui_release_list_page_has_body_preview(
 
 
 @pytest.mark.anyio
-async def test_ui_release_list_page_has_download_count_badge(
+async def test_ui_release_list_page_has_tag_badge(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Release list page renders SSR download link buttons for each release."""
+    """Release list page renders a tag badge for each release."""
     repo_id = await _make_repo(db_session)
     release = MusehubRelease(
-        repo_id=repo_id, tag="v1.0", title="Version 1.0",
+        repo_id=repo_id, tag="v2.0.0", title="Version 2.0",
         body="", author="testuser",
-        download_urls={"midi_bundle": "https://cdn.example.com/v1/midi.zip"},
+        download_urls={},
     )
     db_session.add(release)
     await db_session.commit()
     response = await client.get("/testuser/test-beats/releases")
     assert response.status_code == 200
     body = response.text
-    assert "Download" in body
+    assert "v2.0.0" in body
 
 
 @pytest.mark.anyio
@@ -1404,11 +1398,11 @@ async def test_ui_release_list_page_has_tag_colour_coding(
     repo_id = await _make_repo(db_session)
     db_session.add(MusehubRelease(
         repo_id=repo_id, tag="v1.0", title="Stable Release",
-        body="", author="testuser", is_prerelease=False,
+        body="", author="testuser", channel="stable",
     ))
     db_session.add(MusehubRelease(
         repo_id=repo_id, tag="v2.0-beta", title="Beta Release",
-        body="", author="testuser", is_prerelease=True,
+        body="", author="testuser", channel="beta",
     ))
     await db_session.commit()
     response = await client.get("/testuser/test-beats/releases")

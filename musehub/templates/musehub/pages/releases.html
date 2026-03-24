@@ -1,8 +1,8 @@
 {% extends "musehub/base.html" %}
 {% from "musehub/macros/pagination.html" import pagination %}
 
-{# ── Body preview: first real prose line, skipping markdown headers/bullets ── #}
-{% macro body_preview(body, length=200) %}
+{# ── Body preview: first real prose line ─────────────────────────────────── #}
+{% macro body_preview(body, length=220) %}
   {%- set ns = namespace(found="") -%}
   {%- for line in body.split("\n") -%}
     {%- if ns.found == "" and line.strip() and not line.strip().startswith("#") and not line.strip().startswith("-") and not line.strip().startswith("*") -%}
@@ -14,11 +14,6 @@
   {%- endif -%}
 {% endmacro %}
 
-{% macro author_bg(name) -%}
-  {%- set colors = ["#58a6ff","#3fb950","#a371f7","#fb8500","#2dd4bf","#d29922","#f85149"] -%}
-  {{ colors[(name|length) % (colors|length)] }}
-{%- endmacro %}
-
 {% block title %}Releases · {{ owner }}/{{ repo_slug }}{% endblock %}
 {% block breadcrumb %}
   <a href="/{{ owner }}/{{ repo_slug }}">{{ owner }}/{{ repo_slug }}</a> / releases
@@ -28,108 +23,101 @@
 {% block content %}
 <div class="rl-page">
 
-{# ── Stat strip ───────────────────────────────────────────────────────────── #}
-<div class="rl-stat-strip">
-  <div class="rl-stat">
-    <div class="rl-stat-num">{{ total }}</div>
-    <div class="rl-stat-lbl">Total</div>
-  </div>
-  <div class="rl-stat-divider"></div>
-  <div class="rl-stat">
-    <div class="rl-stat-num rl-stat-num--stable">{{ stable_count }}</div>
-    <div class="rl-stat-lbl">Stable</div>
-  </div>
-  <div class="rl-stat-divider"></div>
-  <div class="rl-stat">
-    <div class="rl-stat-num rl-stat-num--pre">{{ prerelease_count + draft_count }}</div>
-    <div class="rl-stat-lbl">Pre-release / Draft</div>
-  </div>
-  {% if formats_available %}
-  <div class="rl-stat-divider"></div>
-  <div class="rl-stat">
-    <div class="rl-stat-num">{{ formats_available | length }}</div>
-    <div class="rl-stat-lbl">Download Formats</div>
-  </div>
-  {% endif %}
-</div>
-
-{# ── Latest release hero ──────────────────────────────────────────────────── #}
+{# ── Hero ─────────────────────────────────────────────────────────────────── #}
 {% if latest_release %}
 {% set lr = latest_release %}
-{% set lr_urls = lr.download_urls %}
-{% set lr_status = "prerelease" if lr.is_prerelease else ("draft" if lr.is_draft else "stable") %}
+{% set lr_channel = lr.channel if lr.channel else "stable" %}
+<div class="rl-hero-shell">
+  <div class="rl-hero-glow"></div>
+  <div class="rl-hero-inner">
 
-<div class="rl-hero">
-  <div class="rl-hero-eyebrow">
-    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-    Latest Release
-  </div>
-
-  <div class="rl-hero-top">
-    <div class="rl-hero-info">
-      <div class="rl-hero-tag">
-        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-        {{ lr.tag }}
+    <div class="rl-hero-left">
+      <div class="rl-hero-eyebrow">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Latest Release
       </div>
-      <a href="{{ base_url }}/releases/{{ lr.tag | urlencode }}" class="rl-hero-title">{{ lr.title or lr.tag }}</a>
-      <div class="rl-hero-meta">
-        {% if lr.author %}
-          <span class="rl-hero-author">
-            <span class="rl-avatar" style="background:{{ author_bg(lr.author) }}">{{ lr.author[0] | upper }}</span>
-            {{ lr.author }}
+
+      <h1 class="rl-hero-title">
+        <a href="{{ base_url }}/releases/{{ lr.tag | urlencode }}" style="color:inherit;text-decoration:none">
+          {{ lr.title or lr.tag }}
+        </a>
+      </h1>
+
+      <div class="rl-hero-meta-row">
+        {# Tag badge #}
+        <span style="font-family:var(--font-mono);font-size:11px;background:rgba(63,185,80,0.10);color:#3fb950;border:1px solid rgba(63,185,80,0.25);border-radius:var(--radius-full);padding:2px 9px;font-weight:700">
+          {{ lr.tag }}
+        </span>
+
+        {# Channel #}
+        {% if lr_channel != "stable" or lr.is_draft %}
+          <span class="rl-pill rl-pill--{{ 'draft' if lr.is_draft else lr_channel }}">
+            {{ 'Draft' if lr.is_draft else lr_channel | title }}
           </span>
-          <span class="rl-meta-dot">·</span>
         {% endif %}
+
+        <span style="color:var(--border-default)">·</span>
         <span>{{ lr.created_at | fmtrelative }}</span>
+
         {% if lr.commit_id %}
-          <span class="rl-meta-dot">·</span>
-          <a href="{{ base_url }}/commits/{{ lr.commit_id }}" class="rl-hero-sha">{{ lr.commit_id | shortsha }}</a>
+          <span style="color:var(--border-default)">·</span>
+          <a href="{{ base_url }}/commits/{{ lr.commit_id }}" class="rl-hero-sha">
+            {{ lr.commit_id | shortsha }}
+          </a>
         {% endif %}
-        {% if lr.is_prerelease %}
-          <span class="rl-pill rl-pill--prerelease">Pre-release</span>
-        {% elif lr.is_draft %}
-          <span class="rl-pill rl-pill--draft">Draft</span>
+
+        {% if lr.changelog %}
+          <span style="color:var(--border-default)">·</span>
+          <span class="rl-changelog-chip">
+            <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            {{ lr.changelog | length }} commit{{ 's' if lr.changelog | length != 1 else '' }}
+          </span>
         {% endif %}
+      </div>
+
+      {% if lr.body %}
+      <div class="rl-hero-body-preview">{{ body_preview(lr.body) }}</div>
+      {% endif %}
+
+      <div class="rl-hero-actions">
+        <a href="{{ base_url }}/releases/{{ lr.tag | urlencode }}" class="btn btn-primary btn-sm">Release Notes</a>
+        <a href="{{ base_url }}/commits/{{ lr.commit_id }}" class="btn btn-ghost btn-sm">
+          View commit {{ lr.commit_id | shortsha }}
+        </a>
       </div>
     </div>
 
-    <div class="rl-hero-actions">
-      <a href="{{ base_url }}/releases/{{ lr.tag | urlencode }}" class="btn btn-primary btn-sm">Release Notes</a>
+    {# Stat pills — right column #}
+    <div class="rl-hero-right">
+      <div class="rl-stat-pill">
+        <span class="rl-stat-value">{{ total }}</span>
+        <span class="rl-stat-label">Total releases</span>
+      </div>
+      <div class="rl-stat-pill rl-stat-pill--stable">
+        <span class="rl-stat-value rl-stat-value--stable">{{ stable_count }}</span>
+        <span class="rl-stat-label">Stable</span>
+      </div>
+      {% if prerelease_count + draft_count > 0 %}
+      <div class="rl-stat-pill rl-stat-pill--pre">
+        <span class="rl-stat-value rl-stat-value--pre">{{ prerelease_count + draft_count }}</span>
+        <span class="rl-stat-label">Pre-release / Draft</span>
+      </div>
+      {% endif %}
     </div>
-  </div>
 
-  {% if lr.body %}
-  <div class="rl-hero-preview">{{ body_preview(lr.body, 240) }}</div>
-  {% endif %}
-
-  {# Downloads — only available formats #}
-  {% set has_any = lr_urls.midi_bundle or lr_urls.mp3 or lr_urls.stems or lr_urls.musicxml %}
-  {% if has_any %}
-  <div class="rl-dl-row">
-    <span class="rl-dl-label">Download</span>
-    {% if lr_urls.midi_bundle %}<a href="{{ lr_urls.midi_bundle }}" class="rl-dl-chip">
-      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      MIDI Bundle
-    </a>{% endif %}
-    {% if lr_urls.mp3 %}<a href="{{ lr_urls.mp3 }}" class="rl-dl-chip">
-      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      MP3 Mix
-    </a>{% endif %}
-    {% if lr_urls.stems %}<a href="{{ lr_urls.stems }}" class="rl-dl-chip">
-      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Stems
-    </a>{% endif %}
-    {% if lr_urls.musicxml %}<a href="{{ lr_urls.musicxml }}" class="rl-dl-chip">
-      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      MusicXML
-    </a>{% endif %}
   </div>
-  {% endif %}
+</div>
+{% else %}
+{# No releases yet — minimal stat strip #}
+<div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
+  <div class="rl-stat-pill">
+    <span class="rl-stat-value">0</span>
+    <span class="rl-stat-label">Releases</span>
+  </div>
 </div>
 {% endif %}
 
-{# ── Previous releases card ───────────────────────────────────────────────── #}
-{% if releases or (not latest_release) %}
+{# ── Release list card ────────────────────────────────────────────────────── #}
 <div class="rl-card">
   <div class="rl-toolbar">
     <div class="rl-tabs">
@@ -142,7 +130,7 @@
     </div>
     <div class="rl-toolbar-right">
       <label class="rl-search" for="rel-search">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="rel-search" type="text" placeholder="Search releases…" autocomplete="off">
       </label>
       <a href="{{ base_url }}/releases/new" class="btn btn-primary btn-sm">+ New Release</a>
@@ -153,7 +141,6 @@
     {% include "musehub/fragments/release_rows.html" %}
   </div>
 </div>
-{% endif %}
 
 </div>
 {% endblock %}

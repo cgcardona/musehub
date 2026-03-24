@@ -1,349 +1,404 @@
 {% extends "musehub/base.html" %}
 {% block jsonld %}{% if jsonld_script %}{{ jsonld_script | safe }}{% endif %}{% endblock %}
-
 {% block title %}{{ release.title or release.tag }} · {{ owner }}/{{ repo_slug }}{% endblock %}
-
 {% block breadcrumb %}
   <a href="/{{ owner }}">{{ owner }}</a> /
   <a href="{{ base_url }}">{{ repo_slug }}</a> /
   <a href="{{ base_url }}/releases">releases</a> /
   {{ release.tag }}
 {% endblock %}
-
 {% block repo_nav %}{% include "musehub/partials/repo_nav.html" %}{% endblock %}
-
-
-{% block page_json %}{"page": "release-detail", "repoId": {{ repo_id | tojson }}, "tag": {{ tag | tojson }}, "base": {{ base_url | tojson }}, "owner": {{ owner | tojson }}, "audioUrl": {{ release.download_urls.get("mp3") | tojson }}}{% endblock %}
+{% block page_json %}{"page": "release-detail", "repoId": {{ repo_id | tojson }}, "tag": {{ tag | tojson }}, "base": {{ base_url | tojson }}, "owner": {{ owner | tojson }}}{% endblock %}
 
 {% block content %}
-<div class="content-wide" style="padding-top: var(--space-4)">
+{%- set ch = release.channel if release.channel else "stable" %}
+{%- set sr = release.semantic_report %}
+{%- set has_sr = sr is not none and sr.total_files is defined and sr.total_files > 0 %}
+{%- set LANG_COLOR = {
+  "Python":"#3572A5","TypeScript":"#2b7489","JavaScript":"#f1e05a",
+  "Go":"#00ADD8","Rust":"#dea584","Java":"#b07219","C#":"#178600",
+  "C":"#555555","C++":"#f34b7d","Ruby":"#701516","Kotlin":"#A97BFF",
+  "Swift":"#ffac45","CSS":"#563d7c","SCSS":"#c6538c","HTML":"#e34c26",
+  "Shell":"#89e051","TOML":"#9c4221","YAML":"#cb171e","Markdown":"#083fa1",
+} %}
+{%- macro lc(lang) %}{%- if lang in LANG_COLOR %}{{ LANG_COLOR[lang] }}{%- else %}#666{%- endif %}{%- endmacro %}
+{#- addr_to_file: extract file path from address like "a/b.py::Cls::method" #}
+{%- macro addr_file(addr) %}{{ addr.split("::")[0] if "::" in addr else addr }}{%- endmacro %}
+{#- addr_to_anchor: extract symbol name for #anchor from address #}
+{%- macro addr_anchor(addr) %}{{ addr.split("::")[-1] if "::" in addr else "" }}{%- endmacro %}
+{#- deep link to a symbol in code at the release commit #}
+{%- macro sym_url(addr) %}{{ base_url }}/blob/{{ release.commit_id }}/{{ addr_file(addr) }}{% if "::" in addr %}#{{ addr_anchor(addr) }}{% endif %}{%- endmacro %}
 
-  {# ── Header card ──────────────────────────────────────────────────────────── #}
-  {%- set state_cls = "is-draft" if release.is_draft else ("is-prerelease" if release.is_prerelease else "is-stable") %}
-  <div class="rd-header {{ state_cls }}">
-    <div class="rd-header-body">
+<div class="content-wide" style="padding-top:var(--space-4)">
 
-      {# Title + badges #}
-      <div class="rd-title-row">
-        <h1 class="rd-title">{{ release.title or release.tag }}</h1>
-        <span class="rd-tag-badge">{{ release.tag }}</span>
-        {%- if release.is_prerelease %}
-        <span class="rd-prerelease-badge">⚠ Pre-release</span>
-        {%- endif %}
-        {%- if release.is_draft %}
-        <span class="rd-draft-badge">✏ Draft</span>
-        {%- endif %}
-      </div>
-
-      {# Meta columns #}
-      <div class="rd-meta">
-        {%- if release.author %}
-        <div class="rd-meta-item">
-          <span class="rd-meta-label">Author</span>
-          <span class="rd-meta-value">
-            <span class="rd-avatar">{{ release.author[0] | upper }}</span>
-            <a href="/{{ release.author }}" style="color:var(--text-primary);text-decoration:none">{{ release.author }}</a>
-          </span>
-        </div>
-        {%- endif %}
-        <div class="rd-meta-item">
-          <span class="rd-meta-label">Released</span>
-          <span class="rd-meta-value">{{ release.created_at | fmtdate }}</span>
-        </div>
-        {%- if release.commit_id %}
-        <div class="rd-meta-item">
-          <span class="rd-meta-label">Commit</span>
-          <span class="rd-meta-value">
-            <a href="{{ base_url }}/commits/{{ release.commit_id }}"
-               class="rd-commit-sha">{{ release.commit_id[:8] }}</a>
-          </span>
-        </div>
-        {%- endif %}
-        <div class="rd-meta-item">
-          <span class="rd-meta-label">Signature</span>
-          <span class="rd-meta-value">
-            {%- if release.gpg_signature %}
-            <span class="rd-gpg-badge verified">🔓 Verified</span>
-            {%- else %}
-            <span class="rd-gpg-badge unverified">🔒 Unverified</span>
-            {%- endif %}
-          </span>
-        </div>
-        <div class="rd-meta-item">
-          <span class="rd-meta-label">Status</span>
-          <span class="rd-meta-value">
-            {%- if release.is_draft %}Draft
-            {%- elif release.is_prerelease %}Pre-release
-            {%- else %}Stable
-            {%- endif %}
-          </span>
-        </div>
-      </div>
-
+{# ── Header ───────────────────────────────────────────────────────────────── #}
+<div class="rd2-header">
+  <div class="rd2-header-left">
+    <div class="rd2-title-row">
+      <span class="rd2-tag">{{ release.tag }}</span>
+      {%- if release.is_draft %}<span class="rd2-channel rd2-channel--draft">Draft</span>
+      {%- elif ch == "beta" %}<span class="rd2-channel rd2-channel--beta">Beta</span>
+      {%- elif ch == "alpha" %}<span class="rd2-channel rd2-channel--alpha">Alpha</span>
+      {%- elif ch == "nightly" %}<span class="rd2-channel rd2-channel--nightly">Nightly</span>
+      {%- else %}<span class="rd2-channel rd2-channel--stable">Stable</span>
+      {%- endif %}
+      {%- if has_sr and sr.breaking_changes %}<span class="rd2-breaking-flag">⚠ {{ sr.breaking_changes | length }} breaking</span>{%- endif %}
     </div>
-
-    {# Stats ribbon #}
-    <div class="rd-stats">
-      <div class="rd-stat">
-        <span class="rd-stat-value">{{ total_downloads }}</span>
-        <span class="rd-stat-label">Downloads</span>
-      </div>
-      <div class="rd-stat">
-        <span class="rd-stat-value">{{ assets | length }}</span>
-        <span class="rd-stat-label">Assets</span>
-      </div>
-      <div class="rd-stat">
-        <span class="rd-stat-value">{{ available_formats | length }}</span>
-        <span class="rd-stat-label">Formats</span>
-      </div>
-      <div class="rd-stat">
-        <span class="rd-stat-value"
-              style="color: {% if release.is_draft %}var(--text-muted){% elif release.is_prerelease %}#f0a500{% else %}#3fb950{% endif %}">
-          {%- if release.is_draft %}Draft{%- elif release.is_prerelease %}Pre-release{%- else %}Stable{%- endif %}
-        </span>
-        <span class="rd-stat-label">Channel</span>
-      </div>
+    {%- if release.title and release.title != release.tag %}
+    <h1 class="rd2-title">{{ release.title }}</h1>
+    {%- endif %}
+    <div class="rd2-meta-row">
+      {%- if release.commit_id %}<a href="{{ base_url }}/commits/{{ release.commit_id }}" class="rd2-sha">{{ release.commit_id[:8] }}</a>{%- endif %}
+      {%- if release.snapshot_id %}<span class="rd2-sep">·</span><span class="rd2-snap" title="{{ release.snapshot_id }}">snapshot {{ release.snapshot_id[:12] }}…</span>{%- endif %}
+      <span class="rd2-sep">·</span><span class="rd2-date">{{ release.created_at | fmtdate }}</span>
+      {%- if release.gpg_signature %}<span class="rd2-sep">·</span><span class="rd2-verified">✓ Verified</span>{%- endif %}
     </div>
+  </div>
+  <div class="rd2-header-actions">
+    <a href="{{ base_url }}/releases" class="btn btn-ghost btn-sm">← All releases</a>
+    {%- if release.commit_id %}<a href="{{ base_url }}/commits/{{ release.commit_id }}" class="btn btn-ghost btn-sm">View commit</a>{%- endif %}
+    <a class="btn btn-ghost btn-sm" href="/musehub/repos/{{ repo_id }}/releases.rss">RSS</a>
+  </div>
+</div>
 
-    {# Actions bar #}
-    <div class="rd-actions">
-      <a href="{{ base_url }}/releases" class="btn btn-ghost btn-sm">← All releases</a>
-      <a class="btn btn-ghost btn-sm rd-rss-btn"
-         href="/musehub/repos/{{ repo_id }}/releases.rss"
-         title="Subscribe to release feed">⏹ RSS</a>
-      {%- if release.commit_id %}
-      <a href="{{ base_url }}/commits/{{ release.commit_id }}" class="btn btn-ghost btn-sm">
-        📝 View commit {{ release.commit_id[:8] }}
-      </a>
+{# ── Analysis pending banner ───────────────────────────────────────────────── #}
+{%- if not has_sr %}
+<div class="rd2-pending">
+  <div class="rd2-pending-icon">⟳</div>
+  <div class="rd2-pending-title">Semantic analysis in progress</div>
+  <div class="rd2-pending-sub">MuseHub is computing the symbol graph, API surface, and authorship graph. Refresh in a moment.</div>
+</div>
+{%- endif %}
+
+{# ── Codebase at a Glance — hero section ──────────────────────────────────── #}
+{%- if has_sr %}
+{%- set api_added_n   = sr.api_added   | length %}
+{%- set api_removed_n = sr.api_removed | length %}
+{%- set api_modified_n= sr.api_modified| length %}
+{%- set api_net       = api_added_n - api_removed_n %}
+
+<div class="rd2-glance">
+  <div class="rd2-glance-hero">
+    <div class="rd2-hero-stat">
+      <span class="rd2-hero-n">{{ sr.total_symbols | fmtnum }}</span>
+      <span class="rd2-hero-lbl">symbols</span>
+    </div>
+    <div class="rd2-hero-divider"></div>
+    <div class="rd2-hero-stat">
+      <span class="rd2-hero-n">{{ sr.total_files | fmtnum }}</span>
+      <span class="rd2-hero-lbl">files</span>
+    </div>
+    <div class="rd2-hero-divider"></div>
+    <div class="rd2-hero-stat">
+      <span class="rd2-hero-n">{{ sr.languages | length }}</span>
+      <span class="rd2-hero-lbl">languages</span>
+    </div>
+    {%- if api_added_n + api_removed_n > 0 %}
+    <div class="rd2-hero-divider"></div>
+    <div class="rd2-hero-stat">
+      <span class="rd2-hero-n" style="color:{%- if api_net > 0 %}#3fb950{%- elif api_net < 0 %}#f85149{%- else %}var(--text-muted){%- endif %}">
+        {%- if api_net > 0 %}+{{ api_net | fmtnum }}{%- elif api_net < 0 %}{{ api_net | fmtnum }}{%- else %}±0{%- endif %}
+      </span>
+      <span class="rd2-hero-lbl">net API</span>
+    </div>
+    {%- endif %}
+    {%- if release.changelog %}
+    <div class="rd2-hero-divider"></div>
+    <div class="rd2-hero-stat">
+      <span class="rd2-hero-n">{{ release.changelog | length | fmtnum }}</span>
+      <span class="rd2-hero-lbl">commits</span>
+    </div>
+    {%- endif %}
+  </div>
+
+  {%- if sr.languages and sr.total_files > 0 %}
+  <div class="rd2-glance-langs">
+    <div class="rd2-lang-bar-stacked">
+      {%- for lang in sr.languages %}
+      {%- set pct = (lang.files / sr.total_files * 100) | round(1) %}
+      <div class="rd2-lang-seg" style="width:{{ pct }}%;background:{{ lc(lang.language) }}" title="{{ lang.language }} {{ pct }}% · {{ lang.files }} files"></div>
+      {%- endfor %}
+    </div>
+    <div class="rd2-lang-rows">
+      {%- for lang in sr.languages[:6] %}
+      {%- set pct = (lang.files / sr.total_files * 100) | round(1) %}
+      <div class="rd2-lang-row">
+        <span class="rd2-lang-dot" style="background:{{ lc(lang.language) }}"></span>
+        <span class="rd2-lang-name">{{ lang.language }}</span>
+        <div class="rd2-lang-track"><div class="rd2-lang-fill" style="width:{{ pct }}%;background:{{ lc(lang.language) }}60;border-right:2px solid {{ lc(lang.language) }}"></div></div>
+        <span class="rd2-lang-files">{{ lang.files }}f</span>
+        <span class="rd2-lang-syms">{{ lang.symbols }}sym</span>
+        <span class="rd2-lang-pct">{{ pct }}%</span>
+      </div>
+      {%- endfor %}
+      {%- if sr.languages | length > 6 %}
+      <div class="rd2-lang-more">+{{ sr.languages | length - 6 }} more</div>
       {%- endif %}
     </div>
   </div>
+  {%- endif %}
+</div>
+{%- endif %}{# /has_sr glance #}
 
-  {# ── Two-column layout ────────────────────────────────────────────────────── #}
-  <div class="rd-layout">
+{# ── Two-column layout ────────────────────────────────────────────────────── #}
+<div class="rd2-body">
+<div class="rd2-main">
 
-    {# ═══ Main column ════════════════════════════════════════════════════════ #}
-    <div class="rd-main">
+  {# Semantic analysis panels — only when analysis is ready #}
+  {%- if has_sr %}
 
-      {# Audio preview — only if mp3 URL present #}
-      {%- set mp3_url = release.download_urls.get("mp3") %}
-      {%- if mp3_url %}
-      <div class="rd-section" id="rd-audio-section">
-        <div class="rd-section-header">
-          <span>🎵</span>
-          <span>Audio Preview</span>
-          <span class="rd-section-count">{{ release.tag }}</span>
-        </div>
-        <div class="rd-section-body">
-          {# SSR audio shell — TypeScript wires play/progress/time controls #}
-          <audio id="rd-audio" preload="none" style="display:none">
-            <source src="{{ mp3_url }}" type="audio/mpeg">
-          </audio>
+  {# Breaking Changes #}
+  {%- if sr.breaking_changes %}
+  <div class="rd2-panel rd2-panel--danger">
+    <div class="rd2-panel-head"><span class="rd2-panel-icon">⚠</span> Breaking Changes <span class="rd2-badge rd2-badge--danger">{{ sr.breaking_changes | length }}</span></div>
+    <div class="rd2-panel-body">
+      {%- for bc in sr.breaking_changes %}<div class="rd2-breaking-row"><code>{{ bc }}</code></div>{%- endfor %}
+    </div>
+  </div>
+  {%- endif %}
 
-          {# Error state — shown by TS if audio fails; hidden initially #}
-          <div class="rd-audio-error" id="rd-audio-error">
-            <span>🔇</span>
-            <span>Audio preview unavailable for this release.</span>
-            <a href="{{ mp3_url }}" download class="btn btn-ghost btn-sm" style="margin-left:auto">
-              ⬇ Download anyway
-            </a>
-          </div>
-
-          {# Player controls #}
-          <div class="rd-player" id="rd-player">
-            <div class="rd-player-row">
-              <button class="rd-play-btn" id="rd-play-btn" type="button" disabled title="Play / Pause">▶</button>
-              <div class="rd-progress-wrap" id="rd-progress-wrap">
-                <div class="rd-progress-fill" id="rd-progress-fill"></div>
-              </div>
-              <span class="rd-time" id="rd-time">Loading…</span>
-            </div>
-          </div>
-
-          <div class="rd-audio-actions">
-            <a href="{{ mp3_url }}" class="btn btn-secondary btn-sm" download>⬇ Download MP3</a>
-            <a href="{{ base_url }}/listen/{{ release.commit_id or '' }}"
-               class="btn btn-ghost btn-sm" target="_blank">🎧 Open player ↗</a>
-          </div>
-        </div>
+  {# API Surface Delta #}
+  {%- if api_added_n + api_removed_n + api_modified_n > 0 %}
+  <div class="rd2-panel">
+    <div class="rd2-panel-head">
+      <span class="rd2-panel-icon">⟨/⟩</span> API Surface
+      <div class="rd2-api-summary">
+        {%- if api_removed_n %}<span class="rd2-api-pill rd2-api-pill--del">−{{ api_removed_n }} removed</span>{%- endif %}
+        {%- if api_added_n %}<span class="rd2-api-pill rd2-api-pill--add">+{{ api_added_n }} added</span>{%- endif %}
+        {%- if api_modified_n %}<span class="rd2-api-pill rd2-api-pill--mod">~{{ api_modified_n }} modified</span>{%- endif %}
       </div>
-      {%- endif %}
-
-      {# Release notes #}
-      {%- if release.body %}
-      <div class="rd-section">
-        <div class="rd-section-header">
-          <span>📋</span>
-          <span>Release Notes</span>
-        </div>
-        <div class="rd-notes-body">{{ release.body | markdown | safe }}</div>
-      </div>
-      {%- endif %}
-
-      {# Download packages grid #}
-      <div class="rd-section">
-        <div class="rd-section-header">
-          <span>📦</span>
-          <span>Download Packages</span>
-          <span class="rd-section-count">{{ available_formats | length }} available</span>
-        </div>
-        <div class="rd-dl-grid">
-
-          {%- set packages = [
-            ("midi_bundle", "🎹", "Full MIDI",   "All tracks as a single .mid file"),
-            ("stems",       "🎛", "MIDI Stems",   "Individual track stems (zip)"),
-            ("mp3",         "🎵", "MP3 Mix",      "Full mix audio render"),
-            ("musicxml",    "🎼", "MusicXML",     "Notation export"),
-            ("metadata",    "📊", "Metadata",     "JSON: tempo, key, arrangement"),
-          ] %}
-
-          {%- for key, icon, name, desc in packages %}
-          {%- set dl_url = release.download_urls.get(key) %}
-          <div class="rd-dl-card {% if not dl_url %}unavailable{% endif %}">
-            <span class="rd-dl-icon">{{ icon }}</span>
-            <span class="rd-dl-name">{{ name }}</span>
-            <span class="rd-dl-desc">{{ desc }}</span>
-            {%- if dl_url %}
-            <a class="btn btn-secondary btn-sm" href="{{ dl_url }}" download style="margin-top:var(--space-2)">⬇ Download</a>
-            {%- else %}
-            <span class="rd-dl-unavail">Not included in this release</span>
-            {%- endif %}
-          </div>
-          {%- endfor %}
-
-        </div>
-      </div>
-
-      {# Assets #}
-      <div class="rd-section">
-        <div class="rd-section-header">
-          <span>📥</span>
-          <span>Assets</span>
-          <span class="rd-section-count">{{ assets | length }}</span>
-        </div>
-        {%- if assets %}
-        {%- for asset in assets %}
-        <div class="rd-asset-row">
-          <div class="rd-asset-info">
-            <span class="rd-asset-icon">📄</span>
-            <div>
-              <a class="rd-asset-name" href="{{ asset.download_url }}" download>{{ asset.name }}</a>
-              {%- if asset.label %}
-              <span style="color:var(--text-muted);font-size:var(--font-size-xs)"> — {{ asset.label }}</span>
-              {%- endif %}
-              <div class="rd-asset-meta">
-                {%- if asset.size %}<span>{{ asset.size | filesizeformat }}</span>{%- endif %}
-                <span>⬇ {{ asset.download_count }} download{{ 's' if asset.download_count != 1 else '' }}</span>
-                {%- if asset.content_type %}
-                <span>{{ asset.content_type }}</span>
-                {%- endif %}
-              </div>
-            </div>
-          </div>
-          <a class="btn btn-secondary btn-sm" href="{{ asset.download_url }}" download>⬇ Download</a>
-        </div>
+    </div>
+    <div class="rd2-panel-body">
+      {%- if sr.api_removed %}
+      <div class="rd2-api-group">
+        <div class="rd2-api-group-label rd2-api-group-label--del">Removed</div>
+        {%- for item in sr.api_removed[:10] %}
+        <a class="rd2-api-row rd2-api-row--del" href="{{ sym_url(item.address) }}" title="{{ item.address }}">
+          <span class="rd2-kind-chip rd2-kind-chip--{{ item.kind }}">{{ item.kind }}</span>
+          <code class="rd2-api-addr">{{ item.address.split("::")[-1] if "::" in item.address else item.address.split("/")[-1] }}</code>
+          <span class="rd2-api-lang" style="color:{{ lc(item.language) }}">{{ item.language }}</span>
+        </a>
         {%- endfor %}
-        {%- else %}
-        <div class="rd-no-assets">No additional assets attached to this release.</div>
+        {%- if api_removed_n > 10 %}<span class="rd2-api-more">+{{ api_removed_n - 10 }} more removed</span>{%- endif %}
+      </div>
+      {%- endif %}
+      {%- if sr.api_added %}
+      <div class="rd2-api-group">
+        <div class="rd2-api-group-label rd2-api-group-label--add">Added</div>
+        {%- for item in sr.api_added[:12] %}
+        <a class="rd2-api-row rd2-api-row--add" href="{{ sym_url(item.address) }}" title="{{ item.address }}">
+          <span class="rd2-kind-chip rd2-kind-chip--{{ item.kind }}">{{ item.kind }}</span>
+          <code class="rd2-api-addr">{{ item.address.split("::")[-1] if "::" in item.address else item.address.split("/")[-1] }}</code>
+          <span class="rd2-api-lang" style="color:{{ lc(item.language) }}">{{ item.language }}</span>
+        </a>
+        {%- endfor %}
+        {%- if api_added_n > 12 %}<span class="rd2-api-more">+{{ api_added_n - 12 }} more added</span>{%- endif %}
+      </div>
+      {%- endif %}
+      {%- if sr.api_modified %}
+      <div class="rd2-api-group">
+        <div class="rd2-api-group-label rd2-api-group-label--mod">Modified signatures</div>
+        {%- for item in sr.api_modified[:8] %}
+        <a class="rd2-api-row rd2-api-row--mod" href="{{ sym_url(item.address) }}" title="{{ item.address }}">
+          <span class="rd2-kind-chip rd2-kind-chip--{{ item.kind }}">{{ item.kind }}</span>
+          <code class="rd2-api-addr">{{ item.address.split("::")[-1] if "::" in item.address else item.address.split("/")[-1] }}</code>
+          <span class="rd2-api-lang" style="color:{{ lc(item.language) }}">{{ item.language }}</span>
+        </a>
+        {%- endfor %}
+        {%- if api_modified_n > 8 %}<span class="rd2-api-more">+{{ api_modified_n - 8 }} more modified</span>{%- endif %}
+      </div>
+      {%- endif %}
+    </div>
+  </div>
+  {%- endif %}
+
+  {# File Hotspots #}
+  {%- if sr.file_hotspots %}
+  <div class="rd2-panel">
+    <div class="rd2-panel-head"><span class="rd2-panel-icon">🔥</span> File Hotspots <span class="rd2-panel-sub">most-touched this release</span></div>
+    <div class="rd2-panel-body">
+      {%- set max_churn = sr.file_hotspots[0].change_count if sr.file_hotspots else 1 %}
+      {%- for hs in sr.file_hotspots %}
+      {%- set pct = (hs.change_count / max_churn * 100) | round(0) | int %}
+      <a class="rd2-hotspot-row" href="{{ base_url }}/blob/{{ release.commit_id }}/{{ hs.file_path }}" title="{{ hs.file_path }}">
+        <span class="rd2-hotspot-dot" style="background:{{ lc(hs.language) }}"></span>
+        <span class="rd2-hotspot-path">
+          {%- set parts = hs.file_path.split("/") %}
+          {%- if parts | length > 2 %}…/{{ parts[-2] }}/{{ parts[-1] }}{%- else %}{{ hs.file_path }}{%- endif %}
+        </span>
+        <div class="rd2-hotspot-track"><div class="rd2-hotspot-fill" style="width:{{ pct }}%;background:{{ lc(hs.language) }}"></div></div>
+        <span class="rd2-hotspot-n">{{ hs.change_count }}×</span>
+      </a>
+      {%- endfor %}
+    </div>
+  </div>
+  {%- endif %}
+
+  {# Structural changes — moves and deletes only #}
+  {%- set struct_moves = sr.refactor_events | selectattr("kind", "equalto", "move") | list %}
+  {%- set struct_dels  = sr.refactor_events | selectattr("kind", "equalto", "delete") | list %}
+  {%- set struct_all   = struct_moves + struct_dels %}
+  {%- if struct_all %}
+  <div class="rd2-panel">
+    <div class="rd2-panel-head"><span class="rd2-panel-icon">⇄</span> Structural Changes <span class="rd2-badge">{{ struct_all | length }}</span></div>
+    <div class="rd2-panel-body">
+      {%- for ev in struct_all[:12] %}
+      <div class="rd2-struct-row rd2-struct-row--{{ ev.kind }}">
+        <span class="rd2-struct-kind">{{ ev.kind }}</span>
+        <code class="rd2-struct-addr" title="{{ ev.address }}">{{ ev.address.split("/")[-1] if "/" in ev.address else ev.address }}</code>
+        {%- if ev.detail %}<span class="rd2-struct-detail">{{ ev.detail[:50] }}</span>{%- endif %}
+        <span class="rd2-struct-sha">{{ ev.commit_id[:7] }}</span>
+      </div>
+      {%- endfor %}
+      {%- if struct_all | length > 12 %}<span class="rd2-api-more">+{{ struct_all | length - 12 }} more</span>{%- endif %}
+    </div>
+  </div>
+  {%- endif %}
+
+  {%- endif %}{# /if has_sr #}
+
+  {# Release Notes — always #}
+  {%- if release.body %}
+  <div class="rd2-panel">
+    <div class="rd2-panel-head"><span class="rd2-panel-icon">📝</span> Release Notes</div>
+    <div class="rd2-panel-body rd2-notes">{{ release.body | markdown | safe }}</div>
+  </div>
+  {%- endif %}
+
+
+  {# Changelog — collapsible #}
+  {%- if release.changelog %}
+  {%- set ns = namespace(major=0, minor=0, patch=0) %}
+  {%- for e in release.changelog %}
+    {%- if e.sem_ver_bump == "major" %}{%- set ns.major = ns.major + 1 %}{%- endif %}
+    {%- if e.sem_ver_bump == "minor" %}{%- set ns.minor = ns.minor + 1 %}{%- endif %}
+    {%- if e.sem_ver_bump == "patch" %}{%- set ns.patch = ns.patch + 1 %}{%- endif %}
+  {%- endfor %}
+  <div class="rd2-panel">
+    <div class="rd2-panel-head rd2-panel-head--toggle" onclick="this.parentElement.classList.toggle('rd2-panel--open')">
+      <span class="rd2-panel-icon">⏱</span> Changelog
+      <div class="rd2-changelog-pills">
+        {%- if ns.major %}<span class="rd2-cl-pill rd2-cl-pill--major">{{ ns.major }} breaking</span>{%- endif %}
+        {%- if ns.minor %}<span class="rd2-cl-pill rd2-cl-pill--minor">{{ ns.minor }} features</span>{%- endif %}
+        {%- if ns.patch %}<span class="rd2-cl-pill rd2-cl-pill--patch">{{ ns.patch }} fixes</span>{%- endif %}
+        <span class="rd2-badge">{{ release.changelog | length }}</span>
+      </div>
+      <span class="rd2-toggle-arrow">▼</span>
+    </div>
+    <div class="rd2-panel-body rd2-panel-collapsible">
+      {%- for entry in release.changelog %}
+      {%- set bump = entry.sem_ver_bump if entry.sem_ver_bump else "none" %}
+      <div class="rd2-cl-entry">
+        <span class="rd2-cl-bump rd2-cl-bump--{{ bump }}">{%- if bump == "major" %}M!{%- elif bump == "minor" %}✦{%- elif bump == "patch" %}·{%- else %}·{%- endif %}</span>
+        <div class="rd2-cl-body">
+          <div class="rd2-cl-msg">{{ entry.message }}</div>
+          <div class="rd2-cl-meta">
+            {%- if entry.commit_id %}<a href="{{ base_url }}/commits/{{ entry.commit_id }}" class="rd2-sha">{{ entry.commit_id[:8] }}</a>{%- endif %}
+            {%- if entry.author %}<span class="rd2-sep">·</span><span>{{ entry.author }}</span>{%- endif %}
+            {%- if entry.timestamp %}<span class="rd2-sep">·</span><span>{{ entry.timestamp[:10] }}</span>{%- endif %}
+          </div>
+          {%- if entry.breaking_changes %}<div class="rd2-cl-bc">{%- for bc in entry.breaking_changes %}<span class="rd2-bc-chip">⚠ {{ bc }}</span>{%- endfor %}</div>{%- endif %}
+        </div>
+      </div>
+      {%- endfor %}
+    </div>
+  </div>
+  {%- endif %}
+
+</div>{# /rd2-main #}
+
+{# ── Sidebar ───────────────────────────────────────────────────────────────── #}
+<aside class="rd2-aside">
+
+  {# Symbol inventory #}
+  {%- if has_sr and sr.symbols_by_kind %}
+  <div class="rd2-card">
+    <div class="rd2-card-head">Symbol Inventory</div>
+    <div class="rd2-card-body">
+      <div class="rd2-sym-total">{{ sr.total_symbols | fmtnum }}</div>
+      <div class="rd2-sym-sub">across {{ sr.semantic_files | fmtnum }} parsed files</div>
+      {%- set max_k = sr.symbols_by_kind[0].count if sr.symbols_by_kind else 1 %}
+      {%- for sk in sr.symbols_by_kind %}
+      {%- if sk.kind not in ["import", "section"] %}
+      <div class="rd2-sym-row">
+        <span class="rd2-sym-kind">{{ sk.kind }}</span>
+        <div class="rd2-sym-track"><div class="rd2-sym-fill" style="width:{{ (sk.count / max_k * 100) | round(0) | int }}%"></div></div>
+        <span class="rd2-sym-n">{{ sk.count }}</span>
+      </div>
+      {%- endif %}
+      {%- endfor %}
+    </div>
+  </div>
+  {%- endif %}
+
+  {# Authorship #}
+  {%- if has_sr and (sr.human_commits > 0 or sr.agent_commits > 0) %}
+  {%- set total_c = sr.human_commits + sr.agent_commits %}
+  {%- set human_pct = (sr.human_commits / total_c * 100) | round(0) | int if total_c else 0 %}
+  {%- set agent_pct = (sr.agent_commits / total_c * 100) | round(0) | int if total_c else 0 %}
+  <div class="rd2-card">
+    <div class="rd2-card-head">Authorship</div>
+    <div class="rd2-card-body">
+      <div class="rd2-auth-bar">
+        <div class="rd2-auth-human" style="width:{{ human_pct }}%"></div>
+        <div class="rd2-auth-agent" style="width:{{ agent_pct }}%"></div>
+      </div>
+      <div class="rd2-auth-legend">
+        <div class="rd2-auth-item">
+          <span class="rd2-auth-dot rd2-auth-dot--human"></span>
+          <span class="rd2-auth-label">Human</span>
+          <strong class="rd2-auth-n">{{ sr.human_commits }}</strong>
+          <span class="rd2-auth-pct">{{ human_pct }}%</span>
+        </div>
+        {%- if sr.agent_commits > 0 %}
+        <div class="rd2-auth-item">
+          <span class="rd2-auth-dot rd2-auth-dot--agent"></span>
+          <span class="rd2-auth-label">AI Agent</span>
+          <strong class="rd2-auth-n">{{ sr.agent_commits }}</strong>
+          <span class="rd2-auth-pct">{{ agent_pct }}%</span>
+        </div>
         {%- endif %}
       </div>
+      {%- if sr.unique_agents %}<div class="rd2-auth-detail">{%- for a in sr.unique_agents %}<span class="rd2-agent-chip">{{ a[:20] }}</span>{%- endfor %}</div>{%- endif %}
+      {%- if sr.unique_models %}<div class="rd2-auth-detail">{%- for m in sr.unique_models %}<code class="rd2-model-chip">{{ m }}</code>{%- endfor %}</div>{%- endif %}
+      {%- if sr.reviewers %}<div class="rd2-reviewers">Reviewed by {{ sr.reviewers | join(', ') }}</div>{%- endif %}
+    </div>
+  </div>
+  {%- endif %}
 
-    </div>{# /rd-main #}
+  {# Release metadata #}
+  <div class="rd2-card">
+    <div class="rd2-card-head">Release</div>
+    <div class="rd2-card-body rd2-kv-list">
+      <div class="rd2-kv"><span class="rd2-k">Tag</span><span class="rd2-v"><span class="rd2-tag rd2-tag--sm">{{ release.tag }}</span></span></div>
+      <div class="rd2-kv"><span class="rd2-k">Channel</span><span class="rd2-v"><span class="rd2-channel rd2-channel--{{ 'draft' if release.is_draft else ch }}">{{ 'Draft' if release.is_draft else ch | title }}</span></span></div>
+      <div class="rd2-kv"><span class="rd2-k">Published</span><span class="rd2-v">{{ release.created_at | fmtdate }}</span></div>
+      <div class="rd2-kv"><span class="rd2-k">Version</span><span class="rd2-v rd2-mono">{{ release.semver_major }}.{{ release.semver_minor }}.{{ release.semver_patch }}{%- if release.semver_pre %}-{{ release.semver_pre }}{%- endif %}</span></div>
+      <div class="rd2-kv"><span class="rd2-k">Signature</span><span class="rd2-v">{%- if release.gpg_signature %}<span class="rd2-verified">✓ GPG</span>{%- else %}<span style="color:var(--text-muted);font-size:11px">Unverified</span>{%- endif %}</span></div>
+      <div class="rd2-kv"><span class="rd2-k">Downloads</span><span class="rd2-v">{{ total_downloads }}</span></div>
+    </div>
+  </div>
 
-    {# ═══ Sidebar ════════════════════════════════════════════════════════════ #}
-    <aside class="rd-sidebar">
-
-      {# Release summary #}
-      <div class="rd-sidebar-card">
-        <div class="rd-sidebar-header">Release info</div>
-        <div class="rd-sidebar-body">
-          <div class="rd-sidebar-row">
-            <span class="rd-sidebar-key">Tag</span>
-            <span class="rd-tag-badge" style="font-size:0.65rem;padding:1px 7px">{{ release.tag }}</span>
-          </div>
-          <div class="rd-sidebar-row">
-            <span class="rd-sidebar-key">Channel</span>
-            <span class="rd-sidebar-val"
-                  style="color: {% if release.is_draft %}var(--text-muted){% elif release.is_prerelease %}#f0a500{% else %}#3fb950{% endif %}">
-              {%- if release.is_draft %}Draft{%- elif release.is_prerelease %}Pre-release{%- else %}Stable{%- endif %}
-            </span>
-          </div>
-          {%- if release.author %}
-          <div class="rd-sidebar-row">
-            <span class="rd-sidebar-key">Author</span>
-            <span class="rd-sidebar-val">{{ release.author }}</span>
-          </div>
-          {%- endif %}
-          <div class="rd-sidebar-row">
-            <span class="rd-sidebar-key">Published</span>
-            <span class="rd-sidebar-val" style="font-size:var(--font-size-xs)">{{ release.created_at | fmtdate }}</span>
-          </div>
-          <div class="rd-sidebar-row">
-            <span class="rd-sidebar-key">Downloads</span>
-            <span class="rd-sidebar-val">{{ total_downloads }}</span>
-          </div>
-          <div class="rd-sidebar-row">
-            <span class="rd-sidebar-key">Formats</span>
-            <span class="rd-sidebar-val">{{ available_formats | length }}</span>
-          </div>
-        </div>
-      </div>
-
-      {# GPG / trust #}
-      <div class="rd-sidebar-card">
-        <div class="rd-sidebar-header">Signature</div>
-        <div class="rd-sidebar-body">
-          {%- if release.gpg_signature %}
-          <span class="rd-gpg-badge verified" style="width:100%;justify-content:center;display:flex">🔓 GPG Verified</span>
-          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:var(--space-1)">
-            This release was signed and verified.
-          </div>
-          {%- else %}
-          <span class="rd-gpg-badge unverified" style="width:100%;justify-content:center;display:flex">🔒 Unverified</span>
-          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:var(--space-1)">
-            No GPG signature present.
-          </div>
-          {%- endif %}
-        </div>
-      </div>
-
-      {# Available formats #}
-      {%- if available_formats %}
-      <div class="rd-sidebar-card">
-        <div class="rd-sidebar-header">Available formats</div>
-        <div class="rd-sidebar-body">
-          {%- set fmt_labels = {
-            "midi_bundle": ("🎹", "MIDI Bundle"),
-            "stems":       ("🎛", "Stems"),
-            "mp3":         ("🎵", "MP3 Mix"),
-            "musicxml":    ("🎼", "MusicXML"),
-            "metadata":    ("📊", "Metadata"),
-          } %}
-          {%- for fmt in available_formats %}
-          {%- set fmt_info = fmt_labels.get(fmt, ("📄", fmt | title)) %}
-          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-xs);padding:2px 0">
-            <span>{{ fmt_info[0] }}</span>
-            <span style="color:var(--text-primary)">{{ fmt_info[1] }}</span>
-          </div>
-          {%- endfor %}
-        </div>
-      </div>
+  {# Provenance #}
+  <div class="rd2-card">
+    <div class="rd2-card-head">Provenance</div>
+    <div class="rd2-card-body">
+      {%- if release.commit_id %}
+      <div class="rd2-hash-row"><span class="rd2-hash-label">Commit</span><a href="{{ base_url }}/commits/{{ release.commit_id }}" class="rd2-hash">{{ release.commit_id }}</a></div>
       {%- endif %}
+      {%- if release.snapshot_id %}
+      <div class="rd2-hash-row" style="margin-top:6px"><span class="rd2-hash-label">Snapshot</span><span class="rd2-hash" title="{{ release.snapshot_id }}">{{ release.snapshot_id }}</span></div>
+      {%- endif %}
+      {%- if has_sr %}
+      <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">{{ sr.semantic_files }}/{{ sr.total_files }} files parsed</div>
+      {%- endif %}
+      <div style="margin-top:8px;font-size:10px;color:var(--text-muted);line-height:1.5">Content-addressed — permanently reproducible from this snapshot.</div>
+    </div>
+  </div>
 
-      {# RSS subscribe #}
-      <div class="rd-sidebar-card">
-        <div class="rd-sidebar-header">Subscribe</div>
-        <div class="rd-sidebar-body">
-          <a href="/musehub/repos/{{ repo_id }}/releases.rss"
-             class="btn btn-ghost btn-sm rd-rss-btn" style="width:100%;justify-content:center">
-            ⏹ RSS Feed
-          </a>
-        </div>
-      </div>
-
-    </aside>
-
-  </div>{# /rd-layout #}
+</aside>
+</div>{# /rd2-body #}
 
 </div>{# /content-wide #}
+
 {% endblock %}

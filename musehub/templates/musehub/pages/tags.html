@@ -131,7 +131,7 @@
               {% if rel %}
                 {% if rel.is_draft %}
                   <span class="tg-status tg-status--draft">Draft</span>
-                {% elif rel.is_prerelease %}
+                {% elif rel.channel and rel.channel != "stable" %}
                   <span class="tg-status tg-status--prerelease">Pre-release</span>
                 {% else %}
                   <span class="tg-status tg-status--stable">

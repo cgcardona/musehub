@@ -945,20 +945,20 @@ async def test_get_download_stats_aggregates_correctly(db_session: AsyncSession)
 
 
 # ── Regression tests ───────────────────────────────────────────
-# New fields: is_prerelease, is_draft, gpg_signature, list_release_assets,
+# New fields: channel, is_draft, gpg_signature, list_release_assets,
 # increment_asset_download_count, and the GET/POST asset endpoints.
 
 
 @pytest.mark.anyio
-async def test_create_release_is_prerelease_flag(
+async def test_create_release_channel_flag(
     client: AsyncClient,
     auth_headers: dict[str, str],
     db_session: AsyncSession,
 ) -> None:
-    """is_prerelease is stored and returned on create."""
+    """channel is stored and returned on create."""
     repo = await musehub_repository.create_repo(
         db_session,
-        name="prerelease-flag-repo",
+        name="channel-flag-repo",
         owner="testuser",
         visibility="public",
         owner_user_id="user-pr1",
@@ -967,12 +967,12 @@ async def test_create_release_is_prerelease_flag(
 
     resp = await client.post(
         f"/api/v1/repos/{repo.repo_id}/releases",
-        json={"tag": "v0.9-beta", "title": "Beta build", "body": "", "isPrerelease": True},
+        json={"tag": "v0.9-beta", "title": "Beta build", "body": "", "channel": "beta"},
         headers=auth_headers,
     )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["isPrerelease"] is True
+    assert data["channel"] == "beta"
     assert data["isDraft"] is False
     assert data["gpgSignature"] is None
 
@@ -1053,7 +1053,7 @@ async def test_create_release_defaults_for_new_fields(
     )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["isPrerelease"] is False
+    assert data["channel"] == "stable"
     assert data["isDraft"] is False
     assert data["gpgSignature"] is None
 

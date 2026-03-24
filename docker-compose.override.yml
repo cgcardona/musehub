@@ -7,9 +7,13 @@ services:
   musehub:
     environment:
       DEBUG: "true"
+      # Expose the muse source tree so the analysis service can import it.
+      PYTHONPATH: "/muse:/app"
     volumes:
       - ./musehub:/app/musehub
       - ./tests:/app/tests
       - ./tools:/app/tools
       - ./scripts:/app/scripts
       - ./alembic:/app/alembic
+      # Mount the muse package so MuseHub can import muse.plugins.code directly.
+      - /Users/gabriel/muse:/muse
