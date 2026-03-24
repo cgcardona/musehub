@@ -1449,8 +1449,8 @@ async def test_ui_release_detail_has_comment_section(
     response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
-    assert "rd-header" in body
-    assert "rd-title" in body
+    assert "rd2-header" in body
+    assert "rd2-title" in body
 
 
 @pytest.mark.anyio
@@ -1470,7 +1470,7 @@ async def test_ui_release_detail_has_render_comments_js(
     assert response.status_code == 200
     body = response.text
     assert "Release Notes" in body
-    assert "rd-stat" in body
+    assert "rd2-panel" in body
 
 
 @pytest.mark.anyio
@@ -1509,8 +1509,8 @@ async def test_ui_release_detail_has_reply_thread_js(
     response = await client.get("/testuser/test-beats/releases/v1.0")
     assert response.status_code == 200
     body = response.text
-    assert "meta-label" in body
-    assert "Author" in body
+    assert "rd2-k" in body
+    assert "Published" in body
 
 
 @pytest.mark.anyio
@@ -6255,7 +6255,7 @@ async def test_reaction_bar_release_detail_has_load_call(
     body = response.text
     assert "v1.0" in body
     assert "Test Release v1.0" in body
-    assert "rd-header" in body
+    assert "rd2-header" in body
     assert '"page": "release-detail"' in body
 
 

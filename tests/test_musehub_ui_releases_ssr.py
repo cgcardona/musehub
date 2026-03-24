@@ -178,7 +178,7 @@ async def test_release_detail_shows_header_card(
     )
     response = await client.get("/musician/ssr-album/releases/v1.0-audio")
     assert response.status_code == 200
-    assert "rd-header" in response.text
+    assert "rd2-header" in response.text
     assert "v1.0-audio" in response.text
 
 
