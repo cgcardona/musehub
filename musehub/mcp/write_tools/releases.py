@@ -14,24 +14,25 @@ async def execute_create_release(
     *,
     repo_id: str,
     tag: str,
-    title: str,
+    title: str = "",
     body: str = "",
     commit_id: str | None = None,
-    is_prerelease: bool = False,
+    channel: str = "stable",
     actor: str = "",
 ) -> MusehubToolResult:
     """Publish a new release for a MuseHub repository.
 
-    A release pins a version tag to a specific commit and optionally marks
-    it as a pre-release. Tags must be unique per repo (e.g. ``"v1.0"``).
+    A release pins a semver tag to a specific commit.  The ``channel`` field
+    replaces the old ``is_prerelease`` boolean with a named distribution tier
+    (stable | beta | alpha | nightly).  Tags must be unique per repo.
 
     Args:
         repo_id: UUID of the repository.
-        tag: Version tag string (e.g. ``"v1.0"``). Must be unique per repo.
+        tag: Semver tag string (e.g. ``"v1.2.3"``). Must be unique per repo.
         title: Human-readable release title.
         body: Markdown release notes.
         commit_id: Optional commit UUID to pin this release to.
-        is_prerelease: When True, shows a pre-release badge in the UI.
+        channel: Distribution channel: stable | beta | alpha | nightly.
         actor: Authenticated user ID (JWT ``sub`` claim).
 
     Returns:
@@ -57,8 +58,8 @@ async def execute_create_release(
                 title=title,
                 body=body,
                 commit_id=commit_id,
+                channel=channel,
                 author=actor,
-                is_prerelease=is_prerelease,
             )
             await session.commit()
             data: dict[str, JSONValue] = {
@@ -67,7 +68,7 @@ async def execute_create_release(
                 "tag": release.tag,
                 "title": release.title,
                 "body": release.body,
-                "is_prerelease": release.is_prerelease,
+                "channel": release.channel,
                 "commit_id": release.commit_id,
                 "author": release.author,
                 "created_at": release.created_at.isoformat() if release.created_at else None,

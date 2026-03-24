@@ -959,10 +959,10 @@ MUSEHUB_WRITE_TOOLS: list[MCPToolDef] = [
                     "type": "string",
                     "description": "Optional commit SHA to pin this release to. Defaults to HEAD of the default branch.",
                 },
-                "is_prerelease": {
-                    "type": "boolean",
-                    "description": "When true, marks as pre-release.",
-                    "default": False,
+                "channel": {
+                    "type": "string",
+                    "description": "Distribution channel: stable | beta | alpha | nightly. Defaults to 'stable'.",
+                    "default": "stable",
                 },
             },
             "required": ["tag", "title"],

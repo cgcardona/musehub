@@ -894,18 +894,36 @@ class PRReviewCreate(CamelModel):
 # ── Release models ────────────────────────────────────────────────────────────
 
 
+class ChangelogEntryResponse(CamelModel):
+    """A single changelog entry auto-generated from commit metadata.
+
+    Entries are produced by walking the commit graph between releases and
+    extracting ``sem_ver_bump`` and ``breaking_changes`` from each commit's
+    structured metadata.  No conventional-commit parsing is required.
+    """
+
+    commit_id: str
+    message: str
+    sem_ver_bump: str = ""
+    breaking_changes: list[str] = Field(default_factory=list)
+    author: str = ""
+    timestamp: str = ""
+
+
 class ReleaseCreate(CamelModel):
     """Body for POST /musehub/repos/{repo_id}/releases.
 
-    ``tag`` must be unique per repo (e.g. "v1.0", "v2.3.1").
-    ``commit_id`` pins the release to a specific commit snapshot.
+    ``tag`` must be unique per repo and must be a valid semver string
+    (e.g. "v1.2.3", "v2.0.0-beta.1").  ``commit_id`` pins the release to a
+    specific commit snapshot.  ``channel`` replaces the boolean ``is_prerelease``
+    flag with a named distribution tier.
     """
 
     tag: str = Field(
-        ..., min_length=1, max_length=100, description="Version tag, e.g. 'v1.0'", examples=["v1.0"]
+        ..., min_length=1, max_length=100, description="Semver tag, e.g. 'v1.2.3'", examples=["v1.2.3"]
     )
     title: str = Field(
-        ..., min_length=1, max_length=500, description="Release title", examples=["Summer Sessions 2024 — Final Mix"]
+        "", max_length=500, description="Release title", examples=["Summer Sessions 2024 — Final Mix"]
     )
     body: str = Field(
         "",
@@ -916,24 +934,37 @@ class ReleaseCreate(CamelModel):
     commit_id: str | None = Field(
         None, description="Commit to pin this release to", examples=["a3f8c1d2e4b5"]
     )
-    is_prerelease: bool = Field(False, description="Mark as a pre-release (beta, rc, alpha)")
+    snapshot_id: str | None = Field(
+        None, description="Snapshot ID for reproducible builds"
+    )
+    channel: str = Field(
+        "stable",
+        description="Distribution channel: stable | beta | alpha | nightly",
+        examples=["stable"],
+    )
+    semver_major: int = Field(0, ge=0)
+    semver_minor: int = Field(0, ge=0)
+    semver_patch: int = Field(0, ge=0)
+    semver_pre: str = Field("", max_length=255, description="Pre-release label, e.g. 'beta.1'")
+    semver_build: str = Field("", max_length=255, description="Build metadata, e.g. '20250101'")
+    agent_id: str = Field("", max_length=255)
+    model_id: str = Field("", max_length=255)
+    changelog: list[ChangelogEntryResponse] = Field(
+        default_factory=list, description="Auto-generated changelog entries"
+    )
     is_draft: bool = Field(False, description="Save as draft — not yet publicly visible")
     gpg_signature: str | None = Field(
         None,
         description="ASCII-armoured GPG signature for the tag object; omit when unsigned",
     )
+    semantic_report: SemanticReleaseReportResponse | None = Field(
+        None,
+        description="Semantic analysis blob computed by the Muse CLI at push time.",
+    )
 
 
 class ReleaseDownloadUrls(CamelModel):
-    """Structured download package URLs for a release.
-
-    Each field is either a URL string or None if the package is not available.
-    ``midi_bundle`` is the full MIDI export (all tracks as a single .mid).
-    ``stems`` is a zip of per-track MIDI stems.
-    ``mp3`` is the full mix audio render.
-    ``musicxml`` is the notation export in MusicXML format.
-    ``metadata`` is a JSON file with tempo, key, and arrangement info.
-    """
+    """Structured download package URLs for a release."""
 
     midi_bundle: str | None = None
     stems: str | None = None
@@ -942,24 +973,115 @@ class ReleaseDownloadUrls(CamelModel):
     metadata: str | None = None
 
 
+# ── Semantic release report models ────────────────────────────────────────────
+# These mirror the TypedDicts in muse/core/store.py exactly so that the CLI
+# wire payload deserialises without transformation on the server side.
+
+
+class LanguageStatResponse(CamelModel):
+    """File and symbol counts for a single programming language."""
+
+    language: str
+    files: int = 0
+    symbols: int = 0
+
+
+class SymbolKindCountResponse(CamelModel):
+    """Count of symbols of a specific kind in the release snapshot."""
+
+    kind: str
+    count: int = 0
+
+
+class ApiChangeSummaryResponse(CamelModel):
+    """A public-API symbol that was added, removed, or modified."""
+
+    address: str
+    language: str = ""
+    kind: str = ""
+    change: str = ""  # "added" | "removed" | "modified"
+
+
+class FileHotspotResponse(CamelModel):
+    """A file and how many times it was touched across the release's commits."""
+
+    file_path: str
+    change_count: int = 0
+    language: str = ""
+
+
+class RefactorEventResponse(CamelModel):
+    """A single structural refactoring event detected in the release."""
+
+    kind: str = ""   # "rename" | "move" | "add" | "delete" | "patch"
+    address: str = ""
+    detail: str = ""
+    commit_id: str = ""
+
+
+class SemanticReleaseReportResponse(CamelModel):
+    """Semantic analysis of a release, computed by the Muse CLI at push time.
+
+    MuseHub stores this blob verbatim and renders it in the release detail page.
+    All list fields default to ``[]`` and int fields to ``0`` so that a missing
+    or partial report still deserialises cleanly.
+    """
+
+    # Snapshot composition
+    languages: list[LanguageStatResponse] = Field(default_factory=list)
+    total_files: int = 0
+    semantic_files: int = 0
+    total_symbols: int = 0
+    symbols_by_kind: list[SymbolKindCountResponse] = Field(default_factory=list)
+
+    # Delta — what changed in this release vs previous
+    files_changed: int = 0
+    api_added: list[ApiChangeSummaryResponse] = Field(default_factory=list)
+    api_removed: list[ApiChangeSummaryResponse] = Field(default_factory=list)
+    api_modified: list[ApiChangeSummaryResponse] = Field(default_factory=list)
+    file_hotspots: list[FileHotspotResponse] = Field(default_factory=list)
+    refactor_events: list[RefactorEventResponse] = Field(default_factory=list)
+
+    # Provenance
+    breaking_changes: list[str] = Field(default_factory=list)
+    human_commits: int = 0
+    agent_commits: int = 0
+    unique_agents: list[str] = Field(default_factory=list)
+    unique_models: list[str] = Field(default_factory=list)
+    reviewers: list[str] = Field(default_factory=list)
+
+
 class ReleaseResponse(CamelModel):
     """Wire representation of a MuseHub release.
 
-    is_prerelease and is_draft drive the UI badges on the release detail page.
-    gpg_signature is None when the tag was not GPG-signed; a non-empty string
-    indicates the release carries a verifiable signature and the UI renders a verified badge.
+    ``channel`` surfaces the distribution tier (stable | beta | alpha | nightly).
+    ``is_draft`` hides the release from public listings until published.
+    ``gpg_signature`` is None when unsigned; a non-empty string triggers the
+    verified badge in the UI.
+    ``semantic_report`` is the Muse CLI analysis attached at push time; ``None``
+    when the release was pushed with ``--no-analysis`` or by an older CLI.
     """
 
     release_id: str
     tag: str
-    title: str
-    body: str
+    title: str = ""
+    body: str = ""
     commit_id: str | None = None
+    snapshot_id: str | None = None
+    channel: str = "stable"
+    semver_major: int = 0
+    semver_minor: int = 0
+    semver_patch: int = 0
+    semver_pre: str = ""
+    semver_build: str = ""
     download_urls: ReleaseDownloadUrls
     author: str = ""
-    is_prerelease: bool = False
+    agent_id: str = ""
+    model_id: str = ""
+    changelog: list[ChangelogEntryResponse] = Field(default_factory=list)
     is_draft: bool = False
     gpg_signature: str | None = None
+    semantic_report: SemanticReleaseReportResponse | None = None
     created_at: datetime
 
 
@@ -967,6 +1089,23 @@ class ReleaseListResponse(CamelModel):
     """List of releases for a repo (newest first)."""
 
     releases: list[ReleaseResponse]
+
+
+# ── Wire-tag models ───────────────────────────────────────────────────────────
+
+
+class WireTagInput(CamelModel):
+    """A single lightweight tag pushed from a Muse CLI client.
+
+    Wire tags annotate commits with semantic labels (e.g. ``emotion:joyful``,
+    ``section:verse``) that are separate from version releases.  The server
+    upserts them — pushing the same tag twice is a no-op.
+    """
+
+    tag_id: str = Field(..., description="Client-generated UUID for the tag")
+    commit_id: str = Field(..., description="Commit this tag points to")
+    tag: str = Field(..., min_length=1, max_length=500, description="Tag label, e.g. 'emotion:joyful'")
+    created_at: str = Field("", description="ISO-8601 creation timestamp from the client")
 
 
 # ── Release asset models ───────────────────────────────────────────────────

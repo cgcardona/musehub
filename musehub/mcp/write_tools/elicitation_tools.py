@@ -773,7 +773,7 @@ async def execute_create_release_interactive(
             title=resolved_title,
             body=release_notes,
             commit_id=None,
-            is_prerelease=False,
+            channel="stable",
             actor=ctx.user_id or "",
         )
 
@@ -834,7 +834,8 @@ async def execute_create_release_interactive(
     tag = str(prefs.get("tag", "v1.0.0"))
     resolved_title = str(prefs.get("title", tag))
     release_notes = str(prefs.get("release_notes", ""))
-    is_prerelease = bool(prefs.get("is_prerelease", False))
+    channel_raw = prefs.get("channel", "stable")
+    channel = str(channel_raw) if isinstance(channel_raw, str) else "stable"
     highlight = str(prefs.get("highlight", ""))
 
     if highlight:
@@ -851,7 +852,7 @@ async def execute_create_release_interactive(
         title=resolved_title,
         body=release_notes,
         commit_id=None,
-        is_prerelease=is_prerelease,
+        channel=channel,
         actor=ctx.user_id or "",
     )
 

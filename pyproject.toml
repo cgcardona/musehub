@@ -95,5 +95,9 @@ disallow_untyped_decorators = false
 module = ["boto3", "botocore.*", "mido", "yaml", "qdrant_client", "qdrant_client.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["msgpack", "msgpack.*"]
+ignore_missing_imports = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["musehub"]

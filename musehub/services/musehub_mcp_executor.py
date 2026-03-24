@@ -1001,7 +1001,7 @@ async def execute_list_releases(repo_id: str) -> MusehubToolResult:
                     "tag": r.tag,
                     "title": r.title,
                     "body": r.body,
-                    "is_prerelease": r.is_prerelease,
+                    "channel": r.channel,
                     "commit_id": r.commit_id,
                     "author": r.author,
                     "created_at": r.created_at.isoformat() if r.created_at else None,

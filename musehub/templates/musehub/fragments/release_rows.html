@@ -1,14 +1,13 @@
 {#  fragments/release_rows.html — HTMX fragment: release rows.
     Context:
-      releases     : list[ReleaseResponse]   — previous releases (all except latest)
+      releases     : list[ReleaseResponse]   — all releases except the hero latest
       base_url     : str
-      total        : int   — total release count (all releases)
+      total        : int
       page         : int
       total_pages  : int
 #}
 {% from "musehub/macros/pagination.html" import pagination %}
 
-{# ── Body preview ─────────────────────────────────────────────────────────── #}
 {% macro body_preview(body, length=120) %}
   {%- set ns = namespace(found="") -%}
   {%- for line in body.split("\n") -%}
@@ -28,9 +27,9 @@
 
 {% if releases %}
   {% for rel in releases %}
-    {% set status = "prerelease" if rel.is_prerelease else ("draft" if rel.is_draft else "stable") %}
-    {% set urls = rel.download_urls %}
-    {% set has_dl = urls.midi_bundle or urls.mp3 or urls.stems or urls.musicxml %}
+    {# Normalise channel → display status #}
+    {% set ch = rel.channel if rel.channel else "stable" %}
+    {% set status = "draft" if rel.is_draft else ch %}
 
     <div class="rl-row"
          data-status="{{ status }}"
@@ -46,14 +45,20 @@
           <a href="{{ base_url }}/releases/{{ rel.tag | urlencode }}" class="rl-row-title">
             {{ rel.title or rel.tag }}
           </a>
+
+          {# Channel pill #}
           {% if status == "stable" %}
             <span class="rl-pill rl-pill--stable">
-              <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               Stable
             </span>
-          {% elif status == "prerelease" %}
-            <span class="rl-pill rl-pill--prerelease">Pre-release</span>
-          {% else %}
+          {% elif status == "beta" %}
+            <span class="rl-pill rl-pill--prerelease">Beta</span>
+          {% elif status == "alpha" %}
+            <span class="rl-pill rl-pill--alpha">Alpha</span>
+          {% elif status == "nightly" %}
+            <span class="rl-pill rl-pill--nightly">Nightly</span>
+          {% elif status == "draft" %}
             <span class="rl-pill rl-pill--draft">Draft</span>
           {% endif %}
         </div>
@@ -61,7 +66,7 @@
         <div class="rl-row-meta">
           {% if rel.author %}
             <span class="rl-row-author">
-              <span class="rl-avatar" style="background:{{ author_bg(rel.author) }};width:14px;height:14px;font-size:7px">{{ rel.author[0] | upper }}</span>
+              <span class="rl-avatar" style="background:{{ author_bg(rel.author) }}">{{ rel.author[0] | upper }}</span>
               {{ rel.author }}
             </span>
             <span class="rl-meta-dot">·</span>
@@ -71,45 +76,34 @@
             <span class="rl-meta-dot">·</span>
             <a href="{{ base_url }}/commits/{{ rel.commit_id }}" class="rl-row-sha">{{ rel.commit_id | shortsha }}</a>
           {% endif %}
+          {% if rel.changelog %}
+            <span class="rl-meta-dot">·</span>
+            <span class="rl-changelog-chip">
+              <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {{ rel.changelog | length }} commit{{ 's' if rel.changelog | length != 1 else '' }}
+            </span>
+          {% endif %}
           {% if rel.gpg_signature %}
             <span class="rl-meta-dot">·</span>
             <span class="rl-gpg">
-              <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              GPG signed
+              <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Signed
             </span>
+          {% endif %}
+          {% if rel.agent_id %}
+            <span class="rl-meta-dot">·</span>
+            <span class="agent-badge">agent</span>
           {% endif %}
         </div>
 
         {% if rel.body %}
           <div class="rl-row-preview">{{ body_preview(rel.body) }}</div>
         {% endif %}
-
-        {# Downloads — available formats only #}
-        {% if has_dl %}
-        <div class="rl-row-dl-row">
-          {% if urls.midi_bundle %}<a href="{{ urls.midi_bundle }}" class="rl-row-dl-chip">
-            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            MIDI
-          </a>{% endif %}
-          {% if urls.mp3 %}<a href="{{ urls.mp3 }}" class="rl-row-dl-chip">
-            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            MP3
-          </a>{% endif %}
-          {% if urls.stems %}<a href="{{ urls.stems }}" class="rl-row-dl-chip">
-            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Stems
-          </a>{% endif %}
-          {% if urls.musicxml %}<a href="{{ urls.musicxml }}" class="rl-row-dl-chip">
-            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            MusicXML
-          </a>{% endif %}
-        </div>
-        {% endif %}
       </div>
 
       {# Action #}
       <div class="rl-row-action">
-        <a href="{{ base_url }}/releases/{{ rel.tag | urlencode }}" class="btn btn-secondary btn-sm">View</a>
+        <a href="{{ base_url }}/releases/{{ rel.tag | urlencode }}" class="btn btn-ghost btn-sm">View</a>
       </div>
 
     </div>
@@ -126,10 +120,10 @@
       </svg>
     </div>
     <div class="rl-empty-title">No releases yet</div>
-    <div class="rl-empty-desc">Create a release to share packaged snapshots of your work.</div>
-    <a href="{{ base_url }}/releases/new" class="btn btn-primary btn-sm" style="margin-top:var(--space-2)">+ Create first release</a>
+    <div class="rl-empty-desc">Run <code style="font-family:var(--font-mono);font-size:12px;background:var(--bg-overlay);padding:1px 6px;border-radius:3px">muse release push &lt;tag&gt; --remote origin</code> to publish your first release.</div>
+    <a href="{{ base_url }}/releases/new" class="btn btn-primary btn-sm" style="margin-top:var(--space-2)">+ Create release</a>
   </div>
 
 {% else %}
-  <div class="rl-sole-note">All releases are shown above — this is the only release so far.</div>
+  <div class="rl-sole-note">All releases are shown above.</div>
 {% endif %}

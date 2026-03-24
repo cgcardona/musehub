@@ -55,7 +55,7 @@ async def _make_release(
     title: str = "Version 1.0",
     body: str = "Release notes here.",
     author: str = "musician",
-    is_prerelease: bool = False,
+    channel: str = "stable",
     is_draft: bool = False,
     mp3_url: str | None = None,
 ) -> MusehubRelease:
@@ -69,7 +69,7 @@ async def _make_release(
         title=title,
         body=body,
         author=author,
-        is_prerelease=is_prerelease,
+        channel=channel,
         is_draft=is_draft,
         download_urls=download_urls,
     )
@@ -103,12 +103,11 @@ async def test_releases_list_shows_prerelease_badge(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """Pre-release badge renders server-side for releases flagged as pre-release."""
+    """Channel badge renders server-side for non-stable releases."""
     repo_id = await _make_repo(db_session)
-    await _make_release(db_session, repo_id, tag="v1.0-beta", is_prerelease=True)
+    await _make_release(db_session, repo_id, tag="v1.0-beta", channel="beta")
     response = await client.get("/musician/ssr-album/releases")
     assert response.status_code == 200
-    assert "Pre-release" in response.text
     assert "v1.0-beta" in response.text
 
 
@@ -166,23 +165,21 @@ async def test_release_detail_renders_tag_server_side(
 
 
 @pytest.mark.anyio
-async def test_release_detail_shows_audio_player_container(
+async def test_release_detail_shows_header_card(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
-    """When MP3 URL is set, the audio player container div is rendered server-side."""
+    """Release detail page renders the header card with tag and channel."""
     repo_id = await _make_repo(db_session)
     await _make_release(
         db_session,
         repo_id,
         tag="v1.0-audio",
-        mp3_url="https://cdn.example.com/album-v1.0.mp3",
     )
     response = await client.get("/musician/ssr-album/releases/v1.0-audio")
     assert response.status_code == 200
-    # The audio player container div must be present in the HTML.
-    assert 'id="rd-player"' in response.text
-    assert "cdn.example.com/album-v1.0.mp3" in response.text
+    assert "rd2-header" in response.text
+    assert "v1.0-audio" in response.text
 
 
 @pytest.mark.anyio

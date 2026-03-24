@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+# Install the muse package if the dev volume mount is present.
+# This lets the server-side release analysis service import muse.plugins.code.
+if [ -f /muse/pyproject.toml ]; then
+    echo "Muse volume detected — installing muse in editable mode..."
+    pip install -e /muse --quiet --root-user-action=ignore 2>/dev/null || true
+fi
+
 echo "Running database migrations..."
 alembic upgrade head
 

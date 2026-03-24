@@ -282,3 +282,4 @@ def register_musehub_filters(env: Environment) -> None:
     env.filters["filesizeformat"] = _filesizeformat
     env.filters["markdown"] = _markdown
     env.filters["auto_code"] = _auto_code
+    env.filters["fmtnum"] = lambda n: f"{int(n):,}" if n is not None else "0"

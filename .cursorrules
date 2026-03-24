@@ -1,0 +1,207 @@
+# MuseHub — Agent Rules
+
+## Identity
+
+MuseHub — the remote repository server for the Muse version control system. It is the GitHub analogue in the Muse ecosystem: stores pushed commits and snapshots, renders release detail pages, serves the wire protocol, hosts issue tracking and MCP tooling.
+
+- **Stack:** Python 3.14, FastAPI, SQLAlchemy (async), Alembic, Jinja2, SCSS.
+- **Database:** SQLite (local) / PostgreSQL (production), accessed only through the service layer.
+- **Remote name for local dev:** `local` → `http://localhost:10003/gabriel/musehub`
+- **Version control:** Muse and MuseHub exclusively. Git and GitHub are not used.
+
+## No legacy. No deprecated. No exceptions.
+
+- **Delete on sight.** If you touch a file and find dead code, a deprecated API shape, a backward-compatibility shim, or a legacy fallback — delete it in the same commit.
+- **No fallback paths for old shapes.** Remove every trace of the old way.
+- **No "legacy" or "deprecated" comments.** If it's marked deprecated, delete it.
+- **No dead constants, dead regexes, dead fields.** If it can never be reached, delete it.
+
+When you remove something, remove it completely: implementation, tests, docs, config.
+
+## Version control — Muse only. Git and GitHub are not used.
+
+All code changes, branching, merging, and releases happen through Muse. Never run `git`, `gh`, or reference GitHub. The Muse remote for this repo is `local`.
+
+### Starting work
+
+```
+muse status                     # where am I, what's dirty
+muse branch feat/my-thing       # create branch
+muse checkout feat/my-thing     # switch to it
+```
+
+### While working
+
+```
+muse status                     # constantly — like breathing
+muse diff                       # symbol-level diff
+muse code add .                 # stage
+muse commit -m "..."            # typed event; Muse proposes MAJOR/MINOR/PATCH
+```
+
+### Before merging
+
+```
+muse fetch local
+muse status
+muse merge --dry-run main       # confirm no symbol conflicts
+```
+
+### Merging
+
+```
+muse checkout main
+muse merge feat/my-thing
+```
+
+### Releasing
+
+```
+# Create a local release at HEAD (--title and --body are required by convention)
+muse release add <tag> --title "<title>" --body "<description>"
+
+# Optionally set channel (default is inferred from semver pre-release label)
+muse release add <tag> --title "<title>" --body "<description>" --channel stable
+
+# Push to a remote
+muse release push <tag> --remote local
+
+# Full delete-and-recreate cycle (e.g. after a DB migration or data fix):
+muse release delete <tag> --remote local --yes
+muse release add <tag> --title "<title>" --body "<description>"
+muse release push <tag> --remote local
+```
+
+### Branch discipline
+
+**Never work directly on `main`.** Every task lives on a feature branch.
+
+Full lifecycle:
+1. `muse status` — clean before branching.
+2. `muse branch feat/<desc>` then `muse checkout feat/<desc>`.
+3. Do the work. Commit on the branch.
+4. **Verify** before merging — in this exact order:
+   ```
+   mypy musehub/                              # zero errors
+   pytest tests/ -v                           # all green
+   ```
+5. `muse merge --dry-run main` — confirm clean.
+6. `muse checkout main && muse merge feat/<desc>`.
+7. `muse release add <tag> --title "<title>" --body "<description>"` then `muse release push <tag> --remote local`.
+
+## MuseHub interactions
+
+The running server is at `http://localhost:10003`. Start/restart it with Docker Compose.
+
+| Operation | Command |
+|-----------|---------|
+| Start server | `docker compose up -d` |
+| View releases | `http://localhost:10003/gabriel/musehub/releases` |
+| Push release | `muse release push <tag> --remote local` |
+| Delete remote release | `muse release delete <tag> --remote local --yes` |
+| Run migrations | `docker compose exec musehub alembic upgrade head` |
+| Build SCSS | `docker compose exec musehub python -m tools.build_scss` (or equivalent) |
+
+## Architecture (do not weaken)
+
+```
+musehub/
+  api/
+    routes/
+      wire.py          → Muse CLI wire protocol (push, pull, releases)
+      musehub/
+        ui.py          → Server-side rendered HTML pages
+        releases.py    → Release CRUD API
+  db/
+    musehub_models.py  → SQLAlchemy ORM models
+  models/
+    musehub.py         → Pydantic request/response models (camelCase wire, snake_case Python)
+  services/
+    musehub_releases.py → ONLY module that touches musehub_releases table
+  templates/
+    musehub/
+      pages/           → Full-page Jinja2 templates
+      fragments/       → HTMX partial fragments
+      static/
+        scss/          → SCSS source; compiled to app.css
+  mcp/                 → Model Context Protocol tools and resources
+alembic/
+  versions/            → One migration per schema change; never edit applied migrations
+tests/                 → pytest + anyio async test suite
+```
+
+**Layer rules:**
+- Route handlers are thin — delegate all DB access to `services/`.
+- `services/musehub_releases.py` is the ONLY file that touches `musehub_releases`.
+- No business logic in templates — only presentation.
+- Alembic migrations are append-only. Never edit an already-applied migration.
+
+## Frontend separation of concerns — absolute rule
+
+Every concern lives in exactly one layer. Never mix them.
+
+| Layer | Where it lives | What it does |
+|-------|---------------|--------------|
+| **Structure** | `templates/musehub/pages/*.html`, `fragments/*.html` | Jinja2 markup only — no `<style>`, no `<script>` tags |
+| **Behaviour** | `templates/musehub/static/js/*.js` | Vanilla JS / Alpine.js / HTMX configuration |
+| **Style** | `templates/musehub/static/scss/_*.scss` | All CSS, compiled to `app.css` via `app.scss` |
+
+**Banned in templates:**
+- `<style>` or `<style scoped>` blocks — move every rule to the appropriate `_*.scss` partial
+- Inline `style="..."` attributes for anything beyond a truly dynamic value (e.g. `style="width:{{ pct }}%"`)
+- `<script>` tags that contain non-trivial logic — extract to a `.js` file
+
+**Required when adding new UI:**
+1. New CSS classes → new or existing `scss/_*.scss` partial (use the file that matches the page/component)
+2. New interactive behaviour → `static/js/` file imported by `app.js`
+3. Compile SCSS locally after any change — `app.css` is committed and baked into the Docker image:
+   ```
+   sass musehub/templates/musehub/static/scss/app.scss musehub/templates/musehub/static/app.css --style=compressed --no-source-map
+   ```
+4. Then rebuild the container: `docker compose up --build -d`
+
+This rule applies retroactively. If you touch a template and find inline styles, pull them into SCSS in the same commit.
+
+## Code standards
+
+- Type hints everywhere — 100% coverage, no untyped functions or parameters.
+- `list[X]` / `dict[K, V]` style — never `List`, `Dict`, `Optional`.
+- `X | None` — never `Optional[X]`.
+- `logging.getLogger(__name__)` — never `print()`.
+- Docstrings on public modules, classes, and functions.
+
+## Typing — zero-tolerance rules
+
+| Banned | Use instead |
+|--------|-------------|
+| `Any` | `TypedDict`, `Protocol`, specific union |
+| `object` | The actual type or a constrained union |
+| `list` (bare) | `list[X]` |
+| `dict` (bare) | `dict[K, V]` |
+| `cast(T, x)` | Fix the callee to return `T` |
+| `# type: ignore` | Fix the root cause |
+| `Optional[X]` | `X \| None` |
+| `List[X]`, `Dict[K,V]` | `list[X]`, `dict[K, V]` |
+
+## Verification checklist
+
+Run before every merge to `main`:
+
+- [ ] On a feature branch, not `main`
+- [ ] `mypy musehub/` — zero errors
+- [ ] `pytest tests/ -v` — all green
+- [ ] No `Any`, bare collections, `cast()`, `# type: ignore`, `Optional[X]`, legacy `List`/`Dict`
+- [ ] No dead code, no music-domain specific UI elements
+- [ ] New DB columns have an Alembic migration
+- [ ] Affected docs updated in the same commit
+
+## Anti-patterns (never do these)
+
+- Using `git`, `gh`, or GitHub for anything. Muse and MuseHub are the only VCS tools.
+- Working directly on `main`.
+- Adding business logic to route handlers — delegate to services.
+- Editing an already-applied Alembic migration — always create a new one.
+- `Any`, bare collections, `cast()`, `# type: ignore` — absolute bans.
+- `Optional[X]`, `List[X]`, `Dict[K,V]` — use modern syntax.
+- Music-domain-specific UI elements (audio players, MIDI download buttons) in generic release pages.
+- `print()` for diagnostics — use `logging`.

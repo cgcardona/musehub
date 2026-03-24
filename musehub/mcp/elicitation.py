@@ -257,11 +257,11 @@ SCHEMAS: Final[dict[str, JSONObject]] = {
                 "description": "Changelog / what's new in this version",
                 "maxLength": 4000,
             },
-            "is_prerelease": {
-                "type": "boolean",
-                "title": "Pre-release",
-                "description": "Mark as a pre-release (alpha, beta, RC)?",
-                "default": False,
+            "channel": {
+                "type": "string",
+                "title": "Distribution channel",
+                "description": "Channel for this release: stable | beta | alpha | nightly",
+                "default": "stable",
             },
             "highlight": {
                 "type": "string",

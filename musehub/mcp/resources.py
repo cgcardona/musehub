@@ -889,7 +889,7 @@ async def _repo_releases(session: object, repo_id: str) -> dict[str, JSONValue]:
                 "release_id": r.release_id,
                 "tag": r.tag,
                 "title": r.title,
-                "is_prerelease": r.is_prerelease,
+                "channel": r.channel,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in releases
@@ -912,7 +912,7 @@ async def _repo_release_by_tag(session: object, repo_id: str, tag: str) -> dict[
         "title": release.title,
         "body": release.body,
         "commit_id": release.commit_id,
-        "is_prerelease": release.is_prerelease,
+        "channel": release.channel,
         "author": release.author,
         "created_at": release.created_at.isoformat() if release.created_at else None,
     }

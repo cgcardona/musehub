@@ -615,7 +615,7 @@ async def _call_tool(
             title=_str("title"),
             body=_str_or_none("body") or "",
             commit_id=_str_or_none("commit_id"),
-            is_prerelease=_bool("is_prerelease", False),
+            channel=_str_or_none("channel") or "stable",
             actor=user_id or "",
         )
     elif name == "musehub_star_repo":

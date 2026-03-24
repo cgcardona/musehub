@@ -889,7 +889,7 @@ musehub_create_release(
     title="<release title>",
     body="<release notes markdown>",
     commit_id="<latest_commit_id from Step 2>",
-    is_prerelease=False
+    channel="stable"
 )
 ```
 
@@ -1048,7 +1048,7 @@ musehub_create_release(
     title="<release title>",
     body="<release notes>",
     commit_id="<latest_commit_id>",
-    is_prerelease=False
+    channel="stable"
 )
 ```
 
