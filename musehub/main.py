@@ -37,6 +37,7 @@ from musehub.api.routes.musehub import (
     ui_user_profile as musehub_ui_profile_routes,
     ui_mcp_elicitation as musehub_ui_mcp_elicitation_routes,
     ui_new_repo as musehub_ui_new_repo_routes,
+    ui_scan as musehub_ui_scan_routes,
     ui_domains as musehub_ui_domains_routes,
     domains as musehub_domains_routes,
     discover as musehub_discover_routes,
@@ -157,7 +158,7 @@ app = FastAPI(
     # In production (DEBUG=false, MUSE_ENV != "test") it is disabled — agents use /mcp instead.
     openapi_url="/api/v1/openapi.json" if (settings.debug or settings.muse_env == "test") else None,
     description=(
-        "**MuseHub** — the version control hub for multidimensional state, powered by Muse.\n\n"
+        "**MuseHub**: faster version control for agents, powered by Muse.\n\n"
         "Muse is a domain-agnostic version control system. Not just Git — any state space "
         "where a 'change' is a delta across multiple axes simultaneously. "
         "MIDI (21 dimensions), code (symbol graph), genomics, climate simulation, 3D design.\n\n"
@@ -247,6 +248,7 @@ app.include_router(musehub_ui_topics_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_mcp_elicitation_routes.router, tags=["musehub-ui-mcp"])
 app.include_router(musehub_ui_new_repo_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_domains_routes.router, tags=["musehub-ui-domains"])
+app.include_router(musehub_ui_scan_routes.router, tags=["musehub-ui-scan"])
 app.include_router(musehub_ui_routes.fixed_router, tags=["musehub-ui"])
 app.include_router(musehub_ui_milestones_routes.router, tags=["musehub-ui"])
 app.include_router(musehub_ui_stash_routes.router, tags=["musehub-ui-stash"])

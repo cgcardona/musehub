@@ -1,0 +1,64 @@
+{# Scan your code: the free repo scan on the homepage hero. Behaviour is in
+   static/js/pages/scan.ts; styles in scss/_scan.scss. The result panel is
+   filled from the JSON that POST /scan returns. #}
+<section class="scan-card" id="scan-card" aria-labelledby="scan-title">
+  <div class="scan-head">
+    <span class="scan-kicker">Free scan</span>
+    <button class="scan-info-btn" id="scan-info-open" type="button" aria-haspopup="dialog" aria-controls="scan-info">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7.25" y="7" width="1.5" height="5" rx=".75" fill="currentColor"/><circle cx="8" cy="4.6" r=".95" fill="currentColor"/></svg>
+      How the scan works
+    </button>
+  </div>
+  <h2 class="scan-title" id="scan-title">Your coding agent spends nearly half its tokens looking ahead. Muse cuts that.</h2>
+  <p class="scan-sub">Up to 100x fewer tokens to find what a change will break. Paste a public GitHub repo to see how much of a boost Muse would give your agent.</p>
+
+  <form class="scan-form" id="scan-form" action="/scan" method="post">
+    <label class="scan-input">
+      <span>github.com/</span>
+      <input id="scan-repo" name="repo" type="text" required autocomplete="off" spellcheck="false"
+             placeholder="owner/repo" aria-label="GitHub repository">
+    </label>
+    <button class="scan-btn" id="scan-submit" type="submit">Scan for free</button>
+  </form>
+  <p class="scan-note">Public repos only. No sign-in. Takes about a minute.</p>
+
+  <div class="scan-steps" id="scan-steps" hidden>
+    <div class="scan-step" data-step="0"><i>·</i>Reading the last 20 merged pull requests</div>
+    <div class="scan-step" data-step="1"><i>·</i>Finding the functions each one changed</div>
+    <div class="scan-step" data-step="2"><i>·</i>Searching for their callers, two levels deep</div>
+    <div class="scan-step" data-step="3"><i>·</i>Pricing the same question as one Muse query</div>
+    <div class="scan-bar"><b id="scan-progress"></b></div>
+  </div>
+
+  <p class="scan-error" id="scan-error" role="alert" hidden></p>
+
+  <div class="scan-result" id="scan-result" hidden>
+    <div>
+      <p class="scan-repo">Scanned <b data-k="repo"></b> at <span data-k="sha"></span></p>
+      <p class="scan-big"><span data-k="ratio"></span>x fewer tokens</p>
+      <p class="scan-big-sub">to find what each of the last <span data-k="pulls"></span> merged changes could break, with Muse instead of search and file reads.</p>
+      <div class="scan-bars">
+        <div class="scan-row"><span>Without Muse</span><span class="t t-grep" id="scan-bar-grep"></span><span class="v" data-k="grep"></span></div>
+        <div class="scan-row"><span>With Muse</span><span class="t t-muse" id="scan-bar-muse"></span><span class="v" data-k="muse"></span></div>
+      </div>
+      <p class="scan-meta">
+        <span>About <b data-k="saving"></b> fewer tokens per task, estimated</span>
+        <span><b data-k="false"></b> false matches skipped</span>
+        <span><b data-k="alias"></b> aliased imports grep misses</span>
+      </p>
+      <p class="scan-fine">Simulated from the repo's structure and history, not a measured agent run. Click "How the scan works" for the method and a prompt that measures it on your own agent.</p>
+    </div>
+    <div class="scan-share">
+      <a class="scan-preview" id="scan-preview" target="_blank" rel="noopener"><img id="scan-card-img" alt="Shareable scan result"></a>
+      <div class="scan-actions">
+        <a class="scan-act x" id="scan-share-x" target="_blank" rel="noopener">Share on X</a>
+        <button class="scan-act" id="scan-copy" type="button">Copy link</button>
+        <a class="scan-act" id="scan-download" download>Download image</a>
+      </div>
+      <a class="scan-link" id="scan-short"></a>
+      <a class="scan-btn scan-install-btn" href="https://musehub.ai/muse/getting-started">Install Muse</a>
+    </div>
+  </div>
+
+  {% include "musehub/fragments/scan_info.html" %}
+</section>

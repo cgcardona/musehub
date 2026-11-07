@@ -5,11 +5,40 @@
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red?logo=sqlalchemy)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**MuseHub** — the music composition version control platform powered by Muse VCS.
+**Faster version control for agents.**
 
-GitHub for music. Push commits, open pull requests, track issues, browse public repos, publish releases, and give AI agents complete programmatic access via a best-in-class MCP integration.
+Before every change, a coding agent has to work out what that change could break. With Git, it greps for callers and reads every file that mentions them. That reading and searching is nearly half of an agent's tokens: 46.5% in a 300-run study (Zhang et al. 2026, arXiv 2606.14066).
 
-> **Requirements:** Python 3.14+ · PostgreSQL 16+ · Node.js 22+
+Muse tracks functions and the code that calls them, not lines of text. So "what breaks if I change this?" is one `muse code impact --json` call instead of dozens of searches and file reads. On the "what breaks" question, that is up to 100x fewer tokens.
+
+MuseHub is the hub for Muse repos. It lets you:
+
+- push commits;
+- open pull requests;
+- track issues;
+- publish releases;
+- give agents full programmatic access over MCP.
+
+## Free scan: how much would Muse save your agent?
+
+The homepage has a free scan: paste any public GitHub repo, and MuseHub replays its last 20 merged pull requests. For every function they changed, it counts the tokens needed to find its callers two levels deep, both ways: with search and file reads, and with one Muse impact query.
+
+![The free scan, end to end](docs/scan/muse-free-scan.gif)
+
+Every result gets:
+
+- a short URL;
+- a share image sized for X;
+- an **Install Muse** button;
+- a **How the scan works** button. It shows the method and a prompt you can give your own agent to measure the gain for real, instead of simulating it.
+
+| Result | Share image |
+|---|---|
+| ![Scan result](docs/scan/3-homepage-result.png) | ![Share image](docs/scan/6-share-image.png) |
+
+The scan is a simulation from the repo's code and history, and every result says so. Method, files and deployment notes are in [docs/scan/README.md](docs/scan/README.md).
+
+> **Requirements:** Python 3.14+, PostgreSQL 16+, Node.js 22+. The share image needs Pillow. Scans need `GITHUB_TOKEN`, a read-only token for public repos.
 
 ## URL scheme
 

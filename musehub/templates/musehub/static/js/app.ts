@@ -33,6 +33,7 @@ import { initDomainDetail }  from './pages/domain-detail.ts';
 import { initDiff }          from './pages/diff.ts';
 import { initSettings }      from './pages/settings.ts';
 import { initExplore }       from './pages/explore.ts';
+import { initScan }          from './pages/scan.ts';
 import { initBranches }      from './pages/branches.ts';
 import { initTags }          from './pages/tags.ts';
 import { initSessions }      from './pages/sessions.ts';
@@ -70,7 +71,8 @@ const MusePages: Record<string, (data: PageData) => void | Promise<void>> = {
   'domain-detail':   (d) => initDomainDetail(d),
   'diff':            () => initDiff(),
   'settings':        (d) => initSettings(d),
-  'explore':         () => initExplore(),
+  'explore':         () => { initExplore(); initScan(); },
+  'scan-result':     () => initScan(),
   'branches':        () => initBranches(),
   'tags':            () => initTags(),
   'sessions':        () => initSessions(),

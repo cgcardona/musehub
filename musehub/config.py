@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     database_url: str | None = None
     db_password: str | None = None
 
+    # GitHub token for the free repo scan (optional; raises GitHub's rate limit)
+    github_token: str | None = None
+
     # CORS Settings (fail closed: no default origins)
     # Set CORS_ORIGINS (JSON array) in .env. Local dev: ["http://localhost:10003", "muse://"].
     # Production: exact origins only. Never use "*" in production.

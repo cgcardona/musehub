@@ -1,0 +1,57 @@
+{% extends "musehub/base.html" %}
+
+{% block title %}{{ scan.repo }}: {{ scan.ratio }}x fewer tokens to find what breaks{% endblock %}
+{% block breadcrumb_bar %}{% endblock %}
+{% block container_extra_class %}page-container{% endblock %}
+{% block extra_css %}
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ scan.repo }}: {{ scan.ratio }}x fewer tokens to find what breaks, with Muse">
+  <meta property="og:description" content="Free Muse scan of the last {{ scan.pulls }} merged pull requests. Simulated, not a measured agent run.">
+  <meta property="og:image" content="{{ scan.imageUrl }}">
+  <meta property="og:url" content="{{ scan.shortUrl }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ scan.imageUrl }}">
+{% endblock %}
+{% block page_json %}{"page": "scan-result"}{% endblock %}
+
+{% block content %}
+<section class="scan-card scan-card--page" id="scan-card">
+  <div class="scan-head">
+    <span class="scan-kicker">Free scan</span>
+    <button class="scan-info-btn" id="scan-info-open" type="button" aria-haspopup="dialog" aria-controls="scan-info">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="7.25" y="7" width="1.5" height="5" rx=".75" fill="currentColor"/><circle cx="8" cy="4.6" r=".95" fill="currentColor"/></svg>
+      How the scan works
+    </button>
+  </div>
+  <div class="scan-result">
+    <div>
+      <p class="scan-repo">Scanned <b>{{ scan.repo }}</b> at {{ scan.sha }}</p>
+      <p class="scan-big">{{ scan.ratio }}x fewer tokens</p>
+      <p class="scan-big-sub">to find what each of the last {{ scan.pulls }} merged changes could break, with Muse instead of search and file reads.</p>
+      <div class="scan-bars">
+        <div class="scan-row"><span>Without Muse</span><span class="t t-grep scan-w-100"></span><span class="v">{{ grep_label }} tokens</span></div>
+        <div class="scan-row"><span>With Muse</span><span class="t t-muse" style="width:{{ muse_pct }}%"></span><span class="v">{{ muse_label }} tokens</span></div>
+      </div>
+      <p class="scan-meta">
+        <span>About <b>{{ (scan.taskSaving * 100) | round | int }}%</b> fewer tokens per task, estimated</span>
+        <span><b>{{ scan.falseMatches }}</b> false matches skipped</span>
+        <span><b>{{ scan.aliasMisses }}</b> aliased imports grep misses</span>
+      </p>
+      <p class="scan-fine">Simulated from the repo's structure and history, not a measured agent run.</p>
+      <a class="scan-btn scan-install-btn" href="https://musehub.ai/muse/getting-started">Install Muse</a>
+      <p class="scan-note"><a href="/explore#scan-card">Scan another repo for free</a></p>
+    </div>
+    <div class="scan-share">
+      <a class="scan-preview" href="{{ scan.imageUrl }}" target="_blank" rel="noopener"><img src="{{ scan.imageUrl }}" alt="Shareable scan result"></a>
+      <div class="scan-actions">
+        <a class="scan-act x" target="_blank" rel="noopener"
+           href="https://x.com/intent/post?text={{ ('My repo ' ~ scan.repo ~ ': Muse finds what a change breaks with ' ~ scan.ratio ~ 'x fewer agent tokens. Free scan:') | urlencode }}&url={{ scan.shortUrl | urlencode }}">Share on X</a>
+        <button class="scan-act" type="button" data-copy="{{ scan.shortUrl }}">Copy link</button>
+        <a class="scan-act" href="{{ scan.imageUrl }}" download="muse-scan-{{ scan.id }}.png">Download image</a>
+      </div>
+      <span class="scan-link">{{ scan.shortUrl.split('://', 1)[-1] }}</span>
+    </div>
+  </div>
+  {% include "musehub/fragments/scan_info.html" %}
+</section>
+{% endblock %}

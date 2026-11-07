@@ -33,6 +33,14 @@ body {
   --bg-base:    #0d1117;
   --bg-surface: #161b22;
   --bg-overlay: #21262d;
+
+  /* Spectral accents, as on the live site (used by the scan card) */
+  --gradient-spectral: linear-gradient(90deg, #60a5fa, #818cf8, #a78bfa, #c084fc);
+  --gradient-surface: linear-gradient(135deg, #161b22 0%, #1c1c2e 100%);
+  --glow-spectral: 0 0 0 1px rgba(139, 92, 246, 0.20), 0 0 16px rgba(139, 92, 246, 0.12), 0 0 32px rgba(139, 92, 246, 0.06);
+  --border-strong: rgba(139, 92, 246, 0.28);
+  --domain-code-bg: rgba(96, 165, 250, 0.08);
+  --domain-code-border: rgba(96, 165, 250, 0.18);
   --bg-hover:   #30363d;
 
   /* -------------------------------------------------------------------------

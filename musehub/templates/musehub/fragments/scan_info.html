@@ -1,0 +1,19 @@
+{# The info dialog: what the scan computes, and the prompt that measures it for real.
+   `scan_prompt` comes from musehub_scan.BENCHMARK_PROMPT via the route context. #}
+<dialog class="scan-info" id="scan-info" aria-labelledby="scan-info-title">
+  <div class="scan-info-head">
+    <h3 id="scan-info-title">How the scan works</h3>
+    <button class="scan-info-close" type="button" data-close aria-label="Close">×</button>
+  </div>
+  <ol class="scan-info-steps">
+    <li>Takes the repo's last 20 merged pull requests and finds the functions and classes each one changed.</li>
+    <li><b>Without Muse:</b> for each changed name, counts what an agent reads to find its callers two levels deep: search output, then every matching file it opens (up to 25 per name).</li>
+    <li><b>With Muse:</b> counts the size of one <code>muse code impact --json</code> answer listing the same callers.</li>
+    <li>Tokens are estimated at four characters each. The per-task figure applies the measured share of agent tokens spent reading and searching, 46.5% (Zhang et al. 2026, arXiv 2606.14066), and assumes Muse replaces at most 85% of it.</li>
+  </ol>
+  <p class="scan-info-note">This is a simulation from the code, not an agent run. To measure it on your own agent, paste this prompt into it, in your repo:</p>
+  <div class="scan-info-prompt">
+    <button class="scan-act" type="button" id="scan-prompt-copy">Copy prompt</button>
+    <pre id="scan-prompt-text">{{ scan_prompt }}</pre>
+  </div>
+</dialog>

@@ -77,7 +77,7 @@ from musehub.db import musehub_domain_models as domain_db
 from musehub.muse_cli.models import MuseCliTag
 from musehub.db import musehub_label_models as label_db
 from musehub.services import musehub_credits, musehub_divergence, musehub_events, musehub_issues, musehub_pull_requests, musehub_releases
-from musehub.services import musehub_discover, musehub_repository, musehub_search
+from musehub.services import musehub_discover, musehub_repository, musehub_scan, musehub_search
 from musehub.storage.backends import get_backend as _get_storage_backend
 from musehub.api.routes.musehub._templates import templates
 
@@ -444,6 +444,7 @@ async def explore_page(
     ctx: dict[str, object] = {
         "title": "Explore",
         "breadcrumb": "Explore",
+        "scan_prompt": musehub_scan.BENCHMARK_PROMPT,
         "repos": explore.repos,
         "total": explore.total,
         "page": page,
